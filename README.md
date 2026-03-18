@@ -70,6 +70,19 @@ Multi-module проект на Kotlin для параллельной выгру
 3. Подключить новый модуль в [settings.gradle.kts](/Users/kwdev/DataPoolLoader/settings.gradle.kts).
 4. Настроить свой `application.yml`.
 
+Либо использовать Gradle task:
+
+```text
+./gradlew createAppModule -PappName=my-new-app
+```
+
+Что делает task:
+
+- создает `apps/my-new-app`;
+- копирует туда шаблон из `templates/app-module`;
+- подставляет имя модуля вместо `__APP_NAME__`;
+- модуль автоматически подхватится проектом, потому что `settings.gradle.kts` сканирует каталог `apps/`.
+
 ## Формат конфига
 
 ```yaml

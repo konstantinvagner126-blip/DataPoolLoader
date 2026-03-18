@@ -1,4 +1,11 @@
 rootProject.name = "DataPoolLoader"
 
 include(":core")
-include(":apps:dc-sms-offer")
+
+val appsDir = file("apps")
+if (appsDir.exists()) {
+    appsDir.listFiles()
+        ?.filter { it.isDirectory && file("${it.path}/build.gradle.kts").exists() }
+        ?.sortedBy { it.name }
+        ?.forEach { include(":apps:${it.name}") }
+}
