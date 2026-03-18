@@ -15,8 +15,10 @@ data class AppConfig(
     val fetchSize: Int = 1000,
     val progressLogEveryRows: Long = 10_000,
     val maxMergedRows: Long? = null,
+    val deleteOutputFilesAfterCompletion: Boolean = false,
     @param:JsonAlias("sql")
     val commonSql: String = "",
+    val commonSqlFile: String? = null,
     val sources: List<SourceConfig> = emptyList(),
     val quotas: List<SourceQuotaConfig> = emptyList(),
     val target: TargetConfig = TargetConfig(),
@@ -28,6 +30,7 @@ data class SourceConfig(
     val username: String = "",
     val password: String = "",
     val sql: String? = null,
+    val sqlFile: String? = null,
 )
 
 data class TargetConfig(

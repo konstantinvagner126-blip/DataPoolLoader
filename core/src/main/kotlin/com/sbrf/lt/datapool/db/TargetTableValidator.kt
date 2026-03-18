@@ -54,7 +54,7 @@ class TargetTableValidator {
         val targetByName = targetColumns.associateBy { it.name }
         val missingInTarget = incomingColumns.filter { it !in targetByName }
         require(missingInTarget.isEmpty()) {
-            "В целевой таблице $targetTable отсутствуют колонки из входных данных: ${missingInTarget.joinToString(", ")}"
+            buildMissingInTargetMessage(targetTable, targetColumns, missingInTarget)
         }
 
         val missingRequired = targetColumns
@@ -62,6 +62,47 @@ class TargetTableValidator {
             .map { it.name }
         require(missingRequired.isEmpty()) {
             "В целевой таблице $targetTable есть обязательные NOT NULL колонки, отсутствующие во входных данных: ${missingRequired.joinToString(", ")}"
+        }
+    }
+
+    private fun buildMissingInTargetMessage(
+        targetTable: String,
+        targetColumns: List<TargetColumn>,
+        missingInTarget: List<String>,
+    ): String {
+        val targetByLowercase = targetColumns.associateBy { it.name.lowercase() }
+        val caseOnlyMismatches = missingInTarget.mapNotNull { incoming ->
+            val target = targetByLowercase[incoming.lowercase()] ?: return@mapNotNull null
+            if (target.name == incoming) {
+                null
+            } else {
+                incoming to target.name
+            }
+        }
+
+        val unknownColumns = missingInTarget.filter { incoming ->
+            caseOnlyMismatches.none { it.first == incoming }
+        }
+
+        val details = buildList {
+            if (unknownColumns.isNotEmpty()) {
+                add("отсутствуют колонки из входных данных: ${unknownColumns.joinToString(", ")}")
+            }
+            if (caseOnlyMismatches.isNotEmpty()) {
+                add(
+                    "найдены несовпадения только по регистру: ${
+                        caseOnlyMismatches.joinToString(", ") { (incoming, target) -> "$incoming -> $target" }
+                    }",
+                )
+            }
+        }.joinToString("; ")
+
+        return if (caseOnlyMismatches.isNotEmpty()) {
+            "В целевой таблице $targetTable $details. " +
+                "Если в SELECT используются alias для колонок с кавычками в target-таблице, " +
+                "задавайте их в том же регистре, например `as \"UUID\"`."
+        } else {
+            "В целевой таблице $targetTable $details"
         }
     }
 

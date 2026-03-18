@@ -7,9 +7,8 @@ app:
   fetchSize: 1000
   progressLogEveryRows: 10000
   maxMergedRows:
-  commonSql: |
-    select id, created_at, payload
-    from some_table
+  deleteOutputFilesAfterCompletion: false
+  commonSqlFile: ./sql/common.sql
 
   sources:
     - name: db1

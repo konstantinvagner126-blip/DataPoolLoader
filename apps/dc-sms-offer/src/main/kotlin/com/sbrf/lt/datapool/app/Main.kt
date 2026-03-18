@@ -5,7 +5,6 @@ import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 
 fun main(args: Array<String>) {
-    BannerPrinter.printBanner()
     val configArg = args.firstOrNull { it.startsWith("--config=") }
     val configPath = configArg?.substringAfter("=")?.let(Path::of)
         ?: extractDefaultConfig()

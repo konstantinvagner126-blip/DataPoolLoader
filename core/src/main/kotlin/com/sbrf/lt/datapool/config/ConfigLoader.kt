@@ -16,6 +16,7 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.module.kotlin.KotlinModule
 import java.nio.file.Files
 import java.nio.file.Path
+import kotlin.io.path.bufferedReader
 
 class ConfigLoader {
     private val mapper: ObjectMapper = YAMLMapper.builder(YAMLFactory())
@@ -32,14 +33,51 @@ class ConfigLoader {
             mapper.readValue(reader, RootConfig::class.java)
         }
 
-        return root.app.validate()
+        return root.app
+            .resolveSqlFiles(path.parent ?: Path.of("."))
+            .validate()
     }
 
     fun objectMapper(): ObjectMapper = mapper
 }
 
+private fun AppConfig.resolveSqlFiles(configDir: Path): AppConfig {
+    require(commonSql.isBlank() || commonSqlFile.isNullOrBlank()) {
+        "Нельзя одновременно задавать commonSql и commonSqlFile."
+    }
+
+    val resolvedCommonSql = when {
+        commonSql.isNotBlank() -> commonSql
+        !commonSqlFile.isNullOrBlank() -> readSqlFile(configDir, commonSqlFile, "commonSqlFile")
+        else -> ""
+    }
+
+    val resolvedSources = sources.map { source ->
+        require(source.sql.isNullOrBlank() || source.sqlFile.isNullOrBlank()) {
+            "Для источника ${source.name.ifBlank { "<без имени>" }} нельзя одновременно задавать sql и sqlFile."
+        }
+        val resolvedSql = when {
+            !source.sql.isNullOrBlank() -> source.sql
+            !source.sqlFile.isNullOrBlank() -> readSqlFile(
+                configDir,
+                source.sqlFile,
+                "sqlFile источника ${source.name.ifBlank { "<без имени>" }}",
+            )
+            else -> null
+        }
+        source.copy(sql = resolvedSql, sqlFile = source.sqlFile?.trim()?.takeIf { it.isNotEmpty() })
+    }
+
+    return copy(
+        commonSql = resolvedCommonSql,
+        commonSqlFile = commonSqlFile?.trim()?.takeIf { it.isNotEmpty() },
+        sources = resolvedSources,
+    )
+}
+
 fun AppConfig.validate(): AppConfig {
     val normalizedCommonSql = commonSql.trim()
+    val normalizedCommonSqlFile = commonSqlFile?.trim()?.takeIf { it.isNotEmpty() }
     val normalizedSources = sources.map { it.normalize() }
     val normalizedQuotas = quotas.map { it.normalize() }
     val normalizedTarget = target.normalize()
@@ -67,7 +105,9 @@ fun AppConfig.validate(): AppConfig {
         require(source.username.isNotBlank()) { "Имя пользователя источника ${source.name} не должно быть пустым." }
         require(source.password.isNotBlank()) { "Пароль источника ${source.name} не должен быть пустым." }
         val effectiveSql = source.sql ?: normalizedCommonSql.takeIf { it.isNotBlank() }
-        require(effectiveSql != null) { "Для источника ${source.name} не задан SQL-запрос. Укажите commonSql или source.sql." }
+        require(effectiveSql != null) {
+            "Для источника ${source.name} не задан SQL-запрос. Укажите commonSql/commonSqlFile или source.sql/sqlFile."
+        }
         require(isSelectOnly(effectiveSql)) { "SQL-запрос источника ${source.name} должен быть SELECT-запросом." }
     }
 
@@ -90,6 +130,7 @@ fun AppConfig.validate(): AppConfig {
 
     return copy(
         commonSql = normalizedCommonSql,
+        commonSqlFile = normalizedCommonSqlFile,
         sources = normalizedSources,
         quotas = normalizedQuotas,
         target = normalizedTarget,
@@ -102,6 +143,7 @@ private fun SourceConfig.normalize(): SourceConfig = copy(
     username = username.trim(),
     password = password.trim(),
     sql = sql?.trim()?.takeIf { it.isNotEmpty() },
+    sqlFile = sqlFile?.trim()?.takeIf { it.isNotEmpty() },
 )
 
 private fun TargetConfig.normalize(): TargetConfig = copy(
@@ -126,4 +168,13 @@ private fun isSelectOnly(sql: String): Boolean {
         .lowercase()
 
     return normalized.startsWith("select ") || normalized.startsWith("with ")
+}
+
+private fun readSqlFile(configDir: Path, rawPath: String, fieldName: String): String {
+    val sqlPath = configDir.resolve(rawPath.trim()).normalize()
+    require(Files.exists(sqlPath)) { "Файл SQL для параметра $fieldName не найден: $sqlPath" }
+    require(Files.isRegularFile(sqlPath)) { "Путь SQL для параметра $fieldName не является файлом: $sqlPath" }
+    val content = sqlPath.bufferedReader(Charsets.UTF_8).use { it.readText() }.trim()
+    require(content.isNotEmpty()) { "Файл SQL для параметра $fieldName пуст: $sqlPath" }
+    return content
 }

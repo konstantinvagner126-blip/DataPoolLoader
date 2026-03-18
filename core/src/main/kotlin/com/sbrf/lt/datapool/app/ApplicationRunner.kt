@@ -41,47 +41,57 @@ class ApplicationRunner(
         .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
 
     fun run(configPath: Path, credentialsPath: Path? = defaultCredentialsPath()) {
+        BannerPrinter.printBanner()
         val appConfig = configLoader.load(configPath)
         val valueResolver = ValueResolver.fromFile(credentialsPath)
         val runStartedAt = Instant.now()
         val outputDir = createOutputDir(appConfig.outputDir, runStartedAt)
+        val generatedFiles = linkedSetOf<Path>()
         logger.info("Используется выходная директория {}", outputDir)
 
-        val results = exportSources(appConfig, outputDir, valueResolver)
-        val filteredResults = filterSchemaMismatches(results)
-        val successful = filteredResults.filter { it.status == ExecutionStatus.SUCCESS }
-        require(successful.isNotEmpty()) { "Все источники завершились ошибкой. Файл merged.csv не был создан." }
+        try {
+            val results = exportSources(appConfig, outputDir, valueResolver)
+            generatedFiles.addAll(results.mapNotNull { it.outputFile })
+            val filteredResults = filterSchemaMismatches(results)
+            val successful = filteredResults.filter { it.status == ExecutionStatus.SUCCESS }
+            require(successful.isNotEmpty()) { "Все источники завершились ошибкой. Файл merged.csv не был создан." }
 
-        val mergedFile = outputDir.resolve("merged.csv")
-        val mergeResult = mergeService.merge(successful, appConfig, mergedFile)
-        val targetLoad = if (appConfig.target.enabled) {
-            runTargetImport(appConfig, valueResolver, mergedFile, successful.first().columns, mergeResult.rowCount)
-        } else {
-            logger.info("Загрузка в целевую БД отключена конфигурацией. Импорт пропускается.")
-            TargetLoadSummary(
-                table = appConfig.target.table.ifBlank { "<отключено>" },
-                status = ExecutionStatus.SKIPPED,
-                rowCount = 0,
-                finishedAt = Instant.now(),
-                enabled = false,
-                errorMessage = "Загрузка в целевую БД отключена конфигурацией.",
+            val mergedFile = outputDir.resolve("merged.csv")
+            val mergeResult = mergeService.merge(successful, appConfig, mergedFile)
+            generatedFiles.add(mergedFile)
+            val targetLoad = if (appConfig.target.enabled) {
+                runTargetImport(appConfig, valueResolver, mergedFile, successful.first().columns, mergeResult.rowCount)
+            } else {
+                logger.info("Загрузка в целевую БД отключена конфигурацией. Импорт пропускается.")
+                TargetLoadSummary(
+                    table = appConfig.target.table.ifBlank { "<отключено>" },
+                    status = ExecutionStatus.SKIPPED,
+                    rowCount = 0,
+                    finishedAt = Instant.now(),
+                    enabled = false,
+                    errorMessage = "Загрузка в целевую БД отключена конфигурацией.",
+                )
+            }
+            val runFinishedAt = Instant.now()
+            writeSummary(
+                outputDir = outputDir,
+                results = filteredResults,
+                mergeResult = mergeResult,
+                mergedFile = mergedFile,
+                targetLoad = targetLoad,
+                startedAt = runStartedAt,
+                finishedAt = runFinishedAt,
+                config = appConfig,
             )
+            require(!appConfig.target.enabled || targetLoad.status == ExecutionStatus.SUCCESS) {
+                "Ошибка загрузки в целевую таблицу ${appConfig.target.table}: ${targetLoad.errorMessage}"
+            }
+            logger.info("Объединено {} строк в файл {}", mergeResult.rowCount, mergedFile)
+        } finally {
+            if (appConfig.deleteOutputFilesAfterCompletion) {
+                cleanupGeneratedFiles(generatedFiles)
+            }
         }
-        val runFinishedAt = Instant.now()
-        writeSummary(
-            outputDir = outputDir,
-            results = filteredResults,
-            mergeResult = mergeResult,
-            mergedFile = mergedFile,
-            targetLoad = targetLoad,
-            startedAt = runStartedAt,
-            finishedAt = runFinishedAt,
-            config = appConfig,
-        )
-        require(!appConfig.target.enabled || targetLoad.status == ExecutionStatus.SUCCESS) {
-            "Ошибка загрузки в целевую таблицу ${appConfig.target.table}: ${targetLoad.errorMessage}"
-        }
-        logger.info("Объединено {} строк в файл {}", mergeResult.rowCount, mergedFile)
     }
 
     private fun exportSources(
@@ -262,5 +272,17 @@ class ApplicationRunner(
     private fun defaultCredentialsPath(): Path? {
         val candidate = Path.of("gradle", "credential.properties")
         return if (Files.exists(candidate)) candidate else null
+    }
+
+    private fun cleanupGeneratedFiles(files: Set<Path>) {
+        files.forEach { path ->
+            try {
+                if (Files.deleteIfExists(path)) {
+                    logger.info("Удален временный выходной файл {}", path.fileName)
+                }
+            } catch (ex: Exception) {
+                logger.warn("Не удалось удалить временный выходной файл {}: {}", path, ex.message)
+            }
+        }
     }
 }

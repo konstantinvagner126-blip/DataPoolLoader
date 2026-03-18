@@ -39,6 +39,27 @@ class TargetTableValidatorTest {
     }
 
     @Test
+    fun `fails with explicit hint when column differs only by case`() {
+        val error = assertFailsWith<IllegalArgumentException> {
+            validator.validateCompatibility(
+                targetTable = "public.test_data_pool",
+                targetColumns = listOf(
+                    TargetColumn("UUID", nullable = false, hasDefault = false),
+                    TargetColumn("payload", nullable = true, hasDefault = false),
+                ),
+                incomingColumns = listOf("uuid", "payload"),
+            )
+        }
+
+        assertEquals(
+            "В целевой таблице public.test_data_pool найдены несовпадения только по регистру: uuid -> UUID. " +
+                "Если в SELECT используются alias для колонок с кавычками в target-таблице, " +
+                "задавайте их в том же регистре, например `as \"UUID\"`.",
+            error.message,
+        )
+    }
+
+    @Test
     fun `fails when required target column is missing in incoming data`() {
         val error = assertFailsWith<IllegalArgumentException> {
             validator.validateCompatibility(

@@ -12,7 +12,7 @@ Multi-module проект на Kotlin для параллельной выгру
 ## Что делает
 
 - читает `application.yml`;
-- поддерживает общий SQL и override SQL на уровне источника;
+- поддерживает общий SQL и override SQL на уровне источника, как inline в YAML, так и из `.sql` файлов;
 - разрешает `jdbcUrl`, `username` и `password` напрямую или через `${PLACEHOLDER}`;
 - выполняет выгрузки параллельно;
 - сохраняет `<source-name>.csv` по каждому успешному источнику;
@@ -95,9 +95,8 @@ app:
   fetchSize: 1000
   progressLogEveryRows: 10000
   maxMergedRows:
-  commonSql: |
-    select id, created_at, payload
-    from some_table
+  deleteOutputFilesAfterCompletion: false
+  commonSqlFile: ./sql/common.sql
 
   sources:
     - name: db1
@@ -109,9 +108,7 @@ app:
       jdbcUrl: ${DB2_JDBC_URL}
       username: ${DB2_USERNAME}
       password: local-dev-password
-      sql: |
-        select id, created_at, payload
-        from special_table
+      sqlFile: ./sql/db2_override.sql
 
   target:
     enabled: true
@@ -194,15 +191,36 @@ app:
   maxMergedRows: 50000
   ```
 
+- `deleteOutputFilesAfterCompletion`
+  Нужно ли удалять выходные CSV-файлы после завершения работы приложения.
+  Если `true`, после завершения запуска будут удалены:
+  - промежуточные `<source-name>.csv`;
+  - итоговый `merged.csv`.
+  Файл `summary.json` при этом сохраняется.
+  Пример:
+  ```yaml
+  deleteOutputFilesAfterCompletion: true
+  ```
+
 - `commonSql`
-  Общий SQL-запрос для всех источников.
-  Используется, если у конкретного источника не задан собственный `sql`.
+  Общий SQL-запрос для всех источников, заданный прямо в YAML.
+  Используется, если у конкретного источника не задан собственный `sql` или `sqlFile`.
   Должен быть только `SELECT` или `WITH ... SELECT`.
+  Нельзя указывать одновременно с `commonSqlFile`.
   Пример:
   ```yaml
   commonSql: |
     select id, created_at, payload
     from some_table
+  ```
+
+- `commonSqlFile`
+  Путь к `.sql` файлу с общим SQL-запросом для всех источников.
+  Путь разрешается относительно каталога, в котором лежит `application.yml`.
+  Нельзя указывать одновременно с `commonSql`.
+  Пример:
+  ```yaml
+  commonSqlFile: ./sql/common.sql
   ```
 
 ### Блок `app.sources`
@@ -234,15 +252,42 @@ app:
   Можно указывать напрямую или через placeholder.
 
 - `sql`
-  Необязательный SQL-запрос для конкретного источника.
-  Если задан, он имеет приоритет над `commonSql`.
-  Если не задан, используется `commonSql`.
+  Необязательный SQL-запрос для конкретного источника, заданный прямо в YAML.
+  Если задан, он имеет приоритет над `commonSql` и `commonSqlFile`.
+  Если не задан, используется общий SQL.
+  Нельзя указывать одновременно с `sqlFile`.
   Пример:
   ```yaml
   sql: |
     select id, created_at, payload
     from special_table
   ```
+
+- `sqlFile`
+  Необязательный путь к `.sql` файлу для конкретного источника.
+  Если задан, он имеет приоритет над `commonSql` и `commonSqlFile`.
+  Путь разрешается относительно каталога `application.yml`.
+  Нельзя указывать одновременно с `sql`.
+  Пример:
+  ```yaml
+  sqlFile: ./sql/db2_override.sql
+  ```
+
+### Приоритет выбора SQL
+
+Для каждого источника запрос выбирается в таком порядке:
+
+1. `source.sql`
+2. `source.sqlFile`
+3. `app.commonSql`
+4. `app.commonSqlFile`
+
+Дополнительные правила:
+
+- на одном уровне нельзя одновременно задавать inline SQL и SQL-файл;
+- SQL-файл должен существовать и быть непустым;
+- содержимое SQL-файла читается в `UTF-8`;
+- относительные пути разрешаются относительно каталога, где лежит `application.yml`.
 
 ### Блок `app.quotas`
 
@@ -492,9 +537,7 @@ B B B B B B B B B A B B B B B B B B B A ...
 ```yaml
 app:
   mergeMode: quota
-  commonSql: |
-    select id, created_at, payload
-    from some_table
+  commonSqlFile: ./sql/common.sql
 
   quotas:
     - source: db1
@@ -571,9 +614,7 @@ availableRows / quotaShare
 ```yaml
 app:
   mergeMode: quota
-  commonSql: |
-    select id, created_at, payload
-    from some_table
+  commonSqlFile: ./sql/common.sql
 
   quotas:
     - source: db1

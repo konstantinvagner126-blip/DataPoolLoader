@@ -7,9 +7,8 @@ app:
   fetchSize: 1000
   progressLogEveryRows: 10000
   maxMergedRows:
-  commonSql: |
-    select id, created_at, payload
-    from some_table
+  deleteOutputFilesAfterCompletion: false
+  commonSqlFile: ./sql/common.sql
   sources:
     - name: db1
       jdbcUrl: ${DB1_JDBC_URL}
@@ -19,9 +18,7 @@ app:
       jdbcUrl: ${DB2_JDBC_URL}
       username: ${DB2_USERNAME}
       password: local-dev-password
-      sql: |
-        select id, created_at, payload
-        from special_table
+      sqlFile: ./sql/db2_override.sql
 
   target:
     enabled: true

@@ -6,6 +6,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import java.nio.file.Files
+import kotlin.io.path.createDirectories
+import kotlin.io.path.writeText
 
 class ConfigLoaderTest {
     private val loader = ConfigLoader()
@@ -108,7 +110,10 @@ class ConfigLoaderTest {
             loader.load(file)
         }
 
-        assertEquals("Для источника db1 не задан SQL-запрос. Укажите commonSql или source.sql.", error.message)
+        assertEquals(
+            "Для источника db1 не задан SQL-запрос. Укажите commonSql/commonSqlFile или source.sql/sqlFile.",
+            error.message,
+        )
     }
 
     @Test
@@ -206,5 +211,186 @@ class ConfigLoaderTest {
 
         assertEquals(2500L, config.progressLogEveryRows)
         assertEquals(15000L, config.maxMergedRows)
+    }
+
+    @Test
+    fun `loads delete output files flag`() {
+        val file = Files.createTempFile("config", ".yml")
+        Files.writeString(
+            file,
+            """
+            app:
+              fileFormat: csv
+              mergeMode: proportional
+              errorMode: continue_on_error
+              parallelism: 1
+              fetchSize: 100
+              deleteOutputFilesAfterCompletion: true
+              commonSql: select 1
+              target:
+                enabled: false
+              sources:
+                - name: db1
+                  jdbcUrl: jdbc:postgresql://localhost:5432/db1
+                  username: user
+                  password: secret
+            """.trimIndent()
+        )
+
+        val config = loader.load(file)
+
+        assertEquals(true, config.deleteOutputFilesAfterCompletion)
+    }
+
+    @Test
+    fun `loads common sql from file relative to config`() {
+        val dir = Files.createTempDirectory("config-dir")
+        val sqlDir = dir.resolve("sql").createDirectories()
+        sqlDir.resolve("common.sql").writeText(
+            """
+            select id, created_at
+            from common_source
+            """.trimIndent()
+        )
+        val configFile = dir.resolve("application.yml")
+        Files.writeString(
+            configFile,
+            """
+            app:
+              fileFormat: csv
+              mergeMode: plain
+              errorMode: continue_on_error
+              parallelism: 1
+              fetchSize: 100
+              commonSqlFile: ./sql/common.sql
+              target:
+                enabled: false
+              sources:
+                - name: db1
+                  jdbcUrl: jdbc:postgresql://localhost:5432/db1
+                  username: user
+                  password: secret
+            """.trimIndent()
+        )
+
+        val config = loader.load(configFile)
+
+        assertEquals(
+            """
+            select id, created_at
+            from common_source
+            """.trimIndent(),
+            config.commonSql,
+        )
+        assertEquals("./sql/common.sql", config.commonSqlFile)
+    }
+
+    @Test
+    fun `loads source override sql from file`() {
+        val dir = Files.createTempDirectory("config-dir")
+        dir.resolve("source.sql").writeText(
+            """
+            select id
+            from source_override
+            """.trimIndent()
+        )
+        val configFile = dir.resolve("application.yml")
+        Files.writeString(
+            configFile,
+            """
+            app:
+              fileFormat: csv
+              mergeMode: plain
+              errorMode: continue_on_error
+              parallelism: 1
+              fetchSize: 100
+              commonSql: select 1
+              target:
+                enabled: false
+              sources:
+                - name: db1
+                  jdbcUrl: jdbc:postgresql://localhost:5432/db1
+                  username: user
+                  password: secret
+                  sqlFile: ./source.sql
+            """.trimIndent()
+        )
+
+        val config = loader.load(configFile)
+
+        assertEquals(
+            """
+            select id
+            from source_override
+            """.trimIndent(),
+            config.sources.single().sql,
+        )
+        assertEquals("./source.sql", config.sources.single().sqlFile)
+    }
+
+    @Test
+    fun `rejects common sql and common sql file together`() {
+        val dir = Files.createTempDirectory("config-dir")
+        dir.resolve("query.sql").writeText("select 1")
+        val configFile = dir.resolve("application.yml")
+        Files.writeString(
+            configFile,
+            """
+            app:
+              fileFormat: csv
+              mergeMode: plain
+              errorMode: continue_on_error
+              parallelism: 1
+              fetchSize: 100
+              commonSql: select 1
+              commonSqlFile: ./query.sql
+              target:
+                enabled: false
+              sources:
+                - name: db1
+                  jdbcUrl: jdbc:postgresql://localhost:5432/db1
+                  username: user
+                  password: secret
+            """.trimIndent()
+        )
+
+        val error = assertFailsWith<IllegalArgumentException> {
+            loader.load(configFile)
+        }
+
+        assertEquals("Нельзя одновременно задавать commonSql и commonSqlFile.", error.message)
+    }
+
+    @Test
+    fun `rejects source sql and source sql file together`() {
+        val dir = Files.createTempDirectory("config-dir")
+        dir.resolve("query.sql").writeText("select 1")
+        val configFile = dir.resolve("application.yml")
+        Files.writeString(
+            configFile,
+            """
+            app:
+              fileFormat: csv
+              mergeMode: plain
+              errorMode: continue_on_error
+              parallelism: 1
+              fetchSize: 100
+              target:
+                enabled: false
+              sources:
+                - name: db1
+                  jdbcUrl: jdbc:postgresql://localhost:5432/db1
+                  username: user
+                  password: secret
+                  sql: select 1
+                  sqlFile: ./query.sql
+            """.trimIndent()
+        )
+
+        val error = assertFailsWith<IllegalArgumentException> {
+            loader.load(configFile)
+        }
+
+        assertEquals("Для источника db1 нельзя одновременно задавать sql и sqlFile.", error.message)
     }
 }
