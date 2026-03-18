@@ -4,7 +4,9 @@ import com.example.datapoolloader.model.AppConfig
 import com.example.datapoolloader.model.ErrorMode
 import com.example.datapoolloader.model.RootConfig
 import com.example.datapoolloader.model.SourceConfig
+import com.example.datapoolloader.model.SourceQuotaConfig
 import com.example.datapoolloader.model.TargetConfig
+import com.example.datapoolloader.model.MergeMode
 import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.MapperFeature
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -24,7 +26,7 @@ class ConfigLoader {
         .build()
 
     fun load(path: Path): AppConfig {
-        require(Files.exists(path)) { "Config file does not exist: $path" }
+        require(Files.exists(path)) { "Файл конфигурации не найден: $path" }
 
         val root = Files.newBufferedReader(path).use { reader ->
             mapper.readValue(reader, RootConfig::class.java)
@@ -37,37 +39,57 @@ class ConfigLoader {
 }
 
 fun AppConfig.validate(): AppConfig {
-    val normalizedSql = sql.trim()
+    val normalizedCommonSql = commonSql.trim()
     val normalizedSources = sources.map { it.normalize() }
+    val normalizedQuotas = quotas.map { it.normalize() }
     val normalizedTarget = target.normalize()
 
-    require(fileFormat.equals("csv", ignoreCase = true)) { "Only CSV file format is supported." }
-    require(normalizedSources.isNotEmpty()) { "At least one source must be configured." }
-    require(parallelism > 0) { "parallelism must be greater than 0." }
-    require(fetchSize > 0) { "fetchSize must be greater than 0." }
-    require(errorMode == ErrorMode.CONTINUE_ON_ERROR) { "Only CONTINUE_ON_ERROR is supported." }
-    require(normalizedSql.isNotBlank()) { "Global SQL must not be blank." }
-    require(isSelectOnly(normalizedSql)) { "Global SQL must be a SELECT statement." }
+    require(fileFormat.equals("csv", ignoreCase = true)) { "Поддерживается только формат CSV." }
+    require(normalizedSources.isNotEmpty()) { "Должен быть настроен хотя бы один источник." }
+    require(parallelism > 0) { "Параметр parallelism должен быть больше 0." }
+    require(fetchSize > 0) { "Параметр fetchSize должен быть больше 0." }
+    require(errorMode == ErrorMode.CONTINUE_ON_ERROR) { "Поддерживается только режим CONTINUE_ON_ERROR." }
+    if (normalizedCommonSql.isNotBlank()) {
+        require(isSelectOnly(normalizedCommonSql)) { "Общий SQL-запрос должен быть SELECT-запросом." }
+    }
     if (normalizedTarget.enabled) {
-        require(normalizedTarget.jdbcUrl.isNotBlank()) { "Target jdbcUrl must not be blank." }
-        require(normalizedTarget.username.isNotBlank()) { "Target username must not be blank." }
-        require(normalizedTarget.password.isNotBlank()) { "Target password must not be blank." }
-        require(normalizedTarget.table.isNotBlank()) { "Target table must not be blank." }
+        require(normalizedTarget.jdbcUrl.isNotBlank()) { "jdbcUrl для целевой БД не должен быть пустым." }
+        require(normalizedTarget.username.isNotBlank()) { "Имя пользователя для целевой БД не должно быть пустым." }
+        require(normalizedTarget.password.isNotBlank()) { "Пароль для целевой БД не должен быть пустым." }
+        require(normalizedTarget.table.isNotBlank()) { "Имя целевой таблицы не должно быть пустым." }
     }
 
     normalizedSources.forEach { source ->
-        require(source.name.isNotBlank()) { "Source name must not be blank." }
-        require(source.jdbcUrl.isNotBlank()) { "Source ${source.name} jdbcUrl must not be blank." }
-        require(source.username.isNotBlank()) { "Source ${source.name} username must not be blank." }
-        require(source.password.isNotBlank()) { "Source ${source.name} password must not be blank." }
-        source.sql?.let {
-            require(isSelectOnly(it)) { "Source ${source.name} SQL must be a SELECT statement." }
+        require(source.name.isNotBlank()) { "Имя источника не должно быть пустым." }
+        require(source.jdbcUrl.isNotBlank()) { "jdbcUrl источника ${source.name} не должен быть пустым." }
+        require(source.username.isNotBlank()) { "Имя пользователя источника ${source.name} не должно быть пустым." }
+        require(source.password.isNotBlank()) { "Пароль источника ${source.name} не должен быть пустым." }
+        val effectiveSql = source.sql ?: normalizedCommonSql.takeIf { it.isNotBlank() }
+        require(effectiveSql != null) { "Для источника ${source.name} не задан SQL-запрос. Укажите commonSql или source.sql." }
+        require(isSelectOnly(effectiveSql)) { "SQL-запрос источника ${source.name} должен быть SELECT-запросом." }
+    }
+
+    if (mergeMode == MergeMode.QUOTA) {
+        require(normalizedQuotas.isNotEmpty()) { "Для режима QUOTA должен быть задан список quotas." }
+        val configuredSourceNames = normalizedSources.map { it.name }.toSet()
+        val quotaSourceNames = normalizedQuotas.map { it.source }
+        require(quotaSourceNames.size == quotaSourceNames.toSet().size) { "В quotas найдены дублирующиеся источники." }
+        require(quotaSourceNames.toSet() == configuredSourceNames) {
+            "В режиме QUOTA список quotas должен содержать все источники ровно по одному разу."
+        }
+        normalizedQuotas.forEach {
+            require(it.percent > 0.0) { "Процент для источника ${it.source} должен быть больше 0." }
+        }
+        val totalPercent = normalizedQuotas.sumOf { it.percent }
+        require(kotlin.math.abs(totalPercent - 100.0) < 0.0001) {
+            "Сумма процентов в quotas должна быть равна 100."
         }
     }
 
     return copy(
-        sql = normalizedSql,
+        commonSql = normalizedCommonSql,
         sources = normalizedSources,
+        quotas = normalizedQuotas,
         target = normalizedTarget,
     )
 }
@@ -85,6 +107,10 @@ private fun TargetConfig.normalize(): TargetConfig = copy(
     username = username.trim(),
     password = password.trim(),
     table = table.trim(),
+)
+
+private fun SourceQuotaConfig.normalize(): SourceQuotaConfig = copy(
+    source = source.trim(),
 )
 
 private fun isSelectOnly(sql: String): Boolean {

@@ -23,7 +23,7 @@ class ConfigLoaderTest {
               errorMode: continue_on_error
               parallelism: 2
               fetchSize: 500
-              sql: select 1
+              commonSql: select 1
               target:
                 enabled: true
                 jdbcUrl: jdbc:postgresql://localhost:5432/target_db
@@ -60,7 +60,7 @@ class ConfigLoaderTest {
               errorMode: continue_on_error
               parallelism: 1
               fetchSize: 100
-              sql: delete from test
+              commonSql: delete from test
               target:
                 enabled: true
                 jdbcUrl: jdbc:postgresql://localhost:5432/target_db
@@ -92,7 +92,7 @@ class ConfigLoaderTest {
               errorMode: continue_on_error
               parallelism: 1
               fetchSize: 100
-              sql: "   "
+              commonSql: "   "
               target:
                 enabled: false
               sources:
@@ -107,7 +107,7 @@ class ConfigLoaderTest {
             loader.load(file)
         }
 
-        assertEquals("Global SQL must not be blank.", error.message)
+        assertEquals("Для источника db1 не задан SQL-запрос. Укажите commonSql или source.sql.", error.message)
     }
 
     @Test
@@ -122,7 +122,7 @@ class ConfigLoaderTest {
               errorMode: continue_on_error
               parallelism: 1
               fetchSize: 100
-              sql: select 1
+              commonSql: select 1
               target:
                 enabled: false
               sources:
@@ -136,5 +136,43 @@ class ConfigLoaderTest {
         val config = loader.load(file)
 
         assertEquals(false, config.target.enabled)
+    }
+
+    @Test
+    fun `loads quota configuration`() {
+        val file = Files.createTempFile("config", ".yml")
+        Files.writeString(
+            file,
+            """
+            app:
+              fileFormat: csv
+              mergeMode: quota
+              errorMode: continue_on_error
+              parallelism: 1
+              fetchSize: 100
+              commonSql: select 1
+              target:
+                enabled: false
+              quotas:
+                - source: db1
+                  percent: 25
+                - source: db2
+                  percent: 75
+              sources:
+                - name: db1
+                  jdbcUrl: jdbc:postgresql://localhost:5432/db1
+                  username: user
+                  password: secret
+                - name: db2
+                  jdbcUrl: jdbc:postgresql://localhost:5432/db2
+                  username: user
+                  password: secret
+            """.trimIndent()
+        )
+
+        val config = loader.load(file)
+
+        assertEquals(MergeMode.QUOTA, config.mergeMode)
+        assertEquals(2, config.quotas.size)
     }
 }

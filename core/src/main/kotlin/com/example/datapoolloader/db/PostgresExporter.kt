@@ -15,10 +15,11 @@ import java.time.Instant
 
 class PostgresExporter {
     private val logger = LoggerFactory.getLogger(javaClass)
+    private val progressLogInterval = 10_000L
 
     fun export(task: ExportTask): SourceExecutionResult {
         val startedAt = Instant.now()
-        logger.info("Starting export for source {}", task.source.name)
+        logger.info("Запуск выгрузки для источника {}", task.source.name)
 
         return try {
             DriverManager.getConnection(task.resolvedJdbcUrl, task.resolvedUsername, task.resolvedPassword).use { connection ->
@@ -41,13 +42,14 @@ class PostgresExporter {
                                     }
                                     printer.printRecord(row)
                                     rowCount++
+                                    logProgress(task.source.name, rowCount)
                                 }
                                 printer.flush()
                                 val finishedAt = Instant.now()
                                 if (rowCount == 0L) {
-                                    logger.info("Source {} completed with 0 rows", task.source.name)
+                                    logger.info("Выгрузка источника {} завершена. Получено 0 строк", task.source.name)
                                 } else {
-                                    logger.info("Source {} completed with {} rows", task.source.name, rowCount)
+                                    logger.info("Выгрузка источника {} завершена. Получено {} строк", task.source.name, rowCount)
                                 }
                                 SourceExecutionResult(
                                     sourceName = task.source.name,
@@ -64,7 +66,7 @@ class PostgresExporter {
                 }
             }
         } catch (ex: Exception) {
-            logger.error("Source {} failed: {}", task.source.name, ex.message, ex)
+            logger.error("Ошибка выгрузки для источника {}: {}", task.source.name, ex.message, ex)
             SourceExecutionResult(
                 sourceName = task.source.name,
                 status = ExecutionStatus.FAILED,
@@ -73,7 +75,7 @@ class PostgresExporter {
                 columns = emptyList(),
                 startedAt = startedAt,
                 finishedAt = Instant.now(),
-                errorMessage = ex.message ?: ex.javaClass.simpleName,
+                errorMessage = ex.message ?: "Неизвестная ошибка",
             )
         }
     }
@@ -86,5 +88,11 @@ class PostgresExporter {
     private fun readColumns(resultSet: ResultSet): List<String> {
         val metaData = resultSet.metaData
         return (1..metaData.columnCount).map { metaData.getColumnLabel(it) }
+    }
+
+    private fun logProgress(sourceName: String, rowCount: Long) {
+        if (rowCount % progressLogInterval == 0L) {
+            logger.info("Выгрузка источника {}: обработано {} строк", sourceName, rowCount)
+        }
     }
 }

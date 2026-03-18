@@ -43,26 +43,26 @@ class ApplicationRunner(
         val valueResolver = ValueResolver.fromFile(credentialsPath)
         val runStartedAt = Instant.now()
         val outputDir = createOutputDir(appConfig.outputDir, runStartedAt)
-        logger.info("Using output directory {}", outputDir)
+        logger.info("Используется выходная директория {}", outputDir)
 
         val results = exportSources(appConfig, outputDir, valueResolver)
         val filteredResults = filterSchemaMismatches(results)
         val successful = filteredResults.filter { it.status == ExecutionStatus.SUCCESS }
-        require(successful.isNotEmpty()) { "All sources failed. merged.csv was not created." }
+        require(successful.isNotEmpty()) { "Все источники завершились ошибкой. Файл merged.csv не был создан." }
 
         val mergedFile = outputDir.resolve("merged.csv")
-        val mergedRowCount = mergeService.merge(successful, appConfig.mergeMode, mergedFile)
+        val mergedRowCount = mergeService.merge(successful, appConfig, mergedFile)
         val targetLoad = if (appConfig.target.enabled) {
             runTargetImport(appConfig, valueResolver, mergedFile, successful.first().columns, mergedRowCount)
         } else {
-            logger.info("Target load disabled by configuration. Skipping import into target database.")
+            logger.info("Загрузка в целевую БД отключена конфигурацией. Импорт пропускается.")
             TargetLoadSummary(
-                table = appConfig.target.table.ifBlank { "<disabled>" },
+                table = appConfig.target.table.ifBlank { "<отключено>" },
                 status = ExecutionStatus.SKIPPED,
                 rowCount = 0,
                 finishedAt = Instant.now(),
                 enabled = false,
-                errorMessage = "Target load disabled by configuration.",
+                errorMessage = "Загрузка в целевую БД отключена конфигурацией.",
             )
         }
         val runFinishedAt = Instant.now()
@@ -77,9 +77,9 @@ class ApplicationRunner(
             config = appConfig,
         )
         require(!appConfig.target.enabled || targetLoad.status == ExecutionStatus.SUCCESS) {
-            "Target import failed for table ${appConfig.target.table}: ${targetLoad.errorMessage}"
+            "Ошибка загрузки в целевую таблицу ${appConfig.target.table}: ${targetLoad.errorMessage}"
         }
-        logger.info("Merged {} rows into {}", mergedRowCount, mergedFile)
+        logger.info("Объединено {} строк в файл {}", mergedRowCount, mergedFile)
     }
 
     private fun exportSources(
@@ -93,7 +93,7 @@ class ApplicationRunner(
                 executor.submit(Callable {
                     val startedAt = Instant.now()
                     try {
-                        val sourceSql = source.sql ?: appConfig.sql
+                        val sourceSql = source.sql ?: appConfig.commonSql
                         val resolvedJdbcUrl = valueResolver.resolve(source.jdbcUrl)
                         val resolvedUsername = valueResolver.resolve(source.username)
                         val resolvedPassword = valueResolver.resolve(source.password)
@@ -109,7 +109,7 @@ class ApplicationRunner(
                             )
                         )
                     } catch (ex: Exception) {
-                        logger.error("Source {} failed before export: {}", source.name, ex.message, ex)
+                        logger.error("Источник {} завершился ошибкой до начала выгрузки: {}", source.name, ex.message, ex)
                         SourceExecutionResult(
                             sourceName = source.name,
                             status = ExecutionStatus.FAILED,
@@ -118,7 +118,7 @@ class ApplicationRunner(
                             columns = emptyList(),
                             startedAt = startedAt,
                             finishedAt = Instant.now(),
-                            errorMessage = ex.message ?: ex.javaClass.simpleName,
+                            errorMessage = ex.message ?: "Неизвестная ошибка",
                         )
                     }
                 })
@@ -138,7 +138,7 @@ class ApplicationRunner(
                 result
             } else {
                 logger.error(
-                    "Source {} excluded from merge because columns {} do not match baseline {}",
+                    "Источник {} исключен из объединения: колонки {} не совпадают с базовым набором {}",
                     result.sourceName,
                     result.columns,
                     baseline,
@@ -146,7 +146,7 @@ class ApplicationRunner(
                 result.copy(
                     status = ExecutionStatus.SKIPPED_SCHEMA_MISMATCH,
                     outputFile = null,
-                    errorMessage = "Schema mismatch. Expected $baseline, got ${result.columns}",
+                    errorMessage = "Несовпадение схемы. Ожидались колонки $baseline, получены ${result.columns}",
                 )
             }
         }
@@ -224,14 +224,14 @@ class ApplicationRunner(
                 resolvedPassword = resolvedPassword,
             )
         } catch (ex: Exception) {
-            logger.error("Target import pre-check failed: {}", ex.message, ex)
+            logger.error("Предварительная проверка целевой загрузки завершилась ошибкой: {}", ex.message, ex)
             TargetLoadSummary(
                 table = appConfig.target.table,
                 status = ExecutionStatus.FAILED,
                 rowCount = mergedRowCount,
                 finishedAt = Instant.now(),
                 enabled = true,
-                errorMessage = ex.message ?: ex.javaClass.simpleName,
+                errorMessage = ex.message ?: "Неизвестная ошибка",
             )
         }
     }

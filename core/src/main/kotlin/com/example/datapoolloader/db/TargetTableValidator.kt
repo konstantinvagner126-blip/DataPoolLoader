@@ -11,7 +11,7 @@ class TargetTableValidator {
         resolvedPassword: String,
         incomingColumns: List<String>,
     ) {
-        require(incomingColumns.isNotEmpty()) { "Incoming data must contain at least one column." }
+        require(incomingColumns.isNotEmpty()) { "Во входных данных должна быть хотя бы одна колонка." }
 
         val tableRef = parseTableReference(target.table)
         DriverManager.getConnection(resolvedJdbcUrl, resolvedUsername, resolvedPassword).use { connection ->
@@ -49,28 +49,28 @@ class TargetTableValidator {
         targetColumns: List<TargetColumn>,
         incomingColumns: List<String>,
     ) {
-        require(targetColumns.isNotEmpty()) { "Target table $targetTable was not found or has no columns." }
+        require(targetColumns.isNotEmpty()) { "Целевая таблица $targetTable не найдена или не содержит колонок." }
 
         val targetByName = targetColumns.associateBy { it.name }
         val missingInTarget = incomingColumns.filter { it !in targetByName }
         require(missingInTarget.isEmpty()) {
-            "Target table $targetTable does not contain incoming columns: ${missingInTarget.joinToString(", ")}"
+            "В целевой таблице $targetTable отсутствуют колонки из входных данных: ${missingInTarget.joinToString(", ")}"
         }
 
         val missingRequired = targetColumns
             .filter { !it.nullable && !it.hasDefault && it.name !in incomingColumns }
             .map { it.name }
         require(missingRequired.isEmpty()) {
-            "Target table $targetTable requires non-null columns missing in incoming data: ${missingRequired.joinToString(", ")}"
+            "В целевой таблице $targetTable есть обязательные NOT NULL колонки, отсутствующие во входных данных: ${missingRequired.joinToString(", ")}"
         }
     }
 
     internal fun parseTableReference(rawTable: String): TableReference {
         val safeIdentifier = Regex("[A-Za-z_][A-Za-z0-9_]*")
         val parts = rawTable.trim().split('.')
-        require(parts.size in 1..2) { "Target table must be in format table or schema.table." }
+        require(parts.size in 1..2) { "Имя целевой таблицы должно быть в формате table или schema.table." }
         parts.forEach {
-            require(safeIdentifier.matches(it)) { "Unsupported table identifier '$it'." }
+            require(safeIdentifier.matches(it)) { "Неподдерживаемый идентификатор таблицы '$it'." }
         }
         return if (parts.size == 1) {
             TableReference(schema = "public", table = parts[0])

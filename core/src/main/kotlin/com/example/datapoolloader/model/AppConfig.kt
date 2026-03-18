@@ -1,5 +1,7 @@
 package com.example.datapoolloader.model
 
+import com.fasterxml.jackson.annotation.JsonAlias
+
 data class RootConfig(
     val app: AppConfig = AppConfig(),
 )
@@ -11,8 +13,10 @@ data class AppConfig(
     val errorMode: ErrorMode = ErrorMode.CONTINUE_ON_ERROR,
     val parallelism: Int = 5,
     val fetchSize: Int = 1000,
-    val sql: String = "",
+    @param:JsonAlias("sql")
+    val commonSql: String = "",
     val sources: List<SourceConfig> = emptyList(),
+    val quotas: List<SourceQuotaConfig> = emptyList(),
     val target: TargetConfig = TargetConfig(),
 )
 
@@ -33,9 +37,16 @@ data class TargetConfig(
     val enabled: Boolean = true,
 )
 
+data class SourceQuotaConfig(
+    val source: String = "",
+    val percent: Double = 0.0,
+)
+
 enum class MergeMode {
     PLAIN,
     ROUND_ROBIN,
+    PROPORTIONAL,
+    QUOTA,
 }
 
 enum class ErrorMode {

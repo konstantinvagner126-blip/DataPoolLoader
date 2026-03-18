@@ -33,7 +33,7 @@ class TargetTableValidatorTest {
         }
 
         assertEquals(
-            "Target table public.test_data_pool does not contain incoming columns: payload",
+            "В целевой таблице public.test_data_pool отсутствуют колонки из входных данных: payload",
             error.message,
         )
     }
@@ -52,7 +52,7 @@ class TargetTableValidatorTest {
         }
 
         assertEquals(
-            "Target table public.test_data_pool requires non-null columns missing in incoming data: payload",
+            "В целевой таблице public.test_data_pool есть обязательные NOT NULL колонки, отсутствующие во входных данных: payload",
             error.message,
         )
     }

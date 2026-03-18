@@ -24,54 +24,62 @@ class PostgresImporter {
         resolvedPassword: String,
     ): TargetLoadSummary {
         val startedAt = Instant.now()
-        logger.info("Starting import into target table {}", target.table)
+        logger.info("Запуск загрузки в целевую таблицу {}", target.table)
+        logger.info("Подготовлено к загрузке в целевую таблицу {}: {} строк", target.table, expectedRowCount)
 
         return try {
             DriverManager.getConnection(resolvedJdbcUrl, resolvedUsername, resolvedPassword).use { connection ->
-                if (target.truncateBeforeLoad) {
-                    val truncateSql = buildTruncateSql(target.table)
-                    logger.info("Truncating target table {} before import", target.table)
-                    connection.createStatement().use { statement ->
-                        statement.execute(truncateSql)
+                connection.autoCommit = false
+                try {
+                    if (target.truncateBeforeLoad) {
+                        val truncateSql = buildTruncateSql(target.table)
+                        logger.info("Очистка целевой таблицы {} перед загрузкой", target.table)
+                        connection.createStatement().use { statement ->
+                            statement.execute(truncateSql)
+                        }
                     }
-                }
 
-                val copySql = buildCopySql(target.table, columns)
-                val rows = Files.newInputStream(mergedFile).use { input ->
-                    connection.unwrap(PGConnection::class.java)
-                        .copyAPI
-                        .copyIn(copySql, input)
-                }
+                    val copySql = buildCopySql(target.table, columns)
+                    val rows = Files.newInputStream(mergedFile).use { input ->
+                        connection.unwrap(PGConnection::class.java)
+                            .copyAPI
+                            .copyIn(copySql, input)
+                    }
+                    connection.commit()
 
-                logger.info(
-                    "Finished import into target table {}. Loaded {} rows",
-                    target.table,
-                    rows,
-                )
-                TargetLoadSummary(
-                    table = target.table,
-                    status = ExecutionStatus.SUCCESS,
-                    rowCount = rows,
-                    finishedAt = Instant.now(),
-                    enabled = true,
-                )
+                    logger.info(
+                        "Загрузка в целевую таблицу {} завершена. Загружено {} строк",
+                        target.table,
+                        rows,
+                    )
+                    TargetLoadSummary(
+                        table = target.table,
+                        status = ExecutionStatus.SUCCESS,
+                        rowCount = rows,
+                        finishedAt = Instant.now(),
+                        enabled = true,
+                    )
+                } catch (ex: Exception) {
+                    connection.rollback()
+                    throw ex
+                }
             }
         } catch (ex: Exception) {
-            logger.error("Target import failed for table {}: {}", target.table, ex.message, ex)
+            logger.error("Ошибка загрузки в целевую таблицу {}: {}", target.table, ex.message, ex)
             TargetLoadSummary(
                 table = target.table,
                 status = ExecutionStatus.FAILED,
                 rowCount = expectedRowCount,
                 finishedAt = Instant.now(),
                 enabled = true,
-                errorMessage = ex.message ?: ex.javaClass.simpleName,
+                errorMessage = ex.message ?: "Неизвестная ошибка",
             )
         }
     }
 
     internal fun buildCopySql(table: String, columns: List<String>): String {
-        require(table.isNotBlank()) { "Target table must not be blank." }
-        require(columns.isNotEmpty()) { "At least one column is required for import." }
+        require(table.isNotBlank()) { "Имя целевой таблицы не должно быть пустым." }
+        require(columns.isNotEmpty()) { "Для загрузки нужна хотя бы одна колонка." }
 
         val qualifiedTable = table.split('.').joinToString(".") { quoteIdentifier(it) }
         val joinedColumns = columns.joinToString(", ") { quoteIdentifier(it) }
@@ -79,14 +87,14 @@ class PostgresImporter {
     }
 
     internal fun buildTruncateSql(table: String): String {
-        require(table.isNotBlank()) { "Target table must not be blank." }
+        require(table.isNotBlank()) { "Имя целевой таблицы не должно быть пустым." }
         val qualifiedTable = table.split('.').joinToString(".") { quoteIdentifier(it) }
         return "TRUNCATE TABLE $qualifiedTable"
     }
 
     private fun quoteIdentifier(identifier: String): String {
         require(safeIdentifier.matches(identifier)) {
-            "Unsupported identifier '$identifier'. Use simple PostgreSQL identifiers without spaces or special symbols."
+            "Неподдерживаемый идентификатор '$identifier'. Используйте простые PostgreSQL-идентификаторы без пробелов и специальных символов."
         }
         return "\"$identifier\""
     }

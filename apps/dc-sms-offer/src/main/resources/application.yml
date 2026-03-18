@@ -5,7 +5,7 @@ app:
   errorMode: continue_on_error
   parallelism: 5
   fetchSize: 1000
-  sql: |
+  commonSql: |
     select id, created_at, payload
     from some_table
   sources:

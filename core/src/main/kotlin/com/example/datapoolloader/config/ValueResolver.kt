@@ -18,14 +18,16 @@ class ValueResolver private constructor(
         return properties[key]
             ?: System.getenv(key)
             ?: System.getProperty(key)
-            ?: throw IllegalArgumentException("Value for placeholder $trimmed is not defined in credentials file, environment variables, or JVM system properties.")
+            ?: throw IllegalArgumentException("Значение для placeholder $trimmed не найдено в credentials-файле, переменных окружения или JVM system properties.")
     }
 
     companion object {
         fun fromFile(path: Path?): ValueResolver {
-            if (path == null || Files.notExists(path)) {
+            if (path == null) {
                 return ValueResolver(emptyMap())
             }
+
+            require(Files.exists(path)) { "Файл credentials не найден: $path" }
 
             Files.newBufferedReader(path).use { reader ->
                 return ValueResolver(loadProperties(reader))
