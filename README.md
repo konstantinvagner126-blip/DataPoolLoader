@@ -51,6 +51,25 @@ Multi-module проект на Kotlin для параллельной выгру
 ./gradlew :apps:dc-sms-offer:run
 ```
 
+## Шаблон нового app-модуля
+
+В репозитории есть шаблон:
+
+- [templates/app-module](/Users/kwdev/DataPoolLoader/templates/app-module)
+
+Что в нем есть:
+
+- `build.gradle.kts`
+- `Main.kt`
+- `application.yml`
+
+Как использовать:
+
+1. Скопировать `templates/app-module` в `apps/<new-name>`.
+2. Заменить `__APP_NAME__` в `Main.kt`.
+3. Подключить новый модуль в [settings.gradle.kts](/Users/kwdev/DataPoolLoader/settings.gradle.kts).
+4. Настроить свой `application.yml`.
+
 ## Формат конфига
 
 ```yaml
@@ -61,6 +80,8 @@ app:
   errorMode: continue_on_error
   parallelism: 5
   fetchSize: 1000
+  progressLogEveryRows: 10000
+  maxMergedRows:
   commonSql: |
     select id, created_at, payload
     from some_table
@@ -141,6 +162,23 @@ app:
   Пример:
   ```yaml
   fetchSize: 1000
+  ```
+
+- `progressLogEveryRows`
+  Как часто выводить в лог прогресс по обработанным строкам для каждой source БД.
+  Если указано `10000`, лог будет печататься на `10000`, `20000`, `30000` и так далее.
+  Пример:
+  ```yaml
+  progressLogEveryRows: 10000
+  ```
+
+- `maxMergedRows`
+  Необязательный лимит на размер итогового `merged.csv`.
+  Если параметр задан, merge не превысит указанное число строк.
+  Особенно полезно для подготовки ограниченной тестовой выборки.
+  Пример:
+  ```yaml
+  maxMergedRows: 50000
   ```
 
 - `commonSql`

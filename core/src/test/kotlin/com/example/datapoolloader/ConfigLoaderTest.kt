@@ -46,6 +46,7 @@ class ConfigLoaderTest {
         assertEquals("select 2", config.sources.single().sql)
         assertEquals("public.test_data_pool", config.target.table)
         assertEquals(true, config.target.truncateBeforeLoad)
+        assertEquals(10_000L, config.progressLogEveryRows)
     }
 
     @Test
@@ -174,5 +175,36 @@ class ConfigLoaderTest {
 
         assertEquals(MergeMode.QUOTA, config.mergeMode)
         assertEquals(2, config.quotas.size)
+    }
+
+    @Test
+    fun `loads progress and max merged rows`() {
+        val file = Files.createTempFile("config", ".yml")
+        Files.writeString(
+            file,
+            """
+            app:
+              fileFormat: csv
+              mergeMode: proportional
+              errorMode: continue_on_error
+              parallelism: 1
+              fetchSize: 100
+              progressLogEveryRows: 2500
+              maxMergedRows: 15000
+              commonSql: select 1
+              target:
+                enabled: false
+              sources:
+                - name: db1
+                  jdbcUrl: jdbc:postgresql://localhost:5432/db1
+                  username: user
+                  password: secret
+            """.trimIndent()
+        )
+
+        val config = loader.load(file)
+
+        assertEquals(2500L, config.progressLogEveryRows)
+        assertEquals(15000L, config.maxMergedRows)
     }
 }

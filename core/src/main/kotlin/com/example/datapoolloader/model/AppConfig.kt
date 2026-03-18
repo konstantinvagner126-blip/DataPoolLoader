@@ -13,6 +13,8 @@ data class AppConfig(
     val errorMode: ErrorMode = ErrorMode.CONTINUE_ON_ERROR,
     val parallelism: Int = 5,
     val fetchSize: Int = 1000,
+    val progressLogEveryRows: Long = 10_000,
+    val maxMergedRows: Long? = null,
     @param:JsonAlias("sql")
     val commonSql: String = "",
     val sources: List<SourceConfig> = emptyList(),

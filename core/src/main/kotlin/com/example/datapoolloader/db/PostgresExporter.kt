@@ -15,7 +15,6 @@ import java.time.Instant
 
 class PostgresExporter {
     private val logger = LoggerFactory.getLogger(javaClass)
-    private val progressLogInterval = 10_000L
 
     fun export(task: ExportTask): SourceExecutionResult {
         val startedAt = Instant.now()
@@ -42,7 +41,7 @@ class PostgresExporter {
                                     }
                                     printer.printRecord(row)
                                     rowCount++
-                                    logProgress(task.source.name, rowCount)
+                                    logProgress(task.source.name, rowCount, task.progressLogEveryRows)
                                 }
                                 printer.flush()
                                 val finishedAt = Instant.now()
@@ -90,8 +89,8 @@ class PostgresExporter {
         return (1..metaData.columnCount).map { metaData.getColumnLabel(it) }
     }
 
-    private fun logProgress(sourceName: String, rowCount: Long) {
-        if (rowCount % progressLogInterval == 0L) {
+    private fun logProgress(sourceName: String, rowCount: Long, interval: Long) {
+        if (rowCount % interval == 0L) {
             logger.info("Выгрузка источника {}: обработано {} строк", sourceName, rowCount)
         }
     }

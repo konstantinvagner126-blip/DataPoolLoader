@@ -21,9 +21,10 @@ class MergeServiceTest {
         val source2 = createSource(dir, "db2", listOf("id,name", "3,C"))
         val merged = dir.resolve("merged.csv")
 
-        val rowCount = service.merge(listOf(source1, source2), AppConfig(mergeMode = MergeMode.PLAIN), merged)
+        val result = service.merge(listOf(source1, source2), AppConfig(mergeMode = MergeMode.PLAIN), merged)
 
-        assertEquals(3, rowCount)
+        assertEquals(3, result.rowCount)
+        assertEquals(2, result.sourceCounts["db1"])
         assertEquals(listOf("id,name", "1,A", "2,B", "3,C"), Files.readAllLines(merged))
     }
 
@@ -35,9 +36,9 @@ class MergeServiceTest {
         val source3 = createSource(dir, "db3", listOf("id,name", "6,F"))
         val merged = dir.resolve("merged.csv")
 
-        val rowCount = service.merge(listOf(source1, source2, source3), AppConfig(mergeMode = MergeMode.ROUND_ROBIN), merged)
+        val result = service.merge(listOf(source1, source2, source3), AppConfig(mergeMode = MergeMode.ROUND_ROBIN), merged)
 
-        assertEquals(6, rowCount)
+        assertEquals(6, result.rowCount)
         assertEquals(listOf("id,name", "1,A", "4,D", "6,F", "2,B", "5,E", "3,C"), Files.readAllLines(merged))
     }
 
@@ -48,9 +49,11 @@ class MergeServiceTest {
         val source2 = createSource(dir, "db2", listOf("id,name", "3,C", "4,D", "5,E", "6,F"))
         val merged = dir.resolve("merged.csv")
 
-        val rowCount = service.merge(listOf(source1, source2), AppConfig(mergeMode = MergeMode.PROPORTIONAL), merged)
+        val result = service.merge(listOf(source1, source2), AppConfig(mergeMode = MergeMode.PROPORTIONAL), merged)
 
-        assertEquals(6, rowCount)
+        assertEquals(6, result.rowCount)
+        assertEquals(2, result.sourceCounts["db1"])
+        assertEquals(4, result.sourceCounts["db2"])
         assertEquals(listOf("id,name", "1,A", "3,C", "4,D", "2,B", "5,E", "6,F"), Files.readAllLines(merged))
     }
 
@@ -61,7 +64,7 @@ class MergeServiceTest {
         val source2 = createSource(dir, "db2", listOf("id,name", "3,C", "4,D", "5,E", "6,F", "7,G", "8,H"))
         val merged = dir.resolve("merged.csv")
 
-        val rowCount = service.merge(
+        val result = service.merge(
             listOf(source1, source2),
             AppConfig(
                 mergeMode = MergeMode.QUOTA,
@@ -73,8 +76,28 @@ class MergeServiceTest {
             merged,
         )
 
-        assertEquals(8, rowCount)
+        assertEquals(8, result.rowCount)
+        assertEquals(2, result.sourceCounts["db1"])
+        assertEquals(6, result.sourceCounts["db2"])
         assertEquals(2, Files.readAllLines(merged).count { it.endsWith(",A") || it.endsWith(",B") })
+    }
+
+    @Test
+    fun `respects max merged rows`() {
+        val dir = Files.createTempDirectory("merge-max")
+        val source1 = createSource(dir, "db1", listOf("id,name", "1,A", "2,B", "3,C"))
+        val source2 = createSource(dir, "db2", listOf("id,name", "4,D", "5,E", "6,F"))
+        val merged = dir.resolve("merged.csv")
+
+        val result = service.merge(
+            listOf(source1, source2),
+            AppConfig(mergeMode = MergeMode.PROPORTIONAL, maxMergedRows = 4),
+            merged,
+        )
+
+        assertEquals(4, result.rowCount)
+        assertEquals(2, result.sourceCounts["db1"])
+        assertEquals(2, result.sourceCounts["db2"])
     }
 
     private fun createSource(

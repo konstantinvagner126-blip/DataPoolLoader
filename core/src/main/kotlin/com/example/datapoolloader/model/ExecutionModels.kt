@@ -11,6 +11,7 @@ data class ExportTask(
     val sql: String,
     val outputFile: Path,
     val fetchSize: Int,
+    val progressLogEveryRows: Long,
 )
 
 data class SourceExecutionResult(
@@ -37,9 +38,27 @@ data class SummaryReport(
     val mergeMode: MergeMode,
     val mergedRowCount: Long,
     val mergedFile: String?,
+    val maxMergedRows: Long?,
+    val mergeDetails: MergeSummary,
     val targetLoad: TargetLoadSummary,
     val successfulSources: List<SourceSummary>,
     val failedSources: List<SourceSummary>,
+)
+
+data class MergeSummary(
+    val sourceAllocations: List<MergeSourceAllocation>,
+)
+
+data class MergeSourceAllocation(
+    val sourceName: String,
+    val availableRows: Long,
+    val mergedRows: Long,
+    val mergedPercent: Double,
+)
+
+data class MergeResult(
+    val rowCount: Long,
+    val sourceCounts: Map<String, Long>,
 )
 
 data class SourceSummary(

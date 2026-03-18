@@ -9,6 +9,8 @@ import com.example.datapoolloader.merge.MergeService
 import com.example.datapoolloader.model.AppConfig
 import com.example.datapoolloader.model.ExecutionStatus
 import com.example.datapoolloader.model.ExportTask
+import com.example.datapoolloader.model.MergeSourceAllocation
+import com.example.datapoolloader.model.MergeSummary
 import com.example.datapoolloader.model.SourceExecutionResult
 import com.example.datapoolloader.model.SourceSummary
 import com.example.datapoolloader.model.SummaryReport
@@ -51,9 +53,9 @@ class ApplicationRunner(
         require(successful.isNotEmpty()) { "Все источники завершились ошибкой. Файл merged.csv не был создан." }
 
         val mergedFile = outputDir.resolve("merged.csv")
-        val mergedRowCount = mergeService.merge(successful, appConfig, mergedFile)
+        val mergeResult = mergeService.merge(successful, appConfig, mergedFile)
         val targetLoad = if (appConfig.target.enabled) {
-            runTargetImport(appConfig, valueResolver, mergedFile, successful.first().columns, mergedRowCount)
+            runTargetImport(appConfig, valueResolver, mergedFile, successful.first().columns, mergeResult.rowCount)
         } else {
             logger.info("Загрузка в целевую БД отключена конфигурацией. Импорт пропускается.")
             TargetLoadSummary(
@@ -69,7 +71,7 @@ class ApplicationRunner(
         writeSummary(
             outputDir = outputDir,
             results = filteredResults,
-            mergedRowCount = mergedRowCount,
+            mergeResult = mergeResult,
             mergedFile = mergedFile,
             targetLoad = targetLoad,
             startedAt = runStartedAt,
@@ -79,7 +81,7 @@ class ApplicationRunner(
         require(!appConfig.target.enabled || targetLoad.status == ExecutionStatus.SUCCESS) {
             "Ошибка загрузки в целевую таблицу ${appConfig.target.table}: ${targetLoad.errorMessage}"
         }
-        logger.info("Объединено {} строк в файл {}", mergedRowCount, mergedFile)
+        logger.info("Объединено {} строк в файл {}", mergeResult.rowCount, mergedFile)
     }
 
     private fun exportSources(
@@ -106,6 +108,7 @@ class ApplicationRunner(
                                 sql = sourceSql,
                                 outputFile = outputDir.resolve("${source.name}.csv"),
                                 fetchSize = appConfig.fetchSize,
+                                progressLogEveryRows = appConfig.progressLogEveryRows,
                             )
                         )
                     } catch (ex: Exception) {
@@ -155,7 +158,7 @@ class ApplicationRunner(
     private fun writeSummary(
         outputDir: Path,
         results: List<SourceExecutionResult>,
-        mergedRowCount: Long,
+        mergeResult: com.example.datapoolloader.model.MergeResult,
         mergedFile: Path,
         targetLoad: TargetLoadSummary,
         startedAt: Instant,
@@ -166,8 +169,10 @@ class ApplicationRunner(
             startedAt = startedAt,
             finishedAt = finishedAt,
             mergeMode = config.mergeMode,
-            mergedRowCount = mergedRowCount,
+            mergedRowCount = mergeResult.rowCount,
             mergedFile = mergedFile.fileName.toString(),
+            maxMergedRows = config.maxMergedRows,
+            mergeDetails = buildMergeSummary(results, mergeResult),
             targetLoad = targetLoad,
             successfulSources = results.filter { it.status == ExecutionStatus.SUCCESS }.map(::toSummary),
             failedSources = results.filter { it.status != ExecutionStatus.SUCCESS }.map(::toSummary),
@@ -176,6 +181,24 @@ class ApplicationRunner(
         Files.newBufferedWriter(outputDir.resolve("summary.json")).use { writer ->
             summaryMapper.writerWithDefaultPrettyPrinter().writeValue(writer, summary)
         }
+    }
+
+    private fun buildMergeSummary(
+        results: List<SourceExecutionResult>,
+        mergeResult: com.example.datapoolloader.model.MergeResult,
+    ): MergeSummary {
+        val successful = results.filter { it.status == ExecutionStatus.SUCCESS }.associateBy { it.sourceName }
+        val total = mergeResult.rowCount.toDouble().takeIf { it > 0 } ?: 1.0
+        val allocations = successful.values.map { result ->
+            val mergedRows = mergeResult.sourceCounts[result.sourceName] ?: 0L
+            MergeSourceAllocation(
+                sourceName = result.sourceName,
+                availableRows = result.rowCount,
+                mergedRows = mergedRows,
+                mergedPercent = if (mergeResult.rowCount == 0L) 0.0 else (mergedRows * 100.0 / total),
+            )
+        }.sortedBy { it.sourceName }
+        return MergeSummary(sourceAllocations = allocations)
     }
 
     private fun toSummary(result: SourceExecutionResult): SourceSummary = SourceSummary(

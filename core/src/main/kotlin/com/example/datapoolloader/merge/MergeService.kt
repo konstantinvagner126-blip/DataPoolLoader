@@ -2,6 +2,7 @@ package com.example.datapoolloader.merge
 
 import com.example.datapoolloader.export.CsvSupport
 import com.example.datapoolloader.model.AppConfig
+import com.example.datapoolloader.model.MergeResult
 import com.example.datapoolloader.model.MergeMode
 import com.example.datapoolloader.model.SourceExecutionResult
 import org.apache.commons.csv.CSVParser
@@ -17,59 +18,71 @@ class MergeService {
         successfulSources: List<SourceExecutionResult>,
         appConfig: AppConfig,
         outputFile: Path,
-    ): Long {
+    ): MergeResult {
         require(successfulSources.isNotEmpty()) { "Нет успешных источников для объединения." }
 
         Files.newBufferedWriter(outputFile).use { writer ->
             CSVPrinter(writer, CsvSupport.formatWithoutAutoHeader).use { printer ->
                 printer.printRecord(successfulSources.first().columns)
-                val mergedRows = when (appConfig.mergeMode) {
-                    MergeMode.PLAIN -> mergePlain(successfulSources, printer)
-                    MergeMode.ROUND_ROBIN -> mergeRoundRobin(successfulSources, printer)
+                val merged = when (appConfig.mergeMode) {
+                    MergeMode.PLAIN -> mergePlain(successfulSources, printer, appConfig.maxMergedRows)
+                    MergeMode.ROUND_ROBIN -> mergeRoundRobin(successfulSources, printer, appConfig.maxMergedRows)
                     MergeMode.PROPORTIONAL -> mergeWeighted(
                         successfulSources = successfulSources,
-                        targetCounts = successfulSources.associate { it.sourceName to it.rowCount },
+                        targetCounts = capTargetCounts(
+                            successfulSources.associate { it.sourceName to it.rowCount },
+                            appConfig.maxMergedRows,
+                        ),
                         printer = printer,
                     )
                     MergeMode.QUOTA -> mergeWeighted(
                         successfulSources = successfulSources,
-                        targetCounts = buildQuotaTargetCounts(successfulSources, appConfig),
+                        targetCounts = capTargetCounts(buildQuotaTargetCounts(successfulSources, appConfig), appConfig.maxMergedRows),
                         printer = printer,
                     )
                 }
                 printer.flush()
-                return mergedRows
+                return merged
             }
         }
     }
 
-    private fun mergePlain(sources: List<SourceExecutionResult>, printer: CSVPrinter): Long {
+    private fun mergePlain(sources: List<SourceExecutionResult>, printer: CSVPrinter, maxRows: Long?): MergeResult {
         var total = 0L
+        val counts = linkedMapOf<String, Long>()
         sources.forEach { source ->
+            if (maxRows != null && total >= maxRows) return@forEach
             openParser(source.outputFile!!).use { parser ->
-                parser.forEach { record ->
+                val iterator = parser.iterator()
+                while (iterator.hasNext()) {
+                    if (maxRows != null && total >= maxRows) break
+                    val record = iterator.next()
                     printer.printRecord(record.toList())
                     total++
+                    counts[source.sourceName] = (counts[source.sourceName] ?: 0L) + 1
                 }
             }
         }
-        return total
+        return MergeResult(total, counts)
     }
 
-    private fun mergeRoundRobin(sources: List<SourceExecutionResult>, printer: CSVPrinter): Long {
+    private fun mergeRoundRobin(sources: List<SourceExecutionResult>, printer: CSVPrinter, maxRows: Long?): MergeResult {
         if (sources.size > maxOpenReaders) {
-            return mergeRoundRobinWithReopen(sources, printer)
+            return mergeRoundRobinWithReopen(sources, printer, maxRows)
         }
 
         val readers = sources.map { source ->
             SourceReader(source.sourceName, openParser(source.outputFile!!))
         }.toMutableList()
         var total = 0L
+        val counts = linkedMapOf<String, Long>()
 
         try {
             while (readers.isNotEmpty()) {
+                if (maxRows != null && total >= maxRows) break
                 val iterator = readers.iterator()
                 while (iterator.hasNext()) {
+                    if (maxRows != null && total >= maxRows) break
                     val reader = iterator.next()
                     val record = reader.nextRecord()
                     if (record == null) {
@@ -78,6 +91,7 @@ class MergeService {
                     } else {
                         printer.printRecord(record)
                         total++
+                        counts[reader.sourceName()] = (counts[reader.sourceName()] ?: 0L) + 1
                     }
                 }
             }
@@ -85,16 +99,19 @@ class MergeService {
             readers.forEach { it.close() }
         }
 
-        return total
+        return MergeResult(total, counts)
     }
 
-    private fun mergeRoundRobinWithReopen(sources: List<SourceExecutionResult>, printer: CSVPrinter): Long {
+    private fun mergeRoundRobinWithReopen(sources: List<SourceExecutionResult>, printer: CSVPrinter, maxRows: Long?): MergeResult {
         val cursors = sources.map { ReopenableSourceCursor(it) }.toMutableList()
         var total = 0L
+        val counts = linkedMapOf<String, Long>()
 
         while (cursors.isNotEmpty()) {
+            if (maxRows != null && total >= maxRows) break
             val iterator = cursors.iterator()
             while (iterator.hasNext()) {
+                if (maxRows != null && total >= maxRows) break
                 val cursor = iterator.next()
                 val record = cursor.nextRecord()
                 if (record == null) {
@@ -102,21 +119,22 @@ class MergeService {
                 } else {
                     printer.printRecord(record)
                     total++
+                    counts[cursor.sourceName()] = (counts[cursor.sourceName()] ?: 0L) + 1
                 }
             }
         }
 
-        return total
+        return MergeResult(total, counts)
     }
 
     private fun mergeWeighted(
         successfulSources: List<SourceExecutionResult>,
         targetCounts: Map<String, Long>,
         printer: CSVPrinter,
-    ): Long {
+    ): MergeResult {
         val activeSources = successfulSources.filter { (targetCounts[it.sourceName] ?: 0L) > 0L }
         if (activeSources.isEmpty()) {
-            return 0L
+            return MergeResult(0L, emptyMap())
         }
 
         val totalTarget = targetCounts.values.sum()
@@ -138,6 +156,7 @@ class MergeService {
         }.toMutableList()
 
         var total = 0L
+        val counts = linkedMapOf<String, Long>()
         try {
             while (scheduler.isNotEmpty()) {
                 val next = scheduler.minWithOrNull(compareBy<WeightedSourceState> { it.pass }.thenBy { it.order }) ?: break
@@ -150,6 +169,7 @@ class MergeService {
 
                 printer.printRecord(record)
                 total++
+                counts[next.sourceName] = (counts[next.sourceName] ?: 0L) + 1
                 next.emitted++
                 next.pass += next.stride
                 if (next.emitted >= next.targetCount) {
@@ -160,7 +180,35 @@ class MergeService {
             cursors.values.forEach { it.close() }
         }
 
-        return total
+        return MergeResult(total, counts)
+    }
+
+    private fun capTargetCounts(targetCounts: Map<String, Long>, maxMergedRows: Long?): Map<String, Long> {
+        if (maxMergedRows == null) return targetCounts
+        val total = targetCounts.values.sum()
+        if (total <= maxMergedRows) return targetCounts
+        if (maxMergedRows <= 0) return targetCounts.mapValues { 0L }
+
+        val raw = targetCounts.map { (sourceName, count) ->
+            val scaled = count.toDouble() * maxMergedRows.toDouble() / total.toDouble()
+            ScaledCount(
+                sourceName = sourceName,
+                count = kotlin.math.floor(scaled).toLong(),
+                fractional = scaled - kotlin.math.floor(scaled),
+                maxAvailable = count,
+            )
+        }.toMutableList()
+
+        var remaining = maxMergedRows - raw.sumOf { it.count }
+        raw.sortedByDescending { it.fractional }.forEach { item ->
+            if (remaining <= 0) return@forEach
+            if (item.count < item.maxAvailable) {
+                item.count++
+                remaining--
+            }
+        }
+
+        return raw.associate { it.sourceName to it.count }
     }
 
     private fun buildQuotaTargetCounts(
@@ -216,6 +264,7 @@ class MergeService {
 
 private interface SourceCursor : AutoCloseable {
     fun nextRecord(): List<String>?
+    fun sourceName(): String
 }
 
 private class SourceReader(
@@ -234,6 +283,8 @@ private class SourceReader(
     override fun close() {
         parser.close()
     }
+
+    override fun sourceName(): String = sourceName
 }
 
 private class ReopenableSourceCursor(
@@ -259,6 +310,8 @@ private class ReopenableSourceCursor(
     }
 
     override fun close() = Unit
+
+    override fun sourceName(): String = source.sourceName
 }
 
 private fun openParserInternal(file: Path): CSVParser {
@@ -278,6 +331,8 @@ private class OpenSourceCursor(
     override fun nextRecord(): List<String>? = delegate.nextRecord()
 
     override fun close() = delegate.close()
+
+    override fun sourceName(): String = delegate.sourceName()
 }
 
 private data class WeightedSourceState(
@@ -294,4 +349,11 @@ private data class PlannedCount(
     var targetCount: Long,
     val fractional: Double,
     val available: Long,
+)
+
+private data class ScaledCount(
+    val sourceName: String,
+    var count: Long,
+    val fractional: Double,
+    val maxAvailable: Long,
 )

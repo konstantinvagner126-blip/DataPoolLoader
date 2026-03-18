@@ -1,7 +1,7 @@
 app:
   outputDir: ./output
   fileFormat: csv
-  mergeMode: round_robin
+  mergeMode: plain
   errorMode: continue_on_error
   parallelism: 5
   fetchSize: 1000
@@ -10,23 +10,17 @@ app:
   commonSql: |
     select id, created_at, payload
     from some_table
+
   sources:
     - name: db1
       jdbcUrl: ${DB1_JDBC_URL}
       username: ${DB1_USERNAME}
       password: ${DB1_PASSWORD}
-    - name: db2
-      jdbcUrl: ${DB2_JDBC_URL}
-      username: ${DB2_USERNAME}
-      password: local-dev-password
-      sql: |
-        select id, created_at, payload
-        from special_table
 
   target:
-    enabled: true
+    enabled: false
     jdbcUrl: ${TARGET_JDBC_URL}
     username: ${TARGET_USERNAME}
     password: ${TARGET_DB_PASSWORD}
-    table: public.test_data_pool
-    truncateBeforeLoad: true
+    table: public.target_table
+    truncateBeforeLoad: false
