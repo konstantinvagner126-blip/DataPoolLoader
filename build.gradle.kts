@@ -3,18 +3,14 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 
+apply(from = "repositories.gradle")
+
 plugins {
     kotlin("jvm") version "2.2.0" apply false
 }
 
 group = "com.example"
 version = "1.0.0"
-
-allprojects {
-    repositories {
-        mavenCentral()
-    }
-}
 
 subprojects {
     apply(plugin = "org.jetbrains.kotlin.jvm")
