@@ -9,28 +9,28 @@ plugins {
     kotlin("jvm") version "2.2.0" apply false
 }
 
-group = "com.example"
+group = "com.sbrf.lt.datapool"
 version = "1.0.0"
 
 subprojects {
     apply(plugin = "org.jetbrains.kotlin.jvm")
 
     extensions.configure<org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension>("kotlin") {
-        jvmToolchain(25)
+        jvmToolchain(17)
     }
 
     extensions.configure<JavaPluginExtension>("java") {
         toolchain {
-            languageVersion.set(JavaLanguageVersion.of(25))
+            languageVersion.set(JavaLanguageVersion.of(17))
         }
     }
 
     tasks.withType<JavaCompile>().configureEach {
-        options.release.set(24)
+        options.release.set(17)
     }
 
     tasks.withType<KotlinJvmCompile>().configureEach {
-        compilerOptions.jvmTarget.set(JvmTarget.JVM_24)
+        compilerOptions.jvmTarget.set(JvmTarget.JVM_17)
     }
 
     dependencies {

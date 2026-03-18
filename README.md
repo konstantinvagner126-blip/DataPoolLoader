@@ -23,7 +23,7 @@ Multi-module проект на Kotlin для параллельной выгру
 
 ## Запуск из IDEA
 
-Точка входа первого приложения: `com.example.datapoolloader.app.MainKt`
+Точка входа первого приложения: `com.sbrf.lt.datapool.app.MainKt`
 
 Аргумент конфигурации:
 

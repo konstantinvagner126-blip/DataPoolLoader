@@ -7,5 +7,5 @@ dependencies {
 }
 
 application {
-    mainClass = "com.example.datapoolloader.app.MainKt"
+    mainClass = "com.sbrf.lt.datapool.app.MainKt"
 }
