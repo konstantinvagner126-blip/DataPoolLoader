@@ -1,0 +1,13 @@
+.gradle/
+.kotlin/
+build/
+**/build/
+.idea/
+*.iml
+out/
+
+# Local credentials
+gradle/credential.properties
+
+# macOS
+.DS_Store
