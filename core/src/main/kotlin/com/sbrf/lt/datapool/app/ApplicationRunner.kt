@@ -40,7 +40,11 @@ class ApplicationRunner(
         .registerModule(JavaTimeModule())
         .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
 
-    fun run(configPath: Path, credentialsPath: Path? = defaultCredentialsPath()) {
+    fun run(
+        configPath: Path,
+        credentialsPath: Path? = defaultCredentialsPath(),
+        executionListener: ExecutionListener = NoOpExecutionListener,
+    ): ApplicationRunResult {
         BannerPrinter.printBanner()
         val appConfig = configLoader.load(configPath)
         val valueResolver = ValueResolver.fromFile(credentialsPath)
@@ -48,18 +52,51 @@ class ApplicationRunner(
         val outputDir = createOutputDir(appConfig.outputDir, runStartedAt)
         val generatedFiles = linkedSetOf<Path>()
         logger.info("Используется выходная директория {}", outputDir)
+        executionListener.onEvent(
+            RunStartedEvent(
+                timestamp = runStartedAt,
+                configPath = configPath.toString(),
+                outputDir = outputDir.toString(),
+                sourceNames = appConfig.sources.map { it.name },
+                mergeMode = appConfig.mergeMode,
+                targetEnabled = appConfig.target.enabled,
+            )
+        )
 
         try {
-            val results = exportSources(appConfig, outputDir, valueResolver)
+            val results = exportSources(appConfig, outputDir, valueResolver, executionListener)
             generatedFiles.addAll(results.mapNotNull { it.outputFile })
-            val filteredResults = filterSchemaMismatches(results)
+            val filteredResults = filterSchemaMismatches(results, executionListener)
             val successful = filteredResults.filter { it.status == ExecutionStatus.SUCCESS }
             require(successful.isNotEmpty()) { "Все источники завершились ошибкой. Файл merged.csv не был создан." }
 
             val mergedFile = outputDir.resolve("merged.csv")
+            executionListener.onEvent(
+                MergeStartedEvent(
+                    timestamp = Instant.now(),
+                    mergeMode = appConfig.mergeMode,
+                    sourceNames = successful.map { it.sourceName },
+                    outputFile = mergedFile.toString(),
+                )
+            )
             val mergeResult = mergeService.merge(successful, appConfig, mergedFile)
             generatedFiles.add(mergedFile)
+            executionListener.onEvent(
+                MergeFinishedEvent(
+                    timestamp = Instant.now(),
+                    rowCount = mergeResult.rowCount,
+                    outputFile = mergedFile.toString(),
+                    sourceCounts = mergeResult.sourceCounts,
+                )
+            )
             val targetLoad = if (appConfig.target.enabled) {
+                executionListener.onEvent(
+                    TargetImportStartedEvent(
+                        timestamp = Instant.now(),
+                        table = appConfig.target.table,
+                        expectedRowCount = mergeResult.rowCount,
+                    )
+                )
                 runTargetImport(appConfig, valueResolver, mergedFile, successful.first().columns, mergeResult.rowCount)
             } else {
                 logger.info("Загрузка в целевую БД отключена конфигурацией. Импорт пропускается.")
@@ -72,7 +109,17 @@ class ApplicationRunner(
                     errorMessage = "Загрузка в целевую БД отключена конфигурацией.",
                 )
             }
+            executionListener.onEvent(
+                TargetImportFinishedEvent(
+                    timestamp = Instant.now(),
+                    table = targetLoad.table,
+                    status = targetLoad.status,
+                    rowCount = targetLoad.rowCount,
+                    errorMessage = targetLoad.errorMessage,
+                )
+            )
             val runFinishedAt = Instant.now()
+            val summaryFile = outputDir.resolve("summary.json")
             writeSummary(
                 outputDir = outputDir,
                 results = filteredResults,
@@ -87,9 +134,37 @@ class ApplicationRunner(
                 "Ошибка загрузки в целевую таблицу ${appConfig.target.table}: ${targetLoad.errorMessage}"
             }
             logger.info("Объединено {} строк в файл {}", mergeResult.rowCount, mergedFile)
+            executionListener.onEvent(
+                RunFinishedEvent(
+                    timestamp = runFinishedAt,
+                    status = ExecutionStatus.SUCCESS,
+                    mergedRowCount = mergeResult.rowCount,
+                    outputDir = outputDir.toString(),
+                    summaryFile = summaryFile.toString(),
+                )
+            )
+            return ApplicationRunResult(
+                status = ExecutionStatus.SUCCESS,
+                outputDir = outputDir,
+                mergedRowCount = mergeResult.rowCount,
+                summaryFile = summaryFile,
+            )
+        } catch (ex: Exception) {
+            val finishedAt = Instant.now()
+            executionListener.onEvent(
+                RunFinishedEvent(
+                    timestamp = finishedAt,
+                    status = ExecutionStatus.FAILED,
+                    mergedRowCount = 0,
+                    outputDir = outputDir.toString(),
+                    summaryFile = outputDir.resolve("summary.json").takeIf { Files.exists(it) }?.toString(),
+                    errorMessage = ex.message ?: "Неизвестная ошибка",
+                )
+            )
+            throw ex
         } finally {
             if (appConfig.deleteOutputFilesAfterCompletion) {
-                cleanupGeneratedFiles(generatedFiles)
+                cleanupGeneratedFiles(generatedFiles, executionListener)
             }
         }
     }
@@ -98,6 +173,7 @@ class ApplicationRunner(
         appConfig: AppConfig,
         outputDir: Path,
         valueResolver: ValueResolver,
+        executionListener: ExecutionListener,
     ): List<SourceExecutionResult> {
         val executor = Executors.newFixedThreadPool(appConfig.parallelism)
         return try {
@@ -119,10 +195,23 @@ class ApplicationRunner(
                                 outputFile = outputDir.resolve("${source.name}.csv"),
                                 fetchSize = appConfig.fetchSize,
                                 progressLogEveryRows = appConfig.progressLogEveryRows,
+                                executionListener = executionListener,
                             )
                         )
                     } catch (ex: Exception) {
                         logger.error("Источник {} завершился ошибкой до начала выгрузки: {}", source.name, ex.message, ex)
+                        val finishedAt = Instant.now()
+                        executionListener.onEvent(
+                            SourceExportFinishedEvent(
+                                timestamp = finishedAt,
+                                sourceName = source.name,
+                                status = ExecutionStatus.FAILED,
+                                rowCount = 0,
+                                columns = emptyList(),
+                                outputFile = null,
+                                errorMessage = ex.message ?: "Неизвестная ошибка",
+                            )
+                        )
                         SourceExecutionResult(
                             sourceName = source.name,
                             status = ExecutionStatus.FAILED,
@@ -130,7 +219,7 @@ class ApplicationRunner(
                             outputFile = null,
                             columns = emptyList(),
                             startedAt = startedAt,
-                            finishedAt = Instant.now(),
+                            finishedAt = finishedAt,
                             errorMessage = ex.message ?: "Неизвестная ошибка",
                         )
                     }
@@ -142,7 +231,10 @@ class ApplicationRunner(
         }
     }
 
-    private fun filterSchemaMismatches(results: List<SourceExecutionResult>): List<SourceExecutionResult> {
+    private fun filterSchemaMismatches(
+        results: List<SourceExecutionResult>,
+        executionListener: ExecutionListener,
+    ): List<SourceExecutionResult> {
         val baseline = results.firstOrNull { it.status == ExecutionStatus.SUCCESS }?.columns ?: return results
         return results.map { result ->
             if (result.status != ExecutionStatus.SUCCESS) {
@@ -155,6 +247,14 @@ class ApplicationRunner(
                     result.sourceName,
                     result.columns,
                     baseline,
+                )
+                executionListener.onEvent(
+                    SourceSchemaMismatchEvent(
+                        timestamp = Instant.now(),
+                        sourceName = result.sourceName,
+                        expectedColumns = baseline,
+                        actualColumns = result.columns,
+                    )
                 )
                 result.copy(
                     status = ExecutionStatus.SKIPPED_SCHEMA_MISMATCH,
@@ -274,11 +374,17 @@ class ApplicationRunner(
         return if (Files.exists(candidate)) candidate else null
     }
 
-    private fun cleanupGeneratedFiles(files: Set<Path>) {
+    private fun cleanupGeneratedFiles(files: Set<Path>, executionListener: ExecutionListener) {
         files.forEach { path ->
             try {
                 if (Files.deleteIfExists(path)) {
                     logger.info("Удален временный выходной файл {}", path.fileName)
+                    executionListener.onEvent(
+                        OutputCleanupEvent(
+                            timestamp = Instant.now(),
+                            fileName = path.fileName.toString(),
+                        )
+                    )
                 }
             } catch (ex: Exception) {
                 logger.warn("Не удалось удалить временный выходной файл {}: {}", path, ex.message)

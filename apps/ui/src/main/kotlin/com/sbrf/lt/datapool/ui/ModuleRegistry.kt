@@ -1,0 +1,110 @@
+package com.sbrf.lt.datapool.ui
+
+import com.sbrf.lt.datapool.config.ConfigLoader
+import java.nio.file.Files
+import java.nio.file.Path
+import kotlin.io.path.createDirectories
+import kotlin.io.path.readText
+import kotlin.io.path.writeText
+
+class ModuleRegistry(
+    private val configLoader: ConfigLoader = ConfigLoader(),
+) {
+    private val mapper = configLoader.objectMapper()
+
+    fun listModules(): List<ModuleDescriptor> {
+        val root = findProjectRoot()
+        val appsDir = root.resolve("apps")
+        if (!Files.exists(appsDir)) return emptyList()
+
+        val appDirs = Files.list(appsDir).use { paths -> paths.toList() }
+        return appDirs
+            .filter { Files.isDirectory(it) }
+            .filter { it.fileName.toString() != "ui" }
+            .filter { Files.exists(it.resolve("build.gradle.kts")) }
+            .mapNotNull { appDir ->
+                val configFile = appDir.resolve("src/main/resources/application.yml")
+                val resourcesDir = appDir.resolve("src/main/resources")
+                if (!Files.exists(configFile)) {
+                    null
+                } else {
+                    ModuleDescriptor(
+                        id = appDir.fileName.toString(),
+                        title = appDir.fileName.toString(),
+                        configFile = configFile,
+                        resourcesDir = resourcesDir,
+                    )
+                }
+            }
+            .sortedBy { it.id }
+    }
+
+    fun getModule(moduleId: String): ModuleDescriptor =
+        listModules().firstOrNull { it.id == moduleId }
+            ?: error("Модуль '$moduleId' не найден.")
+
+    fun loadModuleDetails(moduleId: String): ModuleDetailsResponse {
+        val module = getModule(moduleId)
+        val configText = module.configFile.readText()
+        val sqlFiles = extractSqlReferences(configText).map { sqlRef ->
+            val path = resolveSqlPath(module, sqlRef)
+            ModuleFileContent(
+                path = sqlRef,
+                content = path?.takeIf { Files.exists(it) }?.readText() ?: "",
+                exists = path?.let { Files.exists(it) } == true,
+            )
+        }
+        return ModuleDetailsResponse(
+            id = module.id,
+            title = module.title,
+            configPath = module.configFile.toString(),
+            configText = configText,
+            sqlFiles = sqlFiles,
+        )
+    }
+
+    fun saveModule(moduleId: String, request: SaveModuleRequest) {
+        val module = getModule(moduleId)
+        module.configFile.writeText(request.configText)
+
+        extractSqlReferences(request.configText).forEach { sqlRef ->
+            val content = request.sqlFiles[sqlRef] ?: return@forEach
+            val file = resolveSqlPath(module, sqlRef) ?: return@forEach
+            file.parent?.createDirectories()
+            file.writeText(content)
+        }
+    }
+
+    fun extractSqlReferences(configText: String): List<String> {
+        val root = mapper.readTree(configText) ?: return emptyList()
+        val app = root.path("app")
+        val refs = linkedSetOf<String>()
+        app.path("commonSqlFile").takeIf { it.isTextual }?.asText()?.takeIf { it.isNotBlank() }?.let(refs::add)
+        app.path("sources").takeIf { it.isArray }?.forEach { source ->
+            source.path("sqlFile").takeIf { it.isTextual }?.asText()?.takeIf { it.isNotBlank() }?.let(refs::add)
+        }
+        return refs.toList()
+    }
+
+    fun resolveSqlPath(module: ModuleDescriptor, sqlRef: String): Path? {
+        val trimmed = sqlRef.trim()
+        if (trimmed.isBlank()) return null
+        return if (trimmed.startsWith("classpath:")) {
+            module.resourcesDir.resolve(trimmed.removePrefix("classpath:").removePrefix("/")).normalize()
+        } else {
+            val path = Path.of(trimmed)
+            if (path.isAbsolute) path else module.configFile.parent.resolve(path).normalize()
+        }
+    }
+
+    fun findProjectRoot(): Path {
+        var current = Path.of("").toAbsolutePath().normalize()
+        while (current.parent != null) {
+            if (Files.exists(current.resolve("settings.gradle.kts"))) {
+                return current
+            }
+            current = current.parent
+        }
+        error("Не удалось определить корень проекта по settings.gradle.kts")
+    }
+}

@@ -1,5 +1,8 @@
 package com.sbrf.lt.datapool.db
 
+import com.sbrf.lt.datapool.app.SourceExportFinishedEvent
+import com.sbrf.lt.datapool.app.SourceExportProgressEvent
+import com.sbrf.lt.datapool.app.SourceExportStartedEvent
 import com.sbrf.lt.datapool.export.CsvSupport
 import com.sbrf.lt.datapool.model.ExecutionStatus
 import com.sbrf.lt.datapool.model.ExportTask
@@ -19,6 +22,12 @@ class PostgresExporter {
     fun export(task: ExportTask): SourceExecutionResult {
         val startedAt = Instant.now()
         logger.info("Запуск выгрузки для источника {}", task.source.name)
+        task.executionListener.onEvent(
+            SourceExportStartedEvent(
+                timestamp = startedAt,
+                sourceName = task.source.name,
+            )
+        )
 
         return try {
             DriverManager.getConnection(task.resolvedJdbcUrl, task.resolvedUsername, task.resolvedPassword).use { connection ->
@@ -41,7 +50,7 @@ class PostgresExporter {
                                     }
                                     printer.printRecord(row)
                                     rowCount++
-                                    logProgress(task.source.name, rowCount, task.progressLogEveryRows)
+                                    logProgress(task, rowCount)
                                 }
                                 printer.flush()
                                 val finishedAt = Instant.now()
@@ -50,7 +59,7 @@ class PostgresExporter {
                                 } else {
                                     logger.info("Выгрузка источника {} завершена. Получено {} строк", task.source.name, rowCount)
                                 }
-                                SourceExecutionResult(
+                                val result = SourceExecutionResult(
                                     sourceName = task.source.name,
                                     status = ExecutionStatus.SUCCESS,
                                     rowCount = rowCount,
@@ -59,6 +68,17 @@ class PostgresExporter {
                                     startedAt = startedAt,
                                     finishedAt = finishedAt,
                                 )
+                                task.executionListener.onEvent(
+                                    SourceExportFinishedEvent(
+                                        timestamp = finishedAt,
+                                        sourceName = task.source.name,
+                                        status = result.status,
+                                        rowCount = result.rowCount,
+                                        columns = result.columns,
+                                        outputFile = result.outputFile?.toString(),
+                                    )
+                                )
+                                result
                             }
                         }
                     }
@@ -66,16 +86,29 @@ class PostgresExporter {
             }
         } catch (ex: Exception) {
             logger.error("Ошибка выгрузки для источника {}: {}", task.source.name, ex.message, ex)
-            SourceExecutionResult(
+            val failedAt = Instant.now()
+            val result = SourceExecutionResult(
                 sourceName = task.source.name,
                 status = ExecutionStatus.FAILED,
                 rowCount = 0,
                 outputFile = null,
                 columns = emptyList(),
                 startedAt = startedAt,
-                finishedAt = Instant.now(),
+                finishedAt = failedAt,
                 errorMessage = ex.message ?: "Неизвестная ошибка",
             )
+            task.executionListener.onEvent(
+                SourceExportFinishedEvent(
+                    timestamp = failedAt,
+                    sourceName = task.source.name,
+                    status = result.status,
+                    rowCount = result.rowCount,
+                    columns = result.columns,
+                    outputFile = null,
+                    errorMessage = result.errorMessage,
+                )
+            )
+            result
         }
     }
 
@@ -89,9 +122,16 @@ class PostgresExporter {
         return (1..metaData.columnCount).map { metaData.getColumnLabel(it) }
     }
 
-    private fun logProgress(sourceName: String, rowCount: Long, interval: Long) {
-        if (rowCount % interval == 0L) {
-            logger.info("Выгрузка источника {}: обработано {} строк", sourceName, rowCount)
+    private fun logProgress(task: ExportTask, rowCount: Long) {
+        if (rowCount % task.progressLogEveryRows == 0L) {
+            logger.info("Выгрузка источника {}: обработано {} строк", task.source.name, rowCount)
+            task.executionListener.onEvent(
+                SourceExportProgressEvent(
+                    timestamp = Instant.now(),
+                    sourceName = task.source.name,
+                    rowCount = rowCount,
+                )
+            )
         }
     }
 }

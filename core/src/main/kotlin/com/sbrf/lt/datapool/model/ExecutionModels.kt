@@ -1,5 +1,7 @@
 package com.sbrf.lt.datapool.model
 
+import com.sbrf.lt.datapool.app.ExecutionListener
+import com.sbrf.lt.datapool.app.NoOpExecutionListener
 import java.nio.file.Path
 import java.time.Instant
 
@@ -12,6 +14,7 @@ data class ExportTask(
     val outputFile: Path,
     val fetchSize: Int,
     val progressLogEveryRows: Long,
+    val executionListener: ExecutionListener = NoOpExecutionListener,
 )
 
 data class SourceExecutionResult(
@@ -26,6 +29,7 @@ data class SourceExecutionResult(
 )
 
 enum class ExecutionStatus {
+    RUNNING,
     SUCCESS,
     FAILED,
     SKIPPED_SCHEMA_MISMATCH,
