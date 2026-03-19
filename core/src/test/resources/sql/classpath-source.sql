@@ -1,0 +1,2 @@
+select id
+from classpath_source_override

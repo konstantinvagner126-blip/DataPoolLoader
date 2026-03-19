@@ -329,6 +329,76 @@ class ConfigLoaderTest {
     }
 
     @Test
+    fun `loads common sql from classpath resource`() {
+        val configFile = Files.createTempFile("config", ".yml")
+        Files.writeString(
+            configFile,
+            """
+            app:
+              fileFormat: csv
+              mergeMode: plain
+              errorMode: continue_on_error
+              parallelism: 1
+              fetchSize: 100
+              commonSqlFile: classpath:sql/classpath-common.sql
+              target:
+                enabled: false
+              sources:
+                - name: db1
+                  jdbcUrl: jdbc:postgresql://localhost:5432/db1
+                  username: user
+                  password: secret
+            """.trimIndent()
+        )
+
+        val config = loader.load(configFile)
+
+        assertEquals(
+            """
+            select id, created_at
+            from classpath_common_source
+            """.trimIndent(),
+            config.commonSql,
+        )
+        assertEquals("classpath:sql/classpath-common.sql", config.commonSqlFile)
+    }
+
+    @Test
+    fun `loads source override sql from classpath resource`() {
+        val configFile = Files.createTempFile("config", ".yml")
+        Files.writeString(
+            configFile,
+            """
+            app:
+              fileFormat: csv
+              mergeMode: plain
+              errorMode: continue_on_error
+              parallelism: 1
+              fetchSize: 100
+              target:
+                enabled: false
+              sources:
+                - name: db1
+                  jdbcUrl: jdbc:postgresql://localhost:5432/db1
+                  username: user
+                  password: secret
+                  sqlFile: classpath:sql/classpath-source.sql
+            """.trimIndent()
+        )
+
+        val config = loader.load(configFile)
+
+        assertEquals(
+            """
+            select id
+            from classpath_source_override
+            """.trimIndent(),
+            config.sources.single().sql,
+        )
+        assertEquals("classpath:sql/classpath-source.sql", config.sources.single().sqlFile)
+    }
+
+    @Test
     fun `rejects common sql and common sql file together`() {
         val dir = Files.createTempDirectory("config-dir")
         dir.resolve("query.sql").writeText("select 1")

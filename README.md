@@ -96,7 +96,7 @@ app:
   progressLogEveryRows: 10000
   maxMergedRows:
   deleteOutputFilesAfterCompletion: false
-  commonSqlFile: ./sql/common.sql
+  commonSqlFile: classpath:sql/common.sql
 
   sources:
     - name: db1
@@ -108,7 +108,7 @@ app:
       jdbcUrl: ${DB2_JDBC_URL}
       username: ${DB2_USERNAME}
       password: local-dev-password
-      sqlFile: ./sql/db2_override.sql
+      sqlFile: classpath:sql/db2_override.sql
 
   target:
     enabled: true
@@ -216,11 +216,16 @@ app:
 
 - `commonSqlFile`
   Путь к `.sql` файлу с общим SQL-запросом для всех источников.
-  Путь разрешается относительно каталога, в котором лежит `application.yml`.
+  Поддерживаются два варианта:
+  - `classpath:sql/common.sql` для ресурсов приложения;
+  - относительный/абсолютный путь в файловой системе.
+  Для `classpath:` путь считается внутри `src/main/resources`:
+  - `classpath:sql/common.sql` -> `src/main/resources/sql/common.sql`
+  Относительный путь разрешается относительно каталога, в котором лежит `application.yml`.
   Нельзя указывать одновременно с `commonSql`.
   Пример:
   ```yaml
-  commonSqlFile: ./sql/common.sql
+  commonSqlFile: classpath:sql/common.sql
   ```
 
 ### Блок `app.sources`
@@ -266,11 +271,13 @@ app:
 - `sqlFile`
   Необязательный путь к `.sql` файлу для конкретного источника.
   Если задан, он имеет приоритет над `commonSql` и `commonSqlFile`.
-  Путь разрешается относительно каталога `application.yml`.
+  Поддерживаются `classpath:`-ресурсы и файловые пути.
+  Для `classpath:` путь считается внутри `src/main/resources`.
+  Относительный путь разрешается относительно каталога `application.yml`.
   Нельзя указывать одновременно с `sql`.
   Пример:
   ```yaml
-  sqlFile: ./sql/db2_override.sql
+  sqlFile: classpath:sql/db2_override.sql
   ```
 
 ### Приоритет выбора SQL
@@ -287,6 +294,7 @@ app:
 - на одном уровне нельзя одновременно задавать inline SQL и SQL-файл;
 - SQL-файл должен существовать и быть непустым;
 - содержимое SQL-файла читается в `UTF-8`;
+- `classpath:`-ресурсы читаются из classpath приложения;
 - относительные пути разрешаются относительно каталога, где лежит `application.yml`.
 
 ### Блок `app.quotas`
@@ -537,7 +545,7 @@ B B B B B B B B B A B B B B B B B B B A ...
 ```yaml
 app:
   mergeMode: quota
-  commonSqlFile: ./sql/common.sql
+  commonSqlFile: classpath:sql/common.sql
 
   quotas:
     - source: db1
@@ -614,7 +622,7 @@ availableRows / quotaShare
 ```yaml
 app:
   mergeMode: quota
-  commonSqlFile: ./sql/common.sql
+  commonSqlFile: classpath:sql/common.sql
 
   quotas:
     - source: db1

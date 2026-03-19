@@ -8,7 +8,7 @@ app:
   progressLogEveryRows: 10000
   maxMergedRows:
   deleteOutputFilesAfterCompletion: false
-  commonSqlFile: ./sql/common.sql
+  commonSqlFile: classpath:sql/common.sql
 
   sources:
     - name: db1

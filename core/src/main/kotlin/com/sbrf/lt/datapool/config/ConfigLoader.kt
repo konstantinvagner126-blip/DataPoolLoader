@@ -171,10 +171,31 @@ private fun isSelectOnly(sql: String): Boolean {
 }
 
 private fun readSqlFile(configDir: Path, rawPath: String, fieldName: String): String {
-    val sqlPath = configDir.resolve(rawPath.trim()).normalize()
+    val trimmedPath = rawPath.trim()
+    return if (trimmedPath.startsWith("classpath:")) {
+        readClasspathSql(trimmedPath.removePrefix("classpath:").removePrefix("/"), fieldName)
+    } else {
+        readFilesystemSql(configDir, trimmedPath, fieldName)
+    }
+}
+
+private fun readFilesystemSql(configDir: Path, rawPath: String, fieldName: String): String {
+    val sqlPath = configDir.resolve(rawPath).normalize()
     require(Files.exists(sqlPath)) { "Файл SQL для параметра $fieldName не найден: $sqlPath" }
     require(Files.isRegularFile(sqlPath)) { "Путь SQL для параметра $fieldName не является файлом: $sqlPath" }
     val content = sqlPath.bufferedReader(Charsets.UTF_8).use { it.readText() }.trim()
     require(content.isNotEmpty()) { "Файл SQL для параметра $fieldName пуст: $sqlPath" }
+    return content
+}
+
+private fun readClasspathSql(resourcePath: String, fieldName: String): String {
+    require(resourcePath.isNotBlank()) {
+        "Для параметра $fieldName задан пустой classpath-ресурс SQL."
+    }
+    val stream = Thread.currentThread().contextClassLoader.getResourceAsStream(resourcePath)
+        ?: ConfigLoader::class.java.classLoader.getResourceAsStream(resourcePath)
+    requireNotNull(stream) { "Classpath-ресурс SQL для параметра $fieldName не найден: $resourcePath" }
+    val content = stream.bufferedReader(Charsets.UTF_8).use { it.readText() }.trim()
+    require(content.isNotEmpty()) { "Classpath-ресурс SQL для параметра $fieldName пуст: $resourcePath" }
     return content
 }
