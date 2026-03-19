@@ -34,4 +34,18 @@ class ValueResolverTest {
             resolver.resolve("\${UNKNOWN_KEY}")
         }
     }
+
+    @Test
+    fun `resolves value from credentials file with utf8 bom`() {
+        val file = Files.createTempFile("credential-bom", ".properties")
+        Files.writeString(
+            file,
+            "\uFEFFDB1_JDBC_URL=jdbc:postgresql://localhost:5432/db1\nDB1_USERNAME=user1\n",
+        )
+
+        val resolver = ValueResolver.fromFile(file)
+
+        assertEquals("jdbc:postgresql://localhost:5432/db1", resolver.resolve("\${DB1_JDBC_URL}"))
+        assertEquals("user1", resolver.resolve("\${DB1_USERNAME}"))
+    }
 }

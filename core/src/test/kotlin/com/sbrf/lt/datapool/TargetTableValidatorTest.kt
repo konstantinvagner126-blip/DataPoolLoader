@@ -85,4 +85,35 @@ class TargetTableValidatorTest {
         assertEquals("public", tableRef.schema)
         assertEquals("test_data_pool", tableRef.table)
     }
+
+    @Test
+    fun `validates target table using jdbc metadata query`() {
+        val validator = TargetTableValidator(
+            connectionProvider = { _, _, _ ->
+                validatorConnection(
+                    listOf(
+                        TargetColumn("id", nullable = false, hasDefault = false),
+                        TargetColumn("payload", nullable = true, hasDefault = false),
+                    ),
+                )
+            },
+        )
+
+        validator.validate(
+            target = com.sbrf.lt.datapool.model.TargetConfig(table = "public.test_data_pool"),
+            resolvedJdbcUrl = "jdbc:test",
+            resolvedUsername = "user",
+            resolvedPassword = "pwd",
+            incomingColumns = listOf("id", "payload"),
+        )
+    }
+
+    @Test
+    fun `rejects invalid qualified table name`() {
+        val error = assertFailsWith<IllegalArgumentException> {
+            validator.parseTableReference("public.test-data")
+        }
+
+        assertEquals("Неподдерживаемый идентификатор таблицы 'test-data'.", error.message)
+    }
 }

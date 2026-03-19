@@ -9,6 +9,7 @@ import com.sbrf.lt.datapool.model.ExecutionStatus
 import com.fasterxml.jackson.databind.node.ObjectNode
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Instant
@@ -23,6 +24,7 @@ class RunManager(
     private val applicationRunner: ApplicationRunner = ApplicationRunner(),
     private val uiConfig: UiAppConfig = UiConfigLoader().load(),
 ) {
+    private val logger = LoggerFactory.getLogger(javaClass)
     private val executor = Executors.newSingleThreadExecutor()
     private val snapshots = mutableListOf<MutableRunSnapshot>()
     private val updatesFlow = MutableSharedFlow<UiStateResponse>(replay = 1, extraBufferCapacity = 32)
@@ -124,7 +126,7 @@ class RunManager(
         publishState()
         val tempDir = Files.createTempDirectory("datapool-ui-${module.id}-")
         val tempConfig = prepareWorkingCopy(module, request, tempDir)
-        val credentialsPath = resolveCredentialsPath(tempDir)
+        val credentialsPath = materializeCredentialsFile(tempDir)
         return applicationRunner.run(
             configPath = tempConfig,
             credentialsPath = credentialsPath,
@@ -153,15 +155,22 @@ class RunManager(
         }
     }
 
-    private fun resolveCredentialsPath(tempDir: Path): Path? {
+    internal fun materializeCredentialsFile(tempDir: Path): Path? {
         val uploaded = synchronized(this) { uploadedCredentials }
         if (uploaded != null) {
             val path = tempDir.resolve("credential.properties")
             path.writeText(uploaded.content)
+            logger.info("Для запуска используется credential.properties, загруженный через UI: {}", uploaded.fileName)
             return path
         }
         val fallback = uiConfig.defaultCredentialsPath()
-        return fallback?.takeIf { Files.exists(it) }
+        val resolved = fallback?.takeIf { Files.exists(it) }
+        if (resolved != null) {
+            logger.info("Для запуска используется fallback credential.properties: {}", resolved)
+        } else {
+            logger.info("credential.properties для запуска не найден, будет использован только inline/env/system resolution")
+        }
+        return resolved
     }
 
     private fun usesCredentialPlaceholders(configText: String): Boolean =

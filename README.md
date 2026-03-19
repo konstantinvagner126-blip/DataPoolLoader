@@ -6,6 +6,7 @@ Multi-module проект на Kotlin для параллельной выгру
 
 - [core](/Users/kwdev/DataPoolLoader/core) — библиотечный модуль с общей логикой.
 - [apps/dc-sms-offer](/Users/kwdev/DataPoolLoader/apps/dc-sms-offer) — первое запускаемое приложение.
+- [apps/local-manual-test](/Users/kwdev/DataPoolLoader/apps/local-manual-test) — локальный сценарий для ручной проверки на PostgreSQL, установленном на машине.
 - [ui](/Users/kwdev/DataPoolLoader/ui) — локальный Ktor UI для запуска и редактирования модулей через браузер.
 
 Пользовательские сценарии добавляются как отдельные app-модули, которые зависят от `core`.
@@ -50,6 +51,92 @@ Multi-module проект на Kotlin для параллельной выгру
 ```text
 ./gradlew test
 ./gradlew :apps:dc-sms-offer:run
+```
+
+## Ручная проверка на локальном PostgreSQL
+
+Для ручной проверки приложения на локальной БД добавлен модуль:
+
+- [apps/local-manual-test](/Users/kwdev/DataPoolLoader/apps/local-manual-test)
+
+Он настроен на локальный PostgreSQL:
+
+- host: `127.0.0.1`
+- port: `5432`
+- database: `postgres`
+- username: `kwdev`
+- password: `dummy`
+
+Перед первым запуском нужно подготовить тестовые таблицы:
+
+```text
+./scripts/setup-local-manual-db.sh
+```
+
+Что создается:
+
+- schema `datapool_manual`
+- таблицы `source_1 ... source_5`
+- таблица `target_pool`
+- тестовые данные для ручного прогона
+
+SQL подготовки лежит в:
+
+- [scripts/local-postgres-manual-setup.sql](/Users/kwdev/DataPoolLoader/scripts/local-postgres-manual-setup.sql)
+
+Запуск модуля:
+
+```text
+./gradlew :apps:local-manual-test:run
+```
+
+Этот модуль также появится в UI в списке доступных сценариев.
+
+## Тестирование на локальном PostgreSQL
+
+Для `core` настроен отдельный integration-task, который использует реальный локальный PostgreSQL.
+
+Запуск:
+
+```text
+./gradlew :core:localPostgresTest
+```
+
+Как это работает:
+
+- тесты подключаются к локальному PostgreSQL;
+- для каждой проверки создается временная schema;
+- после завершения schema удаляется;
+- обычный `./gradlew test` эти тесты не запускает.
+
+Параметры подключения по умолчанию лежат в:
+
+- [gradle/local-postgres-test.properties](/Users/kwdev/DataPoolLoader/gradle/local-postgres-test.properties)
+
+Текущие дефолты:
+
+```properties
+host=127.0.0.1
+port=5432
+database=postgres
+username=kwdev
+password=dummy
+```
+
+Их можно переопределить через system properties:
+
+```text
+-Ddatapool.test.pg.host=127.0.0.1
+-Ddatapool.test.pg.port=5432
+-Ddatapool.test.pg.database=postgres
+-Ddatapool.test.pg.username=kwdev
+-Ddatapool.test.pg.password=dummy
+```
+
+Пример:
+
+```text
+./gradlew :core:localPostgresTest -Ddatapool.test.pg.database=postgres
 ```
 
 ## UI-модуль

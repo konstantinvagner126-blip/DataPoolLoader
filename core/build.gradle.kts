@@ -11,3 +11,15 @@ dependencies {
     api("org.slf4j:slf4j-simple:2.0.17")
     api("org.apache.commons:commons-csv:1.14.1")
 }
+
+val sourceSets = the<SourceSetContainer>()
+
+tasks.register<Test>("localPostgresTest") {
+    description = "Запускает integration-тесты core против локального PostgreSQL"
+    group = "verification"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform {
+        includeTags("local-postgres")
+    }
+}

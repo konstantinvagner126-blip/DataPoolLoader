@@ -1,0 +1,44 @@
+app:
+  outputDir: ./output
+  fileFormat: csv
+  mergeMode: round_robin
+  errorMode: continue_on_error
+  parallelism: 5
+  fetchSize: 1000
+  progressLogEveryRows: 1000
+  maxMergedRows:
+  deleteOutputFilesAfterCompletion: false
+  sources:
+    - name: db1
+      jdbcUrl: ${LOCAL_MANUAL_DB_JDBC_URL}
+      username: ${LOCAL_MANUAL_DB_USERNAME}
+      password: ${LOCAL_MANUAL_DB_PASSWORD}
+      sqlFile: classpath:sql/source1.sql
+    - name: db2
+      jdbcUrl: ${LOCAL_MANUAL_DB_JDBC_URL}
+      username: ${LOCAL_MANUAL_DB_USERNAME}
+      password: ${LOCAL_MANUAL_DB_PASSWORD}
+      sqlFile: classpath:sql/source2.sql
+    - name: db3
+      jdbcUrl: ${LOCAL_MANUAL_DB_JDBC_URL}
+      username: ${LOCAL_MANUAL_DB_USERNAME}
+      password: ${LOCAL_MANUAL_DB_PASSWORD}
+      sqlFile: classpath:sql/source3.sql
+    - name: db4
+      jdbcUrl: ${LOCAL_MANUAL_DB_JDBC_URL}
+      username: ${LOCAL_MANUAL_DB_USERNAME}
+      password: ${LOCAL_MANUAL_DB_PASSWORD}
+      sqlFile: classpath:sql/source4.sql
+    - name: db5
+      jdbcUrl: ${LOCAL_MANUAL_DB_JDBC_URL}
+      username: ${LOCAL_MANUAL_DB_USERNAME}
+      password: ${LOCAL_MANUAL_DB_PASSWORD}
+      sqlFile: classpath:sql/source5.sql
+
+  target:
+    enabled: true
+    jdbcUrl: ${LOCAL_MANUAL_DB_JDBC_URL}
+    username: ${LOCAL_MANUAL_DB_USERNAME}
+    password: ${LOCAL_MANUAL_DB_PASSWORD}
+    table: datapool_manual.target_pool
+    truncateBeforeLoad: true

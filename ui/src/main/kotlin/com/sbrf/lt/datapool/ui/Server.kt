@@ -38,9 +38,10 @@ fun startUiServer(port: Int = UiConfigLoader().load().port) {
     }.start(wait = true)
 }
 
-fun Application.uiModule() {
-    val moduleRegistry = ModuleRegistry()
-    val runManager = RunManager(moduleRegistry = moduleRegistry)
+fun Application.uiModule(
+    moduleRegistry: ModuleRegistry = ModuleRegistry(),
+    runManager: RunManager = RunManager(moduleRegistry = moduleRegistry),
+) {
     val mapper = ObjectMapper()
         .registerModule(JavaTimeModule())
         .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)

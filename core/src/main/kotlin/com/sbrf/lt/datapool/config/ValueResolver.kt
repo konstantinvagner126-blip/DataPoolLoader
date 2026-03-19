@@ -1,6 +1,7 @@
 package com.sbrf.lt.datapool.config
 
 import java.io.Reader
+import java.io.StringReader
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.Properties
@@ -35,8 +36,9 @@ class ValueResolver private constructor(
         }
 
         private fun loadProperties(reader: Reader): Map<String, String> {
+            val normalizedContent = reader.readText().removePrefix("\uFEFF")
             val props = Properties()
-            props.load(reader)
+            props.load(StringReader(normalizedContent))
             return props.stringPropertyNames().associateWith { props.getProperty(it) }
         }
     }

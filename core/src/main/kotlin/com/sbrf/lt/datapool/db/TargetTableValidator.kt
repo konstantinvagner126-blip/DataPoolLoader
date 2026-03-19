@@ -1,9 +1,14 @@
 package com.sbrf.lt.datapool.db
 
 import com.sbrf.lt.datapool.model.TargetConfig
+import java.sql.Connection
 import java.sql.DriverManager
 
-class TargetTableValidator {
+class TargetTableValidator(
+    private val connectionProvider: (String, String, String) -> Connection = { jdbcUrl, username, password ->
+        DriverManager.getConnection(jdbcUrl, username, password)
+    },
+) {
     fun validate(
         target: TargetConfig,
         resolvedJdbcUrl: String,
@@ -14,7 +19,7 @@ class TargetTableValidator {
         require(incomingColumns.isNotEmpty()) { "Во входных данных должна быть хотя бы одна колонка." }
 
         val tableRef = parseTableReference(target.table)
-        DriverManager.getConnection(resolvedJdbcUrl, resolvedUsername, resolvedPassword).use { connection ->
+        connectionProvider(resolvedJdbcUrl, resolvedUsername, resolvedPassword).use { connection ->
             val columns = connection.prepareStatement(
                 """
                 select column_name, is_nullable, column_default

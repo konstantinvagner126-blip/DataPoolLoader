@@ -7,10 +7,22 @@ import org.postgresql.PGConnection
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
+import java.sql.Connection
 import java.sql.DriverManager
 import java.time.Instant
 
-class PostgresImporter {
+class PostgresImporter(
+    private val connectionProvider: (String, String, String) -> Connection = { jdbcUrl, username, password ->
+        DriverManager.getConnection(jdbcUrl, username, password)
+    },
+    private val copyExecutor: (Connection, String, Path) -> Long = { connection, copySql, mergedFile ->
+        Files.newInputStream(mergedFile).use { input ->
+            connection.unwrap(PGConnection::class.java)
+                .copyAPI
+                .copyIn(copySql, input)
+        }
+    },
+) {
     private val logger = LoggerFactory.getLogger(javaClass)
     private val safeIdentifier = Regex("[A-Za-z_][A-Za-z0-9_]*")
 
@@ -28,7 +40,7 @@ class PostgresImporter {
         logger.info("Подготовлено к загрузке в целевую таблицу {}: {} строк", target.table, expectedRowCount)
 
         return try {
-            DriverManager.getConnection(resolvedJdbcUrl, resolvedUsername, resolvedPassword).use { connection ->
+            connectionProvider(resolvedJdbcUrl, resolvedUsername, resolvedPassword).use { connection ->
                 connection.autoCommit = false
                 try {
                     if (target.truncateBeforeLoad) {
@@ -40,11 +52,7 @@ class PostgresImporter {
                     }
 
                     val copySql = buildCopySql(target.table, columns)
-                    val rows = Files.newInputStream(mergedFile).use { input ->
-                        connection.unwrap(PGConnection::class.java)
-                            .copyAPI
-                            .copyIn(copySql, input)
-                    }
+                    val rows = copyExecutor(connection, copySql, mergedFile)
                     connection.commit()
 
                     logger.info(

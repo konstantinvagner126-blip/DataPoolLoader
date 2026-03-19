@@ -7,6 +7,7 @@ apply(from = "repositories.gradle")
 
 plugins {
     kotlin("jvm") version "2.2.0" apply false
+    id("org.jetbrains.kotlinx.kover") version "0.9.1"
 }
 
 group = "com.sbrf.lt.datapool"
@@ -14,6 +15,7 @@ version = "1.0.0"
 
 subprojects {
     apply(plugin = "org.jetbrains.kotlin.jvm")
+    apply(plugin = "org.jetbrains.kotlinx.kover")
 
     extensions.configure<org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension>("kotlin") {
         jvmToolchain(17)
@@ -38,8 +40,18 @@ subprojects {
         add("testImplementation", "org.junit.jupiter:junit-jupiter:5.13.4")
     }
 
-    tasks.withType<Test>().configureEach {
-        useJUnitPlatform()
+    tasks.named<Test>("test") {
+        useJUnitPlatform {
+            excludeTags("local-postgres")
+        }
+    }
+
+    pluginManager.withPlugin("application") {
+        tasks.withType<JavaExec>().configureEach {
+            System.getProperty("credentials.file")
+                ?.takeIf { it.isNotBlank() }
+                ?.let { systemProperty("credentials.file", it) }
+        }
     }
 }
 

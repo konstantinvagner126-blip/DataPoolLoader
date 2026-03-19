@@ -5,6 +5,7 @@ build/
 .idea/
 *.iml
 out/
+**/output/
 
 # Local credentials
 gradle/credential.properties

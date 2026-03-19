@@ -9,6 +9,7 @@ import kotlin.io.path.writeText
 
 class ModuleRegistry(
     private val configLoader: ConfigLoader = ConfigLoader(),
+    private val projectRoot: Path? = null,
 ) {
     private val mapper = configLoader.objectMapper()
 
@@ -116,6 +117,7 @@ class ModuleRegistry(
     }
 
     fun findProjectRoot(): Path {
+        projectRoot?.let { return it }
         var current = Path.of("").toAbsolutePath().normalize()
         while (current.parent != null) {
             if (Files.exists(current.resolve("settings.gradle.kts"))) {

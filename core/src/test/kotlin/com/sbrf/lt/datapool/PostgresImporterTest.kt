@@ -1,9 +1,14 @@
 package com.sbrf.lt.datapool
 
 import com.sbrf.lt.datapool.db.PostgresImporter
+import com.sbrf.lt.datapool.model.ExecutionStatus
+import com.sbrf.lt.datapool.model.TargetConfig
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
+import java.nio.file.Files
+import java.sql.SQLException
 
 class PostgresImporterTest {
     private val importer = PostgresImporter()
@@ -36,5 +41,59 @@ class PostgresImporterTest {
             "TRUNCATE TABLE \"public\".\"test_data_pool\"",
             sql,
         )
+    }
+
+    @Test
+    fun `imports csv in one transaction with truncate`() {
+        val state = FakeConnectionState()
+        val importer = PostgresImporter(
+            connectionProvider = { _, _, _ -> importerConnection(state) },
+            copyExecutor = { _, _, _ -> 3L },
+        )
+        val mergedFile = Files.createTempFile("merged", ".csv").apply {
+            Files.writeString(this, "id\n1\n2\n3\n")
+        }
+
+        val result = importer.importCsv(
+            target = TargetConfig(table = "public.test_data_pool", truncateBeforeLoad = true),
+            resolvedJdbcUrl = "jdbc:test",
+            resolvedUsername = "user",
+            mergedFile = mergedFile,
+            columns = listOf("id"),
+            expectedRowCount = 3,
+            resolvedPassword = "pwd",
+        )
+
+        assertEquals(ExecutionStatus.SUCCESS, result.status)
+        assertEquals(1, state.committed)
+        assertEquals(0, state.rolledBack)
+        assertTrue(state.executedSql.single().startsWith("TRUNCATE TABLE"))
+    }
+
+    @Test
+    fun `rolls back when copy fails`() {
+        val state = FakeConnectionState()
+        val importer = PostgresImporter(
+            connectionProvider = { _, _, _ -> importerConnection(state) },
+            copyExecutor = { _, _, _ -> throw SQLException("copy failed") },
+        )
+        val mergedFile = Files.createTempFile("merged-fail", ".csv").apply {
+            Files.writeString(this, "id\n1\n")
+        }
+
+        val result = importer.importCsv(
+            target = TargetConfig(table = "public.test_data_pool", truncateBeforeLoad = true),
+            resolvedJdbcUrl = "jdbc:test",
+            resolvedUsername = "user",
+            mergedFile = mergedFile,
+            columns = listOf("id"),
+            expectedRowCount = 1,
+            resolvedPassword = "pwd",
+        )
+
+        assertEquals(ExecutionStatus.FAILED, result.status)
+        assertEquals(0, state.committed)
+        assertEquals(1, state.rolledBack)
+        assertEquals("copy failed", result.errorMessage)
     }
 }

@@ -16,7 +16,11 @@ import java.sql.ResultSet
 import java.sql.Statement
 import java.time.Instant
 
-class PostgresExporter {
+class PostgresExporter(
+    private val connectionProvider: (String, String, String) -> Connection = { jdbcUrl, username, password ->
+        DriverManager.getConnection(jdbcUrl, username, password)
+    },
+) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
     fun export(task: ExportTask): SourceExecutionResult {
@@ -30,7 +34,7 @@ class PostgresExporter {
         )
 
         return try {
-            DriverManager.getConnection(task.resolvedJdbcUrl, task.resolvedUsername, task.resolvedPassword).use { connection ->
+            connectionProvider(task.resolvedJdbcUrl, task.resolvedUsername, task.resolvedPassword).use { connection ->
                 connection.autoCommit = false
                 connection.prepareStatement(
                     task.sql,

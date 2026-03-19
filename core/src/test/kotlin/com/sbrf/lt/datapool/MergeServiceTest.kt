@@ -100,6 +100,24 @@ class MergeServiceTest {
         assertEquals(2, result.sourceCounts["db2"])
     }
 
+    @Test
+    fun `uses reopenable round robin when sources exceed open readers limit`() {
+        val dir = Files.createTempDirectory("merge-many")
+        val sources = (1..65).map { index ->
+            createSource(dir, "db$index", listOf("id,name", "$index,N$index"))
+        }
+        val merged = dir.resolve("merged.csv")
+
+        val result = service.merge(
+            sources,
+            AppConfig(mergeMode = MergeMode.ROUND_ROBIN),
+            merged,
+        )
+
+        assertEquals(65, result.rowCount)
+        assertEquals(66, Files.readAllLines(merged).size)
+    }
+
     private fun createSource(
         dir: java.nio.file.Path,
         name: String,
