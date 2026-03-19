@@ -1,8 +1,9 @@
 package com.sbrf.lt.datapool.ui
 
 import com.sbrf.lt.datapool.config.ConfigLoader
+import com.sbrf.lt.datapool.config.CredentialsFileLocator
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleConfig
 import java.io.InputStream
-import java.nio.file.Files
 import java.nio.file.Path
 
 data class UiRootConfig(
@@ -12,6 +13,7 @@ data class UiRootConfig(
 data class UiAppConfig(
     val port: Int = 8080,
     val defaultCredentialsFile: String? = null,
+    val sqlConsole: SqlConsoleConfig = SqlConsoleConfig(),
 )
 
 class UiConfigLoader(
@@ -32,10 +34,5 @@ fun UiAppConfig.defaultCredentialsPath(): Path? {
     if (configured != null) {
         return configured
     }
-    val system = System.getProperty("credentials.file")?.trim()?.takeIf { it.isNotEmpty() }?.let(Path::of)
-    if (system != null) {
-        return system
-    }
-    val local = Path.of("gradle", "credential.properties")
-    return local.takeIf { Files.exists(it) }
+    return CredentialsFileLocator.find()
 }

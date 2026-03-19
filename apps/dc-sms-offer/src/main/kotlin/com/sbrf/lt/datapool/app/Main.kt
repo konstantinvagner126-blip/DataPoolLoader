@@ -10,7 +10,11 @@ fun main(args: Array<String>) {
         ?: extractDefaultConfig()
     val credentialsPath = System.getProperty("credentials.file")?.let(Path::of)
 
-    ApplicationRunner().run(configPath, credentialsPath)
+    if (credentialsPath != null) {
+        ApplicationRunner().run(configPath, credentialsPath)
+    } else {
+        ApplicationRunner().run(configPath)
+    }
 }
 
 private fun extractDefaultConfig(): Path {

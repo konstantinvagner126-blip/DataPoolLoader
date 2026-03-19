@@ -3,10 +3,12 @@ package com.sbrf.lt.datapool.ui
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleService
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.jackson.jackson
 import io.ktor.server.application.Application
+import io.ktor.server.application.ApplicationStarted
 import io.ktor.server.application.call
 import io.ktor.server.application.install
 import io.ktor.server.engine.embeddedServer
@@ -30,10 +32,15 @@ import io.ktor.websocket.Frame
 import io.ktor.utils.io.readRemaining
 import io.ktor.utils.io.core.readText
 import kotlinx.coroutines.flow.collect
+import org.slf4j.LoggerFactory
 import org.slf4j.event.Level
 
 fun startUiServer(port: Int = UiConfigLoader().load().port) {
+    val logger = LoggerFactory.getLogger("com.sbrf.lt.datapool.ui.Startup")
     embeddedServer(Netty, port = port) {
+        environment.monitor.subscribe(ApplicationStarted) {
+            logger.info("UI успешно запущен. Переходи по ссылке для открытия страницы с интерфейсом: http://localhost:$port")
+        }
         uiModule()
     }.start(wait = true)
 }
@@ -41,6 +48,7 @@ fun startUiServer(port: Int = UiConfigLoader().load().port) {
 fun Application.uiModule(
     moduleRegistry: ModuleRegistry = ModuleRegistry(),
     runManager: RunManager = RunManager(moduleRegistry = moduleRegistry),
+    sqlConsoleService: SqlConsoleService = SqlConsoleService(UiConfigLoader().load().sqlConsole),
 ) {
     val mapper = ObjectMapper()
         .registerModule(JavaTimeModule())
@@ -68,6 +76,16 @@ fun Application.uiModule(
                 ?.bufferedReader()
                 ?.use { it.readText() }
                 ?: error("Ресурс static/index.html не найден")
+            call.respondText(
+                content,
+                ContentType.Text.Html,
+            )
+        }
+        get("/sql-console") {
+            val content = javaClass.classLoader.getResourceAsStream("static/sql-console.html")
+                ?.bufferedReader()
+                ?.use { it.readText() }
+                ?: error("Ресурс static/sql-console.html не найден")
             call.respondText(
                 content,
                 ContentType.Text.Html,
@@ -101,6 +119,27 @@ fun Application.uiModule(
 
         get("/api/credentials") {
             call.respond(runManager.currentCredentialsStatus())
+        }
+
+        get("/api/sql-console/info") {
+            call.respond(sqlConsoleService.info().toResponse())
+        }
+
+        post("/api/sql-console/query") {
+            val request = call.receive<SqlConsoleQueryRequest>()
+            val tempDir = kotlin.io.path.createTempDirectory("datapool-ui-sql-console-")
+            try {
+                val credentialsPath = runManager.materializeCredentialsFile(tempDir)
+                call.respond(
+                    sqlConsoleService.executeQuery(
+                        rawSql = request.sql,
+                        credentialsPath = credentialsPath,
+                        selectedSourceNames = request.selectedSourceNames,
+                    ).toResponse(),
+                )
+            } finally {
+                tempDir.toFile().deleteRecursively()
+            }
         }
 
         post("/api/credentials/upload") {

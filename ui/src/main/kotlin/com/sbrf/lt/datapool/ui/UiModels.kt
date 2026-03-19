@@ -2,6 +2,9 @@ package com.sbrf.lt.datapool.ui
 
 import com.sbrf.lt.datapool.app.ExecutionEvent
 import com.sbrf.lt.datapool.model.ExecutionStatus
+import com.sbrf.lt.datapool.sqlconsole.RawShardExecutionResult
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleInfo
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleQueryResult
 import java.nio.file.Path
 import java.time.Instant
 
@@ -70,4 +73,61 @@ data class CredentialsStatusResponse(
     val displayName: String,
     val fileAvailable: Boolean,
     val uploaded: Boolean,
+)
+
+data class SqlConsoleInfoResponse(
+    val configured: Boolean,
+    val sourceNames: List<String>,
+    val maxRowsPerShard: Int,
+)
+
+data class SqlConsoleQueryRequest(
+    val sql: String,
+    val selectedSourceNames: List<String> = emptyList(),
+)
+
+data class SqlConsoleShardResultResponse(
+    val shardName: String,
+    val status: String,
+    val rows: List<Map<String, String?>> = emptyList(),
+    val rowCount: Int = 0,
+    val columns: List<String> = emptyList(),
+    val truncated: Boolean = false,
+    val affectedRows: Int? = null,
+    val message: String? = null,
+    val errorMessage: String? = null,
+)
+
+data class SqlConsoleQueryResponse(
+    val sql: String,
+    val statementType: String,
+    val statementKeyword: String,
+    val shardResults: List<SqlConsoleShardResultResponse>,
+    val maxRowsPerShard: Int,
+)
+
+fun SqlConsoleInfo.toResponse(): SqlConsoleInfoResponse = SqlConsoleInfoResponse(
+    configured = configured,
+    sourceNames = sourceNames,
+    maxRowsPerShard = maxRowsPerShard,
+)
+
+fun SqlConsoleQueryResult.toResponse(): SqlConsoleQueryResponse = SqlConsoleQueryResponse(
+    sql = sql,
+    statementType = statementType.name,
+    statementKeyword = statementKeyword,
+    shardResults = shardResults.map { it.toResponse() },
+    maxRowsPerShard = maxRowsPerShard,
+)
+
+private fun RawShardExecutionResult.toResponse(): SqlConsoleShardResultResponse = SqlConsoleShardResultResponse(
+    shardName = shardName,
+    status = status,
+    rows = rows,
+    rowCount = rows.size,
+    columns = columns,
+    truncated = truncated,
+    affectedRows = affectedRows,
+    message = message,
+    errorMessage = errorMessage,
 )

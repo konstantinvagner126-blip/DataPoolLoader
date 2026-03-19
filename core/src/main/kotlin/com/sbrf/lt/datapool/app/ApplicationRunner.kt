@@ -1,6 +1,7 @@
 package com.sbrf.lt.datapool.app
 
 import com.sbrf.lt.datapool.config.ConfigLoader
+import com.sbrf.lt.datapool.config.CredentialsFileLocator
 import com.sbrf.lt.datapool.config.ValueResolver
 import com.sbrf.lt.datapool.db.PostgresExporter
 import com.sbrf.lt.datapool.db.PostgresImporter
@@ -370,8 +371,7 @@ class ApplicationRunner(
     }
 
     private fun defaultCredentialsPath(): Path? {
-        val candidate = Path.of("gradle", "credential.properties")
-        return if (Files.exists(candidate)) candidate else null
+        return CredentialsFileLocator.find()
     }
 
     private fun cleanupGeneratedFiles(files: Set<Path>, executionListener: ExecutionListener) {

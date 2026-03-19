@@ -39,6 +39,9 @@
     <div class="row g-4">
       <div class="col-12 col-xl-3">
         <div class="panel h-100">
+          <div class="mb-3">
+            <a class="btn btn-outline-dark w-100" href="/sql-console">Открыть SQL-консоль</a>
+          </div>
           <div class="panel-title">Модули</div>
           <div id="moduleList" class="list-group module-list"></div>
         </div>
@@ -104,9 +107,26 @@
           </div>
           <div class="col-12 col-lg-7">
             <div class="panel h-100">
-              <div class="panel-title">События</div>
-              <div id="eventLog" class="event-log"></div>
+              <div class="panel-title">Ход выполнения</div>
+              <div id="eventLog" class="event-log human-log"></div>
             </div>
+          </div>
+        </div>
+
+        <div class="panel mt-4">
+          <div class="panel-title">Состояние источников</div>
+          <div id="sourceStatusTable" class="table-responsive"></div>
+        </div>
+
+        <div class="panel mt-4">
+          <div class="d-flex align-items-center justify-content-between gap-3">
+            <div class="panel-title mb-0">Техническая диагностика</div>
+            <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#technicalEventsCollapse" aria-expanded="false" aria-controls="technicalEventsCollapse">
+              Показать / скрыть
+            </button>
+          </div>
+          <div class="collapse mt-3" id="technicalEventsCollapse">
+            <div id="technicalEventLog" class="event-log technical-log"></div>
           </div>
         </div>
 

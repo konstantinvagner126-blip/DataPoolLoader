@@ -1,217 +1,154 @@
 # DataPoolLoader
 
-Multi-module проект на Kotlin для параллельной выгрузки данных из нескольких PostgreSQL БД в отдельные CSV-файлы, объединения в `merged.csv` и, при необходимости, загрузки результата в target PostgreSQL.
+Multi-module Kotlin-проект для:
 
-## Структура проекта
+- параллельной выгрузки данных из нескольких PostgreSQL БД;
+- сохранения отдельных CSV по каждому источнику;
+- сборки общего `merged.csv`;
+- загрузки результата в целевую PostgreSQL таблицу;
+- запуска как напрямую из app-модулей, так и через локальный Web UI.
 
-- [core](/Users/kwdev/DataPoolLoader/core) — библиотечный модуль с общей логикой.
-- [apps/dc-sms-offer](/Users/kwdev/DataPoolLoader/apps/dc-sms-offer) — первое запускаемое приложение.
-- [apps/local-manual-test](/Users/kwdev/DataPoolLoader/apps/local-manual-test) — локальный сценарий для ручной проверки на PostgreSQL, установленном на машине.
-- [ui](/Users/kwdev/DataPoolLoader/ui) — локальный Ktor UI для запуска и редактирования модулей через браузер.
+## Состав проекта
 
-Пользовательские сценарии добавляются как отдельные app-модули, которые зависят от `core`.
+- `core`  
+  Общее ядро: конфиг, выгрузка, merge, валидация, загрузка в target БД.
 
-## Что делает
+- `apps/dc-sms-offer`  
+  Пример прикладного модуля.
+
+- `ui`  
+  Локальный Ktor UI для запуска и редактирования модулей через браузер.
+
+- `templates/app-module`  
+  Шаблон для создания нового app-модуля.
+
+## Что умеет приложение
 
 - читает `application.yml`;
-- поддерживает общий SQL и override SQL на уровне источника, как inline в YAML, так и из `.sql` файлов;
-- разрешает `jdbcUrl`, `username` и `password` напрямую или через `${PLACEHOLDER}`;
-- выполняет выгрузки параллельно;
+- поддерживает общий SQL и SQL override для отдельных источников;
+- поддерживает SQL прямо в YAML и в отдельных `.sql` файлах;
+- умеет брать `jdbcUrl`, `username`, `password` напрямую или через `${PLACEHOLDER}`;
+- выполняет source-запросы параллельно;
 - сохраняет `<source-name>.csv` по каждому успешному источнику;
-- формирует `merged.csv` в режимах `plain`, `round_robin`, `proportional` и `quota`;
-- загружает `merged.csv` в целевую PostgreSQL таблицу;
-- пишет `summary.json` по результатам запуска;
-- при ошибке одной БД продолжает работу по остальным.
+- формирует `merged.csv` в режимах `plain`, `round_robin`, `proportional`, `quota`;
+- загружает `merged.csv` в target PostgreSQL;
+- пишет `summary.json`;
+- продолжает работу при ошибке отдельных источников, если остались успешные.
 
-## Запуск из IDEA
+## Быстрый старт
 
-Точка входа первого приложения: `com.sbrf.lt.datapool.app.MainKt`
+Сборка и базовая проверка:
 
-Аргумент конфигурации:
-
-```text
---config=/absolute/path/to/application.yml
-```
-
-Либо можно указать путь через VM options:
-
-```text
--Dcredentials.file=/absolute/path/to/credential.properties
-```
-
-Приоритет источников для credentials-файла:
-
-1. `-Dcredentials.file=...`
-2. `gradle/credential.properties`
-
-Если аргумент `--config` не передан, используется [application.yml](/Users/kwdev/DataPoolLoader/apps/dc-sms-offer/src/main/resources/application.yml).
-
-Сборка и запуск:
-
-```text
+```bash
 ./gradlew test
+```
+
+Запуск прикладного модуля:
+
+```bash
 ./gradlew :apps:dc-sms-offer:run
 ```
 
-## Ручная проверка на локальном PostgreSQL
+Запуск UI:
 
-Для ручной проверки приложения на локальной БД добавлен модуль:
-
-- [apps/local-manual-test](/Users/kwdev/DataPoolLoader/apps/local-manual-test)
-
-Он настроен на локальный PostgreSQL:
-
-- host: `127.0.0.1`
-- port: `5432`
-- database: `postgres`
-- username: `kwdev`
-- password: `dummy`
-
-Перед первым запуском нужно подготовить тестовые таблицы:
-
-```text
-./scripts/setup-local-manual-db.sh
-```
-
-Что создается:
-
-- schema `datapool_manual`
-- таблицы `source_1 ... source_5`
-- таблица `target_pool`
-- тестовые данные для ручного прогона
-
-SQL подготовки лежит в:
-
-- [scripts/local-postgres-manual-setup.sql](/Users/kwdev/DataPoolLoader/scripts/local-postgres-manual-setup.sql)
-
-Запуск модуля:
-
-```text
-./gradlew :apps:local-manual-test:run
-```
-
-Этот модуль также появится в UI в списке доступных сценариев.
-
-## Тестирование на локальном PostgreSQL
-
-Для `core` настроен отдельный integration-task, который использует реальный локальный PostgreSQL.
-
-Запуск:
-
-```text
-./gradlew :core:localPostgresTest
-```
-
-Как это работает:
-
-- тесты подключаются к локальному PostgreSQL;
-- для каждой проверки создается временная schema;
-- после завершения schema удаляется;
-- обычный `./gradlew test` эти тесты не запускает.
-
-Параметры подключения по умолчанию лежат в:
-
-- [gradle/local-postgres-test.properties](/Users/kwdev/DataPoolLoader/gradle/local-postgres-test.properties)
-
-Текущие дефолты:
-
-```properties
-host=127.0.0.1
-port=5432
-database=postgres
-username=kwdev
-password=dummy
-```
-
-Их можно переопределить через system properties:
-
-```text
--Ddatapool.test.pg.host=127.0.0.1
--Ddatapool.test.pg.port=5432
--Ddatapool.test.pg.database=postgres
--Ddatapool.test.pg.username=kwdev
--Ddatapool.test.pg.password=dummy
-```
-
-Пример:
-
-```text
-./gradlew :core:localPostgresTest -Ddatapool.test.pg.database=postgres
-```
-
-## UI-модуль
-
-Для локальной работы через браузер можно запускать отдельный модуль UI:
-
-```text
+```bash
 ./gradlew :ui:run
 ```
 
-После старта открой:
+После старта UI:
 
 ```text
 http://localhost:8080
 ```
 
-Что умеет UI:
+## Как запускать app-модули
 
-- показывает список доступных app-модулей;
-- открывает встроенный `application.yml` выбранного модуля;
-- открывает связанные SQL-файлы;
-- редактирует YAML и SQL через Monaco editor;
-- позволяет загрузить `credential.properties` через интерфейс;
-- запускает выбранный модуль через Web UI;
-- показывает прогресс и события выполнения через WebSocket;
-- сохраняет изменения обратно в файлы модуля по кнопке `Сохранить`.
-
-Важно:
-
-- прямой запуск существующих модулей из IDEA остается рабочим;
-- UI не заменяет текущий CLI-режим, а только добавляет альтернативный способ запуска;
-- для `ui` так же можно указывать `-Dcredentials.file=...` в VM options.
-
-Credentials в UI используются в таком порядке:
-
-1. файл `credential.properties`, загруженный через интерфейс;
-2. `ui.defaultCredentialsFile` из `ui/src/main/resources/application.yml`;
-3. `-Dcredentials.file=...` у процесса `ui`;
-4. `gradle/credential.properties`, если файл существует.
-
-Если в конфиге выбранного модуля есть placeholders вида `${...}`, а credentials-файл недоступен, UI покажет предупреждение и не даст запустить выгрузку.
-
-## Шаблон нового app-модуля
-
-В репозитории есть шаблон:
-
-- [templates/app-module](/Users/kwdev/DataPoolLoader/templates/app-module)
-
-Что в нем есть:
-
-- `build.gradle.kts`
-- `Main.kt`
-- `application.yml`
-
-Как использовать:
-
-1. Скопировать `templates/app-module` в `apps/<new-name>`.
-2. Заменить `__APP_NAME__` в `Main.kt`.
-3. Подключить новый модуль в [settings.gradle.kts](/Users/kwdev/DataPoolLoader/settings.gradle.kts).
-4. Настроить свой `application.yml`.
-
-Либо использовать Gradle task:
+Точка входа app-модулей:
 
 ```text
-./gradlew createAppModule -PappName=my-new-app
+com.sbrf.lt.datapool.app.MainKt
 ```
 
-Что делает task:
+Можно запускать:
 
-- создает `apps/my-new-app`;
-- копирует туда шаблон из `templates/app-module`;
-- подставляет имя модуля вместо `__APP_NAME__`;
-- модуль автоматически подхватится проектом, потому что `settings.gradle.kts` сканирует каталог `apps/`.
+1. Через Gradle:
 
-## Формат конфига
+```bash
+./gradlew :apps:<module-name>:run
+```
+
+2. Из IDEA как обычное Kotlin/Gradle-приложение.
+
+3. С внешним конфигом:
+
+```text
+--config=/absolute/path/to/application.yml
+```
+
+Если `--config` не передан, используется встроенный `application.yml` самого модуля.
+
+## Поиск credential.properties
+
+`credential.properties` ищется автоматически в таком порядке:
+
+1. `-Dcredentials.file=/absolute/path/to/credential.properties`
+2. ближайший `gradle/credential.properties` вверх по дереву проекта
+3. `~/.gradle/credential.properties`
+
+Это поведение одинаково для:
+
+- app-модулей;
+- UI;
+- ручного запуска из IDEA;
+- запуска через Gradle `run`.
+
+Пример VM option:
+
+```text
+-Dcredentials.file=/absolute/path/to/credential.properties
+```
+
+## Placeholder-ы в конфиге
+
+В этих полях можно использовать `${KEY}`:
+
+- `sources[].jdbcUrl`
+- `sources[].username`
+- `sources[].password`
+- `target.jdbcUrl`
+- `target.username`
+- `target.password`
+
+Значение ищется так:
+
+1. в найденном `credential.properties`
+2. в переменных окружения
+3. в JVM system properties
+
+Если placeholder не разрешился:
+
+- source помечается ошибочным;
+- target-загрузка падает, если `target.enabled=true`.
+
+Пример `credential.properties`:
+
+```properties
+DB1_JDBC_URL=jdbc:postgresql://localhost:5432/db1
+DB1_USERNAME=user1
+DB1_PASSWORD=secret1
+
+DB2_JDBC_URL=jdbc:postgresql://localhost:5432/db2
+DB2_USERNAME=user2
+DB2_PASSWORD=secret2
+
+TARGET_JDBC_URL=jdbc:postgresql://localhost:5432/target_db
+TARGET_USERNAME=loader
+TARGET_DB_PASSWORD=target_secret
+```
+
+## Формат application.yml
+
+Пример:
 
 ```yaml
 app:
@@ -235,7 +172,7 @@ app:
     - name: db2
       jdbcUrl: ${DB2_JDBC_URL}
       username: ${DB2_USERNAME}
-      password: local-dev-password
+      password: ${DB2_PASSWORD}
       sqlFile: classpath:sql/db2_override.sql
 
   target:
@@ -249,205 +186,239 @@ app:
 
 ## Параметры конфига
 
-Ниже описаны все основные параметры `application.yml`.
+### Краткая таблица defaults
 
-### Блок `app`
+| Параметр | По умолчанию | Обязателен |
+| --- | --- | --- |
+| `app.outputDir` | `./output` | нет |
+| `app.fileFormat` | `csv` | нет |
+| `app.mergeMode` | `plain` | нет |
+| `app.errorMode` | `continue_on_error` | нет |
+| `app.parallelism` | `5` | нет |
+| `app.fetchSize` | `1000` | нет |
+| `app.progressLogEveryRows` | `10000` | нет |
+| `app.maxMergedRows` | без ограничения | нет |
+| `app.deleteOutputFilesAfterCompletion` | `false` | нет |
+| `app.commonSql` | пусто | нет |
+| `app.commonSqlFile` | `null` | нет |
+| `app.sources` | пустой список | да, для рабочего запуска должен быть хотя бы один источник |
+| `app.quotas` | пустой список | только для `mergeMode=quota` |
+| `app.target.enabled` | `true` | нет |
+| `app.target.jdbcUrl` | пусто | да, если `target.enabled=true` |
+| `app.target.username` | пусто | да, если `target.enabled=true` |
+| `app.target.password` | пусто | да, если `target.enabled=true` |
+| `app.target.table` | пусто | да, если `target.enabled=true` |
+| `app.target.truncateBeforeLoad` | `false` | нет |
 
-- `outputDir`
-  Каталог, в который складываются результаты запуска.
-  Для каждого запуска внутри создается подкаталог с timestamp.
-  Пример:
-  ```yaml
-  outputDir: ./output
-  ```
+Для каждого элемента `app.sources`:
 
-- `fileFormat`
-  Формат промежуточных и итогового файлов.
-  Сейчас поддерживается только `csv`.
-  Пример:
-  ```yaml
-  fileFormat: csv
-  ```
+| Параметр | По умолчанию | Обязателен |
+| --- | --- | --- |
+| `name` | пусто | да |
+| `jdbcUrl` | пусто | да |
+| `username` | пусто | да |
+| `password` | пусто | да |
+| `sql` | `null` | нет |
+| `sqlFile` | `null` | нет |
 
-- `mergeMode`
-  Режим объединения данных из всех успешных источников.
-  Поддерживаемые значения:
-  - `plain`
-  - `round_robin`
-  - `proportional`
-  - `quota`
+### `app.outputDir`
 
-- `errorMode`
-  Режим обработки ошибок по источникам.
-  Сейчас поддерживается только `continue_on_error`.
-  Это означает:
-  - ошибка одной БД не останавливает весь запуск;
-  - merge строится по успешным источникам;
-  - если успешных источников нет, запуск завершается ошибкой.
+Каталог результатов. Для каждого запуска создается подпапка с timestamp.
 
-- `parallelism`
-  Сколько source БД обрабатывать одновременно.
-  Если указано `5`, то одновременно будут идти максимум 5 выгрузок.
-  Пример:
-  ```yaml
-  parallelism: 5
-  ```
+По умолчанию: `./output`
 
-- `fetchSize`
-  Размер JDBC-порции при чтении результата из PostgreSQL.
-  Чем больше значение, тем меньше сетевых обращений к БД, но тем больше памяти на одну порцию.
-  Обычно рабочий диапазон: `1000`–`5000`.
-  Пример:
-  ```yaml
-  fetchSize: 1000
-  ```
+Пример:
 
-- `progressLogEveryRows`
-  Как часто выводить в лог прогресс по обработанным строкам для каждой source БД.
-  Если указано `10000`, лог будет печататься на `10000`, `20000`, `30000` и так далее.
-  Пример:
-  ```yaml
-  progressLogEveryRows: 10000
-  ```
+```yaml
+outputDir: ./output
+```
 
-- `maxMergedRows`
-  Необязательный лимит на размер итогового `merged.csv`.
-  Если параметр задан, merge не превысит указанное число строк.
-  Особенно полезно для подготовки ограниченной тестовой выборки.
-  Пример:
-  ```yaml
-  maxMergedRows: 50000
-  ```
+### `app.fileFormat`
 
-- `deleteOutputFilesAfterCompletion`
-  Нужно ли удалять выходные CSV-файлы после завершения работы приложения.
-  Если `true`, после завершения запуска будут удалены:
-  - промежуточные `<source-name>.csv`;
-  - итоговый `merged.csv`.
-  Файл `summary.json` при этом сохраняется.
-  Пример:
-  ```yaml
-  deleteOutputFilesAfterCompletion: true
-  ```
+Сейчас поддерживается только `csv`.
 
-- `commonSql`
-  Общий SQL-запрос для всех источников, заданный прямо в YAML.
-  Используется, если у конкретного источника не задан собственный `sql` или `sqlFile`.
-  Должен быть только `SELECT` или `WITH ... SELECT`.
-  Нельзя указывать одновременно с `commonSqlFile`.
-  Пример:
-  ```yaml
-  commonSql: |
-    select id, created_at, payload
-    from some_table
-  ```
+По умолчанию: `csv`
 
-- `commonSqlFile`
-  Путь к `.sql` файлу с общим SQL-запросом для всех источников.
-  Поддерживаются два варианта:
-  - `classpath:sql/common.sql` для ресурсов приложения;
-  - относительный/абсолютный путь в файловой системе.
-  Для `classpath:` путь считается внутри `src/main/resources`:
-  - `classpath:sql/common.sql` -> `src/main/resources/sql/common.sql`
-  Относительный путь разрешается относительно каталога, в котором лежит `application.yml`.
-  Нельзя указывать одновременно с `commonSql`.
-  Пример:
-  ```yaml
-  commonSqlFile: classpath:sql/common.sql
-  ```
+### `app.mergeMode`
 
-### Блок `app.sources`
+Поддерживаемые значения:
 
-Список source БД, из которых идет чтение.
+- `plain`
+- `round_robin`
+- `proportional`
+- `quota`
 
-Каждый элемент массива описывает одно подключение.
+Подробно описаны ниже в разделе `Режимы merge`.
+
+По умолчанию: `plain`
+
+### `app.errorMode`
+
+Сейчас поддерживается только:
+
+```yaml
+errorMode: continue_on_error
+```
+
+Это значит:
+
+- ошибка одной БД не останавливает весь запуск;
+- merge строится по успешным источникам;
+- если успешных источников не осталось, запуск завершается ошибкой.
+
+По умолчанию: `continue_on_error`
+
+### `app.parallelism`
+
+Сколько source БД обрабатывать одновременно.
+
+По умолчанию: `5`
+
+Пример:
+
+```yaml
+parallelism: 5
+```
+
+### `app.fetchSize`
+
+Размер JDBC-порции при чтении результата из PostgreSQL.
+
+Обычно разумный старт:
+
+По умолчанию: `1000`
+
+```yaml
+fetchSize: 1000
+```
+
+### `app.progressLogEveryRows`
+
+Как часто писать прогресс по строкам для каждой source БД.
+
+По умолчанию: `10000`
+
+Пример:
+
+```yaml
+progressLogEveryRows: 10000
+```
+
+### `app.maxMergedRows`
+
+Необязательный лимит на размер итогового `merged.csv`.
+
+По умолчанию: не ограничен
+
+Пример:
+
+```yaml
+maxMergedRows: 50000
+```
+
+### `app.deleteOutputFilesAfterCompletion`
+
+Если `true`, после завершения будут удалены:
+
+- промежуточные `<source-name>.csv`
+- итоговый `merged.csv`
+
+`summary.json` остается.
+
+По умолчанию: `false`
+
+Пример:
+
+```yaml
+deleteOutputFilesAfterCompletion: true
+```
+
+### `app.commonSql`
+
+Общий SQL для всех источников прямо в YAML.
+
+Нельзя задавать одновременно с `commonSqlFile`.
+
+По умолчанию: пустое значение
+
+Пример:
+
+```yaml
+commonSql: |
+  select id, payload
+  from some_table
+```
+
+### `app.commonSqlFile`
+
+Общий SQL в отдельном файле.
+
+Поддерживаются:
+
+- `classpath:sql/common.sql`
+- относительный путь
+- абсолютный путь
+
+Для `classpath:` путь считается относительно `src/main/resources`.
+
+По умолчанию: `null`
+
+Пример:
+
+```yaml
+commonSqlFile: classpath:sql/common.sql
+```
+
+### `app.sources`
+
+Список источников.
+
+По умолчанию: пустой список, но для рабочего запуска должен быть задан хотя бы один источник.
+
+Обязательные поля у каждого источника:
 
 - `name`
-  Уникальное имя источника.
-  Используется:
-  - в логах;
-  - в имени промежуточного файла `<source-name>.csv`;
-  - в `quota.source`.
-
 - `jdbcUrl`
-  JDBC URL подключения к PostgreSQL.
-  Можно указывать напрямую или через placeholder:
-  ```yaml
-  jdbcUrl: ${DB1_JDBC_URL}
-  ```
-
 - `username`
-  Логин для подключения к source БД.
-  Можно указывать напрямую или через placeholder.
-
 - `password`
-  Пароль для подключения к source БД.
-  Можно указывать напрямую или через placeholder.
+
+Опционально:
 
 - `sql`
-  Необязательный SQL-запрос для конкретного источника, заданный прямо в YAML.
-  Если задан, он имеет приоритет над `commonSql` и `commonSqlFile`.
-  Если не задан, используется общий SQL.
-  Нельзя указывать одновременно с `sqlFile`.
-  Пример:
-  ```yaml
-  sql: |
-    select id, created_at, payload
-    from special_table
-  ```
-
 - `sqlFile`
-  Необязательный путь к `.sql` файлу для конкретного источника.
-  Если задан, он имеет приоритет над `commonSql` и `commonSqlFile`.
-  Поддерживаются `classpath:`-ресурсы и файловые пути.
-  Для `classpath:` путь считается внутри `src/main/resources`.
-  Относительный путь разрешается относительно каталога `application.yml`.
-  Нельзя указывать одновременно с `sql`.
-  Пример:
-  ```yaml
-  sqlFile: classpath:sql/db2_override.sql
-  ```
+
+`sql` и `sqlFile` нельзя задавать одновременно.
+
+Значения по умолчанию внутри элемента `sources`:
+
+- `name`: пустая строка
+- `jdbcUrl`: пустая строка
+- `username`: пустая строка
+- `password`: пустая строка
+- `sql`: `null`
+- `sqlFile`: `null`
+
+Практически это означает: для реального запуска `name`, `jdbcUrl`, `username` и `password` должны быть заданы явно.
 
 ### Приоритет выбора SQL
 
-Для каждого источника запрос выбирается в таком порядке:
+Для каждого источника запрос выбирается так:
 
 1. `source.sql`
 2. `source.sqlFile`
 3. `app.commonSql`
 4. `app.commonSqlFile`
 
-Дополнительные правила:
+### `app.quotas`
 
-- на одном уровне нельзя одновременно задавать inline SQL и SQL-файл;
-- SQL-файл должен существовать и быть непустым;
-- содержимое SQL-файла читается в `UTF-8`;
-- `classpath:`-ресурсы читаются из classpath приложения;
-- относительные пути разрешаются относительно каталога, где лежит `application.yml`.
-
-### Блок `app.quotas`
-
-Используется только при:
+Используется только в режиме:
 
 ```yaml
 mergeMode: quota
 ```
 
-Каждый элемент задает долю строк от конкретного источника в итоговом `merged.csv`.
-
-- `source`
-  Имя источника из `sources.name`.
-
-- `percent`
-  Процент строк этого источника в итоговом merged-файле.
-
-Правила:
-
-- квота должна быть задана для каждого источника;
-- сумма всех `percent` должна быть ровно `100`;
-- проценты используются только в режиме `quota`.
-
 Пример:
+
 ```yaml
 quotas:
   - source: db1
@@ -458,312 +429,256 @@ quotas:
     percent: 60
 ```
 
-### Блок `app.target`
+Правила:
 
-Описывает целевую PostgreSQL БД, в которую загружается итоговый `merged.csv`.
+- квота должна быть задана для каждого источника;
+- сумма процентов должна быть `100`.
 
-- `enabled`
-  Включена ли загрузка в target БД.
-  Если `false`, приложение:
-  - все равно выгрузит source CSV;
-  - все равно соберет `merged.csv`;
-  - не будет делать import в target БД.
-  Пример:
-  ```yaml
-  enabled: false
-  ```
+По умолчанию: пустой список
 
-- `jdbcUrl`
-  JDBC URL целевой PostgreSQL БД.
-  Обязателен, если `enabled: true`.
+### `app.target`
 
-- `username`
-  Логин для target БД.
-  Обязателен, если `enabled: true`.
-
-- `password`
-  Пароль для target БД.
-  Обязателен, если `enabled: true`.
-
-- `table`
-  Таблица, в которую грузится `merged.csv`.
-  Формат:
-  - `table`
-  - или `schema.table`
-  Примеры:
-  ```yaml
-  table: test_data_pool
-  table: public.test_data_pool
-  ```
-
-- `truncateBeforeLoad`
-  Нужно ли очищать target-таблицу перед загрузкой.
-  Если `true`, перед `COPY` выполняется `TRUNCATE TABLE`.
-  Если `false`, данные просто догружаются в таблицу.
-
-### Placeholder-ы и credentials
+Настройки целевой БД.
 
 Поля:
 
-- `sources[].jdbcUrl`
-- `sources[].username`
-- `sources[].password`
-- `target.jdbcUrl`
-- `target.username`
-- `target.password`
+- `enabled`
+- `jdbcUrl`
+- `username`
+- `password`
+- `table`
+- `truncateBeforeLoad`
 
-могут содержать placeholder вида:
+Значения по умолчанию:
 
-```yaml
-${SOME_KEY}
-```
+- `enabled`: `true`
+- `jdbcUrl`: пустая строка
+- `username`: пустая строка
+- `password`: пустая строка
+- `table`: пустая строка
+- `truncateBeforeLoad`: `false`
 
-Значения ищутся в таком порядке:
-
-1. файл из `-Dcredentials.file=/path/to/credential.properties`
-2. `gradle/credential.properties`
-3. переменные окружения
-4. JVM system properties
-
-Если значение не найдено:
-
-- для source БД источник помечается ошибочным;
-- для target БД запуск завершается ошибкой, если `target.enabled=true`.
-
-Пример `gradle/credential.properties`:
-
-```properties
-DB1_JDBC_URL=jdbc:postgresql://localhost:5432/db1
-DB1_USERNAME=user1
-DB1_PASSWORD=secret1
-DB2_JDBC_URL=jdbc:postgresql://localhost:5432/db2
-DB2_USERNAME=user2
-TARGET_JDBC_URL=jdbc:postgresql://localhost:5432/target_db
-TARGET_USERNAME=loader_user
-TARGET_DB_PASSWORD=target_secret
-```
-
-Если нужно только проверить выгрузку и `merged.csv` без загрузки в target БД, установите:
+Пример:
 
 ```yaml
 target:
-  enabled: false
+  enabled: true
+  jdbcUrl: ${TARGET_JDBC_URL}
+  username: ${TARGET_USERNAME}
+  password: ${TARGET_DB_PASSWORD}
+  table: public.test_data_pool
+  truncateBeforeLoad: true
 ```
 
-Дополнительно:
+Если `enabled: false`, выгрузка и merge выполняются, а импорт в target пропускается.
 
-- при `target.enabled=true` перед импортом выполняется preflight-проверка целевой таблицы;
-- если в `merged.csv` есть колонки, которых нет в target таблице, запуск завершается до загрузки;
-- если в target таблице есть обязательные `NOT NULL` колонки без default, которых нет в данных, запуск тоже завершается до загрузки.
+## SQL в отдельных файлах
+
+Поддерживаются:
+
+- `commonSqlFile`
+- `sources[].sqlFile`
+
+Файлы могут лежать:
+
+- в ресурсах модуля, например `src/main/resources/sql/common.sql`
+- во внешней файловой системе
+
+Для ресурсов используется запись:
+
+```yaml
+commonSqlFile: classpath:sql/common.sql
+sqlFile: classpath:sql/source1.sql
+```
+
+То есть:
+
+- `classpath:sql/common.sql` -> `src/main/resources/sql/common.sql`
 
 ## Режимы merge
 
-- `plain` — просто склеить результаты по источникам.
-- `round_robin` — брать по одной строке из каждого источника по кругу.
-- `proportional` — распределять строки по источникам пропорционально фактическому объему каждой выгрузки и равномерно размазывать их по merged-файлу.
-- `quota` — распределять строки по вручную заданным процентам и равномерно размазывать их по merged-файлу.
-
 ### `plain`
 
-Самый простой режим.
-
-Как работает:
-
-- сначала полностью записываются строки первого успешного источника;
-- затем второго;
-- затем третьего;
-- и так далее.
+Просто склеивает успешные источники друг за другом.
 
 Пример:
 
-- `db1`: `A1 A2 A3`
-- `db2`: `B1 B2`
-- `db3`: `C1 C2`
-
-Результат:
-
 ```text
-A1 A2 A3 B1 B2 C1 C2
+db1 -> A1 A2
+db2 -> B1 B2
+результат -> A1 A2 B1 B2
 ```
-
-Когда использовать:
-
-- если нужно получить полный набор данных без перемешивания;
-- если порядок по источникам не важен;
-- если требуется самый предсказуемый и простой merge.
 
 ### `round_robin`
 
-Режим строгого чередования.
-
-Как работает:
-
-- по одной строке из каждого источника по кругу;
-- если у какого-то источника строки закончились, он исключается из дальнейшего обхода;
-- merge продолжается по оставшимся.
+Берет по одной строке из каждого источника по кругу.
 
 Пример:
 
-- `db1`: `A1 A2 A3`
-- `db2`: `B1 B2`
-- `db3`: `C1 C2 C3 C4`
-
-Результат:
-
 ```text
-A1 B1 C1 A2 B2 C2 A3 C3 C4
+db1 -> A1 A2 A3
+db2 -> B1 B2
+db3 -> C1
+результат -> A1 B1 C1 A2 B2 A3
 ```
-
-Когда использовать:
-
-- если объемы источников близки;
-- если хочется равномерного чередования без учета размеров выборок.
-
-Ограничение:
-
-- если один источник очень маленький, а другой очень большой, это не дает “процентно равномерного” распределения по всему файлу, а только чередование в начале merge.
 
 ### `proportional`
 
-Режим автоматического равномерного распределения по фактическому объему данных.
-
-Как работает:
-
-- сначала приложение выгружает все источники в отдельные CSV и считает `rowCount`;
-- затем доля каждого источника определяется автоматически по числу строк;
-- после этого строки из каждого источника равномерно распределяются по merged-файлу в соответствии с этой долей.
+Автоматически распределяет строки по фактическому объему источников и старается размазать их по merged-файлу равномерно.
 
 Пример:
 
-- `db1`: `10` строк
-- `db2`: `90` строк
+- `db1`: 10 строк
+- `db2`: 90 строк
 
-Тогда итоговый merge:
+Итог:
 
-- будет содержать все `100` строк;
-- примерно `10%` строк будут из `db1`;
-- примерно `90%` строк будут из `db2`;
-- строки `db1` будут размазаны по всему merged-файлу, а не лежать одним блоком.
-
-Условный вид:
-
-```text
-B B B B B B B B B A B B B B B B B B B A ...
-```
-
-Когда использовать:
-
-- если нужно автоматически получить равномерное смешивание по реальным объемам источников;
-- если не хочется вручную задавать проценты.
+- в merged-файле будет примерно 10% строк из `db1`
+- и 90% из `db2`
+- строки маленького источника будут распределены по всему файлу, а не лежать блоком
 
 ### `quota`
 
-Режим ручного управления долями данных по источникам.
-
-Как работает:
-
-- для каждого источника в конфиге задается процент;
-- сумма процентов должна быть ровно `100`;
-- сначала приложение выгружает все источники и узнает фактическое число строк по каждому;
-- затем рассчитывается, сколько строк можно взять из каждого источника без дублирования строк;
-- после этого выбранные строки равномерно распределяются по merged-файлу.
-
-Пример конфига:
-
-```yaml
-app:
-  mergeMode: quota
-  commonSqlFile: classpath:sql/common.sql
-
-  quotas:
-    - source: db1
-      percent: 10
-    - source: db2
-      percent: 30
-    - source: db3
-      percent: 60
-```
-
-#### Как считается допустимый итоговый объем
-
-Допустимый объем считается только после фактической выгрузки, когда уже известны `rowCount` всех успешных источников.
-
-Для каждого источника считается максимум:
-
-```text
-availableRows / quotaShare
-```
-
-Где:
-
-- `availableRows` — сколько строк реально вернул источник;
-- `quotaShare` — доля источника в виде числа от `0` до `1`.
-
-Затем берется минимум по всем источникам.
+Распределяет строки по вручную заданным процентам.
 
 Пример:
 
-- `db1`: `10` строк, квота `10%`
-- `db2`: `1000` строк, квота `90%`
+```yaml
+mergeMode: quota
+quotas:
+  - source: db1
+    percent: 25
+  - source: db2
+    percent: 75
+```
 
-Расчет:
+Алгоритм:
 
-- `db1`: `10 / 0.10 = 100`
-- `db2`: `1000 / 0.90 = 1111`
+1. сначала собирается полный `rowCount` по каждому успешному источнику;
+2. затем вычисляется максимально допустимый общий объем merged-файла без дублирования строк;
+3. по этому объему рассчитывается, сколько строк можно взять из каждого источника;
+4. строки равномерно распределяются по merged-файлу.
 
-Итоговый допустимый объем:
+Если источник вернул больше строк, чем попадает по квоте:
+
+- его отдельный CSV сохраняется полностью;
+- в `merged.csv` попадает только часть строк.
+
+## Проверки перед загрузкой в target
+
+Если `target.enabled=true`, выполняется preflight-проверка:
+
+- целевая таблица существует;
+- все колонки из входных данных есть в target;
+- если есть несовпадение только по регистру, ошибка содержит отдельную подсказку;
+- если в target есть обязательные `NOT NULL` колонки без default, которых нет во входных данных, загрузка не начнется.
+
+## UI
+
+Запуск:
+
+```bash
+./gradlew :ui:run
+```
+
+После запуска открыть:
 
 ```text
-100
+http://localhost:8080
 ```
 
-Значит merged-файл будет содержать:
+Что умеет UI:
 
-- `10` строк из `db1`
-- `90` строк из `db2`
+- показывает список app-модулей;
+- открывает и редактирует `application.yml`;
+- открывает и редактирует связанные SQL-файлы;
+- загружает `credential.properties` через интерфейс;
+- запускает модуль;
+- показывает прогресс и события выполнения;
+- сохраняет изменения в файлы модуля.
 
-И все они будут равномерно распределены по merged-файлу.
+Порядок credentials в UI:
 
-#### Если один из источников завершился ошибкой
+1. файл, загруженный через интерфейс;
+2. `ui.defaultCredentialsFile` из `ui/src/main/resources/application.yml`;
+3. `-Dcredentials.file=...`;
+4. ближайший `gradle/credential.properties` вверх по дереву проекта;
+5. `~/.gradle/credential.properties`
 
-В проекте уже используется модель `continue_on_error`, поэтому:
+Важно:
 
-- merge выполняется по успешным источникам;
-- в режиме `quota` проценты нормализуются на успешный набор источников;
-- если успешных источников недостаточно для построения merge, запуск завершится ошибкой.
+- UI не заменяет app-модули;
+- любой app-модуль по-прежнему можно запускать напрямую из IDEA или через Gradle.
 
-#### Если источник вернул больше строк, чем вошло по квоте
+## Тестирование
 
-Это нормальное поведение:
+Обычные тесты:
 
-- отдельный source CSV сохраняется полностью;
-- в `merged.csv` попадает только часть строк этого источника;
-- строки не дублируются.
-
-Когда использовать:
-
-- если нужно явно управлять составом итоговой выборки;
-- если требуется подготовка тестовых данных с заданной долей строк от каждого источника.
-
-Пример `quota`:
-
-```yaml
-app:
-  mergeMode: quota
-  commonSqlFile: classpath:sql/common.sql
-
-  quotas:
-    - source: db1
-      percent: 10
-    - source: db2
-      percent: 30
-    - source: db3
-      percent: 60
+```bash
+./gradlew test
 ```
 
-Для `quota`:
+Локальные integration-тесты против реального PostgreSQL:
 
-- сумма процентов должна быть ровно `100`;
-- квота должна быть задана для каждого источника;
-- если часть источников завершилась ошибкой, merge продолжается по успешным, а проценты нормализуются на оставшийся набор источников;
-- итоговый объем merged-файла ограничивается доступным числом строк в каждом источнике, без дублирования строк.
+```bash
+./gradlew :core:localPostgresTest
+```
+
+Они:
+
+- не входят в обычный `test`;
+- используют локальный PostgreSQL;
+- создают временные схемы и удаляют их после завершения.
+
+Настройки для них по умолчанию лежат в:
+
+- `gradle/local-postgres-test.properties`
+
+Поддерживаются system properties:
+
+```text
+-Ddatapool.test.pg.host=127.0.0.1
+-Ddatapool.test.pg.port=5432
+-Ddatapool.test.pg.database=postgres
+-Ddatapool.test.pg.username=<db-user>
+-Ddatapool.test.pg.password=dummy
+```
+
+## Покрытие тестами
+
+Для проекта подключен `Kover`.
+
+Основные команды:
+
+```bash
+./gradlew koverHtmlReport
+./gradlew koverXmlReport
+```
+
+Текущая целевая планка:
+
+- `core` >= 90%
+- `ui` >= 90%
+
+## Создание нового app-модуля
+
+Через шаблон:
+
+```bash
+./gradlew createAppModule -PappName=my-new-app
+```
+
+Что делает task:
+
+- создает `apps/my-new-app`
+- копирует шаблон из `templates/app-module`
+- подставляет имя модуля
+
+Новый модуль автоматически подхватывается через сканирование `apps/` в `settings.gradle.kts`.
+
+## Полезные файлы
+
+- `apps/dc-sms-offer/src/main/resources/application.yml`
+- `ui/src/main/resources/application.yml`
+- `gradle/credential.properties`
+- `gradle/local-postgres-test.properties`

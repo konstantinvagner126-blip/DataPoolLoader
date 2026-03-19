@@ -20,7 +20,7 @@ fun main(args: Array<String>) {
 private fun extractDefaultConfig(): Path {
     val resourceStream = object {}.javaClass.classLoader.getResourceAsStream("application.yml")
         ?: error("Ресурс application.yml не найден в classpath.")
-    val tempFile = Files.createTempFile("__APP_NAME__-", ".yml")
+    val tempFile = Files.createTempFile("local-manual-big-test-", ".yml")
     resourceStream.use { input ->
         Files.copy(input, tempFile, StandardCopyOption.REPLACE_EXISTING)
     }

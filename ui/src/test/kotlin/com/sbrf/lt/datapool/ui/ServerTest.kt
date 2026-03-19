@@ -1,5 +1,10 @@
 package com.sbrf.lt.datapool.ui
 
+import com.sbrf.lt.datapool.sqlconsole.RawShardExecutionResult
+import com.sbrf.lt.datapool.sqlconsole.ShardSqlExecutor
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleConfig
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleSourceConfig
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleService
 import io.ktor.client.request.get
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
@@ -26,13 +31,34 @@ class ServerTest {
     fun `serves html and module api`() = testApplication {
         val root = createProject()
         val registry = ModuleRegistry(projectRoot = root)
-        val runManager = RunManager(moduleRegistry = registry, uiConfig = UiAppConfig())
+        val uiConfig = UiAppConfig(
+            sqlConsole = SqlConsoleConfig(
+                sources = listOf(SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user", "pwd")),
+            ),
+        )
+        val runManager = RunManager(moduleRegistry = registry, uiConfig = uiConfig)
+        val sqlConsoleService = SqlConsoleService(
+            config = uiConfig.sqlConsole,
+            executor = ShardSqlExecutor { shard, statement, _, _ ->
+                assertEquals("SELECT", statement.leadingKeyword)
+                RawShardExecutionResult(
+                    shardName = shard.name,
+                    status = "SUCCESS",
+                    columns = listOf("id"),
+                    rows = listOf(mapOf("id" to "1")),
+                    truncated = false,
+                )
+            },
+        )
         application {
-            uiModule(moduleRegistry = registry, runManager = runManager)
+            uiModule(moduleRegistry = registry, runManager = runManager, sqlConsoleService = sqlConsoleService)
         }
 
         val html = client.get("/").bodyAsText()
         assertTrue(html.contains("Управление пулами данных НТ"))
+
+        val sqlConsoleHtml = client.get("/sql-console").bodyAsText()
+        assertTrue(sqlConsoleHtml.contains("SQL-редактор"))
 
         val modules = client.get("/api/modules").bodyAsText()
         assertTrue(modules.contains("demo-app"))
@@ -40,6 +66,20 @@ class ServerTest {
         val details = client.get("/api/modules/demo-app").bodyAsText()
         assertTrue(details.contains("Общий SQL"))
         assertTrue(details.contains("Источник: db2"))
+
+        val info = client.get("/api/sql-console/info").bodyAsText()
+        assertTrue(info.contains("\"sourceNames\":[\"shard1\"]"))
+
+        val queryResponse = client.post("/api/sql-console/query") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"sql":"select 1 as id","selectedSourceNames":["shard1"]}""")
+        }
+        assertEquals(HttpStatusCode.OK, queryResponse.status)
+        val queryBody = queryResponse.bodyAsText()
+        assertTrue(queryBody.contains("\"statementType\":\"RESULT_SET\""))
+        assertTrue(queryBody.contains("\"statementKeyword\":\"SELECT\""))
+        assertTrue(queryBody.contains("\"shardName\":\"shard1\""))
+        assertTrue(queryBody.contains("\"rows\":[{\"id\":\"1\"}]"))
     }
 
     @Test

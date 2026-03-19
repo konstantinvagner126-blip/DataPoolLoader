@@ -110,19 +110,29 @@ class RunManagerTest {
             """.trimIndent(),
         )
         val registry = ModuleRegistry(projectRoot = projectRoot)
-        val runManager = RunManager(moduleRegistry = registry, uiConfig = UiAppConfig())
+        val previous = System.getProperty("credentials.file")
+        try {
+            System.setProperty("credentials.file", projectRoot.resolve("missing-credentials.properties").toString())
+            val runManager = RunManager(moduleRegistry = registry, uiConfig = UiAppConfig())
 
-        val error = assertFailsWith<IllegalArgumentException> {
-            runManager.startRun(
-                StartRunRequest(
-                    moduleId = "demo-app",
-                    configText = registry.loadModuleDetails("demo-app").configText,
-                    sqlFiles = emptyMap(),
-                ),
-            )
+            val error = assertFailsWith<IllegalArgumentException> {
+                runManager.startRun(
+                    StartRunRequest(
+                        moduleId = "demo-app",
+                        configText = registry.loadModuleDetails("demo-app").configText,
+                        sqlFiles = emptyMap(),
+                    ),
+                )
+            }
+
+            assertTrue(error.message!!.contains("credential.properties"))
+        } finally {
+            if (previous != null) {
+                System.setProperty("credentials.file", previous)
+            } else {
+                System.clearProperty("credentials.file")
+            }
         }
-
-        assertTrue(error.message!!.contains("credential.properties"))
     }
 
     @Test

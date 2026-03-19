@@ -23,6 +23,17 @@ body {
   gap: 1rem;
 }
 
+.hero-card-compact {
+  min-height: 180px;
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
 .hero-art {
   display: flex;
   align-items: center;
@@ -217,6 +228,89 @@ body {
   overflow: hidden;
 }
 
+.sql-editor-frame {
+  height: 360px;
+}
+
+.sql-sidebar-panel,
+.sql-workspace-panel {
+  height: 100%;
+}
+
+.sql-toolbar {
+  margin-top: 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.sql-status-strip {
+  margin-top: 1rem;
+  border-radius: 14px;
+  padding: 0.85rem 1rem;
+  background: rgba(100, 116, 139, 0.12);
+  color: #475569;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.sql-status-strip-success {
+  background: rgba(13, 148, 136, 0.12);
+  color: #0d9488;
+}
+
+.sql-status-strip-warning {
+  background: rgba(245, 158, 11, 0.16);
+  color: #b45309;
+}
+
+.sql-status-strip-failed {
+  background: rgba(220, 38, 38, 0.12);
+  color: #b91c1c;
+}
+
+.sql-output-panel {
+  margin-top: 1rem;
+  border: 1px solid rgba(19, 34, 56, 0.08);
+  border-radius: 18px;
+  overflow: hidden;
+  background: rgba(248, 251, 255, 0.65);
+}
+
+.sql-output-tabs {
+  display: flex;
+  gap: 0.35rem;
+  padding: 0.75rem 0.75rem 0;
+  border-bottom: 1px solid rgba(19, 34, 56, 0.08);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.sql-output-tab {
+  border: 0;
+  background: transparent;
+  color: #52657e;
+  font-size: 0.88rem;
+  font-weight: 700;
+  padding: 0.7rem 1rem;
+  border-radius: 12px 12px 0 0;
+}
+
+.sql-output-tab.active {
+  background: #132238;
+  color: #eff6ff;
+}
+
+.sql-output-pane {
+  display: none;
+  padding: 1rem;
+}
+
+.sql-output-pane.active {
+  display: block;
+}
+
 .event-log,
 .summary-box {
   background: #0f172a;
@@ -227,6 +321,17 @@ body {
   max-height: 420px;
   overflow: auto;
   font-size: 0.85rem;
+}
+
+.human-log {
+  background: #f8fbff;
+  color: #132238;
+  border: 1px solid rgba(19, 34, 56, 0.08);
+}
+
+.technical-log {
+  min-height: 180px;
+  max-height: 360px;
 }
 
 .summary-box {
@@ -240,6 +345,183 @@ body {
   gap: 1rem;
   border-bottom: 1px solid rgba(19, 34, 56, 0.08);
   padding: 0.45rem 0;
+}
+
+.human-log-entry {
+  padding: 0.75rem 0;
+  border-bottom: 1px solid rgba(19, 34, 56, 0.08);
+}
+
+.human-log-entry:last-child {
+  border-bottom: 0;
+}
+
+.human-log-time {
+  font-size: 0.78rem;
+  color: #607289;
+  margin-bottom: 0.15rem;
+}
+
+.human-log-text {
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.source-status-table thead th {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #607289;
+  border-bottom-width: 1px;
+}
+
+.source-status-table td,
+.source-status-table th {
+  background: transparent;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.status-running {
+  background: rgba(29, 111, 216, 0.12);
+  color: #1d6fd8;
+}
+
+.status-success {
+  background: rgba(13, 148, 136, 0.12);
+  color: #0d9488;
+}
+
+.status-failed {
+  background: rgba(220, 38, 38, 0.12);
+  color: #b91c1c;
+}
+
+.status-skipped,
+.status-skipped_schema_mismatch {
+  background: rgba(245, 158, 11, 0.16);
+  color: #b45309;
+}
+
+.status-pending {
+  background: rgba(100, 116, 139, 0.12);
+  color: #475569;
+}
+
+.sql-shard-summary,
+.sql-shard-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.9rem;
+}
+
+.sql-source-selection {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.sql-source-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 12px;
+  background: rgba(248, 251, 255, 0.9);
+  border: 1px solid rgba(19, 34, 56, 0.08);
+  color: #23364d;
+  font-size: 0.9rem;
+}
+
+.sql-source-checkbox input {
+  margin: 0;
+}
+
+.sql-shard-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 0.5rem 0.5rem 0;
+  padding: 0.45rem 0.8rem;
+  border-radius: 999px;
+  background: #132238;
+  color: #eff6ff;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.sql-shard-card {
+  padding: 0.95rem 1rem;
+  border-radius: 16px;
+  border: 1px solid rgba(19, 34, 56, 0.08);
+  background: rgba(248, 251, 255, 0.9);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  font-size: 0.86rem;
+  color: #23364d;
+}
+
+.sql-shard-card .sql-shard-card-title {
+  font-size: 0.86rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 0.45rem;
+  color: #132238;
+}
+
+.sql-result-table thead th {
+  position: sticky;
+  top: 0;
+  background: #eef4fb;
+  z-index: 1;
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #52657e;
+}
+
+.sql-result-table td {
+  max-width: 320px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sql-result-placeholder {
+  color: #607289;
+  font-size: 0.92rem;
+}
+
+.sql-page-size-select {
+  width: 90px;
+}
+
+.sql-result-tabs .nav-link {
+  border-radius: 12px 12px 0 0;
+  color: #30465f;
+  font-weight: 600;
+}
+
+.sql-result-tabs .nav-link.active {
+  background: #132238;
+  color: #eff6ff;
+  border-color: #132238;
+}
+
+.sql-pagination-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1rem;
+  flex-wrap: wrap;
 }
 
 .footer-note {
