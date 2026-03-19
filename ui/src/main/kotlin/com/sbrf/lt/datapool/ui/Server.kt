@@ -16,6 +16,7 @@ import io.ktor.server.plugins.calllogging.CallLogging
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.plugins.statuspages.StatusPages
 import io.ktor.server.plugins.statuspages.exception
+import io.ktor.server.request.receiveMultipart
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
@@ -24,11 +25,14 @@ import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
 import io.ktor.server.websocket.WebSockets
 import io.ktor.server.websocket.webSocket
+import io.ktor.http.content.PartData
 import io.ktor.websocket.Frame
+import io.ktor.utils.io.readRemaining
+import io.ktor.utils.io.core.readText
 import kotlinx.coroutines.flow.collect
 import org.slf4j.event.Level
 
-fun startUiServer(port: Int = 8080) {
+fun startUiServer(port: Int = UiConfigLoader().load().port) {
     embeddedServer(Netty, port = port) {
         uiModule()
     }.start(wait = true)
@@ -75,7 +79,7 @@ fun Application.uiModule() {
         }
 
         get("/api/modules/{id}") {
-            call.respond(moduleRegistry.loadModuleDetails(requireNotNull(call.parameters["id"])))
+            call.respond(runManager.loadModuleDetails(requireNotNull(call.parameters["id"])))
         }
 
         post("/api/modules/{id}/save") {
@@ -92,6 +96,29 @@ fun Application.uiModule() {
 
         get("/api/state") {
             call.respond(runManager.currentState())
+        }
+
+        get("/api/credentials") {
+            call.respond(runManager.currentCredentialsStatus())
+        }
+
+        post("/api/credentials/upload") {
+            val multipart = call.receiveMultipart()
+            var fileName = "credential.properties"
+            var content: String? = null
+            while (true) {
+                val part = multipart.readPart() ?: break
+                when (part) {
+                    is PartData.FileItem -> {
+                        fileName = part.originalFileName ?: fileName
+                        content = part.provider().readRemaining().readText()
+                    }
+                    else -> Unit
+                }
+                part.dispose.invoke()
+            }
+            require(!content.isNullOrBlank()) { "Не удалось прочитать содержимое credential.properties." }
+            call.respond(runManager.uploadCredentials(fileName, requireNotNull(content)))
         }
 
         webSocket("/ws") {

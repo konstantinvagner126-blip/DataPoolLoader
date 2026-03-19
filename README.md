@@ -6,7 +6,7 @@ Multi-module проект на Kotlin для параллельной выгру
 
 - [core](/Users/kwdev/DataPoolLoader/core) — библиотечный модуль с общей логикой.
 - [apps/dc-sms-offer](/Users/kwdev/DataPoolLoader/apps/dc-sms-offer) — первое запускаемое приложение.
-- [apps/ui](/Users/kwdev/DataPoolLoader/apps/ui) — локальный Ktor UI для запуска и редактирования модулей через браузер.
+- [ui](/Users/kwdev/DataPoolLoader/ui) — локальный Ktor UI для запуска и редактирования модулей через браузер.
 
 Пользовательские сценарии добавляются как отдельные app-модули, которые зависят от `core`.
 
@@ -57,7 +57,7 @@ Multi-module проект на Kotlin для параллельной выгру
 Для локальной работы через браузер можно запускать отдельный модуль UI:
 
 ```text
-./gradlew :apps:ui:run
+./gradlew :ui:run
 ```
 
 После старта открой:
@@ -72,6 +72,7 @@ http://localhost:8080
 - открывает встроенный `application.yml` выбранного модуля;
 - открывает связанные SQL-файлы;
 - редактирует YAML и SQL через Monaco editor;
+- позволяет загрузить `credential.properties` через интерфейс;
 - запускает выбранный модуль через Web UI;
 - показывает прогресс и события выполнения через WebSocket;
 - сохраняет изменения обратно в файлы модуля по кнопке `Сохранить`.
@@ -80,7 +81,16 @@ http://localhost:8080
 
 - прямой запуск существующих модулей из IDEA остается рабочим;
 - UI не заменяет текущий CLI-режим, а только добавляет альтернативный способ запуска;
-- для `apps/ui` так же можно указывать `-Dcredentials.file=...` в VM options.
+- для `ui` так же можно указывать `-Dcredentials.file=...` в VM options.
+
+Credentials в UI используются в таком порядке:
+
+1. файл `credential.properties`, загруженный через интерфейс;
+2. `ui.defaultCredentialsFile` из `ui/src/main/resources/application.yml`;
+3. `-Dcredentials.file=...` у процесса `ui`;
+4. `gradle/credential.properties`, если файл существует.
+
+Если в конфиге выбранного модуля есть placeholders вида `${...}`, а credentials-файл недоступен, UI покажет предупреждение и не даст запустить выгрузку.
 
 ## Шаблон нового app-модуля
 

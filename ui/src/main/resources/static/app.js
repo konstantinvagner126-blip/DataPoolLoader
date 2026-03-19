@@ -4,6 +4,7 @@ let selectedModuleId = null;
 let currentModule = null;
 let currentSqlPath = null;
 let sqlContents = {};
+let currentCredentialsStatus = null;
 
 const moduleList = document.getElementById("moduleList");
 const selectedModuleLabel = document.getElementById("selectedModuleLabel");
@@ -12,6 +13,9 @@ const runSummary = document.getElementById("runSummary");
 const sourceProgress = document.getElementById("sourceProgress");
 const eventLog = document.getElementById("eventLog");
 const summaryJson = document.getElementById("summaryJson");
+const credentialsStatus = document.getElementById("credentialsStatus");
+const credentialsWarning = document.getElementById("credentialsWarning");
+const credentialsFileInput = document.getElementById("credentialsFileInput");
 
 require.config({ paths: { vs: "https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs" } });
 require(["vs/editor/editor.main"], () => {
@@ -38,6 +42,7 @@ require(["vs/editor/editor.main"], () => {
   });
 
   loadModules();
+  refreshCredentialsStatus();
   connectWebSocket();
 });
 
@@ -70,6 +75,20 @@ document.getElementById("runButton").addEventListener("click", async () => {
       sqlFiles: sqlContents
     })
   });
+});
+
+document.getElementById("uploadCredentialsButton").addEventListener("click", async () => {
+  const file = credentialsFileInput.files[0];
+  if (!file) return;
+  const formData = new FormData();
+  formData.append("file", file);
+  const response = await fetch("/api/credentials/upload", {
+    method: "POST",
+    body: formData
+  });
+  currentCredentialsStatus = await response.json();
+  renderCredentialsStatus(currentCredentialsStatus);
+  renderCredentialsWarning();
 });
 
 sqlFileSelect.addEventListener("change", () => {
@@ -113,6 +132,7 @@ async function loadModule(moduleId) {
     sqlContents[file.path] = file.content;
   });
   renderSqlSelect();
+  renderCredentialsWarning();
   [...moduleList.children].forEach(button => {
     button.classList.toggle("active", button.dataset.moduleId === currentModule.id);
   });
@@ -123,7 +143,7 @@ function renderSqlSelect() {
   currentModule.sqlFiles.forEach((file, index) => {
     const option = document.createElement("option");
     option.value = file.path;
-    option.textContent = file.path;
+    option.textContent = `${file.label} · ${file.path}`;
     sqlFileSelect.appendChild(option);
     if (index === 0) {
       currentSqlPath = file.path;
@@ -137,11 +157,20 @@ function connectWebSocket() {
   const ws = new WebSocket(`${protocol}://${window.location.host}/ws`);
   ws.onmessage = (event) => {
     const state = JSON.parse(event.data);
+    currentCredentialsStatus = state.credentialsStatus;
     renderState(state);
   };
 }
 
+async function refreshCredentialsStatus() {
+  const response = await fetch("/api/credentials");
+  currentCredentialsStatus = await response.json();
+  renderCredentialsStatus(currentCredentialsStatus);
+}
+
 function renderState(state) {
+  renderCredentialsStatus(state.credentialsStatus);
+  renderCredentialsWarning();
   const activeRun = state.activeRun;
   const latestRun = activeRun || (state.history && state.history.length > 0 ? state.history[0] : null);
   if (!latestRun) {
@@ -171,4 +200,29 @@ function renderState(state) {
     .join("\n\n");
 
   summaryJson.textContent = latestRun.summaryJson || "Summary еще не сформирован.";
+}
+
+function renderCredentialsStatus(status) {
+  if (!status) {
+    credentialsStatus.textContent = "Файл не задан.";
+    return;
+  }
+  const sourceLabel = status.uploaded ? "загружен через UI" : (status.mode === "FILE" ? "файл по умолчанию" : "файл не задан");
+  const availability = status.fileAvailable ? "доступен" : "не найден";
+  credentialsStatus.textContent = `${sourceLabel}: ${status.displayName} (${availability})`;
+}
+
+function renderCredentialsWarning() {
+  if (!currentModule) {
+    credentialsWarning.classList.add("d-none");
+    return;
+  }
+  const missingCredentials = currentModule.requiresCredentials && (!currentCredentialsStatus || !currentCredentialsStatus.fileAvailable);
+  if (!missingCredentials) {
+    credentialsWarning.classList.add("d-none");
+    credentialsWarning.textContent = "";
+    return;
+  }
+  credentialsWarning.classList.remove("d-none");
+  credentialsWarning.textContent = "В конфиге модуля найдены placeholders ${...}, но credential.properties не загружен и не найден по fallback-настройкам UI.";
 }

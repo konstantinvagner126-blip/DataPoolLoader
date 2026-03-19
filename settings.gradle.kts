@@ -8,6 +8,7 @@ pluginManagement {
 rootProject.name = "DataPoolLoader"
 
 include(":core")
+include(":ui")
 
 val appsDir = file("apps")
 if (appsDir.exists()) {

@@ -13,6 +13,7 @@ data class ModuleDescriptor(
 )
 
 data class ModuleFileContent(
+    val label: String,
     val path: String,
     val content: String,
     val exists: Boolean,
@@ -24,6 +25,8 @@ data class ModuleDetailsResponse(
     val configPath: String,
     val configText: String,
     val sqlFiles: List<ModuleFileContent>,
+    val requiresCredentials: Boolean,
+    val credentialsStatus: CredentialsStatusResponse,
 )
 
 data class SaveModuleRequest(
@@ -53,10 +56,18 @@ data class UiRunSnapshot(
 )
 
 data class UiStateResponse(
+    val credentialsStatus: CredentialsStatusResponse,
     val activeRun: UiRunSnapshot? = null,
     val history: List<UiRunSnapshot> = emptyList(),
 )
 
 data class SaveResultResponse(
     val message: String,
+)
+
+data class CredentialsStatusResponse(
+    val mode: String,
+    val displayName: String,
+    val fileAvailable: Boolean,
+    val uploaded: Boolean,
 )

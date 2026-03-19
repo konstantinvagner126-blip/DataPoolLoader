@@ -21,11 +21,13 @@ import kotlin.io.path.writeText
 class RunManager(
     private val moduleRegistry: ModuleRegistry = ModuleRegistry(),
     private val applicationRunner: ApplicationRunner = ApplicationRunner(),
+    private val uiConfig: UiAppConfig = UiConfigLoader().load(),
 ) {
     private val executor = Executors.newSingleThreadExecutor()
     private val snapshots = mutableListOf<MutableRunSnapshot>()
     private val updatesFlow = MutableSharedFlow<UiStateResponse>(replay = 1, extraBufferCapacity = 32)
     private val configLoader = ConfigLoader()
+    private var uploadedCredentials: UploadedCredentials? = null
 
     init {
         updatesFlow.tryEmit(currentState())
@@ -37,9 +39,48 @@ class RunManager(
     fun currentState(): UiStateResponse {
         val ordered = snapshots.sortedByDescending { it.startedAt }
         return UiStateResponse(
+            credentialsStatus = currentCredentialsStatus(),
             activeRun = ordered.firstOrNull { it.status != ExecutionStatus.SUCCESS && it.status != ExecutionStatus.FAILED }?.toUi(),
             history = ordered.map { it.toUi() },
         )
+    }
+
+    @Synchronized
+    fun uploadCredentials(fileName: String, content: String): CredentialsStatusResponse {
+        require(content.isNotBlank()) { "Файл credential.properties пуст." }
+        uploadedCredentials = UploadedCredentials(fileName = fileName, content = content)
+        publishState()
+        return currentCredentialsStatus()
+    }
+
+    @Synchronized
+    fun currentCredentialsStatus(): CredentialsStatusResponse {
+        val uploaded = uploadedCredentials
+        if (uploaded != null) {
+            return CredentialsStatusResponse(
+                mode = "UPLOADED",
+                displayName = uploaded.fileName,
+                fileAvailable = true,
+                uploaded = true,
+            )
+        }
+
+        val fallback = uiConfig.defaultCredentialsPath()
+        return if (fallback != null) {
+            CredentialsStatusResponse(
+                mode = "FILE",
+                displayName = fallback.toString(),
+                fileAvailable = Files.exists(fallback),
+                uploaded = false,
+            )
+        } else {
+            CredentialsStatusResponse(
+                mode = "NONE",
+                displayName = "Файл не задан",
+                fileAvailable = false,
+                uploaded = false,
+            )
+        }
     }
 
     @Synchronized
@@ -47,6 +88,7 @@ class RunManager(
         require(snapshots.none { it.status != ExecutionStatus.SUCCESS && it.status != ExecutionStatus.FAILED }) {
             "Уже выполняется другой запуск. Дождитесь его завершения."
         }
+        validateCredentialsBeforeRun(request.configText)
 
         val module = moduleRegistry.getModule(request.moduleId)
         val snapshot = MutableRunSnapshot(
@@ -82,7 +124,7 @@ class RunManager(
         publishState()
         val tempDir = Files.createTempDirectory("datapool-ui-${module.id}-")
         val tempConfig = prepareWorkingCopy(module, request, tempDir)
-        val credentialsPath = System.getProperty("credentials.file")?.let(Path::of)
+        val credentialsPath = resolveCredentialsPath(tempDir)
         return applicationRunner.run(
             configPath = tempConfig,
             credentialsPath = credentialsPath,
@@ -91,6 +133,39 @@ class RunManager(
             },
         )
     }
+
+    @Synchronized
+    fun loadModuleDetails(moduleId: String): ModuleDetailsResponse {
+        val details = moduleRegistry.loadModuleDetails(moduleId)
+        return details.copy(
+            requiresCredentials = usesCredentialPlaceholders(details.configText),
+            credentialsStatus = currentCredentialsStatus(),
+        )
+    }
+
+    private fun validateCredentialsBeforeRun(configText: String) {
+        if (!usesCredentialPlaceholders(configText)) {
+            return
+        }
+        val status = currentCredentialsStatus()
+        require(status.fileAvailable) {
+            "Для выбранного модуля требуется credential.properties: в конфиге найдены placeholders \${...}, но файл с credentials не загружен и не найден."
+        }
+    }
+
+    private fun resolveCredentialsPath(tempDir: Path): Path? {
+        val uploaded = synchronized(this) { uploadedCredentials }
+        if (uploaded != null) {
+            val path = tempDir.resolve("credential.properties")
+            path.writeText(uploaded.content)
+            return path
+        }
+        val fallback = uiConfig.defaultCredentialsPath()
+        return fallback?.takeIf { Files.exists(it) }
+    }
+
+    private fun usesCredentialPlaceholders(configText: String): Boolean =
+        Regex("""\$\{[^}]+}""").containsMatchIn(configText)
 
     private fun prepareWorkingCopy(
         module: ModuleDescriptor,
@@ -211,4 +286,9 @@ class RunManager(
             events = events.toList(),
         )
     }
+
+    private data class UploadedCredentials(
+        val fileName: String,
+        val content: String,
+    )
 }

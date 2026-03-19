@@ -46,9 +46,11 @@ class ModuleRegistry(
     fun loadModuleDetails(moduleId: String): ModuleDetailsResponse {
         val module = getModule(moduleId)
         val configText = module.configFile.readText()
-        val sqlFiles = extractSqlReferences(configText).map { sqlRef ->
+        val sqlFiles = extractSqlFileEntries(configText).map { entry ->
+            val sqlRef = entry.path
             val path = resolveSqlPath(module, sqlRef)
             ModuleFileContent(
+                label = entry.label,
                 path = sqlRef,
                 content = path?.takeIf { Files.exists(it) }?.readText() ?: "",
                 exists = path?.let { Files.exists(it) } == true,
@@ -60,6 +62,13 @@ class ModuleRegistry(
             configPath = module.configFile.toString(),
             configText = configText,
             sqlFiles = sqlFiles,
+            requiresCredentials = false,
+            credentialsStatus = CredentialsStatusResponse(
+                mode = "NONE",
+                displayName = "Файл не задан",
+                fileAvailable = false,
+                uploaded = false,
+            ),
         )
     }
 
@@ -67,23 +76,32 @@ class ModuleRegistry(
         val module = getModule(moduleId)
         module.configFile.writeText(request.configText)
 
-        extractSqlReferences(request.configText).forEach { sqlRef ->
-            val content = request.sqlFiles[sqlRef] ?: return@forEach
-            val file = resolveSqlPath(module, sqlRef) ?: return@forEach
+        extractSqlFileEntries(request.configText).forEach { entry ->
+            val content = request.sqlFiles[entry.path] ?: return@forEach
+            val file = resolveSqlPath(module, entry.path) ?: return@forEach
             file.parent?.createDirectories()
             file.writeText(content)
         }
     }
 
     fun extractSqlReferences(configText: String): List<String> {
+        return extractSqlFileEntries(configText).map { it.path }
+    }
+
+    private fun extractSqlFileEntries(configText: String): List<SqlFileEntry> {
         val root = mapper.readTree(configText) ?: return emptyList()
         val app = root.path("app")
-        val refs = linkedSetOf<String>()
-        app.path("commonSqlFile").takeIf { it.isTextual }?.asText()?.takeIf { it.isNotBlank() }?.let(refs::add)
-        app.path("sources").takeIf { it.isArray }?.forEach { source ->
-            source.path("sqlFile").takeIf { it.isTextual }?.asText()?.takeIf { it.isNotBlank() }?.let(refs::add)
+        val refs = linkedMapOf<String, SqlFileEntry>()
+        app.path("commonSqlFile").takeIf { it.isTextual }?.asText()?.takeIf { it.isNotBlank() }?.let { path ->
+            refs[path] = SqlFileEntry(label = "Общий SQL", path = path)
         }
-        return refs.toList()
+        app.path("sources").takeIf { it.isArray }?.forEach { source ->
+            val sourceName = source.path("name").takeIf { it.isTextual }?.asText()?.ifBlank { "source" } ?: "source"
+            source.path("sqlFile").takeIf { it.isTextual }?.asText()?.takeIf { it.isNotBlank() }?.let { path ->
+                refs[path] = SqlFileEntry(label = "Источник: $sourceName", path = path)
+            }
+        }
+        return refs.values.toList()
     }
 
     fun resolveSqlPath(module: ModuleDescriptor, sqlRef: String): Path? {
@@ -107,4 +125,9 @@ class ModuleRegistry(
         }
         error("Не удалось определить корень проекта по settings.gradle.kts")
     }
+
+    private data class SqlFileEntry(
+        val label: String,
+        val path: String,
+    )
 }

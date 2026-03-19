@@ -12,13 +12,27 @@
     <div class="hero-card mb-4">
       <div>
         <div class="eyebrow">DataPool Loader</div>
-        <h1 class="display-6 mb-1">Управление выгрузками</h1>
+        <h1 class="display-6 mb-1">Управление пулами данных НТ</h1>
         <p class="text-secondary mb-0">Выбери модуль, поправь YAML и SQL, затем запусти выгрузку прямо из браузера.</p>
       </div>
-      <div class="gear-wrap" aria-hidden="true">
-        <span class="gear gear-lg">⚙</span>
-        <span class="gear gear-md">⚙</span>
-        <span class="gear gear-sm">⚙</span>
+      <div class="hero-art" aria-hidden="true">
+        <div class="flow-stage">
+          <div class="source-node source-node-1">DB1</div>
+          <div class="source-node source-node-2">DB2</div>
+          <div class="source-node source-node-3">DB3</div>
+          <div class="source-node source-node-4">DB4</div>
+          <div class="source-node source-node-5">DB5</div>
+
+          <div class="flow-line flow-line-1"><span class="flow-dot dot-1"></span></div>
+          <div class="flow-line flow-line-2"><span class="flow-dot dot-2"></span></div>
+          <div class="flow-line flow-line-3"><span class="flow-dot dot-3"></span></div>
+          <div class="flow-line flow-line-4"><span class="flow-dot dot-4"></span></div>
+          <div class="flow-line flow-line-5"><span class="flow-dot dot-5"></span></div>
+
+          <div class="merge-hub">
+            <div class="merge-title">DATAPOOL</div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -31,6 +45,20 @@
       </div>
 
       <div class="col-12 col-xl-9">
+        <div class="panel mb-4">
+          <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div>
+              <div class="panel-title mb-1">credential.properties</div>
+              <div id="credentialsStatus" class="text-secondary small">Файл не загружен.</div>
+            </div>
+            <div class="d-flex flex-wrap align-items-center gap-2">
+              <input id="credentialsFileInput" class="form-control" type="file" accept=".properties,text/plain">
+              <button id="uploadCredentialsButton" class="btn btn-outline-dark">Загрузить файл</button>
+            </div>
+          </div>
+          <div id="credentialsWarning" class="alert alert-warning mt-3 mb-0 d-none"></div>
+        </div>
+
         <div class="panel mb-4">
           <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
             <div>
@@ -88,6 +116,10 @@
         </div>
       </div>
     </div>
+
+    <footer class="footer-note text-center mt-4">
+      Разработано командой MLP
+    </footer>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
