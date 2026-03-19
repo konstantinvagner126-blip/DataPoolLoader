@@ -86,6 +86,9 @@ fun AppConfig.validate(): AppConfig {
     require(normalizedSources.isNotEmpty()) { "Должен быть настроен хотя бы один источник." }
     require(parallelism > 0) { "Параметр parallelism должен быть больше 0." }
     require(fetchSize > 0) { "Параметр fetchSize должен быть больше 0." }
+    require(queryTimeoutSec == null || queryTimeoutSec > 0) {
+        "Параметр queryTimeoutSec должен быть больше 0, если задан."
+    }
     require(progressLogEveryRows > 0) { "Параметр progressLogEveryRows должен быть больше 0." }
     require(maxMergedRows == null || maxMergedRows > 0) { "Параметр maxMergedRows должен быть больше 0, если задан." }
     require(errorMode == ErrorMode.CONTINUE_ON_ERROR) { "Поддерживается только режим CONTINUE_ON_ERROR." }

@@ -195,6 +195,7 @@ class ApplicationRunner(
                                 sql = sourceSql,
                                 outputFile = outputDir.resolve("${source.name}.csv"),
                                 fetchSize = appConfig.fetchSize,
+                                queryTimeoutSec = appConfig.queryTimeoutSec,
                                 progressLogEveryRows = appConfig.progressLogEveryRows,
                                 executionListener = executionListener,
                             )

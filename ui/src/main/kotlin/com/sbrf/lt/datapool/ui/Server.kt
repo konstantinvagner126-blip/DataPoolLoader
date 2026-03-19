@@ -49,6 +49,7 @@ fun Application.uiModule(
     moduleRegistry: ModuleRegistry = ModuleRegistry(),
     runManager: RunManager = RunManager(moduleRegistry = moduleRegistry),
     sqlConsoleService: SqlConsoleService = SqlConsoleService(UiConfigLoader().load().sqlConsole),
+    sqlConsoleQueryManager: SqlConsoleQueryManager = SqlConsoleQueryManager(sqlConsoleService),
 ) {
     val mapper = ObjectMapper()
         .registerModule(JavaTimeModule())
@@ -140,6 +141,38 @@ fun Application.uiModule(
             } finally {
                 tempDir.toFile().deleteRecursively()
             }
+        }
+
+        post("/api/sql-console/query/start") {
+            val request = call.receive<SqlConsoleQueryRequest>()
+            val tempDir = kotlin.io.path.createTempDirectory("datapool-ui-sql-console-")
+            val credentialsPath = try {
+                runManager.materializeCredentialsFile(tempDir)
+            } catch (ex: Exception) {
+                tempDir.toFile().deleteRecursively()
+                throw ex
+            }
+            try {
+                call.respond(
+                    sqlConsoleQueryManager.startQuery(
+                        sql = request.sql,
+                        credentialsPath = credentialsPath,
+                        selectedSourceNames = request.selectedSourceNames,
+                        cleanupDir = tempDir,
+                    ).toStartResponse(),
+                )
+            } catch (ex: Exception) {
+                tempDir.toFile().deleteRecursively()
+                throw ex
+            }
+        }
+
+        get("/api/sql-console/query/{id}") {
+            call.respond(sqlConsoleQueryManager.snapshot(requireNotNull(call.parameters["id"])).toResponse())
+        }
+
+        post("/api/sql-console/query/{id}/cancel") {
+            call.respond(sqlConsoleQueryManager.cancel(requireNotNull(call.parameters["id"])).toResponse())
         }
 
         post("/api/credentials/upload") {

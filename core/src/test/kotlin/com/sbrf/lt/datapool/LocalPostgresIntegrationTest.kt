@@ -58,6 +58,7 @@ class LocalPostgresIntegrationTest {
                     """.trimIndent(),
                     outputFile = outputFile,
                     fetchSize = 100,
+                    queryTimeoutSec = 30,
                     progressLogEveryRows = 2,
                 ),
             )

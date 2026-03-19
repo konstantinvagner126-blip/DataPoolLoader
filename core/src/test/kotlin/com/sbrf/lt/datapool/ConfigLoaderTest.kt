@@ -194,6 +194,7 @@ class ConfigLoaderTest {
               errorMode: continue_on_error
               parallelism: 1
               fetchSize: 100
+              queryTimeoutSec: 30
               progressLogEveryRows: 2500
               maxMergedRows: 15000
               commonSql: select 1
@@ -211,6 +212,7 @@ class ConfigLoaderTest {
 
         assertEquals(2500L, config.progressLogEveryRows)
         assertEquals(15000L, config.maxMergedRows)
+        assertEquals(30, config.queryTimeoutSec)
     }
 
     @Test

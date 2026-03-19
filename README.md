@@ -196,6 +196,7 @@ app:
 | `app.errorMode` | `continue_on_error` | нет |
 | `app.parallelism` | `5` | нет |
 | `app.fetchSize` | `1000` | нет |
+| `app.queryTimeoutSec` | не задан | нет |
 | `app.progressLogEveryRows` | `10000` | нет |
 | `app.maxMergedRows` | без ограничения | нет |
 | `app.deleteOutputFilesAfterCompletion` | `false` | нет |
@@ -290,6 +291,18 @@ parallelism: 5
 
 ```yaml
 fetchSize: 1000
+```
+
+### `app.queryTimeoutSec`
+
+Таймаут выполнения одного SQL-запроса к source БД в секундах.
+
+Если параметр не задан, приложение не устанавливает JDBC query timeout.
+
+По умолчанию: не задан
+
+```yaml
+queryTimeoutSec: 60
 ```
 
 ### `app.progressLogEveryRows`

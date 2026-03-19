@@ -79,11 +79,29 @@ data class SqlConsoleInfoResponse(
     val configured: Boolean,
     val sourceNames: List<String>,
     val maxRowsPerShard: Int,
+    val queryTimeoutSec: Int?,
 )
 
 data class SqlConsoleQueryRequest(
     val sql: String,
     val selectedSourceNames: List<String> = emptyList(),
+)
+
+data class SqlConsoleStartQueryResponse(
+    val id: String,
+    val status: String,
+    val startedAt: Instant,
+    val cancelRequested: Boolean,
+)
+
+data class SqlConsoleExecutionResponse(
+    val id: String,
+    val status: String,
+    val startedAt: Instant,
+    val finishedAt: Instant? = null,
+    val cancelRequested: Boolean,
+    val result: SqlConsoleQueryResponse? = null,
+    val errorMessage: String? = null,
 )
 
 data class SqlConsoleShardResultResponse(
@@ -110,6 +128,7 @@ fun SqlConsoleInfo.toResponse(): SqlConsoleInfoResponse = SqlConsoleInfoResponse
     configured = configured,
     sourceNames = sourceNames,
     maxRowsPerShard = maxRowsPerShard,
+    queryTimeoutSec = queryTimeoutSec,
 )
 
 fun SqlConsoleQueryResult.toResponse(): SqlConsoleQueryResponse = SqlConsoleQueryResponse(
@@ -129,5 +148,22 @@ private fun RawShardExecutionResult.toResponse(): SqlConsoleShardResultResponse 
     truncated = truncated,
     affectedRows = affectedRows,
     message = message,
+    errorMessage = errorMessage,
+)
+
+fun SqlConsoleExecutionSnapshot.toStartResponse(): SqlConsoleStartQueryResponse = SqlConsoleStartQueryResponse(
+    id = id,
+    status = status.name,
+    startedAt = startedAt,
+    cancelRequested = cancelRequested,
+)
+
+fun SqlConsoleExecutionSnapshot.toResponse(): SqlConsoleExecutionResponse = SqlConsoleExecutionResponse(
+    id = id,
+    status = status.name,
+    startedAt = startedAt,
+    finishedAt = finishedAt,
+    cancelRequested = cancelRequested,
+    result = result?.toResponse(),
     errorMessage = errorMessage,
 )

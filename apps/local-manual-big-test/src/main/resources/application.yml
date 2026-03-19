@@ -5,6 +5,7 @@ app:
   errorMode: continue_on_error
   parallelism: 5
   fetchSize: 5000
+  queryTimeoutSec: 120
   progressLogEveryRows: 10000
   maxMergedRows:
   deleteOutputFilesAfterCompletion: false

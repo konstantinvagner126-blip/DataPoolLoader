@@ -261,6 +261,11 @@ body {
   color: #0d9488;
 }
 
+.sql-status-strip-running {
+  background: rgba(29, 111, 216, 0.12);
+  color: #1d4ed8;
+}
+
 .sql-status-strip-warning {
   background: rgba(245, 158, 11, 0.16);
   color: #b45309;

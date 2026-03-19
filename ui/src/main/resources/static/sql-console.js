@@ -4,13 +4,20 @@ let sqlConsoleCredentialsStatus = null;
 let sqlConsoleResult = null;
 let currentSelectShard = null;
 let selectedSourceNames = [];
+let currentExecutionId = null;
+let currentExecutionStartedAt = null;
+let currentExecutionType = "SQL";
+let pollTimerId = null;
+let elapsedTimerId = null;
 const currentPages = {};
 const SQL_DRAFT_STORAGE_KEY = "datapool.sqlConsole.draft";
+const LONG_RUNNING_THRESHOLD_MS = 5000;
 
 const credentialsStatusEl = document.getElementById("sqlCredentialsStatus");
 const credentialsWarningEl = document.getElementById("sqlCredentialsWarning");
 const credentialsFileInputEl = document.getElementById("sqlCredentialsFileInput");
 const consoleInfoEl = document.getElementById("sqlConsoleInfo");
+const consoleLimitsInfoEl = document.getElementById("sqlConsoleLimitsInfo");
 const sourceSelectionEl = document.getElementById("sqlSourceSelection");
 const executionStatusEl = document.getElementById("sqlExecutionStatus");
 const resultMetaEl = document.getElementById("sqlResultMeta");
@@ -21,6 +28,8 @@ const dataTabButtonEl = document.getElementById("sqlDataTabButton");
 const statusTabButtonEl = document.getElementById("sqlStatusTabButton");
 const dataPaneEl = document.getElementById("sqlDataPane");
 const statusPaneEl = document.getElementById("sqlStatusPane");
+const runButtonEl = document.getElementById("sqlRunButton");
+const cancelButtonEl = document.getElementById("sqlCancelButton");
 
 require.config({ paths: { vs: "https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs" } });
 require(["vs/editor/editor.main"], async () => {
@@ -63,7 +72,7 @@ document.getElementById("sqlUploadCredentialsButton").addEventListener("click", 
 });
 
 pageSizeSelectEl.addEventListener("change", () => {
-  if (sqlConsoleResult && sqlConsoleResult.statementType === "SELECT") {
+  if (sqlConsoleResult && sqlConsoleResult.statementType === "RESULT_SET") {
     const shardResults = successfulSelectShards(sqlConsoleResult);
     if (currentSelectShard && shardResults.some(item => item.shardName === currentSelectShard)) {
       currentPages[currentSelectShard] = 1;
@@ -72,7 +81,7 @@ pageSizeSelectEl.addEventListener("change", () => {
   }
 });
 
-document.getElementById("sqlRunButton").addEventListener("click", async () => {
+runButtonEl.addEventListener("click", async () => {
   const sql = sqlConsoleEditor.getValue();
   const statementKeyword = detectStatementKeyword(sql);
   if (!isReadOnlyLikeStatement(statementKeyword)) {
@@ -82,33 +91,48 @@ document.getElementById("sqlRunButton").addEventListener("click", async () => {
     }
   }
 
-  executionStatusEl.textContent = "Запрос выполняется...";
-  executionStatusEl.className = "small text-secondary";
+  resetResultArea();
+  currentExecutionType = statementKeyword;
+  setRunningState(true);
 
   try {
-    const response = await fetch("/api/sql-console/query", {
+    const response = await fetch("/api/sql-console/query/start", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ sql, selectedSourceNames })
     });
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || "Не удалось выполнить запрос.");
+      throw new Error(error.error || "Не удалось запустить запрос.");
     }
-    sqlConsoleResult = await response.json();
-    const successfulShards = successfulSelectShards(sqlConsoleResult);
-    currentSelectShard = successfulShards.length > 0 ? successfulShards[0].shardName : null;
-    successfulShards.forEach(item => {
-      if (!currentPages[item.shardName]) currentPages[item.shardName] = 1;
-    });
-    renderResult(sqlConsoleResult);
+
+    const started = await response.json();
+    currentExecutionId = started.id;
+    currentExecutionStartedAt = new Date(started.startedAt);
+    renderRunningStatus();
+    startExecutionPolling();
   } catch (error) {
-    executionStatusEl.textContent = error.message || "Не удалось выполнить запрос.";
+    setRunningState(false);
+    renderExecutionError(error.message || "Не удалось запустить запрос.");
+  }
+});
+
+cancelButtonEl.addEventListener("click", async () => {
+  if (!currentExecutionId) return;
+  cancelButtonEl.disabled = true;
+  try {
+    const response = await fetch(`/api/sql-console/query/${currentExecutionId}/cancel`, {
+      method: "POST"
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Не удалось отменить запрос.");
+    }
+    renderRunningStatus(true);
+  } catch (error) {
+    cancelButtonEl.disabled = false;
+    executionStatusEl.textContent = error.message || "Не удалось отменить запрос.";
     executionStatusEl.className = "sql-status-strip sql-status-strip-failed";
-    resultMetaEl.textContent = "Результат не получен.";
-    resultSummaryEl.innerHTML = `<div class="alert alert-danger mb-0">${escapeHtml(error.message || "Не удалось выполнить запрос.")}</div>`;
-    resultTableEl.innerHTML = `<div class="alert alert-danger mb-0">${escapeHtml(error.message || "Не удалось выполнить запрос.")}</div>`;
-    setActiveOutputTab("status");
   }
 });
 
@@ -129,6 +153,7 @@ async function refreshCredentialsStatus() {
 function renderConsoleInfo(info) {
   if (!info || !info.configured) {
     consoleInfoEl.textContent = "В ui.application.yml пока не настроены source-подключения.";
+    consoleLimitsInfoEl.textContent = "";
     sourceSelectionEl.innerHTML = "";
     return;
   }
@@ -137,6 +162,9 @@ function renderConsoleInfo(info) {
     <div><strong>Sources настроено:</strong> ${info.sourceNames.length}</div>
     <div><strong>Лимит строк на SELECT с одного source:</strong> ${info.maxRowsPerShard}</div>
   `;
+  consoleLimitsInfoEl.textContent = info.queryTimeoutSec
+    ? `Таймаут запроса на один source: ${info.queryTimeoutSec} сек.`
+    : "Таймаут запроса не задан.";
 
   if (selectedSourceNames.length === 0) {
     selectedSourceNames = [...info.sourceNames];
@@ -191,6 +219,86 @@ function renderCredentialsWarning() {
   }
   credentialsWarningEl.classList.remove("d-none");
   credentialsWarningEl.textContent = "Если source-подключения в ui.application.yml используют placeholders ${...}, загрузи credential.properties перед выполнением запроса.";
+}
+
+function startExecutionPolling() {
+  stopExecutionPolling();
+  pollTimerId = window.setInterval(async () => {
+    try {
+      await pollExecutionStatus();
+    } catch (error) {
+      stopExecutionPolling();
+      setRunningState(false);
+      renderExecutionError(error.message || "Не удалось получить статус SQL-запроса.");
+      currentExecutionId = null;
+      currentExecutionStartedAt = null;
+    }
+  }, 1000);
+  elapsedTimerId = window.setInterval(() => {
+    renderRunningStatus();
+  }, 1000);
+}
+
+function stopExecutionPolling() {
+  if (pollTimerId) {
+    window.clearInterval(pollTimerId);
+    pollTimerId = null;
+  }
+  if (elapsedTimerId) {
+    window.clearInterval(elapsedTimerId);
+    elapsedTimerId = null;
+  }
+}
+
+async function pollExecutionStatus() {
+  if (!currentExecutionId) return;
+  const response = await fetch(`/api/sql-console/query/${currentExecutionId}`);
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "Не удалось получить статус SQL-запроса.");
+  }
+  const snapshot = await response.json();
+  if (snapshot.status === "RUNNING") {
+    renderRunningStatus(snapshot.cancelRequested);
+    return;
+  }
+
+  stopExecutionPolling();
+  setRunningState(false);
+  if (snapshot.status === "SUCCESS" && snapshot.result) {
+    sqlConsoleResult = snapshot.result;
+    const successfulShards = successfulSelectShards(sqlConsoleResult);
+    currentSelectShard = successfulShards.length > 0 ? successfulShards[0].shardName : null;
+    successfulShards.forEach(item => {
+      currentPages[item.shardName] = 1;
+    });
+    renderResult(sqlConsoleResult);
+  } else if (snapshot.status === "CANCELLED") {
+    renderExecutionCancelled(snapshot.errorMessage || "Запрос отменен пользователем.");
+  } else {
+    renderExecutionError(snapshot.errorMessage || "Не удалось выполнить запрос.");
+  }
+  currentExecutionId = null;
+  currentExecutionStartedAt = null;
+}
+
+function renderRunningStatus(cancelRequested = false) {
+  const elapsedMs = currentExecutionStartedAt ? (Date.now() - currentExecutionStartedAt.getTime()) : 0;
+  const seconds = Math.max(1, Math.floor(elapsedMs / 1000));
+  const selectedSourcesLabel = selectedSourceNames.length > 0
+    ? selectedSourceNames.join(", ")
+    : "все sources";
+  const isLongRunning = elapsedMs >= LONG_RUNNING_THRESHOLD_MS;
+  executionStatusEl.textContent = cancelRequested
+    ? `Отмена запроса типа ${currentExecutionType} отправлена. Sources: ${selectedSourcesLabel}. Ожидание завершения...`
+    : isLongRunning
+      ? `Запрос типа ${currentExecutionType} выполняется дольше обычного: ${seconds} сек. Sources: ${selectedSourcesLabel}.`
+      : `Запрос типа ${currentExecutionType} выполняется: ${seconds} сек. Sources: ${selectedSourcesLabel}.`;
+  executionStatusEl.className = cancelRequested
+    ? "sql-status-strip sql-status-strip-warning"
+    : isLongRunning
+      ? "sql-status-strip sql-status-strip-warning"
+      : "sql-status-strip sql-status-strip-running";
 }
 
 function renderResult(result) {
@@ -309,6 +417,37 @@ function renderSelectResults(result) {
 
 function renderCommandResults(result) {
   resultTableEl.innerHTML = `<div class="alert alert-secondary mb-0">Команда ${result.statementKeyword} не возвращает табличные данные. Смотри вкладку "Статусы".</div>`;
+}
+
+function renderExecutionError(message) {
+  executionStatusEl.textContent = message;
+  executionStatusEl.className = "sql-status-strip sql-status-strip-failed";
+  resultMetaEl.textContent = "Результат не получен.";
+  resultSummaryEl.innerHTML = `<div class="alert alert-danger mb-0">${escapeHtml(message)}</div>`;
+  resultTableEl.innerHTML = `<div class="alert alert-danger mb-0">${escapeHtml(message)}</div>`;
+  setActiveOutputTab("status");
+}
+
+function renderExecutionCancelled(message) {
+  executionStatusEl.textContent = message;
+  executionStatusEl.className = "sql-status-strip sql-status-strip-warning";
+  resultMetaEl.textContent = "Выполнение было остановлено.";
+  resultSummaryEl.innerHTML = `<div class="alert alert-warning mb-0">${escapeHtml(message)}</div>`;
+  resultTableEl.innerHTML = `<div class="alert alert-warning mb-0">${escapeHtml(message)}</div>`;
+  setActiveOutputTab("status");
+}
+
+function resetResultArea() {
+  sqlConsoleResult = null;
+  currentSelectShard = null;
+  resultMetaEl.textContent = "Выполняется запрос...";
+  resultSummaryEl.innerHTML = `<div class="alert alert-secondary mb-0">Ожидается завершение запроса.</div>`;
+  resultTableEl.innerHTML = `<div class="alert alert-secondary mb-0">Ожидается завершение запроса.</div>`;
+}
+
+function setRunningState(isRunning) {
+  runButtonEl.disabled = isRunning;
+  cancelButtonEl.disabled = !isRunning;
 }
 
 function renderShardCards(shardResults) {

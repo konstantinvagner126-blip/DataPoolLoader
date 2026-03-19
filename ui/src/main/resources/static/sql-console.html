@@ -62,6 +62,7 @@
             <div>
               <div class="panel-title mb-1">SQL-редактор</div>
               <div class="text-secondary small">Поддерживается один SQL за запуск. Если запрос возвращает данные, результат показывается отдельно по каждому source. Для потенциально изменяющих команд UI запрашивает подтверждение.</div>
+              <div id="sqlConsoleLimitsInfo" class="text-secondary small mt-2"></div>
             </div>
           </div>
           <div id="sqlEditor" class="editor-frame sql-editor-frame"></div>
@@ -77,6 +78,7 @@
             </div>
             <div class="d-flex flex-wrap align-items-center gap-2">
               <button id="sqlRunButton" class="btn btn-primary">Выполнить запрос</button>
+              <button id="sqlCancelButton" class="btn btn-outline-danger" type="button" disabled>Отменить</button>
             </div>
           </div>
 

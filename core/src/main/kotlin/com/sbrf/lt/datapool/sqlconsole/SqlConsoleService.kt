@@ -6,10 +6,15 @@ import org.slf4j.LoggerFactory
 import java.nio.file.Path
 import java.sql.Connection
 import java.sql.DriverManager
+import java.sql.SQLException
+import java.sql.Statement
+import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.atomic.AtomicBoolean
 
 data class SqlConsoleConfig(
     val fetchSize: Int = 1000,
     val maxRowsPerShard: Int = 200,
+    val queryTimeoutSec: Int? = null,
     @param:JsonAlias("shards")
     val sources: List<SqlConsoleSourceConfig> = emptyList(),
 )
@@ -55,6 +60,8 @@ fun interface ShardSqlExecutor {
         statement: SqlConsoleStatement,
         fetchSize: Int,
         maxRows: Int,
+        queryTimeoutSec: Int?,
+        executionControl: SqlConsoleExecutionControl,
     ): RawShardExecutionResult
 }
 
@@ -62,6 +69,7 @@ data class SqlConsoleInfo(
     val configured: Boolean,
     val sourceNames: List<String>,
     val maxRowsPerShard: Int,
+    val queryTimeoutSec: Int?,
 )
 
 data class SqlConsoleQueryResult(
@@ -82,16 +90,21 @@ class SqlConsoleService(
         configured = config.sources.isNotEmpty(),
         sourceNames = config.sources.map { it.name },
         maxRowsPerShard = config.maxRowsPerShard,
+        queryTimeoutSec = config.queryTimeoutSec,
     )
 
     fun executeQuery(
         rawSql: String,
         credentialsPath: Path?,
         selectedSourceNames: List<String> = emptyList(),
+        executionControl: SqlConsoleExecutionControl = SqlConsoleExecutionControl(),
     ): SqlConsoleQueryResult {
         val statement = parseAndValidateStatement(rawSql)
         require(config.fetchSize > 0) { "Параметр ui.sqlConsole.fetchSize должен быть больше 0." }
         require(config.maxRowsPerShard > 0) { "Параметр ui.sqlConsole.maxRowsPerShard должен быть больше 0." }
+        require(config.queryTimeoutSec == null || config.queryTimeoutSec > 0) {
+            "Параметр ui.sqlConsole.queryTimeoutSec должен быть больше 0, если задан."
+        }
         require(config.sources.isNotEmpty()) {
             "В конфиге UI не настроены source-подключения. Заполни ui.sqlConsole.sources."
         }
@@ -127,14 +140,22 @@ class SqlConsoleService(
         }
 
         val shardResults = resolvedShards.map { shard ->
+            if (executionControl.isCancelled()) {
+                throw SqlConsoleExecutionCancelledException("Запрос отменен пользователем.")
+            }
             runCatching {
                 executor.execute(
                     shard = shard,
                     statement = statement,
                     fetchSize = config.fetchSize,
                     maxRows = config.maxRowsPerShard,
+                    queryTimeoutSec = config.queryTimeoutSec,
+                    executionControl = executionControl,
                 )
             }.onFailure { ex ->
+                if (ex is SqlConsoleExecutionCancelledException) {
+                    throw ex
+                }
                 logger.warn("SQL-консоль: shard {} завершился ошибкой: {}", shard.name, ex.message)
             }.getOrElse { ex ->
                 RawShardExecutionResult(
@@ -169,9 +190,11 @@ class JdbcShardSqlExecutor : ShardSqlExecutor {
         statement: SqlConsoleStatement,
         fetchSize: Int,
         maxRows: Int,
+        queryTimeoutSec: Int?,
+        executionControl: SqlConsoleExecutionControl,
     ): RawShardExecutionResult {
         DriverManager.getConnection(shard.jdbcUrl, shard.username, shard.password).use { connection ->
-            return executeSql(connection, shard, statement, fetchSize, maxRows)
+            return executeSql(connection, shard, statement, fetchSize, maxRows, queryTimeoutSec, executionControl)
         }
     }
 
@@ -181,51 +204,95 @@ class JdbcShardSqlExecutor : ShardSqlExecutor {
         statement: SqlConsoleStatement,
         fetchSize: Int,
         maxRows: Int,
+        queryTimeoutSec: Int?,
+        executionControl: SqlConsoleExecutionControl,
     ): RawShardExecutionResult {
         connection.createStatement().use { jdbcStatement ->
-            jdbcStatement.fetchSize = fetchSize
-            jdbcStatement.maxRows = maxRows + 1
-            val hasResultSet = jdbcStatement.execute(statement.sql)
-            if (hasResultSet) {
-                jdbcStatement.resultSet.use { resultSet ->
-                    val metaData = resultSet.metaData
-                    val columns = (1..metaData.columnCount).map { metaData.getColumnLabel(it) }
-                    val rows = mutableListOf<Map<String, String?>>()
-                    var truncated = false
-                    while (resultSet.next()) {
-                        if (rows.size == maxRows) {
-                            truncated = true
-                            break
-                        }
-                        rows += buildMap {
-                            columns.forEachIndexed { index, column ->
-                                put(column, resultSet.getObject(index + 1)?.toString())
+            executionControl.register(jdbcStatement)
+            try {
+                jdbcStatement.fetchSize = fetchSize
+                jdbcStatement.maxRows = maxRows + 1
+                jdbcStatement.queryTimeout = queryTimeoutSec ?: 0
+                val hasResultSet = jdbcStatement.execute(statement.sql)
+                if (hasResultSet) {
+                    jdbcStatement.resultSet.use { resultSet ->
+                        val metaData = resultSet.metaData
+                        val columns = (1..metaData.columnCount).map { metaData.getColumnLabel(it) }
+                        val rows = mutableListOf<Map<String, String?>>()
+                        var truncated = false
+                        while (resultSet.next()) {
+                            if (rows.size == maxRows) {
+                                truncated = true
+                                break
+                            }
+                            rows += buildMap {
+                                columns.forEachIndexed { index, column ->
+                                    put(column, resultSet.getObject(index + 1)?.toString())
+                                }
                             }
                         }
+                        return RawShardExecutionResult(
+                            shardName = shard.name,
+                            status = "SUCCESS",
+                            columns = columns,
+                            rows = rows,
+                            truncated = truncated,
+                            message = if (truncated) {
+                                "Результат усечен до $maxRows строк."
+                            } else {
+                                "Данные получены успешно."
+                            },
+                        )
                     }
-                    return RawShardExecutionResult(
-                        shardName = shard.name,
-                        status = "SUCCESS",
-                        columns = columns,
-                        rows = rows,
-                        truncated = truncated,
-                        message = if (truncated) {
-                            "Результат усечен до $maxRows строк."
-                        } else {
-                            "Данные получены успешно."
-                        },
-                    )
                 }
+                return RawShardExecutionResult(
+                    shardName = shard.name,
+                    status = "SUCCESS",
+                    affectedRows = jdbcStatement.updateCount.takeIf { it >= 0 },
+                    message = "${statement.leadingKeyword} выполнен успешно.",
+                )
+            } catch (ex: SQLException) {
+                if (executionControl.isCancelled()) {
+                    throw SqlConsoleExecutionCancelledException("Запрос отменен пользователем.", ex)
+                }
+                throw ex
+            } finally {
+                executionControl.unregister(jdbcStatement)
             }
-            return RawShardExecutionResult(
-                shardName = shard.name,
-                status = "SUCCESS",
-                affectedRows = jdbcStatement.updateCount.takeIf { it >= 0 },
-                message = "${statement.leadingKeyword} выполнен успешно.",
-            )
         }
     }
 }
+
+class SqlConsoleExecutionControl {
+    private val cancelled = AtomicBoolean(false)
+    private val statements = CopyOnWriteArrayList<Statement>()
+
+    fun cancel() {
+        if (cancelled.compareAndSet(false, true)) {
+            statements.forEach {
+                runCatching { it.cancel() }
+            }
+        }
+    }
+
+    fun register(statement: Statement) {
+        statements += statement
+        if (cancelled.get()) {
+            runCatching { statement.cancel() }
+        }
+    }
+
+    fun unregister(statement: Statement) {
+        statements -= statement
+    }
+
+    fun isCancelled(): Boolean = cancelled.get()
+}
+
+class SqlConsoleExecutionCancelledException(
+    message: String,
+    cause: Throwable? = null,
+) : RuntimeException(message, cause)
 
 private fun parseAndValidateStatement(rawSql: String): SqlConsoleStatement {
     val trimmed = rawSql.trim()

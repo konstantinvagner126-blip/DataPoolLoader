@@ -42,6 +42,7 @@ class PostgresExporter(
                     ResultSet.CONCUR_READ_ONLY,
                 ).use { statement ->
                     configureStreaming(connection, statement, task.fetchSize)
+                    statement.queryTimeout = task.queryTimeoutSec ?: 0
                     statement.executeQuery().use { resultSet ->
                         val columns = readColumns(resultSet)
                         Files.newBufferedWriter(task.outputFile).use { writer ->

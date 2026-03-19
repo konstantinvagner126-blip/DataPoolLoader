@@ -33,13 +33,14 @@ class ServerTest {
         val registry = ModuleRegistry(projectRoot = root)
         val uiConfig = UiAppConfig(
             sqlConsole = SqlConsoleConfig(
+                queryTimeoutSec = 30,
                 sources = listOf(SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user", "pwd")),
             ),
         )
         val runManager = RunManager(moduleRegistry = registry, uiConfig = uiConfig)
         val sqlConsoleService = SqlConsoleService(
             config = uiConfig.sqlConsole,
-            executor = ShardSqlExecutor { shard, statement, _, _ ->
+            executor = ShardSqlExecutor { shard, statement, _, _, _, _ ->
                 assertEquals("SELECT", statement.leadingKeyword)
                 RawShardExecutionResult(
                     shardName = shard.name,
@@ -69,6 +70,7 @@ class ServerTest {
 
         val info = client.get("/api/sql-console/info").bodyAsText()
         assertTrue(info.contains("\"sourceNames\":[\"shard1\"]"))
+        assertTrue(info.contains("\"queryTimeoutSec\":30"))
 
         val queryResponse = client.post("/api/sql-console/query") {
             contentType(ContentType.Application.Json)

@@ -13,6 +13,7 @@ data class ExportTask(
     val sql: String,
     val outputFile: Path,
     val fetchSize: Int,
+    val queryTimeoutSec: Int?,
     val progressLogEveryRows: Long,
     val executionListener: ExecutionListener = NoOpExecutionListener,
 )

@@ -35,13 +35,15 @@ class SqlConsoleServiceTest {
         val service = SqlConsoleService(
             config = SqlConsoleConfig(
                 maxRowsPerShard = 2,
+                queryTimeoutSec = 15,
                 sources = listOf(
                     SqlConsoleSourceConfig("shard1", "\${SHARD1_URL}", "\${SHARD1_USER}", "\${SHARD1_PASSWORD}"),
                     SqlConsoleSourceConfig("shard2", "\${SHARD2_URL}", "\${SHARD2_USER}", "\${SHARD2_PASSWORD}"),
                 ),
             ),
-            executor = ShardSqlExecutor { shard, statement, _, maxRows ->
+            executor = ShardSqlExecutor { shard, statement, _, maxRows, timeout, _ ->
                 assertEquals("SELECT", statement.leadingKeyword)
+                assertEquals(15, timeout)
                 when (shard.name) {
                     "shard1" -> RawShardExecutionResult(
                         shardName = shard.name,
@@ -89,7 +91,7 @@ class SqlConsoleServiceTest {
                     SqlConsoleSourceConfig("shard2", "jdbc:test:two", "user2", "pwd2"),
                 ),
             ),
-            executor = ShardSqlExecutor { shard, statement, _, _ ->
+            executor = ShardSqlExecutor { shard, statement, _, _, _, _ ->
                 assertEquals("SELECT", statement.leadingKeyword)
                 if (shard.name == "shard2") error("boom")
                 RawShardExecutionResult(
@@ -120,7 +122,7 @@ class SqlConsoleServiceTest {
                     SqlConsoleSourceConfig("shard3", "jdbc:test:three", "user3", "pwd3"),
                 ),
             ),
-            executor = ShardSqlExecutor { shard, statement, _, _ ->
+            executor = ShardSqlExecutor { shard, statement, _, _, _, _ ->
                 executed += shard.name
                 assertEquals("SELECT", statement.leadingKeyword)
                 RawShardExecutionResult(
@@ -144,7 +146,7 @@ class SqlConsoleServiceTest {
             config = SqlConsoleConfig(
                 sources = listOf(SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user1", "pwd1")),
             ),
-            executor = ShardSqlExecutor { shard, statement, _, _ ->
+            executor = ShardSqlExecutor { shard, statement, _, _, _, _ ->
                 assertEquals("shard1", shard.name)
                 assertEquals("UPDATE", statement.leadingKeyword)
                 RawShardExecutionResult(
@@ -169,7 +171,7 @@ class SqlConsoleServiceTest {
             config = SqlConsoleConfig(
                 sources = listOf(SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user1", "pwd1")),
             ),
-            executor = ShardSqlExecutor { shard, statement, _, _ ->
+            executor = ShardSqlExecutor { shard, statement, _, _, _, _ ->
                 assertEquals("DELETE", statement.leadingKeyword)
                 RawShardExecutionResult(
                     shardName = shard.name,
@@ -193,7 +195,7 @@ class SqlConsoleServiceTest {
             config = SqlConsoleConfig(
                 sources = listOf(SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user1", "pwd1")),
             ),
-            executor = ShardSqlExecutor { _, _, _, _ -> error("should not be called") },
+            executor = ShardSqlExecutor { _, _, _, _, _, _ -> error("should not be called") },
         )
 
         val error = assertFailsWith<IllegalArgumentException> {
@@ -201,5 +203,18 @@ class SqlConsoleServiceTest {
         }
 
         assertEquals("В SQL-консоли разрешен только один SQL-запрос за запуск.", error.message)
+    }
+
+    @Test
+    fun `exposes timeout in info`() {
+        val service = SqlConsoleService(
+            config = SqlConsoleConfig(
+                queryTimeoutSec = 45,
+                sources = listOf(SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user1", "pwd1")),
+            ),
+            executor = ShardSqlExecutor { _, _, _, _, _, _ -> error("should not be called") },
+        )
+
+        assertEquals(45, service.info().queryTimeoutSec)
     }
 }
