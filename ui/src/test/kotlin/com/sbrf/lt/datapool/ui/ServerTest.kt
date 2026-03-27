@@ -3,6 +3,7 @@ package com.sbrf.lt.datapool.ui
 import com.sbrf.lt.datapool.sqlconsole.RawShardExecutionResult
 import com.sbrf.lt.datapool.sqlconsole.ShardSqlExecutor
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleConfig
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleExecutionCancelledException
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleSourceConfig
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleService
 import io.ktor.client.request.get
@@ -22,6 +23,7 @@ import kotlin.io.path.readText
 import kotlin.io.path.writeText
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import java.nio.file.Files
 
@@ -131,6 +133,155 @@ class ServerTest {
         val resources = root.resolve("apps/demo-app/src/main/resources")
         assertEquals("select 10", resources.resolve("sql/common.sql").readText())
         assertEquals("select 20", resources.resolve("sql/db2.sql").readText())
+    }
+
+    @Test
+    fun `parses and updates config form state through api`() = testApplication {
+        application {
+            uiModule()
+        }
+
+        val parseResponse = client.post("/api/config-form/parse") {
+            contentType(ContentType.Application.Json)
+            setBody(
+                """
+                {"configText":"app:\n  outputDir: ./output\n  mergeMode: round_robin\n  sources:\n    - name: db1\n      jdbcUrl: ${'$'}{DB1_JDBC_URL}\n      username: ${'$'}{DB1_USERNAME}\n      password: ${'$'}{DB1_PASSWORD}\n  target:\n    enabled: true\n    table: public.sample\n    truncateBeforeLoad: true\n"}
+                """.trimIndent(),
+            )
+        }
+        assertEquals(HttpStatusCode.OK, parseResponse.status)
+        val parseBody = parseResponse.bodyAsText()
+        assertTrue(parseBody.contains("\"fileFormat\":\"csv\""))
+        assertTrue(parseBody.contains("\"mergeMode\":\"round_robin\""))
+        assertTrue(parseBody.contains("\"sources\":["))
+        assertTrue(parseBody.contains("\"targetTable\":\"public.sample\""))
+
+        val updateResponse = client.post("/api/config-form/update") {
+            contentType(ContentType.Application.Json)
+            setBody(
+                """
+                {
+                  "configText": "app:\n  outputDir: ./output\n  mergeMode: plain\n  sources:\n    - name: db1\n      jdbcUrl: ${'$'}{DB1_JDBC_URL}\n      username: ${'$'}{DB1_USERNAME}\n      password: ${'$'}{DB1_PASSWORD}\n  target:\n    enabled: false\n    table: public.old_table\n    truncateBeforeLoad: false\n",
+                  "formState": {
+                    "outputDir": "./next-output",
+                    "fileFormat": "csv",
+                    "mergeMode": "quota",
+                    "errorMode": "continue_on_error",
+                    "parallelism": 6,
+                    "fetchSize": 1500,
+                    "queryTimeoutSec": 45,
+                    "progressLogEveryRows": 2222,
+                    "maxMergedRows": 3333,
+                    "deleteOutputFilesAfterCompletion": true,
+                    "commonSql": "select 5 as id",
+                    "commonSqlFile": "classpath:sql/common.sql",
+                    "sources": [
+                      {
+                        "name": "db1",
+                        "jdbcUrl": "${'$'}{DB1_JDBC_URL}",
+                        "username": "${'$'}{DB1_USERNAME}",
+                        "password": "${'$'}{DB1_PASSWORD}",
+                        "sql": "select 9",
+                        "sqlFile": "classpath:sql/db1.sql"
+                      }
+                    ],
+                    "quotas": [
+                      {
+                        "source": "db1",
+                        "percent": 100.0
+                      }
+                    ],
+                    "targetEnabled": true,
+                    "targetJdbcUrl": "${'$'}{TARGET_JDBC_URL}",
+                    "targetUsername": "${'$'}{TARGET_USERNAME}",
+                    "targetPassword": "${'$'}{TARGET_PASSWORD}",
+                    "targetTable": "public.new_table",
+                    "targetTruncateBeforeLoad": true
+                  }
+                }
+                """.trimIndent(),
+            )
+        }
+        assertEquals(HttpStatusCode.OK, updateResponse.status)
+        val updateBody = updateResponse.bodyAsText()
+        assertTrue(updateBody.contains("\"mergeMode\":\"quota\""))
+        assertTrue(updateBody.contains("\"targetTable\":\"public.new_table\""))
+        assertTrue(updateBody.contains("\"commonSql\":\"select 5 as id\""))
+        assertTrue(updateBody.contains("\"quotas\":["))
+        assertTrue(updateBody.contains("next-output"))
+        assertTrue(updateBody.contains("DB1_JDBC_URL"))
+    }
+
+    @Test
+    fun `supports async sql console lifecycle and service routes`() = testApplication {
+        val root = createProject()
+        val registry = ModuleRegistry(projectRoot = root)
+        val uiConfig = UiAppConfig(
+            sqlConsole = SqlConsoleConfig(
+                queryTimeoutSec = 30,
+                sources = listOf(SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user", "pwd")),
+            ),
+        )
+        val runManager = RunManager(moduleRegistry = registry, uiConfig = uiConfig)
+        val sqlConsoleService = SqlConsoleService(
+            config = uiConfig.sqlConsole,
+            executor = ShardSqlExecutor { shard, statement, _, _, _, control ->
+                assertEquals("DELETE", statement.leadingKeyword)
+                repeat(30) {
+                    if (control.isCancelled()) {
+                        throw SqlConsoleExecutionCancelledException("Запрос отменен пользователем.")
+                    }
+                    Thread.sleep(10)
+                }
+                RawShardExecutionResult(
+                    shardName = shard.name,
+                    status = "SUCCESS",
+                    affectedRows = 3,
+                    message = "DELETE выполнен успешно.",
+                )
+            },
+        )
+        val queryManager = SqlConsoleQueryManager(sqlConsoleService)
+        application {
+            uiModule(
+                moduleRegistry = registry,
+                runManager = runManager,
+                sqlConsoleService = sqlConsoleService,
+                sqlConsoleQueryManager = queryManager,
+            )
+        }
+
+        val stateBody = client.get("/api/state").bodyAsText()
+        assertTrue(stateBody.contains("\"history\":[]"))
+
+        val credentialsBody = client.get("/api/credentials").bodyAsText()
+        assertTrue(credentialsBody.contains("\"mode\":\"NONE\""))
+
+        val started = client.post("/api/sql-console/query/start") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"sql":"delete from demo","selectedSourceNames":["shard1"]}""")
+        }
+        assertEquals(HttpStatusCode.OK, started.status)
+        val startedBody = started.bodyAsText()
+        assertTrue(startedBody.contains("\"status\":\"RUNNING\""))
+        val executionId = Regex(""""id":"([^"]+)"""").find(startedBody)?.groupValues?.get(1)
+        assertNotNull(executionId)
+
+        val running = client.get("/api/sql-console/query/$executionId").bodyAsText()
+        assertTrue(running.contains("\"status\":\"RUNNING\""))
+
+        val cancelled = client.post("/api/sql-console/query/$executionId/cancel").bodyAsText()
+        assertTrue(cancelled.contains("\"cancelRequested\":true"))
+
+        repeat(20) {
+            val polled = client.get("/api/sql-console/query/$executionId").bodyAsText()
+            if (polled.contains("\"status\":\"CANCELLED\"")) {
+                assertTrue(polled.contains("Запрос отменен пользователем"))
+                return@testApplication
+            }
+            Thread.sleep(50)
+        }
+        error("async SQL execution was not cancelled in time")
     }
 
     private fun createProject() = Files.createTempDirectory("ui-server").apply {

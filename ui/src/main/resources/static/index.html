@@ -67,33 +67,47 @@
             <div>
               <div class="panel-title mb-1">Редактор модуля</div>
               <div id="selectedModuleLabel" class="text-secondary small">Модуль не выбран</div>
+              <div id="moduleDraftStatus" class="module-draft-status small mt-1 text-secondary">
+                <span class="module-draft-dot module-draft-dot-saved" aria-hidden="true"></span>
+                <span>Изменений нет.</span>
+              </div>
             </div>
             <div class="d-flex flex-wrap gap-2">
-              <button id="reloadButton" class="btn btn-outline-secondary">Перезагрузить</button>
-              <button id="saveButton" class="btn btn-outline-primary">Сохранить</button>
+              <button id="reloadButton" class="btn btn-outline-secondary">Отменить изменения</button>
+              <button id="saveButton" class="btn btn-outline-primary" disabled>Сохранить</button>
               <button id="runButton" class="btn btn-primary">Запустить</button>
             </div>
           </div>
 
           <ul class="nav nav-tabs mb-3" id="editorTabs" role="tablist">
-            <li class="nav-item" role="presentation">
-              <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#configTab" type="button">application.yml</button>
-            </li>
-            <li class="nav-item" role="presentation">
-              <button class="nav-link" data-bs-toggle="tab" data-bs-target="#sqlTab" type="button">SQL</button>
-            </li>
-          </ul>
+              <li class="nav-item" role="presentation">
+                <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#configFormTab" type="button">Настройки модуля</button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#configTab" type="button">application.yml</button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#sqlTab" type="button">SQL</button>
+              </li>
+            </ul>
 
           <div class="tab-content">
-            <div class="tab-pane fade show active" id="configTab">
-              <div id="configEditor" class="editor-frame"></div>
-            </div>
-            <div class="tab-pane fade" id="sqlTab">
-              <div class="mb-2">
-                <select id="sqlFileSelect" class="form-select"></select>
+              <div class="tab-pane fade show active" id="configFormTab">
+                <div id="configFormWarning" class="alert alert-warning d-none mb-3"></div>
+                <div class="config-form-note text-secondary small mb-3">
+                  В этой вкладке визуально редактируется конфиг модуля. Изменения синхронизируются с <code>application.yml</code> в реальном времени.
+                </div>
+                <div id="configForm" class="config-form-shell"></div>
               </div>
-              <div id="sqlEditor" class="editor-frame"></div>
-            </div>
+              <div class="tab-pane fade" id="configTab">
+                <div id="configEditor" class="editor-frame"></div>
+              </div>
+              <div class="tab-pane fade" id="sqlTab">
+                <div class="mb-2">
+                  <select id="sqlFileSelect" class="form-select"></select>
+                </div>
+                <div id="sqlEditor" class="editor-frame"></div>
+              </div>
           </div>
         </div>
 

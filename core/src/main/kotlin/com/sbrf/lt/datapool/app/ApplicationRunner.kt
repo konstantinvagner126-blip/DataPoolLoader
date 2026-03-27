@@ -2,6 +2,7 @@ package com.sbrf.lt.datapool.app
 
 import com.sbrf.lt.datapool.config.ConfigLoader
 import com.sbrf.lt.datapool.config.CredentialsFileLocator
+import com.sbrf.lt.datapool.config.ProjectRootLocator
 import com.sbrf.lt.datapool.config.ValueResolver
 import com.sbrf.lt.datapool.db.PostgresExporter
 import com.sbrf.lt.datapool.db.PostgresImporter
@@ -326,7 +327,13 @@ class ApplicationRunner(
 
     private fun createOutputDir(outputRoot: String, startedAt: Instant): Path {
         val formatter = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").withZone(ZoneOffset.UTC)
-        val path = Path.of(outputRoot, formatter.format(startedAt))
+        val outputRootPath = Path.of(outputRoot)
+        val baseDir = if (outputRootPath.isAbsolute) {
+            outputRootPath
+        } else {
+            (ProjectRootLocator.find() ?: Path.of("").toAbsolutePath().normalize()).resolve(outputRootPath).normalize()
+        }
+        val path = baseDir.resolve(formatter.format(startedAt))
         Files.createDirectories(path)
         return path
     }

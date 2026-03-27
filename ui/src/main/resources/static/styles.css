@@ -221,6 +221,260 @@ body {
   border-color: #132238;
 }
 
+.module-draft-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.module-draft-dot {
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 999px;
+  flex: 0 0 auto;
+}
+
+.module-draft-dot-saved {
+  background: #16a34a;
+  box-shadow: 0 0 0 0.18rem rgba(22, 163, 74, 0.14);
+}
+
+.module-draft-dot-dirty {
+  background: #2563eb;
+  box-shadow: 0 0 0 0.18rem rgba(37, 99, 235, 0.14);
+}
+
+.module-draft-dot-neutral {
+  background: #94a3b8;
+  box-shadow: 0 0 0 0.18rem rgba(148, 163, 184, 0.12);
+}
+
+.config-form-shell {
+  display: block;
+  width: 100%;
+}
+
+.config-section-tabs {
+  gap: 0.5rem;
+}
+
+.config-section-tabs .nav-link {
+  border-radius: 999px;
+  color: #132238;
+  border: 1px solid rgba(19, 34, 56, 0.12);
+  background: #fff;
+  font-size: 0.9rem;
+}
+
+.config-section-tabs .nav-link.active {
+  background: #132238;
+  color: #fff;
+  border-color: #132238;
+}
+
+.config-section-content .tab-pane {
+  padding-top: 0.25rem;
+}
+
+.config-form-card {
+  background: rgba(19, 34, 56, 0.03);
+  border: 1px solid rgba(19, 34, 56, 0.08);
+  border-radius: 16px;
+  padding: 1rem;
+}
+
+.config-form-collapsible-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.config-form-card-summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1rem 0.9rem;
+  cursor: pointer;
+}
+
+.config-form-card-summary::-webkit-details-marker,
+.config-form-subcard-summary::-webkit-details-marker {
+  display: none;
+}
+
+.config-form-card-body {
+  padding: 0 1rem 1rem;
+}
+
+.config-form-card-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 0.9rem;
+  color: #132238;
+}
+
+.config-form-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.config-form-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.config-form-subcard {
+  background: #fff;
+  border: 1px solid rgba(19, 34, 56, 0.1);
+  border-radius: 14px;
+  padding: 0;
+  overflow: hidden;
+}
+
+.config-form-subcard-summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem;
+  cursor: pointer;
+}
+
+.config-form-subcard-summary-text {
+  min-width: 0;
+}
+
+.config-form-subcard-summary-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.config-form-subcard-body {
+  padding: 0 1rem 1rem;
+}
+
+.config-form-subtitle {
+  font-size: 0.88rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #132238;
+}
+
+.config-form-inline-note {
+  font-size: 0.88rem;
+  color: #64748b;
+}
+
+.config-collapse-indicator {
+  width: 0.65rem;
+  height: 0.65rem;
+  border-right: 2px solid #132238;
+  border-bottom: 2px solid #132238;
+  transform: rotate(45deg);
+  transition: transform 0.18s ease;
+  flex: 0 0 auto;
+}
+
+.config-form-collapsible-card[open] > .config-form-card-summary .config-collapse-indicator,
+.config-form-subcard-collapsible[open] > .config-form-subcard-summary .config-collapse-indicator {
+  transform: rotate(225deg);
+}
+
+.config-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.config-form-field-wide textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+.config-form-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #132238;
+}
+
+.config-form-help,
+.config-form-note {
+  font-size: 0.82rem;
+  color: #64748b;
+}
+
+.config-form-check {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  font-size: 0.92rem;
+  color: #132238;
+  min-height: 38px;
+}
+
+.config-form-check-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.config-form-check .form-check-input {
+  margin: 0;
+}
+
+.config-radio-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.config-radio-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.6rem 0.85rem;
+  border: 1px solid rgba(19, 34, 56, 0.12);
+  border-radius: 12px;
+  background: #fff;
+  font-size: 0.92rem;
+  color: #132238;
+}
+
+.config-radio-option input {
+  margin: 0;
+}
+
+.config-form-empty-state {
+  border: 1px dashed rgba(19, 34, 56, 0.18);
+  border-radius: 16px;
+  padding: 1.5rem;
+  background: rgba(19, 34, 56, 0.03);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.85rem;
+}
+
+.config-form-empty-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #132238;
+}
+
+.config-form-empty-text {
+  font-size: 0.92rem;
+  color: #64748b;
+  max-width: 640px;
+}
+
 .editor-frame {
   height: 460px;
   border: 1px solid rgba(19, 34, 56, 0.12);

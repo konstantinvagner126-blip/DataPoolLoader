@@ -16,10 +16,10 @@ data class UiAppConfig(
     val sqlConsole: SqlConsoleConfig = SqlConsoleConfig(),
 )
 
-class UiConfigLoader(
+open class UiConfigLoader(
     private val configLoader: ConfigLoader = ConfigLoader(),
 ) {
-    fun load(): UiAppConfig {
+    open fun load(): UiAppConfig {
         val stream: InputStream = javaClass.classLoader.getResourceAsStream("application.yml")
             ?: return UiAppConfig()
         val root = stream.bufferedReader().use {

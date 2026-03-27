@@ -48,6 +48,7 @@ fun startUiServer(port: Int = UiConfigLoader().load().port) {
 fun Application.uiModule(
     moduleRegistry: ModuleRegistry = ModuleRegistry(),
     runManager: RunManager = RunManager(moduleRegistry = moduleRegistry),
+    configFormService: ConfigFormService = ConfigFormService(),
     sqlConsoleService: SqlConsoleService = SqlConsoleService(UiConfigLoader().load().sqlConsole),
     sqlConsoleQueryManager: SqlConsoleQueryManager = SqlConsoleQueryManager(sqlConsoleService),
 ) {
@@ -108,6 +109,16 @@ fun Application.uiModule(
                 call.receive<SaveModuleRequest>(),
             )
             call.respond(SaveResultResponse("Изменения модуля сохранены."))
+        }
+
+        post("/api/config-form/parse") {
+            val request = call.receive<ConfigFormParseRequest>()
+            call.respond(configFormService.parse(request.configText))
+        }
+
+        post("/api/config-form/update") {
+            val request = call.receive<ConfigFormUpdateRequest>()
+            call.respond(configFormService.apply(request.configText, request.formState))
         }
 
         post("/api/runs") {
