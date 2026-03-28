@@ -20,6 +20,9 @@ class ModuleRegistryTest {
 
         val modules = registry.listModules()
         assertEquals(listOf("demo-app"), modules.map { it.id })
+        assertEquals("Demo App", modules.single().title)
+        assertEquals("VALID", modules.single().validationStatus)
+        assertTrue(modules.single().tags.contains("postgres"))
 
         val details = registry.loadModuleDetails("demo-app")
         assertTrue(details.configText.contains("commonSqlFile"))
@@ -27,6 +30,8 @@ class ModuleRegistryTest {
             listOf("Общий SQL", "Источник: db2"),
             details.sqlFiles.map { it.label },
         )
+        assertEquals("Demo App", details.title)
+        assertEquals("Учебный модуль для UI-тестов.", details.description)
     }
 
     @Test
@@ -129,6 +134,8 @@ class ModuleRegistryTest {
         assertEquals(2, details.sqlFiles.size)
         assertFalse(details.sqlFiles.first().exists)
         assertTrue(details.sqlFiles.first().content.isEmpty())
+        assertEquals("INVALID", details.validationStatus)
+        assertTrue(details.validationIssues.any { it.message.contains("missing.sql") })
 
         val error = assertFailsWith<IllegalStateException> {
             registry.getModule("unknown-module")
@@ -137,7 +144,7 @@ class ModuleRegistryTest {
     }
 
     @Test
-    fun `list modules skips directories without application config`() {
+    fun `list modules keeps modules without application config and marks them invalid`() {
         val root = createProject()
         val emptyModule = root.resolve("apps/empty-app")
         emptyModule.createDirectories()
@@ -146,7 +153,12 @@ class ModuleRegistryTest {
 
         val modules = registry.listModules()
 
-        assertEquals(listOf("demo-app"), modules.map { it.id })
+        assertEquals(listOf("demo-app", "empty-app"), modules.map { it.id })
+        val emptyApp = modules.first { it.id == "empty-app" }
+        assertEquals("INVALID", emptyApp.validationStatus)
+        assertTrue(emptyApp.validationIssues.any { it.message.contains("application.yml") })
+        val details = registry.loadModuleDetails("empty-app")
+        assertEquals("", details.configText)
     }
 
     private fun createProject() = Files.createTempDirectory("ui-modules").apply {
@@ -154,6 +166,15 @@ class ModuleRegistryTest {
         val appDir = resolve("apps/demo-app")
         appDir.createDirectories()
         appDir.resolve("build.gradle.kts").writeText("plugins { application }")
+        appDir.resolve("ui-module.yml").writeText(
+            """
+            title: Demo App
+            description: Учебный модуль для UI-тестов.
+            tags:
+              - postgres
+              - demo
+            """.trimIndent(),
+        )
         val resources = appDir.resolve("src/main/resources").createDirectories()
         resources.resolve("application.yml").writeText(
             """

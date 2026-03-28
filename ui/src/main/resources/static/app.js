@@ -21,7 +21,9 @@
   const moduleList = document.getElementById("moduleList");
   const moduleCatalogStatus = document.getElementById("moduleCatalogStatus");
   const selectedModuleLabel = document.getElementById("selectedModuleLabel");
+  const selectedModuleDescription = document.getElementById("selectedModuleDescription");
   const moduleDraftStatus = document.getElementById("moduleDraftStatus");
+  const moduleValidationAlert = document.getElementById("moduleValidationAlert");
   const sqlFileSelect = document.getElementById("sqlFileSelect");
   const configForm = document.getElementById("configForm");
   const configFormWarning = document.getElementById("configFormWarning");
@@ -176,7 +178,7 @@
         const button = document.createElement("button");
         button.type = "button";
         button.className = "list-group-item list-group-item-action";
-        button.textContent = module.title;
+        button.innerHTML = renderModuleListItem(module);
         button.dataset.moduleId = module.id;
         button.addEventListener("click", () => selectModule(module.id));
         moduleList.appendChild(button);
@@ -226,6 +228,10 @@
     persistedSqlContents = {};
     persistedConfigText = "";
     selectedModuleLabel.textContent = "Модуль не выбран";
+    selectedModuleDescription.classList.add("d-none");
+    selectedModuleDescription.textContent = "";
+    moduleValidationAlert.classList.add("d-none");
+    moduleValidationAlert.textContent = "";
     sqlFileSelect.innerHTML = "";
     formController.initialize();
     renderCredentialsWarning();
@@ -245,6 +251,13 @@
     currentModule = await fetchJson(`/api/modules/${moduleId}`, {}, "Не удалось загрузить модуль.");
     formController.restoreExpansionStateForModule(currentModule.id);
     selectedModuleLabel.textContent = `${currentModule.title} · ${currentModule.configPath}`;
+    if (currentModule.description) {
+      selectedModuleDescription.textContent = currentModule.description;
+      selectedModuleDescription.classList.remove("d-none");
+    } else {
+      selectedModuleDescription.classList.add("d-none");
+      selectedModuleDescription.textContent = "";
+    }
     persistedConfigText = currentModule.configText;
     configEditor.setValue(currentModule.configText);
 
@@ -254,6 +267,7 @@
     });
     persistedSqlContents = cloneSqlContents(sqlContents);
     renderSqlSelect();
+    renderModuleValidation(currentModule);
     renderCredentialsWarning();
     updateDraftState();
 
@@ -279,6 +293,61 @@
     if (sqlEditor) {
       sqlEditor.setValue(currentSqlPath ? (sqlContents[currentSqlPath] || "") : "");
     }
+  }
+
+  function renderModuleListItem(module) {
+    const validationBadge = renderValidationBadge(module.validationStatus);
+    const description = module.description
+      ? `<div class="module-list-description">${escapeHtml(module.description)}</div>`
+      : "";
+    const tags = Array.isArray(module.tags) && module.tags.length > 0
+      ? `<div class="module-list-tags">${module.tags.map(tag => `<span class="module-tag">${escapeHtml(tag)}</span>`).join("")}</div>`
+      : "";
+    const issues = Array.isArray(module.validationIssues) && module.validationIssues.length > 0
+      ? `<div class="module-list-issues">${escapeHtml(module.validationIssues[0].message)}</div>`
+      : "";
+    return `
+      <div class="module-list-head">
+        <span class="module-list-title">${escapeHtml(module.title)}</span>
+        ${validationBadge}
+      </div>
+      ${description}
+      ${tags}
+      ${issues}
+    `;
+  }
+
+  function renderValidationBadge(status) {
+    const normalized = String(status || "VALID").toUpperCase();
+    const label = normalized === "VALID" ? "OK" : (normalized === "WARNING" ? "Warning" : "Invalid");
+    return `<span class="module-validation-badge module-validation-badge-${normalized.toLowerCase()}">${label}</span>`;
+  }
+
+  function renderModuleValidation(module) {
+    const issues = Array.isArray(module.validationIssues) ? module.validationIssues : [];
+    const status = String(module.validationStatus || "VALID").toUpperCase();
+    if (status === "VALID" && issues.length === 0) {
+      moduleValidationAlert.classList.add("d-none");
+      moduleValidationAlert.textContent = "";
+      return;
+    }
+
+    const alertClass = status === "INVALID" ? "alert-danger" : "alert-warning";
+    const title = status === "INVALID"
+      ? "У модуля есть проблемы, которые стоит исправить."
+      : "У модуля есть предупреждения.";
+    moduleValidationAlert.className = `alert ${alertClass} mb-3`;
+    moduleValidationAlert.innerHTML = `
+      <div class="fw-semibold mb-2">${escapeHtml(title)}</div>
+      <ul class="module-validation-list mb-0">
+        ${issues.map(issue => `
+          <li>
+            <span class="module-validation-severity module-validation-severity-${String(issue.severity || "").toLowerCase()}">${escapeHtml(issue.severity || "INFO")}</span>
+            <span>${escapeHtml(issue.message || "")}</span>
+          </li>
+        `).join("")}
+      </ul>
+    `;
   }
 
   function cloneSqlContents(source) {

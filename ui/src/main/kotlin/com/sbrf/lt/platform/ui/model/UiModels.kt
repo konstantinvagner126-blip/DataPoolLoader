@@ -2,6 +2,8 @@ package com.sbrf.lt.platform.ui.model
 
 import com.sbrf.lt.datapool.model.ExecutionStatus
 import com.sbrf.lt.datapool.sqlconsole.RawShardExecutionResult
+import com.sbrf.lt.datapool.sqlconsole.RawShardConnectionCheckResult
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleConnectionCheckResult
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleInfo
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleQueryResult
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleExecutionSnapshot
@@ -11,8 +13,27 @@ import java.time.Instant
 data class ModuleDescriptor(
     val id: String,
     val title: String,
+    val description: String? = null,
+    val tags: List<String> = emptyList(),
+    val hiddenFromUi: Boolean = false,
+    val validationStatus: String = "VALID",
+    val validationIssues: List<ModuleValidationIssueResponse> = emptyList(),
     val configFile: Path,
     val resourcesDir: Path,
+)
+
+data class ModuleValidationIssueResponse(
+    val severity: String,
+    val message: String,
+)
+
+data class ModuleCatalogItemResponse(
+    val id: String,
+    val title: String,
+    val description: String? = null,
+    val tags: List<String> = emptyList(),
+    val validationStatus: String = "VALID",
+    val validationIssues: List<ModuleValidationIssueResponse> = emptyList(),
 )
 
 data class AppsRootStatusResponse(
@@ -23,7 +44,7 @@ data class AppsRootStatusResponse(
 
 data class ModulesCatalogResponse(
     val appsRootStatus: AppsRootStatusResponse,
-    val modules: List<Map<String, String>>,
+    val modules: List<ModuleCatalogItemResponse>,
 )
 
 data class ModuleFileContent(
@@ -36,6 +57,10 @@ data class ModuleFileContent(
 data class ModuleDetailsResponse(
     val id: String,
     val title: String,
+    val description: String? = null,
+    val tags: List<String> = emptyList(),
+    val validationStatus: String = "VALID",
+    val validationIssues: List<ModuleValidationIssueResponse> = emptyList(),
     val configPath: String,
     val configText: String,
     val sqlFiles: List<ModuleFileContent>,
@@ -150,6 +175,37 @@ data class SqlConsoleInfoResponse(
     val queryTimeoutSec: Int?,
 )
 
+data class SqlConsoleSourceConnectionStatusResponse(
+    val sourceName: String,
+    val status: String,
+    val message: String? = null,
+    val errorMessage: String? = null,
+)
+
+data class SqlConsoleConnectionCheckResponse(
+    val configured: Boolean,
+    val sourceResults: List<SqlConsoleSourceConnectionStatusResponse>,
+)
+
+data class SqlConsoleStateResponse(
+    val draftSql: String,
+    val recentQueries: List<String> = emptyList(),
+    val selectedSourceNames: List<String> = emptyList(),
+    val pageSize: Int = 50,
+)
+
+data class SqlConsoleStateUpdateRequest(
+    val draftSql: String,
+    val recentQueries: List<String> = emptyList(),
+    val selectedSourceNames: List<String> = emptyList(),
+    val pageSize: Int = 50,
+)
+
+data class SqlConsoleSettingsUpdateRequest(
+    val maxRowsPerShard: Int,
+    val queryTimeoutSec: Int? = null,
+)
+
 data class SqlConsoleQueryRequest(
     val sql: String,
     val selectedSourceNames: List<String> = emptyList(),
@@ -204,6 +260,11 @@ fun SqlConsoleInfo.toResponse(): SqlConsoleInfoResponse = SqlConsoleInfoResponse
     queryTimeoutSec = queryTimeoutSec,
 )
 
+fun SqlConsoleConnectionCheckResult.toResponse(configured: Boolean): SqlConsoleConnectionCheckResponse = SqlConsoleConnectionCheckResponse(
+    configured = configured,
+    sourceResults = sourceResults.map { it.toResponse() },
+)
+
 fun SqlConsoleQueryResult.toResponse(): SqlConsoleQueryResponse = SqlConsoleQueryResponse(
     sql = sql,
     statementType = statementType.name,
@@ -224,6 +285,13 @@ private fun RawShardExecutionResult.toResponse(): SqlConsoleShardResultResponse 
     errorMessage = errorMessage,
 )
 
+private fun RawShardConnectionCheckResult.toResponse(): SqlConsoleSourceConnectionStatusResponse = SqlConsoleSourceConnectionStatusResponse(
+    sourceName = shardName,
+    status = status,
+    message = message,
+    errorMessage = errorMessage,
+)
+
 fun SqlConsoleExecutionSnapshot.toStartResponse(): SqlConsoleStartQueryResponse = SqlConsoleStartQueryResponse(
     id = id,
     status = status.name,
@@ -239,4 +307,13 @@ fun SqlConsoleExecutionSnapshot.toResponse(): SqlConsoleExecutionResponse = SqlC
     cancelRequested = cancelRequested,
     result = result?.toResponse(),
     errorMessage = errorMessage,
+)
+
+fun ModuleDescriptor.toCatalogItemResponse(): ModuleCatalogItemResponse = ModuleCatalogItemResponse(
+    id = id,
+    title = title,
+    description = description,
+    tags = tags,
+    validationStatus = validationStatus,
+    validationIssues = validationIssues,
 )

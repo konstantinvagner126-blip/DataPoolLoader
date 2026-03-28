@@ -54,6 +54,13 @@ data class RawShardExecutionResult(
     val errorMessage: String? = null,
 )
 
+data class RawShardConnectionCheckResult(
+    val shardName: String,
+    val status: String,
+    val message: String? = null,
+    val errorMessage: String? = null,
+)
+
 fun interface ShardSqlExecutor {
     fun execute(
         shard: ResolvedSqlConsoleShardConfig,
@@ -63,6 +70,13 @@ fun interface ShardSqlExecutor {
         queryTimeoutSec: Int?,
         executionControl: SqlConsoleExecutionControl,
     ): RawShardExecutionResult
+}
+
+fun interface ShardConnectionChecker {
+    fun check(
+        shard: ResolvedSqlConsoleShardConfig,
+        queryTimeoutSec: Int?,
+    ): RawShardConnectionCheckResult
 }
 
 data class SqlConsoleInfo(
@@ -80,18 +94,47 @@ data class SqlConsoleQueryResult(
     val maxRowsPerShard: Int,
 )
 
+data class SqlConsoleConnectionCheckResult(
+    val sourceResults: List<RawShardConnectionCheckResult>,
+)
+
 class SqlConsoleService(
-    private val config: SqlConsoleConfig,
+    config: SqlConsoleConfig,
     private val executor: ShardSqlExecutor = JdbcShardSqlExecutor(),
+    private val connectionChecker: ShardConnectionChecker = JdbcShardConnectionChecker(),
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
+    @Volatile
+    private var currentConfig: SqlConsoleConfig = config
 
-    fun info(): SqlConsoleInfo = SqlConsoleInfo(
-        configured = config.sources.isNotEmpty(),
-        sourceNames = config.sources.map { it.name },
-        maxRowsPerShard = config.maxRowsPerShard,
-        queryTimeoutSec = config.queryTimeoutSec,
-    )
+    fun info(): SqlConsoleInfo {
+        val config = currentConfig
+        return SqlConsoleInfo(
+            configured = config.sources.isNotEmpty(),
+            sourceNames = config.sources.map { it.name },
+            maxRowsPerShard = config.maxRowsPerShard,
+            queryTimeoutSec = config.queryTimeoutSec,
+        )
+    }
+
+    fun updateMaxRowsPerShard(maxRowsPerShard: Int): SqlConsoleInfo {
+        return updateSettings(maxRowsPerShard, currentConfig.queryTimeoutSec)
+    }
+
+    fun updateSettings(
+        maxRowsPerShard: Int,
+        queryTimeoutSec: Int?,
+    ): SqlConsoleInfo {
+        require(maxRowsPerShard > 0) { "Лимит строк на source должен быть больше 0." }
+        require(queryTimeoutSec == null || queryTimeoutSec > 0) {
+            "Таймаут запроса на source должен быть больше 0, если задан."
+        }
+        currentConfig = currentConfig.copy(
+            maxRowsPerShard = maxRowsPerShard,
+            queryTimeoutSec = queryTimeoutSec,
+        )
+        return info()
+    }
 
     fun executeQuery(
         rawSql: String,
@@ -99,45 +142,9 @@ class SqlConsoleService(
         selectedSourceNames: List<String> = emptyList(),
         executionControl: SqlConsoleExecutionControl = SqlConsoleExecutionControl(),
     ): SqlConsoleQueryResult {
+        val config = currentConfig
         val statement = parseAndValidateStatement(rawSql)
-        require(config.fetchSize > 0) { "Параметр ui.sqlConsole.fetchSize должен быть больше 0." }
-        require(config.maxRowsPerShard > 0) { "Параметр ui.sqlConsole.maxRowsPerShard должен быть больше 0." }
-        require(config.queryTimeoutSec == null || config.queryTimeoutSec > 0) {
-            "Параметр ui.sqlConsole.queryTimeoutSec должен быть больше 0, если задан."
-        }
-        require(config.sources.isNotEmpty()) {
-            "В конфиге UI не настроены source-подключения. Заполни ui.sqlConsole.sources."
-        }
-        val normalizedSelectedSourceNames = selectedSourceNames.map { it.trim() }.filter { it.isNotEmpty() }
-        val selectedSources = if (normalizedSelectedSourceNames.isEmpty()) {
-            config.sources
-        } else {
-            val configuredSourceNames = config.sources.map { it.name }.toSet()
-            val unknown = normalizedSelectedSourceNames.filter { it !in configuredSourceNames }
-            require(unknown.isEmpty()) {
-                "В SQL-консоли выбраны неизвестные sources: ${unknown.joinToString(", ")}"
-            }
-            config.sources.filter { it.name in normalizedSelectedSourceNames }
-        }
-        require(selectedSources.isNotEmpty()) {
-            "В SQL-консоли должен быть выбран хотя бы один source."
-        }
-
-        val resolver = ValueResolver.fromFile(credentialsPath)
-        val resolvedShards = selectedSources.map { shard ->
-            ResolvedSqlConsoleShardConfig(
-                name = shard.name.trim().also { require(it.isNotBlank()) { "Имя shard не должно быть пустым." } },
-                jdbcUrl = resolver.resolve(shard.jdbcUrl).trim().also {
-                    require(it.isNotBlank()) { "jdbcUrl для shard ${shard.name} не должен быть пустым." }
-                },
-                username = resolver.resolve(shard.username).trim().also {
-                    require(it.isNotBlank()) { "username для shard ${shard.name} не должен быть пустым." }
-                },
-                password = resolver.resolve(shard.password).trim().also {
-                    require(it.isNotBlank()) { "password для shard ${shard.name} не должен быть пустым." }
-                },
-            )
-        }
+        val resolvedShards = resolveSources(config, credentialsPath, selectedSourceNames)
 
         val shardResults = resolvedShards.map { shard ->
             if (executionControl.isCancelled()) {
@@ -175,12 +182,97 @@ class SqlConsoleService(
         )
     }
 
+    fun checkConnections(
+        credentialsPath: Path?,
+        selectedSourceNames: List<String> = emptyList(),
+    ): SqlConsoleConnectionCheckResult {
+        val config = currentConfig
+        validateConfig(config)
+        val selectedSources = selectSources(config, selectedSourceNames)
+        val resolver = ValueResolver.fromFile(credentialsPath)
+        val results = selectedSources.map { source ->
+            runCatching {
+                connectionChecker.check(resolveSource(source, resolver), config.queryTimeoutSec)
+            }.onFailure { ex ->
+                logger.warn("SQL-консоль: проверка подключения shard {} завершилась ошибкой: {}", source.name, ex.message)
+            }.getOrElse { ex ->
+                RawShardConnectionCheckResult(
+                    shardName = source.name,
+                    status = "FAILED",
+                    errorMessage = ex.message ?: "Не удалось установить подключение.",
+                )
+            }
+        }
+        return SqlConsoleConnectionCheckResult(sourceResults = results)
+    }
+
     private fun determineResultType(results: List<RawShardExecutionResult>): SqlConsoleStatementType {
         return if (results.any { it.columns.isNotEmpty() || it.rows.isNotEmpty() }) {
             SqlConsoleStatementType.RESULT_SET
         } else {
             SqlConsoleStatementType.COMMAND
         }
+    }
+
+    private fun resolveSources(
+        config: SqlConsoleConfig,
+        credentialsPath: Path?,
+        selectedSourceNames: List<String> = emptyList(),
+    ): List<ResolvedSqlConsoleShardConfig> {
+        validateConfig(config)
+        val selectedSources = selectSources(config, selectedSourceNames)
+        val resolver = ValueResolver.fromFile(credentialsPath)
+        return selectedSources.map { resolveSource(it, resolver) }
+    }
+
+    private fun validateConfig(config: SqlConsoleConfig) {
+        require(config.fetchSize > 0) { "Параметр ui.sqlConsole.fetchSize должен быть больше 0." }
+        require(config.maxRowsPerShard > 0) { "Параметр ui.sqlConsole.maxRowsPerShard должен быть больше 0." }
+        require(config.queryTimeoutSec == null || config.queryTimeoutSec > 0) {
+            "Параметр ui.sqlConsole.queryTimeoutSec должен быть больше 0, если задан."
+        }
+        require(config.sources.isNotEmpty()) {
+            "В конфиге UI не настроены source-подключения. Заполни ui.sqlConsole.sources."
+        }
+    }
+
+    private fun selectSources(
+        config: SqlConsoleConfig,
+        selectedSourceNames: List<String> = emptyList(),
+    ): List<SqlConsoleSourceConfig> {
+        val normalizedSelectedSourceNames = selectedSourceNames.map { it.trim() }.filter { it.isNotEmpty() }
+        val selectedSources = if (normalizedSelectedSourceNames.isEmpty()) {
+            config.sources
+        } else {
+            val configuredSourceNames = config.sources.map { it.name }.toSet()
+            val unknown = normalizedSelectedSourceNames.filter { it !in configuredSourceNames }
+            require(unknown.isEmpty()) {
+                "В SQL-консоли выбраны неизвестные sources: ${unknown.joinToString(", ")}"
+            }
+            config.sources.filter { it.name in normalizedSelectedSourceNames }
+        }
+        require(selectedSources.isNotEmpty()) {
+            "В SQL-консоли должен быть выбран хотя бы один source."
+        }
+        return selectedSources
+    }
+
+    private fun resolveSource(
+        source: SqlConsoleSourceConfig,
+        resolver: ValueResolver,
+    ): ResolvedSqlConsoleShardConfig {
+        return ResolvedSqlConsoleShardConfig(
+            name = source.name.trim().also { require(it.isNotBlank()) { "Имя shard не должно быть пустым." } },
+            jdbcUrl = resolver.resolve(source.jdbcUrl).trim().also {
+                require(it.isNotBlank()) { "jdbcUrl для shard ${source.name} не должен быть пустым." }
+            },
+            username = resolver.resolve(source.username).trim().also {
+                require(it.isNotBlank()) { "username для shard ${source.name} не должен быть пустым." }
+            },
+            password = resolver.resolve(source.password).trim().also {
+                require(it.isNotBlank()) { "password для shard ${source.name} не должен быть пустым." }
+            },
+        )
     }
 }
 
@@ -260,6 +352,25 @@ class JdbcShardSqlExecutor : ShardSqlExecutor {
                 executionControl.unregister(jdbcStatement)
             }
         }
+    }
+}
+
+class JdbcShardConnectionChecker : ShardConnectionChecker {
+    override fun check(
+        shard: ResolvedSqlConsoleShardConfig,
+        queryTimeoutSec: Int?,
+    ): RawShardConnectionCheckResult {
+        DriverManager.getConnection(shard.jdbcUrl, shard.username, shard.password).use { connection ->
+            val isValid = runCatching {
+                connection.isValid((queryTimeoutSec ?: 5).coerceIn(1, 30))
+            }.getOrDefault(true)
+            require(isValid) { "Подключение установлено, но валидация соединения не пройдена." }
+        }
+        return RawShardConnectionCheckResult(
+            shardName = shard.name,
+            status = "SUCCESS",
+            message = "Подключение установлено.",
+        )
     }
 }
 

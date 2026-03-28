@@ -7,12 +7,20 @@
   let sqlConsoleEditor = null;
   let sqlConsoleInfo = null;
   let sqlConsoleCredentialsStatus = null;
+  let sourceConnectionStatuses = {};
+  let sqlConsoleState = {
+    draftSql: "select 1 as check_value",
+    recentQueries: [],
+    selectedSourceNames: [],
+    pageSize: 50
+  };
   let selectedSourceNames = [];
   let currentExecutionId = null;
   let currentExecutionStartedAt = null;
   let currentExecutionType = "SQL";
   let pollTimerId = null;
   let elapsedTimerId = null;
+  let persistStateTimerId = null;
   let queryToolsController = null;
   let resultsController = null;
 
@@ -20,7 +28,12 @@
   const credentialsWarningEl = document.getElementById("sqlCredentialsWarning");
   const credentialsFileInputEl = document.getElementById("sqlCredentialsFileInput");
   const consoleInfoEl = document.getElementById("sqlConsoleInfo");
-  const consoleLimitsInfoEl = document.getElementById("sqlConsoleLimitsInfo");
+  const maxRowsPerShardInputEl = document.getElementById("sqlMaxRowsPerShardInput");
+  const queryTimeoutInputEl = document.getElementById("sqlQueryTimeoutInput");
+  const saveConsoleSettingsButtonEl = document.getElementById("sqlSaveConsoleSettingsButton");
+  const saveConsoleSettingsStatusEl = document.getElementById("sqlSaveConsoleSettingsStatus");
+  const connectionCheckStatusEl = document.getElementById("sqlConnectionCheckStatus");
+  const checkConnectionsButtonEl = document.getElementById("sqlCheckConnectionsButton");
   const sourceSelectionEl = document.getElementById("sqlSourceSelection");
   const executionStatusEl = document.getElementById("sqlExecutionStatus");
   const resultMetaEl = document.getElementById("sqlResultMeta");
@@ -38,9 +51,16 @@
   const recentQuerySelectEl = document.getElementById("sqlRecentQuerySelect");
   const applyRecentQueryButtonEl = document.getElementById("sqlApplyRecentQueryButton");
   const clearRecentQueriesButtonEl = document.getElementById("sqlClearRecentQueriesButton");
-  const queryTemplatesEl = document.getElementById("sqlQueryTemplates");
   const commandGuardrailEl = document.getElementById("sqlCommandGuardrail");
   const uploadCredentialsButtonEl = document.getElementById("sqlUploadCredentialsButton");
+
+  global.addEventListener("pagehide", () => {
+    if (persistStateTimerId) {
+      global.clearTimeout(persistStateTimerId);
+      persistStateTimerId = null;
+    }
+    persistSqlConsoleState();
+  });
 
   uploadCredentialsButtonEl.addEventListener("click", async () => {
     const file = credentialsFileInputEl.files[0];
@@ -52,6 +72,54 @@
     sqlConsoleCredentialsStatus = await postFormData("/api/credentials/upload", formData, "Не удалось загрузить credential.properties.");
     renderCredentialsStatus(sqlConsoleCredentialsStatus);
     renderCredentialsWarning();
+    await checkConnections();
+  });
+
+  checkConnectionsButtonEl.addEventListener("click", async () => {
+    await checkConnections();
+  });
+
+  maxRowsPerShardInputEl.addEventListener("input", () => {
+    updateConsoleSettingsDirtyState();
+  });
+
+  queryTimeoutInputEl.addEventListener("input", () => {
+    updateConsoleSettingsDirtyState();
+  });
+
+  saveConsoleSettingsButtonEl.addEventListener("click", async () => {
+    if (!sqlConsoleInfo || !sqlConsoleInfo.configured) {
+      return;
+    }
+    const maxRowsPerShard = Number(maxRowsPerShardInputEl.value);
+    if (!Number.isInteger(maxRowsPerShard) || maxRowsPerShard <= 0) {
+      setConsoleSettingsSaveStatus("Укажи корректный лимит строк: целое число больше 0.", "failed");
+      return;
+    }
+    const queryTimeoutSec = parseQueryTimeoutInput();
+    if (Number.isNaN(queryTimeoutSec)) {
+      setConsoleSettingsSaveStatus("Укажи корректный таймаут: пусто или целое число больше 0.", "failed");
+      return;
+    }
+
+    saveConsoleSettingsButtonEl.disabled = true;
+    setConsoleSettingsSaveStatus("Сохраняем настройки SQL-консоли...", "neutral");
+    try {
+      sqlConsoleInfo = await fetchJson(
+        "/api/sql-console/settings",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ maxRowsPerShard, queryTimeoutSec })
+        },
+        "Не удалось сохранить настройки SQL-консоли."
+      );
+      renderConsoleInfo(sqlConsoleInfo);
+      setConsoleSettingsSaveStatus("Настройки SQL-консоли сохранены.", "success");
+    } catch (error) {
+      setConsoleSettingsSaveStatus(error.message || "Не удалось сохранить настройки SQL-консоли.", "failed");
+      updateConsoleSettingsDirtyState();
+    }
   });
 
   runButtonEl.addEventListener("click", async () => {
@@ -140,19 +208,30 @@
   });
 
   withMonacoReady(async () => {
+    await loadSqlConsoleState();
     sqlConsoleEditor = createMonacoEditor("sqlEditor", {
-      value: "select 1 as check_value",
+      value: sqlConsoleState.draftSql || "select 1 as check_value",
       language: "sql"
     });
+
+    pageSizeSelectEl.value = String(normalizePageSize(sqlConsoleState.pageSize));
 
     queryToolsController = createQueryToolsController({
       editor: sqlConsoleEditor,
       recentQuerySelectEl,
       applyRecentQueryButtonEl,
       clearRecentQueriesButtonEl,
-      queryTemplatesEl,
       commandGuardrailEl,
-      runButtonEl
+      runButtonEl,
+      initialDraft: sqlConsoleState.draftSql,
+      initialRecentQueries: sqlConsoleState.recentQueries,
+      onStateChanged: partialState => {
+        sqlConsoleState = {
+          ...sqlConsoleState,
+          ...partialState
+        };
+        schedulePersistSqlConsoleState();
+      }
     });
 
     resultsController = createResultsController({
@@ -176,6 +255,14 @@
       queryToolsController.handleEditorChange(sqlConsoleEditor.getValue());
     });
 
+    pageSizeSelectEl.addEventListener("change", () => {
+      sqlConsoleState = {
+        ...sqlConsoleState,
+        pageSize: normalizePageSize(pageSizeSelectEl.value)
+      };
+      schedulePersistSqlConsoleState();
+    });
+
     queryToolsController.initialize();
     resultsController.initialize();
 
@@ -183,12 +270,24 @@
       loadSqlConsoleInfo(),
       refreshCredentialsStatus()
     ]);
+    await checkConnections();
   });
 
   async function loadSqlConsoleInfo() {
     sqlConsoleInfo = await fetchJson("/api/sql-console/info", {}, "Не удалось загрузить конфигурацию SQL-консоли.");
     renderConsoleInfo(sqlConsoleInfo);
     renderCredentialsWarning();
+  }
+
+  async function loadSqlConsoleState() {
+    sqlConsoleState = await fetchJson("/api/sql-console/state", {}, "Не удалось загрузить состояние SQL-консоли.");
+    sqlConsoleState = {
+      draftSql: sqlConsoleState.draftSql || "select 1 as check_value",
+      recentQueries: Array.isArray(sqlConsoleState.recentQueries) ? sqlConsoleState.recentQueries : [],
+      selectedSourceNames: Array.isArray(sqlConsoleState.selectedSourceNames) ? sqlConsoleState.selectedSourceNames : [],
+      pageSize: normalizePageSize(sqlConsoleState.pageSize)
+    };
+    selectedSourceNames = [...sqlConsoleState.selectedSourceNames];
   }
 
   async function refreshCredentialsStatus() {
@@ -200,41 +299,91 @@
   function renderConsoleInfo(info) {
     if (!info || !info.configured) {
       consoleInfoEl.textContent = "В ui.application.yml пока не настроены source-подключения.";
-      consoleLimitsInfoEl.textContent = "";
+      setConnectionCheckStatus("Проверка подключений недоступна, пока не настроены sources.");
       sourceSelectionEl.innerHTML = "";
+      sourceConnectionStatuses = {};
+      checkConnectionsButtonEl.disabled = true;
+      maxRowsPerShardInputEl.disabled = true;
+      queryTimeoutInputEl.disabled = true;
+      saveConsoleSettingsButtonEl.disabled = true;
+      maxRowsPerShardInputEl.value = "200";
+      queryTimeoutInputEl.value = "";
+      setConsoleSettingsSaveStatus("Сохранение недоступно, пока не настроены sources.");
       return;
     }
 
+    checkConnectionsButtonEl.disabled = false;
+    maxRowsPerShardInputEl.disabled = false;
+    queryTimeoutInputEl.disabled = false;
     consoleInfoEl.innerHTML = `
       <div><strong>Sources настроено:</strong> ${info.sourceNames.length}</div>
       <div><strong>Лимит строк на SELECT с одного source:</strong> ${info.maxRowsPerShard}</div>
     `;
-    consoleLimitsInfoEl.textContent = info.queryTimeoutSec
-      ? `Таймаут запроса на один source: ${info.queryTimeoutSec} сек.`
-      : "Таймаут запроса не задан.";
+    maxRowsPerShardInputEl.value = String(info.maxRowsPerShard);
+    queryTimeoutInputEl.value = info.queryTimeoutSec ? String(info.queryTimeoutSec) : "";
+    updateConsoleSettingsDirtyState();
+
+    sourceConnectionStatuses = Object.fromEntries(
+      Object.entries(sourceConnectionStatuses).filter(([name]) => info.sourceNames.includes(name))
+    );
 
     if (selectedSourceNames.length === 0) {
-      selectedSourceNames = [...info.sourceNames];
+      selectedSourceNames = sqlConsoleState.selectedSourceNames.length > 0
+        ? sqlConsoleState.selectedSourceNames.filter(name => info.sourceNames.includes(name))
+        : [...info.sourceNames];
+      if (selectedSourceNames.length === 0) {
+        selectedSourceNames = [...info.sourceNames];
+      }
     } else {
       selectedSourceNames = selectedSourceNames.filter(name => info.sourceNames.includes(name));
-      info.sourceNames.forEach(name => {
-        if (!selectedSourceNames.includes(name)) {
-          selectedSourceNames.push(name);
-        }
-      });
+      if (selectedSourceNames.length === 0) {
+        selectedSourceNames = [...info.sourceNames];
+      }
     }
+    sqlConsoleState = {
+      ...sqlConsoleState,
+      selectedSourceNames: [...selectedSourceNames]
+    };
+    schedulePersistSqlConsoleState();
 
-    sourceSelectionEl.innerHTML = info.sourceNames.map(name => `
-      <label class="sql-source-checkbox">
-        <input type="checkbox" value="${escapeHtml(name)}" ${selectedSourceNames.includes(name) ? "checked" : ""}>
-        <span>${escapeHtml(name)}</span>
-      </label>
-    `).join("");
+    renderSourceSelection(info);
+  }
+
+  function renderSourceSelection(info) {
+    sourceSelectionEl.innerHTML = info.sourceNames.map(name => {
+      const connectionState = sourceConnectionStatuses[name] || null;
+      const stateClass = connectionState
+        ? `sql-source-checkbox-${String(connectionState.status || "UNKNOWN").toLowerCase()}`
+        : "sql-source-checkbox-unknown";
+      const stateLabel = connectionState
+        ? (connectionState.status === "SUCCESS" ? "Подключение OK" : "Ошибка подключения")
+        : "Статус не проверен";
+      const stateMessage = connectionState
+        ? (connectionState.errorMessage || connectionState.message || stateLabel)
+        : "Нажми «Проверить подключение», чтобы увидеть статус.";
+      return `
+        <label class="sql-source-checkbox ${stateClass}">
+          <input type="checkbox" value="${escapeHtml(name)}" ${selectedSourceNames.includes(name) ? "checked" : ""}>
+          <span class="sql-source-checkbox-body">
+            <span class="sql-source-checkbox-head">
+              <span class="sql-source-checkbox-name">${escapeHtml(name)}</span>
+              <span class="sql-source-checkbox-status">${escapeHtml(stateLabel)}</span>
+            </span>
+            <span class="sql-source-checkbox-message">${escapeHtml(stateMessage)}</span>
+          </span>
+        </label>
+      `;
+    }).join("");
 
     sourceSelectionEl.querySelectorAll("input[type=\"checkbox\"]").forEach(input => {
       input.addEventListener("change", () => {
         selectedSourceNames = [...sourceSelectionEl.querySelectorAll("input[type=\"checkbox\"]:checked")]
           .map(checkbox => checkbox.value);
+        sqlConsoleState = {
+          ...sqlConsoleState,
+          selectedSourceNames: [...selectedSourceNames]
+        };
+        schedulePersistSqlConsoleState();
       });
     });
   }
@@ -266,6 +415,104 @@
 
     credentialsWarningEl.classList.remove("d-none");
     credentialsWarningEl.textContent = "Если source-подключения в ui.application.yml используют placeholders ${...}, загрузи credential.properties перед выполнением запроса.";
+  }
+
+  async function checkConnections() {
+    if (!sqlConsoleInfo || !sqlConsoleInfo.configured) {
+      return;
+    }
+    checkConnectionsButtonEl.disabled = true;
+    setConnectionCheckStatus("Проверяем подключение ко всем sources...");
+    try {
+      const response = await fetchJson(
+        "/api/sql-console/connections/check",
+        {
+          method: "POST"
+        },
+        "Не удалось проверить подключение к sources."
+      );
+      sourceConnectionStatuses = Object.fromEntries(
+        (response.sourceResults || []).map(item => [item.sourceName, item])
+      );
+      const successCount = (response.sourceResults || []).filter(item => item.status === "SUCCESS").length;
+      const failedCount = (response.sourceResults || []).filter(item => item.status !== "SUCCESS").length;
+      setConnectionCheckStatus(
+        failedCount > 0
+          ? `Проверка завершена: успешных подключений ${successCount}, с ошибкой ${failedCount}.`
+          : `Проверка завершена: все ${successCount} sources доступны.`,
+        failedCount > 0 ? "failed" : "success"
+      );
+      renderSourceSelection(sqlConsoleInfo);
+    } catch (error) {
+      setConnectionCheckStatus(error.message || "Не удалось проверить подключение к sources.", "failed");
+      renderSourceSelection(sqlConsoleInfo);
+    } finally {
+      checkConnectionsButtonEl.disabled = false;
+    }
+  }
+
+  function setConnectionCheckStatus(message, tone = "neutral") {
+    connectionCheckStatusEl.textContent = message;
+    connectionCheckStatusEl.className = `small mt-2 ${
+      tone === "success"
+        ? "text-success"
+        : tone === "failed"
+          ? "text-danger"
+          : "text-secondary"
+    }`;
+  }
+
+  function updateConsoleSettingsDirtyState() {
+    if (!sqlConsoleInfo || !sqlConsoleInfo.configured) {
+      saveConsoleSettingsButtonEl.disabled = true;
+      return;
+    }
+    const inputValue = Number(maxRowsPerShardInputEl.value);
+    const timeoutValue = parseQueryTimeoutInput();
+    const timeoutInvalid = Number.isNaN(timeoutValue);
+    const timeoutChanged = !timeoutInvalid && timeoutValue !== sqlConsoleInfo.queryTimeoutSec;
+    const maxRowsChanged = Number.isInteger(inputValue) && inputValue > 0 && inputValue !== sqlConsoleInfo.maxRowsPerShard;
+    const changed = maxRowsChanged || timeoutChanged;
+    saveConsoleSettingsButtonEl.disabled = !changed;
+    if (timeoutInvalid) {
+      setConsoleSettingsSaveStatus("Укажи корректный таймаут: пусто или целое число больше 0.", "failed");
+      return;
+    }
+    if (changed) {
+      setConsoleSettingsSaveStatus("Есть несохраненные изменения настроек SQL-консоли.", "neutral");
+    } else if (!saveConsoleSettingsStatusEl.dataset.lockedTone) {
+      setConsoleSettingsSaveStatus("Изменений нет.");
+    }
+  }
+
+  function setConsoleSettingsSaveStatus(message, tone = "neutral") {
+    saveConsoleSettingsStatusEl.textContent = message;
+    saveConsoleSettingsStatusEl.dataset.lockedTone = tone === "success" || tone === "failed" ? "true" : "";
+    saveConsoleSettingsStatusEl.className = `small mt-2 ${
+      tone === "success"
+        ? "text-success"
+        : tone === "failed"
+          ? "text-danger"
+          : "text-secondary"
+    }`;
+    if (tone === "success" || tone === "failed") {
+      global.setTimeout(() => {
+        saveConsoleSettingsStatusEl.dataset.lockedTone = "";
+        updateConsoleSettingsDirtyState();
+      }, 2500);
+    }
+  }
+
+  function parseQueryTimeoutInput() {
+    const raw = String(queryTimeoutInputEl.value || "").trim();
+    if (!raw) {
+      return null;
+    }
+    const value = Number(raw);
+    if (!Number.isInteger(value) || value <= 0) {
+      return Number.NaN;
+    }
+    return value;
   }
 
   function startExecutionPolling() {
@@ -329,5 +576,41 @@
     }
     currentExecutionId = null;
     currentExecutionStartedAt = null;
+  }
+
+  function schedulePersistSqlConsoleState() {
+    if (persistStateTimerId) {
+      global.clearTimeout(persistStateTimerId);
+    }
+    persistStateTimerId = global.setTimeout(() => {
+      persistStateTimerId = null;
+      persistSqlConsoleState();
+    }, 300);
+  }
+
+  async function persistSqlConsoleState() {
+    try {
+      sqlConsoleState = await fetchJson(
+        "/api/sql-console/state",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            draftSql: sqlConsoleState.draftSql || queryToolsController?.getInitialDraft?.() || "select 1 as check_value",
+            recentQueries: sqlConsoleState.recentQueries || [],
+            selectedSourceNames: selectedSourceNames,
+            pageSize: normalizePageSize(pageSizeSelectEl.value)
+          })
+        },
+        "Не удалось сохранить состояние SQL-консоли."
+      );
+    } catch (_) {
+      // Состояние SQL-консоли не должно ломать основной workflow страницы.
+    }
+  }
+
+  function normalizePageSize(value) {
+    const parsed = Number(value);
+    return [25, 50, 100].includes(parsed) ? parsed : 50;
   }
 })(window);

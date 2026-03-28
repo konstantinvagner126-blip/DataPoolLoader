@@ -1,32 +1,33 @@
+---
 ui:
   port: 8080
-  appsRoot: /Users/kwdev/DataPoolLoader/apps
-  storageDir: /Users/kwdev/.datapool-loader/ui/storage
+  appsRoot: "/Users/kwdev/DataPoolLoader/apps"
+  storageDir: "/Users/kwdev/.datapool-loader/ui/storage"
   showTechnicalDiagnostics: false
   showRawSummaryJson: false
-  defaultCredentialsFile:
+  defaultCredentialsFile: null
   sqlConsole:
     fetchSize: 1000
     maxRowsPerShard: 200
     queryTimeoutSec: 60
     sources:
-      - name: db1
-        jdbcUrl: ${LOCAL_MANUAL_DB_JDBC_URL}
-        username: ${LOCAL_MANUAL_DB_USERNAME}
-        password: ${LOCAL_MANUAL_DB_PASSWORD}
-      - name: db2
-        jdbcUrl: ${LOCAL_MANUAL_DB_JDBC_URL}
-        username: ${LOCAL_MANUAL_DB_USERNAME}
-        password: ${LOCAL_MANUAL_DB_PASSWORD}
-      - name: db3
-        jdbcUrl: ${LOCAL_MANUAL_DB_JDBC_URL}
-        username: ${LOCAL_MANUAL_DB_USERNAME}
-        password: ${LOCAL_MANUAL_DB_PASSWORD}
-      - name: db4
-        jdbcUrl: ${LOCAL_MANUAL_DB_JDBC_URL}
-        username: ${LOCAL_MANUAL_DB_USERNAME}
-        password: ${LOCAL_MANUAL_DB_PASSWORD}
-      - name: db5
-        jdbcUrl: ${LOCAL_MANUAL_DB_JDBC_URL}
-        username: ${LOCAL_MANUAL_DB_USERNAME}
-        password: ${LOCAL_MANUAL_DB_PASSWORD}
+    - name: "db1"
+      jdbcUrl: "${LOCAL_MANUAL_DB_JDBC_URL}"
+      username: "${LOCAL_MANUAL_DB_USERNAME}"
+      password: "${LOCAL_MANUAL_DB_PASSWORD}"
+    - name: "db2"
+      jdbcUrl: "${LOCAL_MANUAL_DB_JDBC_URL}"
+      username: "${LOCAL_MANUAL_DB_USERNAME}"
+      password: "${LOCAL_MANUAL_DB_PASSWORD}"
+    - name: "db3"
+      jdbcUrl: "${LOCAL_MANUAL_DB_JDBC_URL}"
+      username: "${LOCAL_MANUAL_DB_USERNAME}"
+      password: "${LOCAL_MANUAL_DB_PASSWORD}"
+    - name: "db4"
+      jdbcUrl: "${LOCAL_MANUAL_DB_JDBC_URL}"
+      username: "${LOCAL_MANUAL_DB_USERNAME}"
+      password: "${LOCAL_MANUAL_DB_PASSWORD}"
+    - name: "db5"
+      jdbcUrl: "${LOCAL_MANUAL_DB_JDBC_URL}"
+      username: "${LOCAL_MANUAL_DB_USERNAME}"
+      password: "${LOCAL_MANUAL_DB_PASSWORD}"

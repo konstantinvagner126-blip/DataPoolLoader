@@ -27,6 +27,18 @@ body {
   min-height: 180px;
 }
 
+.sql-console-hero {
+  align-items: stretch;
+}
+
+.sql-console-hero-copy {
+  display: flex;
+  flex: 1 1 420px;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: center;
+}
+
 .hero-actions {
   display: flex;
   flex-wrap: wrap;
@@ -44,6 +56,12 @@ body {
   position: relative;
   width: 280px;
   height: 140px;
+}
+
+.sql-console-stage {
+  position: relative;
+  width: 360px;
+  height: 150px;
 }
 
 .source-node,
@@ -64,6 +82,63 @@ body {
   height: 24px;
   background: #132238;
   color: #eff6ff;
+}
+
+.sql-console-node,
+.sql-console-hub {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  box-shadow: 0 12px 26px rgba(19, 34, 56, 0.12);
+}
+
+.sql-console-node {
+  min-width: 88px;
+  height: 30px;
+  padding: 0 0.8rem;
+  background: #132238;
+  color: #eff6ff;
+}
+
+.sql-console-hub {
+  left: 128px;
+  top: 34px;
+  width: 112px;
+  height: 82px;
+  flex-direction: column;
+  background: linear-gradient(135deg, #111827 0%, #1e293b 100%);
+  color: #fff;
+  border-radius: 20px;
+}
+
+.sql-console-node-sources {
+  left: 0;
+  top: 0;
+}
+
+.sql-console-node-check {
+  left: 0;
+  top: 58px;
+}
+
+.sql-console-node-sql {
+  left: 0;
+  top: 116px;
+}
+
+.sql-console-node-results {
+  right: 0;
+  top: 22px;
+}
+
+.sql-console-node-status {
+  right: 0;
+  top: 94px;
 }
 
 .source-node-1 { left: 0; top: 4px; }
@@ -104,6 +179,48 @@ body {
   transform-origin: left center;
 }
 
+.sql-console-line {
+  position: absolute;
+  height: 2px;
+  background: linear-gradient(90deg, rgba(29, 111, 216, 0.14), rgba(29, 111, 216, 0.6), rgba(29, 111, 216, 0.14));
+  transform-origin: left center;
+}
+
+.sql-console-line-left-top {
+  left: 88px;
+  top: 23px;
+  width: 62px;
+  transform: rotate(18deg);
+}
+
+.sql-console-line-left-middle {
+  left: 88px;
+  top: 73px;
+  width: 56px;
+  transform: rotate(0deg);
+}
+
+.sql-console-line-left-bottom {
+  left: 88px;
+  top: 123px;
+  width: 62px;
+  transform: rotate(-18deg);
+}
+
+.sql-console-line-right-top {
+  left: 236px;
+  top: 63px;
+  width: 62px;
+  transform: rotate(-18deg);
+}
+
+.sql-console-line-right-bottom {
+  left: 236px;
+  top: 86px;
+  width: 62px;
+  transform: rotate(18deg);
+}
+
 .flow-line-1 { top: 16px; transform: rotate(15deg); }
 .flow-line-2 { top: 40px; transform: rotate(9deg); }
 .flow-line-3 { top: 69px; transform: rotate(0deg); }
@@ -121,6 +238,24 @@ body {
   box-shadow: 0 0 0 5px rgba(249, 115, 22, 0.16);
   animation: flow-move 2.3s linear infinite;
 }
+
+.sql-console-dot {
+  position: absolute;
+  top: -4px;
+  left: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #f97316;
+  box-shadow: 0 0 0 4px rgba(249, 115, 22, 0.14);
+  animation: pulse-line 2.6s ease-in-out infinite;
+}
+
+.sql-console-dot-left-top { animation-delay: 0s; }
+.sql-console-dot-left-middle { animation-delay: 0.4s; }
+.sql-console-dot-left-bottom { animation-delay: 0.8s; }
+.sql-console-dot-right-top { animation-delay: 1.2s; }
+.sql-console-dot-right-bottom { animation-delay: 1.6s; }
 
 .dot-2 { animation-delay: 0.25s; }
 .dot-3 { animation-delay: 0.5s; }
@@ -214,11 +349,111 @@ body {
   border-radius: 14px;
   margin-bottom: 0.5rem;
   background: transparent;
+  text-align: left;
 }
 
 .module-list .list-group-item.active {
   background: #132238;
   border-color: #132238;
+}
+
+.module-list-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.module-list-title {
+  font-weight: 700;
+}
+
+.module-list-description {
+  margin-top: 0.35rem;
+  color: #475569;
+  font-size: 0.88rem;
+  line-height: 1.35;
+}
+
+.module-list-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+}
+
+.module-tag {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #1e293b;
+  background: rgba(15, 23, 42, 0.06);
+}
+
+.module-list-issues {
+  margin-top: 0.5rem;
+  color: #92400e;
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.module-validation-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 0.18rem 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.module-validation-badge-valid {
+  background: rgba(22, 163, 74, 0.12);
+  color: #166534;
+}
+
+.module-validation-badge-warning {
+  background: rgba(245, 158, 11, 0.16);
+  color: #92400e;
+}
+
+.module-validation-badge-invalid {
+  background: rgba(220, 38, 38, 0.12);
+  color: #b91c1c;
+}
+
+.module-validation-list {
+  padding-left: 1rem;
+}
+
+.module-validation-list li + li {
+  margin-top: 0.35rem;
+}
+
+.module-validation-severity {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 4.4rem;
+  margin-right: 0.45rem;
+  border-radius: 999px;
+  padding: 0.12rem 0.4rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.module-validation-severity-error {
+  background: rgba(220, 38, 38, 0.12);
+  color: #b91c1c;
+}
+
+.module-validation-severity-warning {
+  background: rgba(245, 158, 11, 0.16);
+  color: #92400e;
 }
 
 .module-catalog-status {
@@ -1124,6 +1359,37 @@ body {
   flex-wrap: wrap;
 }
 
+.sql-action-button {
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+}
+
+.sql-action-icon {
+  display: inline-block;
+  flex: 0 0 auto;
+}
+
+.sql-action-icon-play {
+  width: 0;
+  height: 0;
+  border-top: 8px solid transparent;
+  border-bottom: 8px solid transparent;
+  border-left: 14px solid currentColor;
+  margin-left: 3px;
+}
+
+.sql-action-icon-stop {
+  width: 14px;
+  height: 14px;
+  background: currentColor;
+  border-radius: 2px;
+}
+
 .sql-guardrail {
   margin-top: 1rem;
   border-radius: 14px;
@@ -1720,9 +1986,13 @@ body {
   gap: 0.6rem;
 }
 
+.sql-source-limit-input {
+  max-width: 140px;
+}
+
 .sql-source-checkbox {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.55rem;
   padding: 0.55rem 0.7rem;
   border-radius: 12px;
@@ -1734,6 +2004,67 @@ body {
 
 .sql-source-checkbox input {
   margin: 0;
+  margin-top: 0.18rem;
+}
+
+.sql-source-checkbox-body {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.sql-source-checkbox-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.sql-source-checkbox-name {
+  font-weight: 700;
+  color: #132238;
+}
+
+.sql-source-checkbox-status {
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.sql-source-checkbox-message {
+  font-size: 0.78rem;
+  color: #52657e;
+  line-height: 1.4;
+}
+
+.sql-source-checkbox-success {
+  border-color: rgba(13, 148, 136, 0.28);
+  background: rgba(13, 148, 136, 0.08);
+}
+
+.sql-source-checkbox-success .sql-source-checkbox-status {
+  color: #0d9488;
+}
+
+.sql-source-checkbox-failed {
+  border-color: rgba(220, 38, 38, 0.26);
+  background: rgba(220, 38, 38, 0.08);
+}
+
+.sql-source-checkbox-failed .sql-source-checkbox-status {
+  color: #b91c1c;
+}
+
+.sql-source-checkbox-unknown {
+  border-color: rgba(100, 116, 139, 0.18);
+  background: rgba(241, 245, 249, 0.8);
+}
+
+.sql-source-checkbox-unknown .sql-source-checkbox-status {
+  color: #64748b;
 }
 
 .sql-shard-chip {
@@ -1825,6 +2156,18 @@ body {
 }
 
 @media (max-width: 767px) {
+  .sql-console-hero {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .sql-console-stage {
+    width: 100%;
+    max-width: 360px;
+    transform-origin: left top;
+    transform: scale(0.9);
+  }
+
   .run-summary-metrics {
     grid-template-columns: 1fr;
   }

@@ -1,44 +1,28 @@
 (function initDataPoolSqlConsoleTools(global) {
   const common = global.DataPoolCommon || {};
   const namespace = global.DataPoolSqlConsole || (global.DataPoolSqlConsole = {});
-  const { escapeHtml, loadJsonStorage, loadTextStorage, removeStorageValue, saveJsonStorage, saveTextStorage } = common;
-
-  const SQL_DRAFT_STORAGE_KEY = "datapool.sqlConsole.draft";
-  const SQL_RECENT_STORAGE_KEY = "datapool.sqlConsole.recentQueries";
+  const { escapeHtml } = common;
   const MAX_RECENT_QUERIES = 10;
   const DANGEROUS_STATEMENTS = ["DROP", "TRUNCATE", "ALTER", "DELETE"];
   const MUTATING_STATEMENTS = ["INSERT", "UPDATE", "CREATE", "GRANT", "REVOKE", "VACUUM", "ANALYZE", "REINDEX"];
-  const QUERY_TEMPLATES = [
-    {
-      key: "health-check",
-      label: "Проверка подключения",
-      sql: "select current_database() as database_name, current_user as current_user, now() as server_time"
-    },
-    {
-      key: "table-list",
-      label: "Список таблиц",
-      sql: "select table_schema, table_name\nfrom information_schema.tables\nwhere table_schema not in ('pg_catalog', 'information_schema')\norder by table_schema, table_name"
-    },
-    {
-      key: "row-count",
-      label: "Подсчет строк",
-      sql: "select count(*) as total_rows\nfrom your_table_name"
-    }
-  ];
 
   function createQueryToolsController({
     editor,
     recentQuerySelectEl,
     applyRecentQueryButtonEl,
     clearRecentQueriesButtonEl,
-    queryTemplatesEl,
     commandGuardrailEl,
-    runButtonEl
+    runButtonEl,
+    initialDraft = "select 1 as check_value",
+    initialRecentQueries = [],
+    onStateChanged = () => {}
   }) {
+    let draftSql = String(initialDraft || "select 1 as check_value");
+    let recentQueries = normalizeRecentQueries(initialRecentQueries);
+
     function initialize() {
       renderRecentQueries();
-      renderQueryTemplates();
-      renderCommandGuardrail(editor.getValue());
+      renderCommandGuardrail(draftSql);
 
       recentQuerySelectEl.addEventListener("change", () => {
         applyRecentQueryButtonEl.disabled = !recentQuerySelectEl.value;
@@ -49,17 +33,19 @@
       });
 
       clearRecentQueriesButtonEl.addEventListener("click", () => {
-        removeStorageValue(window.localStorage, SQL_RECENT_STORAGE_KEY);
+        recentQueries = [];
+        emitStateChanged();
         renderRecentQueries();
       });
     }
 
     function getInitialDraft() {
-      return loadTextStorage(window.sessionStorage, SQL_DRAFT_STORAGE_KEY, "select 1 as check_value");
+      return draftSql;
     }
 
     function handleEditorChange(sql) {
-      saveTextStorage(window.sessionStorage, SQL_DRAFT_STORAGE_KEY, sql);
+      draftSql = String(sql || "");
+      emitStateChanged();
       renderCommandGuardrail(sql);
     }
 
@@ -68,15 +54,13 @@
       if (!normalized) {
         return;
       }
-      const queries = loadRecentQueries().filter(item => item !== normalized);
-      queries.unshift(normalized);
-      saveRecentQueries(queries.slice(0, MAX_RECENT_QUERIES));
+      recentQueries = [normalized, ...recentQueries.filter(item => item !== normalized)].slice(0, MAX_RECENT_QUERIES);
+      emitStateChanged();
       renderRecentQueries();
     }
 
     function renderRecentQueries() {
-      const queries = loadRecentQueries();
-      if (queries.length === 0) {
+      if (recentQueries.length === 0) {
         recentQuerySelectEl.innerHTML = `<option value="">История пока пуста</option>`;
         applyRecentQueryButtonEl.disabled = true;
         clearRecentQueriesButtonEl.disabled = true;
@@ -85,7 +69,7 @@
 
       recentQuerySelectEl.innerHTML = `
         <option value="">Выбери запрос из истории</option>
-        ${queries.map((query, index) => `
+        ${recentQueries.map((query, index) => `
           <option value="${index}">${index + 1}. ${escapeHtml(compactSql(query))}</option>
         `).join("")}
       `;
@@ -98,7 +82,7 @@
       if (selectedIndex === "") {
         return;
       }
-      const query = loadRecentQueries()[Number(selectedIndex)];
+      const query = recentQueries[Number(selectedIndex)];
       if (!query) {
         return;
       }
@@ -106,30 +90,6 @@
       editor.focus();
       handleEditorChange(query);
       applyRecentQueryButtonEl.disabled = false;
-    }
-
-    function renderQueryTemplates() {
-      queryTemplatesEl.innerHTML = QUERY_TEMPLATES.map(template => `
-        <button
-          class="btn btn-outline-dark btn-sm"
-          type="button"
-          data-query-template="${escapeHtml(template.key)}"
-        >
-          ${escapeHtml(template.label)}
-        </button>
-      `).join("");
-
-      queryTemplatesEl.querySelectorAll("[data-query-template]").forEach(button => {
-        button.addEventListener("click", () => {
-          const template = QUERY_TEMPLATES.find(item => item.key === button.dataset.queryTemplate);
-          if (!template) {
-            return;
-          }
-          editor.setValue(template.sql);
-          editor.focus();
-          handleEditorChange(template.sql);
-        });
-      });
     }
 
     function renderCommandGuardrail(sql) {
@@ -171,9 +131,21 @@
       runButtonEl.classList.add("btn-warning");
     }
 
+    function getState() {
+      return {
+        draftSql,
+        recentQueries: [...recentQueries]
+      };
+    }
+
+    function emitStateChanged() {
+      onStateChanged(getState());
+    }
+
     return {
       initialize,
       getInitialDraft,
+      getState,
       handleEditorChange,
       rememberRecentQuery,
       detectStatementKeyword,
@@ -204,15 +176,14 @@
     return DANGEROUS_STATEMENTS.includes(keyword);
   }
 
-  function loadRecentQueries() {
-    const parsed = loadJsonStorage(window.localStorage, SQL_RECENT_STORAGE_KEY, []);
-    return Array.isArray(parsed)
-      ? parsed.filter(item => typeof item === "string" && item.trim().length > 0)
+  function normalizeRecentQueries(queries) {
+    return Array.isArray(queries)
+      ? queries
+        .filter(item => typeof item === "string" && item.trim().length > 0)
+        .map(item => item.trim())
+        .filter((item, index, all) => all.indexOf(item) === index)
+        .slice(0, MAX_RECENT_QUERIES)
       : [];
-  }
-
-  function saveRecentQueries(queries) {
-    saveJsonStorage(window.localStorage, SQL_RECENT_STORAGE_KEY, queries);
   }
 
   function compactSql(sql) {

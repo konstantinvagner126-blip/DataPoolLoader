@@ -6,6 +6,7 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleService
 import com.sbrf.lt.platform.ui.config.UiAppConfig
 import com.sbrf.lt.platform.ui.config.UiConfigLoader
+import com.sbrf.lt.platform.ui.config.UiConfigPersistenceService
 import com.sbrf.lt.platform.ui.config.appsRootPath
 import com.sbrf.lt.platform.ui.config.storageDirPath
 import com.sbrf.lt.platform.ui.model.ConfigFormParseRequest
@@ -14,8 +15,10 @@ import com.sbrf.lt.platform.ui.model.ModulesCatalogResponse
 import com.sbrf.lt.platform.ui.model.SaveModuleRequest
 import com.sbrf.lt.platform.ui.model.SaveResultResponse
 import com.sbrf.lt.platform.ui.model.SqlConsoleExportRequest
+import com.sbrf.lt.platform.ui.model.SqlConsoleSettingsUpdateRequest
 import com.sbrf.lt.platform.ui.model.SqlConsoleQueryRequest
 import com.sbrf.lt.platform.ui.model.StartRunRequest
+import com.sbrf.lt.platform.ui.model.toCatalogItemResponse
 import com.sbrf.lt.platform.ui.model.toResponse
 import com.sbrf.lt.platform.ui.model.toStartResponse
 import com.sbrf.lt.platform.ui.module.ConfigFormService
@@ -23,6 +26,8 @@ import com.sbrf.lt.platform.ui.module.ModuleRegistry
 import com.sbrf.lt.platform.ui.run.RunManager
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleExportService
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleQueryManager
+import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleStateService
+import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleStateStore
 import io.ktor.http.ContentDisposition
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
@@ -112,6 +117,8 @@ fun Application.uiModule(
     sqlConsoleService: SqlConsoleService = SqlConsoleService(uiConfig.sqlConsole),
     sqlConsoleQueryManager: SqlConsoleQueryManager = SqlConsoleQueryManager(sqlConsoleService),
     sqlConsoleExportService: SqlConsoleExportService = SqlConsoleExportService(),
+    sqlConsoleStateService: SqlConsoleStateService = SqlConsoleStateService(SqlConsoleStateStore(uiConfig.storageDirPath())),
+    uiConfigPersistenceService: UiConfigPersistenceService = UiConfigPersistenceService(),
 ) {
     val mapper = ObjectMapper()
         .registerModule(JavaTimeModule())
@@ -165,14 +172,14 @@ fun Application.uiModule(
         staticResources("/static", "static")
 
         get("/api/modules") {
-            call.respond(moduleRegistry.listModules().map { mapOf("id" to it.id, "title" to it.title) })
+            call.respond(moduleRegistry.listModules().map { it.toCatalogItemResponse() })
         }
 
         get("/api/modules/catalog") {
             call.respond(
                 ModulesCatalogResponse(
                     appsRootStatus = moduleRegistry.appsRootStatus(),
-                    modules = moduleRegistry.listModules().map { mapOf("id" to it.id, "title" to it.title) },
+                    modules = moduleRegistry.listModules().map { it.toCatalogItemResponse() },
                 ),
             )
         }
@@ -213,6 +220,42 @@ fun Application.uiModule(
 
         get("/api/sql-console/info") {
             call.respond(sqlConsoleService.info().toResponse())
+        }
+
+        get("/api/sql-console/state") {
+            call.respond(sqlConsoleStateService.currentState())
+        }
+
+        post("/api/sql-console/state") {
+            call.respond(sqlConsoleStateService.updateState(call.receive()))
+        }
+
+        post("/api/sql-console/settings") {
+            val request = call.receive<SqlConsoleSettingsUpdateRequest>()
+            uiConfigPersistenceService.updateSqlConsoleSettings(
+                maxRowsPerShard = request.maxRowsPerShard,
+                queryTimeoutSec = request.queryTimeoutSec,
+            )
+            call.respond(
+                sqlConsoleService.updateSettings(
+                    maxRowsPerShard = request.maxRowsPerShard,
+                    queryTimeoutSec = request.queryTimeoutSec,
+                ).toResponse()
+            )
+        }
+
+        post("/api/sql-console/connections/check") {
+            val tempDir = kotlin.io.path.createTempDirectory("datapool-ui-sql-console-check-")
+            try {
+                val credentialsPath = runManager.materializeCredentialsFile(tempDir)
+                call.respond(
+                    sqlConsoleService.checkConnections(credentialsPath = credentialsPath).toResponse(
+                        configured = sqlConsoleService.info().configured,
+                    ),
+                )
+            } finally {
+                tempDir.toFile().deleteRecursively()
+            }
         }
 
         post("/api/sql-console/query") {

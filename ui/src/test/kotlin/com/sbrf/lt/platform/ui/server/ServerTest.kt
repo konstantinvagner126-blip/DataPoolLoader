@@ -4,6 +4,8 @@ import io.ktor.client.call.body
 import io.ktor.client.plugins.websocket.WebSockets
 import io.ktor.client.plugins.websocket.webSocketSession
 import com.sbrf.lt.datapool.sqlconsole.RawShardExecutionResult
+import com.sbrf.lt.datapool.sqlconsole.RawShardConnectionCheckResult
+import com.sbrf.lt.datapool.sqlconsole.ShardConnectionChecker
 import com.sbrf.lt.datapool.sqlconsole.ShardSqlExecutor
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleConfig
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleExecutionCancelledException
@@ -12,6 +14,7 @@ import com.sbrf.lt.datapool.sqlconsole.SqlConsoleService
 import com.sbrf.lt.datapool.app.ApplicationRunner
 import com.sbrf.lt.datapool.db.PostgresExporter
 import com.sbrf.lt.platform.ui.config.UiAppConfig
+import com.sbrf.lt.platform.ui.config.UiConfigPersistenceService
 import com.sbrf.lt.platform.ui.model.SqlConsoleQueryRequest
 import com.sbrf.lt.platform.ui.module.ModuleRegistry
 import com.sbrf.lt.platform.ui.run.RunManager
@@ -192,9 +195,36 @@ class ServerTest {
                     truncated = false,
                 )
             },
+            connectionChecker = ShardConnectionChecker { shard, _ ->
+                RawShardConnectionCheckResult(
+                    shardName = shard.name,
+                    status = "SUCCESS",
+                    message = "Подключение установлено.",
+                )
+            },
         )
+        var savedMaxRows: Int? = null
+        var savedTimeout: Int? = null
+        val uiConfigPersistenceService = object : UiConfigPersistenceService() {
+            override fun updateSqlConsoleSettings(maxRowsPerShard: Int, queryTimeoutSec: Int?): UiAppConfig {
+                savedMaxRows = maxRowsPerShard
+                savedTimeout = queryTimeoutSec
+                return uiConfig.copy(
+                    sqlConsole = uiConfig.sqlConsole.copy(
+                        maxRowsPerShard = maxRowsPerShard,
+                        queryTimeoutSec = queryTimeoutSec,
+                    )
+                )
+            }
+        }
         application {
-            uiModule(moduleRegistry = registry, runManager = runManager, sqlConsoleService = sqlConsoleService)
+            uiModule(
+                uiConfig = uiConfig,
+                moduleRegistry = registry,
+                runManager = runManager,
+                sqlConsoleService = sqlConsoleService,
+                uiConfigPersistenceService = uiConfigPersistenceService,
+            )
         }
 
         val homeHtml = client.get("/").bodyAsText()
@@ -217,19 +247,63 @@ class ServerTest {
 
         val modules = client.get("/api/modules").bodyAsText()
         assertTrue(modules.contains("demo-app"))
+        assertTrue(modules.contains("\"validationStatus\":\"VALID\""))
 
         val catalog = client.get("/api/modules/catalog").bodyAsText()
         assertTrue(catalog.contains("\"mode\":\"READY\""))
         assertTrue(catalog.contains("Доступно модулей: 1"))
         assertTrue(catalog.contains("demo-app"))
+        assertTrue(catalog.contains("Учебный модуль для UI-тестов."))
+        assertTrue(catalog.contains("\"tags\":[\"postgres\",\"demo\"]"))
 
         val details = client.get("/api/modules/demo-app").bodyAsText()
         assertTrue(details.contains("Общий SQL"))
         assertTrue(details.contains("Источник: db2"))
+        assertTrue(details.contains("Учебный модуль для UI-тестов."))
+        assertTrue(details.contains("\"validationStatus\":\"VALID\""))
 
         val info = client.get("/api/sql-console/info").bodyAsText()
         assertTrue(info.contains("\"sourceNames\":[\"shard1\"]"))
         assertTrue(info.contains("\"queryTimeoutSec\":30"))
+        assertTrue(info.contains("\"maxRowsPerShard\":200"))
+
+        val state = client.get("/api/sql-console/state").bodyAsText()
+        assertTrue(state.contains("\"draftSql\":\"select 1 as check_value\""))
+        assertTrue(state.contains("\"pageSize\":50"))
+
+        val savedState = client.post("/api/sql-console/state") {
+            contentType(ContentType.Application.Json)
+            setBody(
+                """
+                {
+                  "draftSql":"select * from demo",
+                  "recentQueries":["select * from demo"],
+                  "selectedSourceNames":["shard1"],
+                  "pageSize":100
+                }
+                """.trimIndent()
+            )
+        }
+        assertEquals(HttpStatusCode.OK, savedState.status)
+        val savedStateBody = savedState.bodyAsText()
+        assertTrue(savedStateBody.contains("\"draftSql\":\"select * from demo\""))
+        assertTrue(savedStateBody.contains("\"pageSize\":100"))
+
+        val settings = client.post("/api/sql-console/settings") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"maxRowsPerShard":350,"queryTimeoutSec":75}""")
+        }
+        assertEquals(HttpStatusCode.OK, settings.status)
+        val settingsBody = settings.bodyAsText()
+        assertTrue(settingsBody.contains("\"maxRowsPerShard\":350"))
+        assertTrue(settingsBody.contains("\"queryTimeoutSec\":75"))
+        assertEquals(350, savedMaxRows)
+        assertEquals(75, savedTimeout)
+
+        val connections = client.post("/api/sql-console/connections/check").bodyAsText()
+        assertTrue(connections.contains("\"configured\":true"))
+        assertTrue(connections.contains("\"sourceName\":\"shard1\""))
+        assertTrue(connections.contains("\"status\":\"SUCCESS\""))
 
         val queryResponse = client.post("/api/sql-console/query") {
             contentType(ContentType.Application.Json)
@@ -680,6 +754,15 @@ class ServerTest {
         val appDir = resolve("apps/demo-app")
         appDir.createDirectories()
         appDir.resolve("build.gradle.kts").writeText("plugins { application }")
+        appDir.resolve("ui-module.yml").writeText(
+            """
+            title: Demo App
+            description: Учебный модуль для UI-тестов.
+            tags:
+              - postgres
+              - demo
+            """.trimIndent(),
+        )
         val resources = appDir.resolve("src/main/resources").createDirectories()
         resources.resolve("application.yml").writeText(
             """

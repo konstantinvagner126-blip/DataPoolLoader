@@ -1,6 +1,8 @@
 package com.sbrf.lt.datapool
 
 import com.sbrf.lt.datapool.sqlconsole.RawShardExecutionResult
+import com.sbrf.lt.datapool.sqlconsole.RawShardConnectionCheckResult
+import com.sbrf.lt.datapool.sqlconsole.ShardConnectionChecker
 import com.sbrf.lt.datapool.sqlconsole.ShardSqlExecutor
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleConfig
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleSourceConfig
@@ -216,5 +218,98 @@ class SqlConsoleServiceTest {
         )
 
         assertEquals(45, service.info().queryTimeoutSec)
+    }
+
+    @Test
+    fun `updates max rows per shard at runtime`() {
+        val service = SqlConsoleService(
+            config = SqlConsoleConfig(
+                maxRowsPerShard = 200,
+                sources = listOf(SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user1", "pwd1")),
+            ),
+            executor = ShardSqlExecutor { _, _, _, _, _, _ -> error("should not be called") },
+        )
+
+        val updated = service.updateMaxRowsPerShard(350)
+
+        assertEquals(350, updated.maxRowsPerShard)
+        assertEquals(350, service.info().maxRowsPerShard)
+    }
+
+    @Test
+    fun `updates timeout at runtime`() {
+        val service = SqlConsoleService(
+            config = SqlConsoleConfig(
+                maxRowsPerShard = 200,
+                queryTimeoutSec = 45,
+                sources = listOf(SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user1", "pwd1")),
+            ),
+            executor = ShardSqlExecutor { _, _, _, _, _, _ -> error("should not be called") },
+        )
+
+        val updated = service.updateSettings(maxRowsPerShard = 280, queryTimeoutSec = 90)
+
+        assertEquals(280, updated.maxRowsPerShard)
+        assertEquals(90, updated.queryTimeoutSec)
+        assertEquals(90, service.info().queryTimeoutSec)
+    }
+
+    @Test
+    fun `checks connections for all configured sources`() {
+        val checked = mutableListOf<String>()
+        val service = SqlConsoleService(
+            config = SqlConsoleConfig(
+                queryTimeoutSec = 12,
+                sources = listOf(
+                    SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user1", "pwd1"),
+                    SqlConsoleSourceConfig("shard2", "jdbc:test:two", "user2", "pwd2"),
+                ),
+            ),
+            executor = ShardSqlExecutor { _, _, _, _, _, _ -> error("should not be called") },
+            connectionChecker = ShardConnectionChecker { shard, timeout ->
+                checked += shard.name
+                assertEquals(12, timeout)
+                if (shard.name == "shard2") {
+                    error("boom")
+                }
+                RawShardConnectionCheckResult(
+                    shardName = shard.name,
+                    status = "SUCCESS",
+                    message = "ok",
+                )
+            },
+        )
+
+        val result = service.checkConnections(credentialsPath = null)
+
+        assertEquals(listOf("shard1", "shard2"), checked)
+        assertEquals("SUCCESS", result.sourceResults.first { it.shardName == "shard1" }.status)
+        assertEquals("FAILED", result.sourceResults.first { it.shardName == "shard2" }.status)
+    }
+
+    @Test
+    fun `connection check returns failed status when placeholder is not resolved`() {
+        val service = SqlConsoleService(
+            config = SqlConsoleConfig(
+                sources = listOf(
+                    SqlConsoleSourceConfig("shard1", "\${SHARD1_URL}", "user1", "pwd1"),
+                    SqlConsoleSourceConfig("shard2", "jdbc:test:two", "user2", "pwd2"),
+                ),
+            ),
+            executor = ShardSqlExecutor { _, _, _, _, _, _ -> error("should not be called") },
+            connectionChecker = ShardConnectionChecker { shard, _ ->
+                RawShardConnectionCheckResult(
+                    shardName = shard.name,
+                    status = "SUCCESS",
+                    message = "ok",
+                )
+            },
+        )
+
+        val result = service.checkConnections(credentialsPath = null)
+
+        assertEquals("FAILED", result.sourceResults.first { it.shardName == "shard1" }.status)
+        assertTrue(result.sourceResults.first { it.shardName == "shard1" }.errorMessage!!.contains("SHARD1_URL"))
+        assertEquals("SUCCESS", result.sourceResults.first { it.shardName == "shard2" }.status)
     }
 }

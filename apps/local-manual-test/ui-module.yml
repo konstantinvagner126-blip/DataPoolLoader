@@ -1,0 +1,6 @@
+title: Local Manual Test
+description: Ручной локальный сценарий для проверки выгрузки и загрузки на небольшом объеме данных.
+tags:
+  - local
+  - manual
+  - postgres

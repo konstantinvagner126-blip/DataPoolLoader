@@ -68,6 +68,7 @@
             <div>
               <div class="panel-title mb-1">Редактор модуля</div>
               <div id="selectedModuleLabel" class="text-secondary small">Модуль не выбран</div>
+              <div id="selectedModuleDescription" class="text-secondary small mt-1 d-none"></div>
               <div id="moduleDraftStatus" class="module-draft-status small mt-1 text-secondary">
                 <span class="module-draft-dot module-draft-dot-saved" aria-hidden="true"></span>
                 <span>Изменений нет.</span>
@@ -79,6 +80,8 @@
               <button id="runButton" class="btn btn-primary">Запустить</button>
             </div>
           </div>
+
+          <div id="moduleValidationAlert" class="alert d-none mb-3"></div>
 
           <ul class="nav nav-tabs mb-3" id="editorTabs" role="tablist">
               <li class="nav-item" role="presentation">

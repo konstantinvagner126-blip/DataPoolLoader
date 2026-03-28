@@ -1,0 +1,6 @@
+title: Local Manual Big Test
+description: Ручной локальный сценарий для проверки выгрузки и загрузки на большом объеме данных.
+tags:
+  - local
+  - manual
+  - big-data
