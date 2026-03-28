@@ -1,6 +1,5 @@
 package com.sbrf.lt.platform.ui.model
 
-import com.sbrf.lt.datapool.app.ExecutionEvent
 import com.sbrf.lt.datapool.model.ExecutionStatus
 import com.sbrf.lt.datapool.sqlconsole.RawShardExecutionResult
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleInfo
@@ -118,13 +117,19 @@ data class UiRunSnapshot(
     val summaryJson: String? = null,
     val errorMessage: String? = null,
     val sourceProgress: Map<String, Long> = emptyMap(),
-    val events: List<ExecutionEvent> = emptyList(),
+    val events: List<Map<String, Any?>> = emptyList(),
 )
 
 data class UiStateResponse(
     val credentialsStatus: CredentialsStatusResponse,
+    val uiSettings: UiSettingsResponse = UiSettingsResponse(),
     val activeRun: UiRunSnapshot? = null,
     val history: List<UiRunSnapshot> = emptyList(),
+)
+
+data class UiSettingsResponse(
+    val showTechnicalDiagnostics: Boolean = true,
+    val showRawSummaryJson: Boolean = false,
 )
 
 data class SaveResultResponse(
@@ -148,6 +153,11 @@ data class SqlConsoleInfoResponse(
 data class SqlConsoleQueryRequest(
     val sql: String,
     val selectedSourceNames: List<String> = emptyList(),
+)
+
+data class SqlConsoleExportRequest(
+    val result: SqlConsoleQueryResponse,
+    val shardName: String? = null,
 )
 
 data class SqlConsoleStartQueryResponse(

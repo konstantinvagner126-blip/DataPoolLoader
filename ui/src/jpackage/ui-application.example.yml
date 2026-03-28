@@ -1,7 +1,10 @@
 ui:
   port: 8080
   appsRoot: __APPS_ROOT__
-  defaultCredentialsFile: /path/to/credential.properties
+  storageDir: storage
+  showTechnicalDiagnostics: false
+  showRawSummaryJson: false
+  defaultCredentialsFile: credential.properties
   sqlConsole:
     fetchSize: 1000
     maxRowsPerShard: 200

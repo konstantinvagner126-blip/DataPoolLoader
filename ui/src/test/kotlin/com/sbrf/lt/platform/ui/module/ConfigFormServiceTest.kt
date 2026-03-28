@@ -7,6 +7,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -150,6 +151,145 @@ class ConfigFormServiceTest {
             assertTrue(state.outputDir.isNotBlank(), "outputDir should be parsed for $path")
             assertTrue(state.mergeMode.isNotBlank(), "mergeMode should be parsed for $path")
         }
+    }
+
+    @Test
+    fun `apply removes optional fields and quotas without percent`() {
+        val result = service.apply(
+            configText = """
+                app:
+                  outputDir: ./output
+                  mergeMode: plain
+                  errorMode: continue_on_error
+                  commonSql: select 1
+                  commonSqlFile: classpath:sql/common.sql
+                  queryTimeoutSec: 60
+                  maxMergedRows: 100
+                  sources:
+                    - name: db1
+                      jdbcUrl: jdbc:test
+                      username: user
+                      password: pwd
+                      sql: select 2
+                      sqlFile: classpath:sql/db1.sql
+                  quotas:
+                    - source: db1
+                      percent: 50.0
+                  target:
+                    enabled: true
+                    jdbcUrl: jdbc:test
+                    username: user
+                    password: pwd
+                    table: public.pool
+                    truncateBeforeLoad: true
+            """.trimIndent(),
+            formState = ConfigFormStateResponse(
+                outputDir = "./output",
+                fileFormat = "csv",
+                mergeMode = "plain",
+                errorMode = "continue_on_error",
+                parallelism = 1,
+                fetchSize = 1000,
+                queryTimeoutSec = null,
+                progressLogEveryRows = 10000,
+                maxMergedRows = null,
+                deleteOutputFilesAfterCompletion = false,
+                commonSql = "",
+                commonSqlFile = null,
+                sources = listOf(
+                    ConfigFormSourceState(
+                        name = "db1",
+                        jdbcUrl = "jdbc:test",
+                        username = "user",
+                        password = "pwd",
+                        sql = "",
+                        sqlFile = null,
+                    ),
+                ),
+                quotas = listOf(ConfigFormQuotaState(source = "db1", percent = null)),
+                targetEnabled = false,
+                targetJdbcUrl = "",
+                targetUsername = "",
+                targetPassword = "",
+                targetTable = "",
+                targetTruncateBeforeLoad = false,
+            ),
+        )
+
+        assertFalse(result.configText.contains("commonSqlFile"))
+        assertFalse(result.configText.contains("commonSql:"))
+        assertFalse(result.configText.contains("queryTimeoutSec"))
+        assertFalse(result.configText.contains("maxMergedRows"))
+        assertFalse(result.configText.contains("sqlFile"))
+        assertFalse(result.configText.contains("percent"))
+    }
+
+    @Test
+    fun `apply rejects unknown merge mode and error mode`() {
+        val baseFormState = ConfigFormStateResponse(
+            outputDir = "./output",
+            fileFormat = "csv",
+            mergeMode = "plain",
+            errorMode = "continue_on_error",
+            parallelism = 1,
+            fetchSize = 1000,
+            queryTimeoutSec = null,
+            progressLogEveryRows = 10000,
+            maxMergedRows = null,
+            deleteOutputFilesAfterCompletion = false,
+            commonSql = "",
+            commonSqlFile = null,
+            sources = emptyList(),
+            quotas = emptyList(),
+            targetEnabled = false,
+            targetJdbcUrl = "",
+            targetUsername = "",
+            targetPassword = "",
+            targetTable = "",
+            targetTruncateBeforeLoad = false,
+        )
+
+        val mergeError = assertFailsWith<IllegalArgumentException> {
+            service.apply("app: {}", baseFormState.copy(mergeMode = "broken"))
+        }
+        assertTrue(mergeError.message!!.contains("mergeMode"))
+
+        val errorModeError = assertFailsWith<IllegalArgumentException> {
+            service.apply("app: {}", baseFormState.copy(errorMode = "broken"))
+        }
+        assertTrue(errorModeError.message!!.contains("errorMode"))
+    }
+
+    @Test
+    fun `apply creates app root when yaml is not an object`() {
+        val result = service.apply(
+            configText = "[]",
+            formState = ConfigFormStateResponse(
+                outputDir = "./output",
+                fileFormat = "csv",
+                mergeMode = "plain",
+                errorMode = "continue_on_error",
+                parallelism = 1,
+                fetchSize = 1000,
+                queryTimeoutSec = null,
+                progressLogEveryRows = 10000,
+                maxMergedRows = null,
+                deleteOutputFilesAfterCompletion = false,
+                commonSql = "",
+                commonSqlFile = null,
+                sources = emptyList(),
+                quotas = emptyList(),
+                targetEnabled = false,
+                targetJdbcUrl = "",
+                targetUsername = "",
+                targetPassword = "",
+                targetTable = "",
+                targetTruncateBeforeLoad = false,
+            ),
+        )
+
+        assertTrue(result.configText.contains("app:"))
+        assertEquals("./output", result.formState.outputDir)
     }
 
     private fun projectPath(relative: String): Path = Path.of("")

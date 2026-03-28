@@ -9,30 +9,31 @@ import com.sbrf.lt.datapool.sqlconsole.SqlConsoleSourceConfig
 import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class SqlConsoleQueryManagerTest {
 
     @Test
-    fun `completes query asynchronously`() {
+    fun `current snapshot is null before first start and cancel unknown execution fails`() {
         val manager = SqlConsoleQueryManager(
-            sqlConsoleService = SqlConsoleService(
-                config = SqlConsoleConfig(
-                    sources = listOf(SqlConsoleSourceConfig("db1", "jdbc:test", "user", "pwd")),
-                ),
-                executor = ShardSqlExecutor { shard, statement, _, _, _, _ ->
-                    assertEquals("SELECT", statement.leadingKeyword)
-                    RawShardExecutionResult(
-                        shardName = shard.name,
-                        status = "SUCCESS",
-                        columns = listOf("id"),
-                        rows = listOf(mapOf("id" to "1")),
-                    )
-                },
-            ),
+            sqlConsoleService = serviceWithSuccess(),
         )
+
+        assertNull(manager.currentSnapshot())
+
+        val error = assertFailsWith<IllegalArgumentException> {
+            manager.cancel("missing")
+        }
+        assertTrue(error.message!!.contains("не найден"))
+    }
+
+    @Test
+    fun `completes query asynchronously`() {
+        val manager = SqlConsoleQueryManager(sqlConsoleService = serviceWithSuccess())
 
         val started = manager.startQuery("select 1 as id", null)
         val snapshot = waitForCompletion(manager, started.id)
@@ -161,6 +162,62 @@ class SqlConsoleQueryManagerTest {
         }
         assertTrue(error.message!!.contains("уже завершен"))
     }
+
+    @Test
+    fun `keeps snapshot and cleans up directory when shard execution fails`() {
+        val cleanupDir = Files.createTempDirectory("sql-console-failed-cleanup")
+        val manager = SqlConsoleQueryManager(
+            sqlConsoleService = SqlConsoleService(
+                config = SqlConsoleConfig(
+                    sources = listOf(SqlConsoleSourceConfig("db1", "jdbc:test", "user", "pwd")),
+                ),
+                executor = ShardSqlExecutor { _, _, _, _, _, _ ->
+                    throw IllegalStateException("boom")
+                },
+            ),
+        )
+
+        val started = manager.startQuery("select 1", null, cleanupDir = cleanupDir)
+        val snapshot = waitForCompletion(manager, started.id)
+
+        assertEquals(SqlConsoleExecutionStatus.SUCCESS, snapshot.status)
+        assertEquals("FAILED", snapshot.result?.shardResults?.single()?.status)
+        assertEquals("boom", snapshot.result?.shardResults?.single()?.errorMessage)
+        assertTrue(!Files.exists(cleanupDir))
+    }
+
+    @Test
+    fun `marks execution as failed when service throws before shard execution`() {
+        val cleanupDir = Files.createTempDirectory("sql-console-invalid-config")
+        val manager = SqlConsoleQueryManager(
+            sqlConsoleService = SqlConsoleService(
+                config = SqlConsoleConfig(sources = emptyList()),
+            ),
+        )
+
+        val started = manager.startQuery("select 1", null, cleanupDir = cleanupDir)
+        val snapshot = waitForCompletion(manager, started.id)
+
+        assertEquals(SqlConsoleExecutionStatus.FAILED, snapshot.status)
+        assertFalse(snapshot.cancelRequested)
+        assertTrue(snapshot.errorMessage!!.contains("не настроены source-подключения"))
+        assertTrue(!Files.exists(cleanupDir))
+    }
+
+    private fun serviceWithSuccess() = SqlConsoleService(
+        config = SqlConsoleConfig(
+            sources = listOf(SqlConsoleSourceConfig("db1", "jdbc:test", "user", "pwd")),
+        ),
+        executor = ShardSqlExecutor { shard, statement, _, _, _, _ ->
+            assertEquals("SELECT", statement.leadingKeyword)
+            RawShardExecutionResult(
+                shardName = shard.name,
+                status = "SUCCESS",
+                columns = listOf("id"),
+                rows = listOf(mapOf("id" to "1")),
+            )
+        },
+    )
 
     private fun waitForCompletion(
         manager: SqlConsoleQueryManager,

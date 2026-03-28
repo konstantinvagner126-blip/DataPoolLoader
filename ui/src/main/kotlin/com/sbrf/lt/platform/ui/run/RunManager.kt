@@ -10,10 +10,12 @@ import com.fasterxml.jackson.databind.node.ObjectNode
 import com.sbrf.lt.platform.ui.config.UiAppConfig
 import com.sbrf.lt.platform.ui.config.UiConfigLoader
 import com.sbrf.lt.platform.ui.config.defaultCredentialsPath
+import com.sbrf.lt.platform.ui.config.storageDirPath
 import com.sbrf.lt.platform.ui.model.CredentialsStatusResponse
 import com.sbrf.lt.platform.ui.model.ModuleDescriptor
 import com.sbrf.lt.platform.ui.model.ModuleDetailsResponse
 import com.sbrf.lt.platform.ui.model.StartRunRequest
+import com.sbrf.lt.platform.ui.model.UiSettingsResponse
 import com.sbrf.lt.platform.ui.model.UiRunSnapshot
 import com.sbrf.lt.platform.ui.model.UiStateResponse
 import com.sbrf.lt.platform.ui.module.ModuleRegistry
@@ -33,6 +35,7 @@ class RunManager(
     private val moduleRegistry: ModuleRegistry = ModuleRegistry(),
     private val applicationRunner: ApplicationRunner = ApplicationRunner(),
     private val uiConfig: UiAppConfig = UiConfigLoader().load(),
+    private val stateStore: RunStateStore = RunStateStore(uiConfig.storageDirPath()),
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
     private val executor = Executors.newSingleThreadExecutor()
@@ -42,6 +45,7 @@ class RunManager(
     private var uploadedCredentials: UploadedCredentials? = null
 
     init {
+        restorePersistedState()
         updatesFlow.tryEmit(currentState())
     }
 
@@ -52,6 +56,10 @@ class RunManager(
         val ordered = snapshots.sortedByDescending { it.startedAt }
         return UiStateResponse(
             credentialsStatus = currentCredentialsStatus(),
+            uiSettings = UiSettingsResponse(
+                showTechnicalDiagnostics = uiConfig.showTechnicalDiagnostics,
+                showRawSummaryJson = uiConfig.showRawSummaryJson,
+            ),
             activeRun = ordered.firstOrNull { it.status != ExecutionStatus.SUCCESS && it.status != ExecutionStatus.FAILED }?.toUi(),
             history = ordered.map { it.toUi() },
         )
@@ -236,7 +244,7 @@ class RunManager(
 
     @Synchronized
     private fun handleEvent(snapshot: MutableRunSnapshot, event: ExecutionEvent) {
-        snapshot.events.add(event)
+        snapshot.events.add(event.toUiEventMap())
         when (event) {
             is com.sbrf.lt.datapool.app.RunStartedEvent -> snapshot.status = ExecutionStatus.RUNNING
             is com.sbrf.lt.datapool.app.SourceExportProgressEvent -> snapshot.sourceProgress[event.sourceName] = event.rowCount
@@ -273,7 +281,55 @@ class RunManager(
 
     @Synchronized
     private fun publishState() {
+        persistState()
         updatesFlow.tryEmit(currentState())
+    }
+
+    @Synchronized
+    private fun restorePersistedState() {
+        val persisted = stateStore.load()
+        uploadedCredentials = persisted.uploadedCredentials?.let {
+            UploadedCredentials(
+                fileName = it.fileName,
+                content = it.content,
+            )
+        }
+        snapshots.clear()
+        snapshots.addAll(
+            persisted.history.map { snapshot ->
+                MutableRunSnapshot(
+                    id = snapshot.id,
+                    moduleId = snapshot.moduleId,
+                    moduleTitle = snapshot.moduleTitle,
+                    status = snapshot.status,
+                    startedAt = snapshot.startedAt,
+                    finishedAt = snapshot.finishedAt,
+                    outputDir = snapshot.outputDir,
+                    mergedRowCount = snapshot.mergedRowCount,
+                    summaryJson = snapshot.summaryJson,
+                    errorMessage = snapshot.errorMessage,
+                    sourceProgress = snapshot.sourceProgress.toMutableMap(),
+                    events = snapshot.events.toMutableList(),
+                )
+            },
+        )
+    }
+
+    @Synchronized
+    private fun persistState() {
+        stateStore.save(
+            PersistedRunState(
+                uploadedCredentials = uploadedCredentials?.let {
+                    PersistedUploadedCredentials(
+                        fileName = it.fileName,
+                        content = it.content,
+                    )
+                },
+                history = snapshots
+                    .sortedByDescending { it.startedAt }
+                    .map { it.toUi() },
+            ),
+        )
     }
 
     private data class MutableRunSnapshot(
@@ -288,7 +344,7 @@ class RunManager(
         var summaryJson: String? = null,
         var errorMessage: String? = null,
         val sourceProgress: MutableMap<String, Long> = linkedMapOf(),
-        val events: MutableList<ExecutionEvent> = mutableListOf(),
+        val events: MutableList<Map<String, Any?>> = mutableListOf(),
     ) {
         fun toUi(): UiRunSnapshot = UiRunSnapshot(
             id = id,
@@ -310,4 +366,12 @@ class RunManager(
         val fileName: String,
         val content: String,
     )
+
+    private fun ExecutionEvent.toUiEventMap(): Map<String, Any?> {
+        val result = configLoader.objectMapper().convertValue(this, MutableMap::class.java)
+            .mapKeys { it.key.toString() }
+            .toMutableMap()
+        result["type"] = javaClass.simpleName
+        return result
+    }
 }

@@ -1,11 +1,16 @@
 package com.sbrf.lt.platform.ui.server
 
+import io.ktor.client.call.body
+import io.ktor.client.plugins.websocket.WebSockets
+import io.ktor.client.plugins.websocket.webSocketSession
 import com.sbrf.lt.datapool.sqlconsole.RawShardExecutionResult
 import com.sbrf.lt.datapool.sqlconsole.ShardSqlExecutor
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleConfig
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleExecutionCancelledException
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleSourceConfig
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleService
+import com.sbrf.lt.datapool.app.ApplicationRunner
+import com.sbrf.lt.datapool.db.PostgresExporter
 import com.sbrf.lt.platform.ui.config.UiAppConfig
 import com.sbrf.lt.platform.ui.model.SqlConsoleQueryRequest
 import com.sbrf.lt.platform.ui.module.ModuleRegistry
@@ -22,23 +27,153 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
 import io.ktor.http.HttpStatusCode
+import io.ktor.server.application.Application
 import io.ktor.server.testing.testApplication
+import io.ktor.websocket.Frame
+import io.ktor.websocket.readText
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.withTimeout
 import kotlin.io.path.createDirectories
 import kotlin.io.path.readText
 import kotlin.io.path.writeText
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import java.nio.file.Files
+import java.lang.reflect.Proxy
+import java.sql.Connection
+import java.sql.PreparedStatement
+import java.sql.ResultSet
+import java.sql.ResultSetMetaData
+import org.slf4j.helpers.NOPLogger
 
 class ServerTest {
+
+    @Test
+    fun `loads static text and fails for missing resource`() {
+        assertTrue(loadStaticText("static/home.html").contains("Load Testing Data Platform"))
+
+        val error = assertFailsWith<IllegalStateException> {
+            loadStaticText(
+                "static/missing.html",
+                object : ClassLoader(null) {
+                    override fun getResourceAsStream(name: String?) = null
+                },
+            )
+        }
+
+        assertTrue(error.message!!.contains("static/missing.html"))
+    }
+
+    @Test
+    fun `start ui server delegates startup to provided starter`() {
+        val appsRoot = Files.createTempDirectory("ui-start-apps")
+        val storageDir = Files.createTempDirectory("ui-start-storage")
+        val ports = mutableListOf<Int>()
+        var module: (Application.() -> Unit)? = null
+        val starter = UiServerStarter { port, applicationModule ->
+            ports += port
+            module = applicationModule
+        }
+
+        startUiServer(
+            uiConfig = UiAppConfig(
+                port = 9191,
+                appsRoot = appsRoot.toString(),
+                storageDir = storageDir.toString(),
+                sqlConsole = SqlConsoleConfig(),
+            ),
+            logger = NOPLogger.NOP_LOGGER,
+            starter = starter,
+        )
+        startUiServer(
+            uiConfig = UiAppConfig(
+                port = 9292,
+                storageDir = storageDir.toString(),
+                sqlConsole = SqlConsoleConfig(),
+            ),
+            logger = NOPLogger.NOP_LOGGER,
+            starter = starter,
+        )
+
+        assertEquals(listOf(9191, 9292), ports)
+        assertNotNull(module)
+    }
+
+    @Test
+    fun `startup module serves content and websocket publishes state updates`() = testApplication {
+        val root = createProject()
+        val registry = ModuleRegistry(appsRoot = root.resolve("apps"))
+        val uiConfig = UiAppConfig(
+            storageDir = Files.createTempDirectory("ui-server-state-").toString(),
+            sqlConsole = SqlConsoleConfig(),
+        )
+        val runManager = RunManager(moduleRegistry = registry, uiConfig = uiConfig)
+        val wsClient = createClient {
+            install(WebSockets)
+        }
+        application(
+            uiStartupModule(
+                uiConfig = uiConfig,
+                logger = NOPLogger.NOP_LOGGER,
+                moduleInstaller = {
+                    uiModule(
+                        uiConfig = uiConfig,
+                        moduleRegistry = registry,
+                        runManager = runManager,
+                    )
+                },
+            ),
+        )
+
+        val session = wsClient.webSocketSession("/ws")
+        try {
+            val initial = session.incoming.receive() as Frame.Text
+            assertTrue(initial.readText().contains("\"history\":[]"))
+
+            val uploadResponse = client.post("/api/credentials/upload") {
+                setBody(
+                    MultiPartFormDataContent(
+                        formData {
+                            append(
+                                "file",
+                                "DB1_USERNAME=uploaded",
+                                io.ktor.http.Headers.build {
+                                    append(HttpHeaders.ContentDisposition, ContentDisposition.File.withParameter(ContentDisposition.Parameters.Name, "file").withParameter(ContentDisposition.Parameters.FileName, "credential.properties").toString())
+                                    append(HttpHeaders.ContentType, ContentType.Text.Plain.toString())
+                                },
+                            )
+                        },
+                    ),
+                )
+            }
+            assertEquals(HttpStatusCode.OK, uploadResponse.status)
+
+            var uploadedSeen = false
+            withTimeout(2_000) {
+                while (true) {
+                    val frame = session.incoming.receive()
+                    if (frame is Frame.Text && frame.readText().contains("\"mode\":\"UPLOADED\"")) {
+                        uploadedSeen = true
+                        break
+                    }
+                }
+            }
+            assertTrue(uploadedSeen)
+        } finally {
+            session.cancel()
+        }
+    }
 
     @Test
     fun `serves html and module api`() = testApplication {
         val root = createProject()
         val registry = ModuleRegistry(appsRoot = root.resolve("apps"))
+        val storageDir = Files.createTempDirectory("ui-server-state-")
         val uiConfig = UiAppConfig(
+            storageDir = storageDir.toString(),
             sqlConsole = SqlConsoleConfig(
                 queryTimeoutSec = 30,
                 sources = listOf(SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user", "pwd")),
@@ -106,13 +241,76 @@ class ServerTest {
         assertTrue(queryBody.contains("\"statementKeyword\":\"SELECT\""))
         assertTrue(queryBody.contains("\"shardName\":\"shard1\""))
         assertTrue(queryBody.contains("\"rows\":[{\"id\":\"1\"}]"))
+
+        val exportCsvResponse = client.post("/api/sql-console/export/source-csv") {
+            contentType(ContentType.Application.Json)
+            setBody(
+                """
+                {
+                  "result": {
+                    "sql": "select 1 as id",
+                    "statementType": "RESULT_SET",
+                    "statementKeyword": "SELECT",
+                    "maxRowsPerShard": 200,
+                    "shardResults": [
+                      {
+                        "shardName": "shard1",
+                        "status": "SUCCESS",
+                        "rows": [{"id": "1"}],
+                        "rowCount": 1,
+                        "columns": ["id"],
+                        "truncated": false
+                      }
+                    ]
+                  },
+                  "shardName": "shard1"
+                }
+                """.trimIndent(),
+            )
+        }
+        assertEquals(HttpStatusCode.OK, exportCsvResponse.status)
+        assertTrue(exportCsvResponse.headers[HttpHeaders.ContentDisposition]?.contains("shard1.csv") == true)
+        assertEquals("id\n1\n", exportCsvResponse.bodyAsText())
+
+        val exportZipResponse = client.post("/api/sql-console/export/all-zip") {
+            contentType(ContentType.Application.Json)
+            setBody(
+                """
+                {
+                  "result": {
+                    "sql": "select 1 as id",
+                    "statementType": "RESULT_SET",
+                    "statementKeyword": "SELECT",
+                    "maxRowsPerShard": 200,
+                    "shardResults": [
+                      {
+                        "shardName": "shard1",
+                        "status": "SUCCESS",
+                        "rows": [{"id": "1"}],
+                        "rowCount": 1,
+                        "columns": ["id"],
+                        "truncated": false
+                      }
+                    ]
+                  }
+                }
+                """.trimIndent(),
+            )
+        }
+        assertEquals(HttpStatusCode.OK, exportZipResponse.status)
+        assertTrue(exportZipResponse.headers[HttpHeaders.ContentDisposition]?.contains("sql-console-results.zip") == true)
+        val zipBytes: ByteArray = exportZipResponse.body()
+        assertTrue(zipBytes.isNotEmpty())
     }
 
     @Test
     fun `uploads credentials and saves module files`() = testApplication {
         val root = createProject()
         val registry = ModuleRegistry(appsRoot = root.resolve("apps"))
-        val runManager = RunManager(moduleRegistry = registry, uiConfig = UiAppConfig())
+        val runManager = RunManager(
+            moduleRegistry = registry,
+            uiConfig = UiAppConfig(storageDir = Files.createTempDirectory("ui-server-state-").toString()),
+        )
         application {
             uiModule(moduleRegistry = registry, runManager = runManager)
         }
@@ -238,7 +436,9 @@ class ServerTest {
     fun `supports async sql console lifecycle and service routes`() = testApplication {
         val root = createProject()
         val registry = ModuleRegistry(appsRoot = root.resolve("apps"))
+        val storageDir = Files.createTempDirectory("ui-server-state-")
         val uiConfig = UiAppConfig(
+            storageDir = storageDir.toString(),
             sqlConsole = SqlConsoleConfig(
                 queryTimeoutSec = 30,
                 sources = listOf(SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user", "pwd")),
@@ -292,6 +492,13 @@ class ServerTest {
         val running = client.get("/api/sql-console/query/$executionId").bodyAsText()
         assertTrue(running.contains("\"status\":\"RUNNING\""))
 
+        val duplicateStart = client.post("/api/sql-console/query/start") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"sql":"delete from demo_again","selectedSourceNames":["shard1"]}""")
+        }
+        assertEquals(HttpStatusCode.BadRequest, duplicateStart.status)
+        assertTrue(duplicateStart.bodyAsText().contains("уже выполняется запрос"))
+
         val cancelled = client.post("/api/sql-console/query/$executionId/cancel").bodyAsText()
         assertTrue(cancelled.contains("\"cancelRequested\":true"))
 
@@ -308,11 +515,12 @@ class ServerTest {
 
     @Test
     fun `returns apps root diagnostics when modules path is not configured`() = testApplication {
+        val uiConfig = UiAppConfig(storageDir = Files.createTempDirectory("ui-server-state-").toString())
         application {
             uiModule(
-                uiConfig = UiAppConfig(),
+                uiConfig = uiConfig,
                 moduleRegistry = ModuleRegistry(appsRoot = null),
-                runManager = RunManager(uiConfig = UiAppConfig()),
+                runManager = RunManager(uiConfig = uiConfig),
             )
         }
 
@@ -320,6 +528,151 @@ class ServerTest {
         assertTrue(catalog.contains("\"mode\":\"NOT_CONFIGURED\""))
         assertTrue(catalog.contains("Путь ui.appsRoot не задан"))
         assertTrue(catalog.contains("\"modules\":[]"))
+    }
+
+    @Test
+    fun `starts run through api and returns bad request for invalid requests`() = testApplication {
+        val root = createProject()
+        val registry = ModuleRegistry(appsRoot = root.resolve("apps"))
+        val runManager = RunManager(
+            moduleRegistry = registry,
+            applicationRunner = ApplicationRunner(
+                exporter = PostgresExporter { _, _, _ ->
+                    exportConnection(
+                        columns = listOf("id"),
+                        rows = listOf(listOf(1)),
+                    )
+                },
+            ),
+            uiConfig = UiAppConfig(storageDir = Files.createTempDirectory("ui-server-state-").toString()),
+        )
+        application {
+            uiModule(
+                moduleRegistry = registry,
+                runManager = runManager,
+            )
+        }
+
+        val runResponse = client.post("/api/runs") {
+            contentType(ContentType.Application.Json)
+            setBody(
+                """
+                {
+                  "moduleId": "demo-app",
+                  "configText": "app:\n  commonSqlFile: classpath:sql/common.sql\n  sources:\n    - name: db2\n      sqlFile: classpath:sql/db2.sql\n",
+                  "sqlFiles": {
+                    "classpath:sql/common.sql": "select 1",
+                    "classpath:sql/db2.sql": "select 2"
+                  }
+                }
+                """.trimIndent(),
+            )
+        }
+        assertEquals(HttpStatusCode.OK, runResponse.status)
+        assertTrue(runResponse.bodyAsText().contains("\"moduleId\":\"demo-app\""))
+
+        val invalidModuleResponse = client.get("/api/modules/unknown")
+        assertEquals(HttpStatusCode.BadRequest, invalidModuleResponse.status)
+        assertTrue(invalidModuleResponse.bodyAsText().contains("не найден"))
+
+        val invalidExportResponse = client.post("/api/sql-console/export/source-csv") {
+            contentType(ContentType.Application.Json)
+            setBody(
+                """
+                {
+                  "result": {
+                    "sql": "select 1",
+                    "statementType": "RESULT_SET",
+                    "statementKeyword": "SELECT",
+                    "maxRowsPerShard": 200,
+                    "shardResults": []
+                  },
+                  "shardName": "   "
+                }
+                """.trimIndent(),
+            )
+        }
+        assertEquals(HttpStatusCode.BadRequest, invalidExportResponse.status)
+        assertTrue(invalidExportResponse.bodyAsText().contains("shardName"))
+
+        val emptyUploadResponse = client.post("/api/credentials/upload") {
+            setBody(
+                MultiPartFormDataContent(
+                    formData {
+                        append(
+                            "file",
+                            "",
+                            io.ktor.http.Headers.build {
+                                append(HttpHeaders.ContentDisposition, ContentDisposition.File.withParameter(ContentDisposition.Parameters.Name, "file").withParameter(ContentDisposition.Parameters.FileName, "credential.properties").toString())
+                                append(HttpHeaders.ContentType, ContentType.Text.Plain.toString())
+                            },
+                        )
+                    },
+                ),
+            )
+        }
+        assertEquals(HttpStatusCode.BadRequest, emptyUploadResponse.status)
+        assertTrue(emptyUploadResponse.bodyAsText().contains("Не удалось прочитать"))
+    }
+
+    private fun exportConnection(
+        columns: List<String>,
+        rows: List<List<Any?>>,
+    ): Connection {
+        var cursor = -1
+        val metaData = Proxy.newProxyInstance(
+            ResultSetMetaData::class.java.classLoader,
+            arrayOf(ResultSetMetaData::class.java),
+        ) { _, method, args ->
+            when (method.name) {
+                "getColumnCount" -> columns.size
+                "getColumnLabel" -> columns[(args?.get(0) as Int) - 1]
+                else -> defaultValue(method.returnType)
+            }
+        } as ResultSetMetaData
+        val resultSet = Proxy.newProxyInstance(
+            ResultSet::class.java.classLoader,
+            arrayOf(ResultSet::class.java),
+        ) { _, method, args ->
+            when (method.name) {
+                "next" -> {
+                    cursor++
+                    cursor < rows.size
+                }
+                "getObject" -> rows[cursor][(args?.get(0) as Int) - 1]
+                "getMetaData" -> metaData
+                "close" -> null
+                else -> defaultValue(method.returnType)
+            }
+        } as ResultSet
+        val statement = Proxy.newProxyInstance(
+            PreparedStatement::class.java.classLoader,
+            arrayOf(PreparedStatement::class.java),
+        ) { _, method, _ ->
+            when (method.name) {
+                "executeQuery" -> resultSet
+                "setFetchSize", "close" -> null
+                else -> defaultValue(method.returnType)
+            }
+        } as PreparedStatement
+        return Proxy.newProxyInstance(
+            Connection::class.java.classLoader,
+            arrayOf(Connection::class.java),
+        ) { _, method, _ ->
+            when (method.name) {
+                "prepareStatement" -> statement
+                "setAutoCommit", "close", "commit", "rollback" -> null
+                "getAutoCommit" -> false
+                else -> defaultValue(method.returnType)
+            }
+        } as Connection
+    }
+
+    private fun defaultValue(type: Class<*>): Any? = when {
+        type == java.lang.Boolean.TYPE -> false
+        type == java.lang.Integer.TYPE -> 0
+        type == java.lang.Long.TYPE -> 0L
+        else -> null
     }
 
     private fun createProject() = Files.createTempDirectory("ui-server").apply {

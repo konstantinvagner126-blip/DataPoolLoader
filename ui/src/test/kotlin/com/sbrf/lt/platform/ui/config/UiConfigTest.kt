@@ -5,8 +5,10 @@ import java.nio.file.Files
 import kotlin.io.path.writeText
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class UiConfigTest {
 
@@ -28,6 +30,20 @@ class UiConfigTest {
 
         assertNotNull(path)
         assertEquals("/tmp/custom-credentials.properties", path.toString())
+    }
+
+    @Test
+    fun `relative credentials file is resolved against external config directory`() {
+        val configDir = Files.createTempDirectory("ui-config-dir")
+
+        val path = UiAppConfig(
+            defaultCredentialsFile = "credential.properties",
+            configBaseDir = configDir.toString(),
+            sqlConsole = SqlConsoleConfig(),
+        ).defaultCredentialsPath()
+
+        assertNotNull(path)
+        assertEquals(configDir.resolve("credential.properties").normalize(), path)
     }
 
     @Test
@@ -75,6 +91,28 @@ class UiConfigTest {
         assertEquals(9191, config.port)
         assertEquals("/tmp/apps-root", config.appsRoot)
         assertEquals("/tmp/credentials.properties", config.defaultCredentialsFile)
+        assertEquals(configFile.parent.toAbsolutePath().normalize().toString(), config.configBaseDir)
+    }
+
+    @Test
+    fun `resolves external config from system property`() {
+        val configFile = Files.createTempDirectory("ui-system-config")
+            .resolve("custom-ui.yml")
+            .apply { writeText("ui:\n  port: 8181\n") }
+        val previous = System.getProperty("datapool.ui.config")
+        try {
+            System.setProperty("datapool.ui.config", configFile.toString())
+
+            val path = UiConfigLoader().resolveExternalConfigPath()
+
+            assertEquals(configFile.toAbsolutePath().normalize(), path)
+        } finally {
+            if (previous != null) {
+                System.setProperty("datapool.ui.config", previous)
+            } else {
+                System.clearProperty("datapool.ui.config")
+            }
+        }
     }
 
     @Test
@@ -100,6 +138,69 @@ class UiConfigTest {
     }
 
     @Test
+    fun `fails when explicit external config does not exist`() {
+        val missing = Files.createTempDirectory("ui-missing-config").resolve("missing.yml")
+
+        val error = assertFailsWith<IllegalArgumentException> {
+            object : UiConfigLoader() {
+                override fun resolveExternalConfigPath() = missing
+            }.load()
+        }
+
+        assertTrue(error.message!!.contains("UI-конфиг не найден"))
+    }
+
+    @Test
+    fun `returns default ui config when classpath config is missing`() {
+        val config = object : UiConfigLoader() {
+            override fun resolveExternalConfigPath() = null
+            override fun classpathConfigStream() = null
+        }.load()
+
+        assertEquals(UiAppConfig(), config)
+    }
+
+    @Test
+    fun `resolves packaged sidecar from mac app bundle parent`() {
+        val appDir = Files.createTempDirectory("ui-packaged-app")
+        val launcherPath = appDir.resolve("LoadTestingDataPlatform.app/Contents/MacOS/LoadTestingDataPlatform")
+        Files.createDirectories(launcherPath.parent)
+        val sidecar = appDir.resolve("ui-application.yml").apply { writeText("ui:\n  port: 8182\n") }
+        val previous = System.getProperty("jpackage.app-path")
+        try {
+            System.setProperty("jpackage.app-path", launcherPath.toString())
+
+            val resolved = UiConfigLoader().resolvePackagedSidecarConfigPath()
+
+            assertEquals(sidecar.toAbsolutePath().normalize(), resolved)
+        } finally {
+            if (previous != null) {
+                System.setProperty("jpackage.app-path", previous)
+            } else {
+                System.clearProperty("jpackage.app-path")
+            }
+        }
+    }
+
+    @Test
+    fun `packaged sidecar path is null when launcher path is unavailable`() {
+        val loader = object : UiConfigLoader() {
+            override fun resolveProcessCommand(): String? = null
+        }
+        val previous = System.getProperty("jpackage.app-path")
+        try {
+            System.clearProperty("jpackage.app-path")
+
+            assertNull(loader.resolvePackagedSidecarConfigPath())
+            assertNull(loader.resolvePackagedAppDirectory())
+        } finally {
+            if (previous != null) {
+                System.setProperty("jpackage.app-path", previous)
+            }
+        }
+    }
+
+    @Test
     fun `configured apps root is resolved to absolute path`() {
         val appsRoot = Files.createTempDirectory("ui-apps-root")
         val path = UiAppConfig(
@@ -114,5 +215,66 @@ class UiConfigTest {
     @Test
     fun `apps root is null when not configured`() {
         assertNull(UiAppConfig(sqlConsole = SqlConsoleConfig()).appsRootPath())
+    }
+
+    @Test
+    fun `configured storage dir is resolved to absolute path`() {
+        val storageDir = Files.createTempDirectory("ui-storage-root")
+
+        val path = UiAppConfig(
+            storageDir = storageDir.toString(),
+            sqlConsole = SqlConsoleConfig(),
+        ).storageDirPath()
+
+        assertEquals(storageDir.toAbsolutePath().normalize(), path)
+    }
+
+    @Test
+    fun `relative storage dir is resolved against external config directory`() {
+        val configDir = Files.createTempDirectory("ui-storage-config-dir")
+
+        val path = UiAppConfig(
+            storageDir = "storage",
+            configBaseDir = configDir.toString(),
+            sqlConsole = SqlConsoleConfig(),
+        ).storageDirPath()
+
+        assertEquals(configDir.resolve("storage").normalize(), path)
+    }
+
+    @Test
+    fun `relative storage dir without config base resolves against current directory`() {
+        val path = UiAppConfig(
+            storageDir = "storage",
+            sqlConsole = SqlConsoleConfig(),
+        ).storageDirPath()
+
+        assertEquals(java.nio.file.Path.of("storage").toAbsolutePath().normalize(), path)
+    }
+
+    @Test
+    fun `default storage dir points to user home ui storage`() {
+        val path = UiAppConfig(sqlConsole = SqlConsoleConfig()).storageDirPath()
+
+        assertTrue(path.toString().contains(".datapool-loader"))
+        assertTrue(path.toString().endsWith("ui/storage"))
+    }
+
+    @Test
+    fun `default storage dir falls back to current directory when user home is blank`() {
+        val previous = System.getProperty("user.home")
+        try {
+            System.setProperty("user.home", " ")
+
+            val path = UiAppConfig(sqlConsole = SqlConsoleConfig()).storageDirPath()
+
+            assertEquals(java.nio.file.Path.of(".datapool-loader/ui/storage").toAbsolutePath().normalize(), path)
+        } finally {
+            if (previous != null) {
+                System.setProperty("user.home", previous)
+            } else {
+                System.clearProperty("user.home")
+            }
+        }
     }
 }

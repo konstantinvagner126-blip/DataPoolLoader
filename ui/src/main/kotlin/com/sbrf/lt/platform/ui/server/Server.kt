@@ -7,11 +7,13 @@ import com.sbrf.lt.datapool.sqlconsole.SqlConsoleService
 import com.sbrf.lt.platform.ui.config.UiAppConfig
 import com.sbrf.lt.platform.ui.config.UiConfigLoader
 import com.sbrf.lt.platform.ui.config.appsRootPath
+import com.sbrf.lt.platform.ui.config.storageDirPath
 import com.sbrf.lt.platform.ui.model.ConfigFormParseRequest
 import com.sbrf.lt.platform.ui.model.ConfigFormUpdateRequest
 import com.sbrf.lt.platform.ui.model.ModulesCatalogResponse
 import com.sbrf.lt.platform.ui.model.SaveModuleRequest
 import com.sbrf.lt.platform.ui.model.SaveResultResponse
+import com.sbrf.lt.platform.ui.model.SqlConsoleExportRequest
 import com.sbrf.lt.platform.ui.model.SqlConsoleQueryRequest
 import com.sbrf.lt.platform.ui.model.StartRunRequest
 import com.sbrf.lt.platform.ui.model.toResponse
@@ -19,8 +21,11 @@ import com.sbrf.lt.platform.ui.model.toStartResponse
 import com.sbrf.lt.platform.ui.module.ConfigFormService
 import com.sbrf.lt.platform.ui.module.ModuleRegistry
 import com.sbrf.lt.platform.ui.run.RunManager
+import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleExportService
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleQueryManager
+import io.ktor.http.ContentDisposition
 import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.content.PartData
 import io.ktor.serialization.jackson.jackson
@@ -38,6 +43,7 @@ import io.ktor.server.plugins.statuspages.exception
 import io.ktor.server.request.receiveMultipart
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
+import io.ktor.server.response.respondBytes
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
@@ -48,24 +54,54 @@ import io.ktor.websocket.Frame
 import io.ktor.utils.io.readRemaining
 import io.ktor.utils.io.core.readText
 import kotlinx.coroutines.flow.collect
+import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.slf4j.event.Level
 
-fun startUiServer(uiConfig: UiAppConfig = UiConfigLoader().load()) {
+fun interface UiServerStarter {
+    fun start(port: Int, module: Application.() -> Unit)
+}
+
+internal fun defaultUiServerStarter(): UiServerStarter = UiServerStarter { port, module ->
+    embeddedServer(Netty, port = port, module = module).start(wait = true)
+}
+
+internal fun loadStaticText(
+    resourcePath: String,
+    classLoader: ClassLoader = UiConfigLoader::class.java.classLoader,
+): String {
+    return classLoader.getResourceAsStream(resourcePath)
+        ?.bufferedReader()
+        ?.use { it.readText() }
+        ?: error("Ресурс $resourcePath не найден")
+}
+
+internal fun uiStartupModule(
+    uiConfig: UiAppConfig,
+    logger: Logger,
+    moduleInstaller: Application.() -> Unit = { uiModule(uiConfig = uiConfig) },
+): Application.() -> Unit = {
+    environment.monitor.subscribe(ApplicationStarted) {
+        logger.info("UI успешно запущен. Переходи по ссылке для открытия страницы с интерфейсом: http://localhost:${uiConfig.port}")
+    }
+    moduleInstaller()
+}
+
+fun startUiServer(
+    uiConfig: UiAppConfig = UiConfigLoader().load(),
+    logger: Logger = LoggerFactory.getLogger("com.sbrf.lt.platform.ui.Startup"),
+    starter: UiServerStarter = defaultUiServerStarter(),
+) {
     val port = uiConfig.port
-    val logger = LoggerFactory.getLogger("com.sbrf.lt.platform.ui.Startup")
     val appsRoot = uiConfig.appsRootPath()
+    val storageDir = uiConfig.storageDirPath()
     if (appsRoot != null) {
         logger.info("Apps root определен: {}", appsRoot)
     } else {
         logger.warn("Apps root не определен. Список app-модулей будет пустым, пока не задан ui.appsRoot.")
     }
-    embeddedServer(Netty, port = port) {
-        environment.monitor.subscribe(ApplicationStarted) {
-            logger.info("UI успешно запущен. Переходи по ссылке для открытия страницы с интерфейсом: http://localhost:$port")
-        }
-        uiModule(uiConfig = uiConfig)
-    }.start(wait = true)
+    logger.info("Каталог состояния UI: {}", storageDir)
+    starter.start(port, uiStartupModule(uiConfig, logger))
 }
 
 fun Application.uiModule(
@@ -75,6 +111,7 @@ fun Application.uiModule(
     configFormService: ConfigFormService = ConfigFormService(),
     sqlConsoleService: SqlConsoleService = SqlConsoleService(uiConfig.sqlConsole),
     sqlConsoleQueryManager: SqlConsoleQueryManager = SqlConsoleQueryManager(sqlConsoleService),
+    sqlConsoleExportService: SqlConsoleExportService = SqlConsoleExportService(),
 ) {
     val mapper = ObjectMapper()
         .registerModule(JavaTimeModule())
@@ -98,40 +135,28 @@ fun Application.uiModule(
 
     routing {
         get("/") {
-            val content = javaClass.classLoader.getResourceAsStream("static/home.html")
-                ?.bufferedReader()
-                ?.use { it.readText() }
-                ?: error("Ресурс static/home.html не найден")
+            val content = loadStaticText("static/home.html")
             call.respondText(
                 content,
                 ContentType.Text.Html,
             )
         }
         get("/modules") {
-            val content = javaClass.classLoader.getResourceAsStream("static/index.html")
-                ?.bufferedReader()
-                ?.use { it.readText() }
-                ?: error("Ресурс static/index.html не найден")
+            val content = loadStaticText("static/index.html")
             call.respondText(
                 content,
                 ContentType.Text.Html,
             )
         }
         get("/help") {
-            val content = javaClass.classLoader.getResourceAsStream("static/help.html")
-                ?.bufferedReader()
-                ?.use { it.readText() }
-                ?: error("Ресурс static/help.html не найден")
+            val content = loadStaticText("static/help.html")
             call.respondText(
                 content,
                 ContentType.Text.Html,
             )
         }
         get("/sql-console") {
-            val content = javaClass.classLoader.getResourceAsStream("static/sql-console.html")
-                ?.bufferedReader()
-                ?.use { it.readText() }
-                ?: error("Ресурс static/sql-console.html не найден")
+            val content = loadStaticText("static/sql-console.html")
             call.respondText(
                 content,
                 ContentType.Text.Html,
@@ -205,6 +230,35 @@ fun Application.uiModule(
             } finally {
                 tempDir.toFile().deleteRecursively()
             }
+        }
+
+        post("/api/sql-console/export/source-csv") {
+            val request = call.receive<SqlConsoleExportRequest>()
+            val shardName = requireNotNull(request.shardName?.takeIf { it.isNotBlank() }) {
+                "Для CSV-экспорта нужно указать shardName."
+            }
+            val bytes = sqlConsoleExportService.exportShardCsv(request.result, shardName)
+            call.response.headers.append(
+                HttpHeaders.ContentDisposition,
+                ContentDisposition.Attachment.withParameter(
+                    ContentDisposition.Parameters.FileName,
+                    "$shardName.csv",
+                ).toString(),
+            )
+            call.respondBytes(bytes, ContentType.parse("text/csv; charset=utf-8"))
+        }
+
+        post("/api/sql-console/export/all-zip") {
+            val request = call.receive<SqlConsoleExportRequest>()
+            val bytes = sqlConsoleExportService.exportAllZip(request.result)
+            call.response.headers.append(
+                HttpHeaders.ContentDisposition,
+                ContentDisposition.Attachment.withParameter(
+                    ContentDisposition.Parameters.FileName,
+                    "sql-console-results.zip",
+                ).toString(),
+            )
+            call.respondBytes(bytes, ContentType.Application.Zip)
         }
 
         post("/api/sql-console/query/start") {

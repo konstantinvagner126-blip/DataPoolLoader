@@ -1,6 +1,9 @@
 ui:
   port: 8080
-  appsRoot:
+  appsRoot: /Users/kwdev/DataPoolLoader/apps
+  storageDir: /Users/kwdev/.datapool-loader/ui/storage
+  showTechnicalDiagnostics: false
+  showRawSummaryJson: false
   defaultCredentialsFile:
   sqlConsole:
     fetchSize: 1000

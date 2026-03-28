@@ -1,5 +1,6 @@
 package com.sbrf.lt.platform.ui.config
 
+import com.fasterxml.jackson.annotation.JsonIgnore
 import com.sbrf.lt.datapool.config.ConfigLoader
 import com.sbrf.lt.datapool.config.CredentialsFileLocator
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleConfig
@@ -15,8 +16,12 @@ data class UiRootConfig(
 data class UiAppConfig(
     val port: Int = 8080,
     val appsRoot: String? = null,
+    val storageDir: String? = null,
+    val showTechnicalDiagnostics: Boolean = true,
+    val showRawSummaryJson: Boolean = false,
     val defaultCredentialsFile: String? = null,
     val sqlConsole: SqlConsoleConfig = SqlConsoleConfig(),
+    @JsonIgnore val configBaseDir: String? = null,
 )
 
 open class UiConfigLoader(
@@ -29,12 +34,14 @@ open class UiConfigLoader(
                 "UI-конфиг не найден: $externalConfig"
             }
             externalConfig.inputStream().bufferedReader().use {
-                return configLoader.objectMapper().readValue(it, UiRootConfig::class.java).ui
+                return configLoader.objectMapper()
+                    .readValue(it, UiRootConfig::class.java)
+                    .ui
+                    .copy(configBaseDir = externalConfig.parent?.toAbsolutePath()?.normalize()?.toString())
             }
         }
 
-        val stream: InputStream = javaClass.classLoader.getResourceAsStream("application.yml")
-            ?: return UiAppConfig()
+        val stream: InputStream = classpathConfigStream() ?: return UiAppConfig()
         return stream.bufferedReader().use {
             configLoader.objectMapper().readValue(it, UiRootConfig::class.java).ui
         }
@@ -59,7 +66,7 @@ open class UiConfigLoader(
     }
 
     open fun resolvePackagedSidecarConfigPath(): Path? {
-        val appDir = packagedAppDirectory() ?: return null
+        val appDir = resolvePackagedAppDirectory() ?: return null
         val candidates = listOf(
             appDir.resolve("ui-application.yml"),
             appDir.resolve("application.yml"),
@@ -67,12 +74,15 @@ open class UiConfigLoader(
         return candidates.firstOrNull { Files.exists(it) }
     }
 
-    private fun packagedAppDirectory(): Path? {
+    open fun classpathConfigStream(): InputStream? =
+        javaClass.classLoader.getResourceAsStream("application.yml")
+
+    open fun resolvePackagedAppDirectory(): Path? {
         val launcherPath = System.getProperty("jpackage.app-path")
             ?.trim()
             ?.takeIf { it.isNotEmpty() }
             ?.let { Path.of(it).toAbsolutePath().normalize() }
-            ?: ProcessHandle.current().info().command().orElse(null)
+            ?: resolveProcessCommand()
                 ?.let { Path.of(it).toAbsolutePath().normalize() }
             ?: return null
 
@@ -83,10 +93,20 @@ open class UiConfigLoader(
         }
         return launcherPath.parent?.normalize()
     }
+
+    open fun resolveProcessCommand(): String? =
+        ProcessHandle.current().info().command().orElse(null)
 }
 
 fun UiAppConfig.defaultCredentialsPath(): Path? {
-    val configured = defaultCredentialsFile?.trim()?.takeIf { it.isNotEmpty() }?.let(Path::of)
+    val configured = defaultCredentialsFile?.trim()?.takeIf { it.isNotEmpty() }?.let { configuredPath ->
+        val path = Path.of(configuredPath)
+        if (path.isAbsolute) {
+            path
+        } else {
+            configBaseDir?.let { Path.of(it).resolve(path).normalize() } ?: path
+        }
+    }
     if (configured != null) {
         return configured
     }
@@ -97,6 +117,22 @@ fun UiAppConfig.appsRootPath(): Path? {
     return appsRoot?.trim()?.takeIf { it.isNotEmpty() }?.let {
         Path.of(it).toAbsolutePath().normalize()
     }
+}
+
+fun UiAppConfig.storageDirPath(): Path {
+    storageDir?.trim()?.takeIf { it.isNotEmpty() }?.let { configuredStorageDir ->
+        val path = Path.of(configuredStorageDir)
+        if (path.isAbsolute) {
+            return path.normalize()
+        }
+        configBaseDir?.let {
+            return Path.of(it).resolve(path).normalize()
+        }
+        return path.toAbsolutePath().normalize()
+    }
+    val userHome = System.getProperty("user.home")?.trim()?.takeIf { it.isNotEmpty() }
+        ?: return Path.of(".datapool-loader/ui/storage").toAbsolutePath().normalize()
+    return Path.of(userHome).resolve(".datapool-loader/ui/storage").toAbsolutePath().normalize()
 }
 
 private fun Path.ancestors(): Sequence<Path> = sequence {
