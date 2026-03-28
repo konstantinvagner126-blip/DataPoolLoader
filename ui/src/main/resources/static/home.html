@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DataPool Loader UI</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/static/styles.css?v=20260328a" rel="stylesheet">
+</head>
+<body>
+  <div class="container-fluid py-4">
+    <div class="hero-card mb-4">
+      <div>
+        <div class="eyebrow">MLP Platform</div>
+        <h1 class="display-6 mb-1">Load Testing Data Platform</h1>
+        <p class="text-secondary mb-0">Единая точка входа для подготовки данных, запуска модулей БД и Kafka, ручной работы с источниками и служебных операций при нагрузочном тестировании микросервисов.</p>
+      </div>
+      <div class="hero-art" aria-hidden="true">
+        <div class="platform-stage">
+          <div class="platform-node platform-node-db">DB</div>
+          <div class="platform-node platform-node-kafka">KAFKA</div>
+          <div class="platform-node platform-node-pool">DATAPOOL</div>
+
+          <div class="platform-core">
+            <div class="platform-core-title">LTP</div>
+            <div class="platform-core-subtitle">MICROSERVICES</div>
+          </div>
+
+          <div class="platform-rail platform-rail-db"><span class="platform-packet packet-db"></span></div>
+          <div class="platform-rail platform-rail-kafka"><span class="platform-packet packet-kafka"></span></div>
+          <div class="platform-rail platform-rail-pool"><span class="platform-packet packet-pool"></span></div>
+        </div>
+          </div>
+      </div>
+    </div>
+
+    <div class="home-grid">
+      <a class="home-card" href="/modules">
+        <div class="home-card-label">Модули</div>
+        <div class="home-card-title">Загрузка данных</div>
+        <div class="home-card-text">Запуск app-модулей, редактирование конфига и SQL, просмотр истории запусков и summary.</div>
+        <div class="home-card-action">Открыть модуль загрузки</div>
+      </a>
+
+      <a class="home-card" href="/sql-console">
+        <div class="home-card-label">SQL</div>
+        <div class="home-card-title">SQL-консоль</div>
+        <div class="home-card-text">Ручное выполнение SQL по выбранным источникам, просмотр результатов по shard/source и служебные операции.</div>
+        <div class="home-card-action">Открыть SQL-консоль</div>
+      </a>
+
+      <a class="home-card" href="/help">
+        <div class="home-card-label">Docs</div>
+        <div class="home-card-title">Справка</div>
+        <div class="home-card-text">Подробные инструкции по каждому модулю, рекомендации по запуску и пояснения по ключевым параметрам конфигурации.</div>
+        <div class="home-card-action">Открыть справку</div>
+      </a>
+    </div>
+
+    <footer class="footer-note text-center mt-4">
+      Разработано командой MLP
+    </footer>
+  </div>
+</body>
+</html>

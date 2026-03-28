@@ -1,5 +1,6 @@
-package com.sbrf.lt.datapool.ui
+package com.sbrf.lt.platform.ui.module
 
+import com.sbrf.lt.platform.ui.model.SaveModuleRequest
 import kotlin.io.path.createDirectories
 import kotlin.io.path.readText
 import kotlin.io.path.writeText
@@ -13,7 +14,7 @@ class ModuleRegistryTest {
     @Test
     fun `lists modules and loads sql labels`() {
         val root = createProject()
-        val registry = ModuleRegistry(projectRoot = root)
+        val registry = ModuleRegistry(appsRoot = root.resolve("apps"))
 
         val modules = registry.listModules()
         assertEquals(listOf("demo-app"), modules.map { it.id })
@@ -29,7 +30,7 @@ class ModuleRegistryTest {
     @Test
     fun `saves config and sql files back to module`() {
         val root = createProject()
-        val registry = ModuleRegistry(projectRoot = root)
+        val registry = ModuleRegistry(appsRoot = root.resolve("apps"))
 
         registry.saveModule(
             "demo-app",
@@ -56,7 +57,7 @@ class ModuleRegistryTest {
     @Test
     fun `resolves classpath and relative sql paths`() {
         val root = createProject()
-        val registry = ModuleRegistry(projectRoot = root)
+        val registry = ModuleRegistry(appsRoot = root.resolve("apps"))
         val module = registry.getModule("demo-app")
 
         assertEquals(

@@ -1,10 +1,11 @@
-package com.sbrf.lt.datapool.ui
+package com.sbrf.lt.platform.ui.model
 
 import com.sbrf.lt.datapool.app.ExecutionEvent
 import com.sbrf.lt.datapool.model.ExecutionStatus
 import com.sbrf.lt.datapool.sqlconsole.RawShardExecutionResult
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleInfo
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleQueryResult
+import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleExecutionSnapshot
 import java.nio.file.Path
 import java.time.Instant
 
@@ -13,6 +14,17 @@ data class ModuleDescriptor(
     val title: String,
     val configFile: Path,
     val resourcesDir: Path,
+)
+
+data class AppsRootStatusResponse(
+    val mode: String,
+    val configuredPath: String? = null,
+    val message: String,
+)
+
+data class ModulesCatalogResponse(
+    val appsRootStatus: AppsRootStatusResponse,
+    val modules: List<Map<String, String>>,
 )
 
 data class ModuleFileContent(

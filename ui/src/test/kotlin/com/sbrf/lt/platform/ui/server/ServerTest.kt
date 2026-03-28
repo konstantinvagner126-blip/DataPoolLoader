@@ -1,4 +1,4 @@
-package com.sbrf.lt.datapool.ui
+package com.sbrf.lt.platform.ui.server
 
 import com.sbrf.lt.datapool.sqlconsole.RawShardExecutionResult
 import com.sbrf.lt.datapool.sqlconsole.ShardSqlExecutor
@@ -6,6 +6,11 @@ import com.sbrf.lt.datapool.sqlconsole.SqlConsoleConfig
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleExecutionCancelledException
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleSourceConfig
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleService
+import com.sbrf.lt.platform.ui.config.UiAppConfig
+import com.sbrf.lt.platform.ui.model.SqlConsoleQueryRequest
+import com.sbrf.lt.platform.ui.module.ModuleRegistry
+import com.sbrf.lt.platform.ui.run.RunManager
+import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleQueryManager
 import io.ktor.client.request.get
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
@@ -32,7 +37,7 @@ class ServerTest {
     @Test
     fun `serves html and module api`() = testApplication {
         val root = createProject()
-        val registry = ModuleRegistry(projectRoot = root)
+        val registry = ModuleRegistry(appsRoot = root.resolve("apps"))
         val uiConfig = UiAppConfig(
             sqlConsole = SqlConsoleConfig(
                 queryTimeoutSec = 30,
@@ -57,14 +62,31 @@ class ServerTest {
             uiModule(moduleRegistry = registry, runManager = runManager, sqlConsoleService = sqlConsoleService)
         }
 
-        val html = client.get("/").bodyAsText()
-        assertTrue(html.contains("Управление пулами данных НТ"))
+        val homeHtml = client.get("/").bodyAsText()
+        assertTrue(homeHtml.contains("Load Testing Data Platform"))
+        assertTrue(homeHtml.contains("Загрузка данных"))
+        assertTrue(homeHtml.contains("SQL-консоль"))
+        assertTrue(homeHtml.contains("Справка"))
+
+        val html = client.get("/modules").bodyAsText()
+        assertTrue(html.contains("Редактор модуля"))
+
+        val helpHtml = client.get("/help").bodyAsText()
+        assertTrue(helpHtml.contains("Справка"))
+        assertTrue(helpHtml.contains("Модуль загрузки данных"))
+        assertTrue(helpHtml.contains("SQL-консоль"))
+        assertTrue(helpHtml.contains("credential.properties"))
 
         val sqlConsoleHtml = client.get("/sql-console").bodyAsText()
         assertTrue(sqlConsoleHtml.contains("SQL-редактор"))
 
         val modules = client.get("/api/modules").bodyAsText()
         assertTrue(modules.contains("demo-app"))
+
+        val catalog = client.get("/api/modules/catalog").bodyAsText()
+        assertTrue(catalog.contains("\"mode\":\"READY\""))
+        assertTrue(catalog.contains("Доступно модулей: 1"))
+        assertTrue(catalog.contains("demo-app"))
 
         val details = client.get("/api/modules/demo-app").bodyAsText()
         assertTrue(details.contains("Общий SQL"))
@@ -89,7 +111,7 @@ class ServerTest {
     @Test
     fun `uploads credentials and saves module files`() = testApplication {
         val root = createProject()
-        val registry = ModuleRegistry(projectRoot = root)
+        val registry = ModuleRegistry(appsRoot = root.resolve("apps"))
         val runManager = RunManager(moduleRegistry = registry, uiConfig = UiAppConfig())
         application {
             uiModule(moduleRegistry = registry, runManager = runManager)
@@ -215,7 +237,7 @@ class ServerTest {
     @Test
     fun `supports async sql console lifecycle and service routes`() = testApplication {
         val root = createProject()
-        val registry = ModuleRegistry(projectRoot = root)
+        val registry = ModuleRegistry(appsRoot = root.resolve("apps"))
         val uiConfig = UiAppConfig(
             sqlConsole = SqlConsoleConfig(
                 queryTimeoutSec = 30,
@@ -282,6 +304,22 @@ class ServerTest {
             Thread.sleep(50)
         }
         error("async SQL execution was not cancelled in time")
+    }
+
+    @Test
+    fun `returns apps root diagnostics when modules path is not configured`() = testApplication {
+        application {
+            uiModule(
+                uiConfig = UiAppConfig(),
+                moduleRegistry = ModuleRegistry(appsRoot = null),
+                runManager = RunManager(uiConfig = UiAppConfig()),
+            )
+        }
+
+        val catalog = client.get("/api/modules/catalog").bodyAsText()
+        assertTrue(catalog.contains("\"mode\":\"NOT_CONFIGURED\""))
+        assertTrue(catalog.contains("Путь ui.appsRoot не задан"))
+        assertTrue(catalog.contains("\"modules\":[]"))
     }
 
     private fun createProject() = Files.createTempDirectory("ui-server").apply {

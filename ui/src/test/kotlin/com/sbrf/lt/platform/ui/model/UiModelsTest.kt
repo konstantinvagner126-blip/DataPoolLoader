@@ -1,9 +1,11 @@
-package com.sbrf.lt.datapool.ui
+package com.sbrf.lt.platform.ui.model
 
 import com.sbrf.lt.datapool.sqlconsole.RawShardExecutionResult
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleInfo
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleQueryResult
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleStatementType
+import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleExecutionSnapshot
+import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleExecutionStatus
 import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals

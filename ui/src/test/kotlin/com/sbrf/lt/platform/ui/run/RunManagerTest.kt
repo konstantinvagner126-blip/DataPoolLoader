@@ -1,8 +1,11 @@
-package com.sbrf.lt.datapool.ui
+package com.sbrf.lt.platform.ui.run
 
 import com.sbrf.lt.datapool.app.ApplicationRunner
 import com.sbrf.lt.datapool.db.PostgresExporter
 import com.sbrf.lt.datapool.model.ExecutionStatus
+import com.sbrf.lt.platform.ui.config.UiAppConfig
+import com.sbrf.lt.platform.ui.model.StartRunRequest
+import com.sbrf.lt.platform.ui.module.ModuleRegistry
 import java.lang.reflect.Proxy
 import java.sql.Connection
 import java.sql.PreparedStatement
@@ -59,7 +62,7 @@ class RunManagerTest {
     @Test
     fun `starts run and stores successful result in history`() {
         val projectRoot = createProject()
-        val registry = ModuleRegistry(projectRoot = projectRoot)
+        val registry = ModuleRegistry(appsRoot = projectRoot.resolve("apps"))
         val runManager = RunManager(
             moduleRegistry = registry,
             applicationRunner = ApplicationRunner(
@@ -109,7 +112,7 @@ class RunManagerTest {
                       password: ${'$'}{DB1_PASSWORD}
             """.trimIndent(),
         )
-        val registry = ModuleRegistry(projectRoot = projectRoot)
+        val registry = ModuleRegistry(appsRoot = projectRoot.resolve("apps"))
         val previous = System.getProperty("credentials.file")
         try {
             System.setProperty("credentials.file", projectRoot.resolve("missing-credentials.properties").toString())

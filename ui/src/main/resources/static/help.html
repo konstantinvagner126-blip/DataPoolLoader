@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DataPool Loader UI</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/static/styles.css?v=20260328a" rel="stylesheet">
+</head>
+<body>
+  <div class="container-fluid py-4">
+    <div class="hero-card hero-card-compact mb-4">
+      <div>
+        <div class="eyebrow">Knowledge Base</div>
+        <h1 class="display-6 mb-1">Справка</h1>
+        <p class="text-secondary mb-0">Краткая и практическая документация по двум основным режимам платформы: модулю загрузки данных и SQL-консоли.</p>
+      </div>
+      <div class="hero-actions">
+        <a class="btn btn-outline-secondary" href="/">На главную</a>
+        <a class="btn btn-outline-primary" href="/modules">К модулям</a>
+        <a class="btn btn-outline-dark" href="/sql-console">К SQL-консоли</a>
+      </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+      <div class="col-xl-4">
+        <div class="panel help-intro-card h-100">
+          <div class="panel-title text-primary mb-3">Что здесь есть</div>
+          <div class="help-intro-grid">
+            <div class="help-intro-block">
+              <div class="help-intro-title">Модуль загрузки данных</div>
+              <div class="help-intro-text">Как устроен `application.yml`, как задавать SQL, источники, target и какие значения есть по умолчанию.</div>
+            </div>
+            <div class="help-intro-block">
+              <div class="help-intro-title">Credential.properties</div>
+              <div class="help-intro-text">Как выглядит файл с placeholders, где он ищется автоматически и как использовать его в UI.</div>
+            </div>
+            <div class="help-intro-block">
+              <div class="help-intro-title">SQL-консоль</div>
+              <div class="help-intro-text">Как настроить `ui.sqlConsole.sources`, выбрать источники, запустить запрос и отменить долгую операцию.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-xl-8">
+        <div class="panel help-banner h-100">
+          <div class="help-banner-grid">
+            <div class="help-banner-chip">DB</div>
+            <div class="help-banner-chip">KAFKA</div>
+            <div class="help-banner-chip">DATAPOOL</div>
+            <div class="help-banner-chip help-banner-chip-core">LTP / MICROSERVICES</div>
+          </div>
+          <div class="small text-secondary mt-3">Страница описывает не конкретные app-модули, а сами инструменты платформы: модуль загрузки данных и SQL-консоль.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="help-doc-grid">
+      <section class="panel help-doc-card">
+        <div class="help-doc-header">
+          <div>
+            <div class="help-doc-kicker">Раздел 1</div>
+            <h2 class="help-doc-title">Модуль загрузки данных</h2>
+            <div class="help-doc-subtitle">Используется для выгрузки данных из нескольких PostgreSQL-источников, сборки `merged.csv` и загрузки результата в target-таблицу.</div>
+          </div>
+          <a class="btn btn-sm btn-outline-primary" href="/modules">Открыть модуль</a>
+        </div>
+
+        <div class="help-doc-highlight-grid">
+          <div class="help-doc-highlight">
+            <div class="help-doc-highlight-title">Что делает</div>
+            <div class="help-doc-highlight-value">Export -> Merge -> Import</div>
+            <div class="help-doc-highlight-text">По каждому source создается отдельный CSV, затем формируется общий файл и при необходимости выполняется загрузка в target.</div>
+          </div>
+          <div class="help-doc-highlight">
+            <div class="help-doc-highlight-title">Где настраивается</div>
+            <div class="help-doc-highlight-value">application.yml</div>
+            <div class="help-doc-highlight-text">В каждом app-модуле используется собственный `src/main/resources/application.yml` и связанные SQL-файлы.</div>
+          </div>
+          <div class="help-doc-highlight">
+            <div class="help-doc-highlight-title">Как запускать</div>
+            <div class="help-doc-highlight-value">UI или Gradle</div>
+            <div class="help-doc-highlight-text">Можно запускать из UI, из IDEA или через `./gradlew :apps:&lt;module&gt;:run`.</div>
+          </div>
+        </div>
+
+        <div class="row g-4 mt-1">
+          <div class="col-xl-6">
+            <div class="help-detail-card h-100">
+              <div class="help-detail-title">Что должно быть в конфиге</div>
+              <div class="help-detail-list">
+                <div><strong>Общие параметры:</strong> `outputDir`, `mergeMode`, `parallelism`, `fetchSize`, `queryTimeoutSec`.</div>
+                <div><strong>SQL:</strong> либо `commonSql`/`commonSqlFile`, либо `sources[].sql`/`sources[].sqlFile`.</div>
+                <div><strong>Источники:</strong> `sources[].name`, `jdbcUrl`, `username`, `password`.</div>
+                <div><strong>Квоты:</strong> `quotas` используются только при `mergeMode=quota`.</div>
+                <div><strong>Target:</strong> `enabled`, `jdbcUrl`, `username`, `password`, `table`, `truncateBeforeLoad`.</div>
+              </div>
+            </div>
+          </div>
+          <div class="col-xl-6">
+            <div class="help-detail-card h-100">
+              <div class="help-detail-title">Значения по умолчанию</div>
+              <div class="help-default-grid">
+                <div><code>outputDir</code><span>`./output`</span></div>
+                <div><code>mergeMode</code><span>`plain`</span></div>
+                <div><code>parallelism</code><span>`5`</span></div>
+                <div><code>fetchSize</code><span>`1000`</span></div>
+                <div><code>progressLogEveryRows</code><span>`10000`</span></div>
+                <div><code>target.enabled</code><span>`true`</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="row g-4 mt-1">
+          <div class="col-xl-7">
+            <div class="help-detail-card h-100">
+              <div class="help-detail-title">Пример application.yml</div>
+              <pre class="help-code-block"><code>app:
+  outputDir: ./output
+  mergeMode: round_robin
+  parallelism: 5
+  fetchSize: 1000
+  queryTimeoutSec: 60
+  commonSqlFile: classpath:sql/common.sql
+
+  sources:
+    - name: db1
+      jdbcUrl: ${DB1_JDBC_URL}
+      username: ${DB1_USERNAME}
+      password: ${DB1_PASSWORD}
+
+    - name: db2
+      jdbcUrl: ${DB2_JDBC_URL}
+      username: ${DB2_USERNAME}
+      password: ${DB2_PASSWORD}
+      sqlFile: classpath:sql/db2_override.sql
+
+  target:
+    enabled: true
+    jdbcUrl: ${TARGET_JDBC_URL}
+    username: ${TARGET_USERNAME}
+    password: ${TARGET_DB_PASSWORD}
+    table: public.test_data_pool
+    truncateBeforeLoad: true</code></pre>
+            </div>
+          </div>
+          <div class="col-xl-5">
+            <div class="help-detail-card h-100">
+              <div class="help-detail-title">Как работает credential.properties</div>
+              <div class="help-detail-list">
+                <div><strong>Назначение:</strong> подставляет значения для `${...}` в `jdbcUrl`, `username`, `password`.</div>
+                <div><strong>Поиск:</strong> `-Dcredentials.file` -> `gradle/credential.properties` -> `~/.gradle/credential.properties`.</div>
+                <div><strong>В UI:</strong> можно загрузить файл через интерфейс, он имеет приоритет над fallback-поиском.</div>
+              </div>
+              <pre class="help-code-block help-code-block-compact"><code>DB1_JDBC_URL=jdbc:postgresql://localhost:5432/db1
+DB1_USERNAME=user1
+DB1_PASSWORD=secret1
+
+TARGET_JDBC_URL=jdbc:postgresql://localhost:5432/target_db
+TARGET_USERNAME=loader
+TARGET_DB_PASSWORD=target_secret</code></pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="help-detail-card mt-3">
+          <div class="help-detail-title">Что важно помнить</div>
+          <ul class="help-steps">
+            <li>Если `target.enabled=false`, выгрузка и merge выполняются, но импорт в target пропускается.</li>
+            <li>`commonSql` и `commonSqlFile` нельзя задавать одновременно. То же правило действует для `source.sql` и `source.sqlFile`.</li>
+            <li>Для `classpath:sql/...` путь считается относительно `src/main/resources`.</li>
+            <li>В UI можно менять конфиг через визуальную форму и `application.yml`; изменения синхронизируются между собой.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="panel help-doc-card">
+        <div class="help-doc-header">
+          <div>
+            <div class="help-doc-kicker">Раздел 2</div>
+            <h2 class="help-doc-title">SQL-консоль</h2>
+            <div class="help-doc-subtitle">Инструмент для ручной работы с настроенными источниками: проверки `SELECT`, служебных DDL/DML-команд и диагностики данных.</div>
+          </div>
+          <a class="btn btn-sm btn-outline-dark" href="/sql-console">Открыть SQL-консоль</a>
+        </div>
+
+        <div class="help-doc-highlight-grid">
+          <div class="help-doc-highlight">
+            <div class="help-doc-highlight-title">Источники</div>
+            <div class="help-doc-highlight-value">ui.sqlConsole.sources</div>
+            <div class="help-doc-highlight-text">SQL-консоль не использует app-модули. Она читает собственный список источников из UI-конфига.</div>
+          </div>
+          <div class="help-doc-highlight">
+            <div class="help-doc-highlight-title">Режим выполнения</div>
+            <div class="help-doc-highlight-value">1 statement</div>
+            <div class="help-doc-highlight-text">За один запуск выполняется один SQL statement. Для `SELECT` данные показываются отдельно по каждому source.</div>
+          </div>
+          <div class="help-doc-highlight">
+            <div class="help-doc-highlight-title">Управление</div>
+            <div class="help-doc-highlight-value">Async + Cancel</div>
+            <div class="help-doc-highlight-text">Запрос выполняется асинхронно, в UI виден статус и есть кнопка отмены длительной операции.</div>
+          </div>
+        </div>
+
+        <div class="row g-4 mt-1">
+          <div class="col-xl-6">
+            <div class="help-detail-card h-100">
+              <div class="help-detail-title">Как настроить источники</div>
+              <pre class="help-code-block"><code>ui:
+  sqlConsole:
+    fetchSize: 1000
+    maxRowsPerShard: 200
+    queryTimeoutSec: 60
+    sources:
+      - name: db1
+        jdbcUrl: ${DB1_JDBC_URL}
+        username: ${DB1_USERNAME}
+        password: ${DB1_PASSWORD}
+      - name: db2
+        jdbcUrl: ${DB2_JDBC_URL}
+        username: ${DB2_USERNAME}
+        password: ${DB2_PASSWORD}</code></pre>
+            </div>
+          </div>
+          <div class="col-xl-6">
+            <div class="help-detail-card h-100">
+              <div class="help-detail-title">Как пользоваться</div>
+              <ol class="help-steps">
+                <li>Открой SQL-консоль с главной страницы.</li>
+                <li>Проверь, что `credential.properties` загружен, если в `ui.sqlConsole.sources` используются `${...}`.</li>
+                <li>Отметь чекбоксами нужные sources.</li>
+                <li>Введи SQL и нажми `Выполнить`.</li>
+                <li>Если запрос работает долго, следи за статусом и при необходимости нажми `Отменить`.</li>
+              </ol>
+            </div>
+          </div>
+        </div>
+
+        <div class="row g-4 mt-1">
+          <div class="col-xl-6">
+            <div class="help-detail-card h-100">
+              <div class="help-detail-title">Как выглядит результат</div>
+              <div class="help-detail-list">
+                <div><strong>Для SELECT:</strong> отдельные вкладки/результаты по каждому source, без смешивания строк между источниками.</div>
+                <div><strong>Для DDL/DML:</strong> сводка по каждому source со статусом, `affected rows` и текстом ошибки, если она была.</div>
+                <div><strong>Ограничение выдачи:</strong> используется `maxRowsPerShard` из UI-конфига.</div>
+              </div>
+            </div>
+          </div>
+          <div class="col-xl-6">
+            <div class="help-detail-card h-100">
+              <div class="help-detail-title">Что важно помнить</div>
+              <ul class="help-steps">
+                <li>SQL-консоль использует свой timeout: `ui.sqlConsole.queryTimeoutSec`.</li>
+                <li>Если в `ui.sqlConsole.sources` используются placeholders, без credentials часть подключений не разрешится.</li>
+                <li>Сейчас поддерживается один SQL statement за запуск; `multi-statement SQL` пока отложен.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <footer class="footer-note text-center mt-4">
+      Разработано командой MLP
+    </footer>
+  </div>
+</body>
+</html>

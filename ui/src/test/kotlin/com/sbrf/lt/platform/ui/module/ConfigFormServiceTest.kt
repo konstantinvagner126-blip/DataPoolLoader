@@ -1,5 +1,8 @@
-package com.sbrf.lt.datapool.ui
+package com.sbrf.lt.platform.ui.module
 
+import com.sbrf.lt.platform.ui.model.ConfigFormQuotaState
+import com.sbrf.lt.platform.ui.model.ConfigFormSourceState
+import com.sbrf.lt.platform.ui.model.ConfigFormStateResponse
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.Test

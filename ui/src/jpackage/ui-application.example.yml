@@ -1,7 +1,7 @@
 ui:
   port: 8080
-  appsRoot:
-  defaultCredentialsFile:
+  appsRoot: __APPS_ROOT__
+  defaultCredentialsFile: /path/to/credential.properties
   sqlConsole:
     fetchSize: 1000
     maxRowsPerShard: 200

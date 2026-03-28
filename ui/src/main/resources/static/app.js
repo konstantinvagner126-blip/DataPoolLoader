@@ -7,12 +7,15 @@ let sqlContents = {};
 let persistedConfigText = "";
 let persistedSqlContents = {};
 let currentCredentialsStatus = null;
+let latestUiState = null;
 let isApplyingConfigFromForm = false;
 let isUpdatingFormFromYaml = false;
 let configSyncDebounceId = null;
 let configSyncRequestId = 0;
 let configApplyRequestId = 0;
 let activeConfigSectionId = "configSectionGeneral";
+let selectedHistoryRunId = null;
+let runHistoryFilter = "ALL";
 let expandedConfigCards = {
   general: true,
   sql: true,
@@ -24,6 +27,7 @@ let expandedSourceCards = new Set();
 let expandedQuotaCards = new Set();
 
 const moduleList = document.getElementById("moduleList");
+const moduleCatalogStatus = document.getElementById("moduleCatalogStatus");
 const selectedModuleLabel = document.getElementById("selectedModuleLabel");
 const moduleDraftStatus = document.getElementById("moduleDraftStatus");
 const sqlFileSelect = document.getElementById("sqlFileSelect");
@@ -33,7 +37,10 @@ const runSummary = document.getElementById("runSummary");
 const sourceProgress = document.getElementById("sourceProgress");
 const eventLog = document.getElementById("eventLog");
 const technicalEventLog = document.getElementById("technicalEventLog");
+const runHistoryFilters = document.getElementById("runHistoryFilters");
+const runHistory = document.getElementById("runHistory");
 const sourceStatusTable = document.getElementById("sourceStatusTable");
+const summaryStructured = document.getElementById("summaryStructured");
 const summaryJson = document.getElementById("summaryJson");
 const credentialsStatus = document.getElementById("credentialsStatus");
 const credentialsWarning = document.getElementById("credentialsWarning");
@@ -138,21 +145,66 @@ sqlFileSelect.addEventListener("change", () => {
 });
 
 async function loadModules() {
-  const response = await fetch("/api/modules");
-  const modules = await response.json();
-  moduleList.innerHTML = "";
-  modules.forEach((module, index) => {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "list-group-item list-group-item-action";
-    button.textContent = module.title;
-    button.dataset.moduleId = module.id;
-    button.addEventListener("click", () => selectModule(module.id));
-    moduleList.appendChild(button);
-    if (index === 0) {
-      selectModule(module.id);
+  try {
+    const response = await fetch("/api/modules/catalog");
+    const payload = await response.json();
+    if (!response.ok) {
+      throw new Error(payload.error || "Не удалось загрузить список модулей.");
     }
-  });
+    renderModuleCatalogStatus(payload.appsRootStatus);
+    const modules = Array.isArray(payload.modules) ? payload.modules : [];
+    moduleList.innerHTML = "";
+    if (modules.length === 0) {
+      renderModuleListEmpty(payload.appsRootStatus?.message || "Модули не найдены.");
+      return;
+    }
+    modules.forEach((module, index) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "list-group-item list-group-item-action";
+      button.textContent = module.title;
+      button.dataset.moduleId = module.id;
+      button.addEventListener("click", () => selectModule(module.id));
+      moduleList.appendChild(button);
+      if (index === 0) {
+        selectModule(module.id);
+      }
+    });
+  } catch (error) {
+    console.error(error);
+    renderModuleCatalogStatus({
+      mode: "ERROR",
+      message: error.message || "Не удалось определить состояние каталога app-модулей."
+    });
+    renderModuleListEmpty(error.message || "Не удалось загрузить список модулей.");
+  }
+}
+
+function renderModuleCatalogStatus(status) {
+  if (!status) {
+    moduleCatalogStatus.className = "module-catalog-status mt-3 mb-3 text-secondary small";
+    moduleCatalogStatus.textContent = "Состояние каталога app-модулей пока недоступно.";
+    return;
+  }
+
+  const isReady = status.mode === "READY";
+  moduleCatalogStatus.className = `module-catalog-status mt-3 mb-3 small ${isReady ? "module-catalog-ready" : "module-catalog-warning"}`;
+  moduleCatalogStatus.innerHTML = `
+    <div>${escapeHtml(status.message || "Состояние каталога app-модулей неизвестно.")}</div>
+    ${status.configuredPath ? `<span class="module-catalog-path">${escapeHtml(status.configuredPath)}</span>` : ""}
+  `;
+}
+
+function renderModuleListEmpty(message) {
+  moduleList.innerHTML = `
+    <div class="list-group-item text-secondary">
+      ${escapeHtml(message)}
+    </div>
+  `;
+  selectedModuleId = null;
+  currentModule = null;
+  selectedModuleLabel.textContent = "Модуль не выбран";
+  updateDraftState();
 }
 
 async function selectModule(moduleId) {
@@ -965,37 +1017,26 @@ async function refreshCredentialsStatus() {
 }
 
 function renderState(state) {
+  latestUiState = state;
   renderCredentialsStatus(state.credentialsStatus);
   renderCredentialsWarning();
-  const activeRun = state.activeRun;
-  const latestRun = activeRun || (state.history && state.history.length > 0 ? state.history[0] : null);
+  const latestRun = resolveSelectedRun(state);
+  renderRunHistory(state.history || [], latestRun?.id || null);
   if (!latestRun) {
     runSummary.textContent = "Запусков пока нет.";
     sourceProgress.innerHTML = "";
     eventLog.textContent = "";
     technicalEventLog.textContent = "";
+    runHistory.innerHTML = `<div class="text-secondary small">История запусков пока пуста.</div>`;
     sourceStatusTable.innerHTML = "";
+    summaryStructured.innerHTML = `<div class="text-secondary">Пока нет данных summary.</div>`;
     summaryJson.textContent = "Пока нет данных summary.";
     return;
   }
 
   const sourceStates = buildSourceStates(latestRun);
   const timeline = buildHumanTimeline(latestRun, sourceStates);
-  const overallStatus = translateStatus(latestRun.status);
-  const stageLabel = detectCurrentStage(latestRun);
-
-  runSummary.innerHTML = `
-    <div><strong>Модуль:</strong> ${latestRun.moduleTitle}</div>
-    <div><strong>Статус:</strong> ${overallStatus}</div>
-    <div><strong>Этап:</strong> ${stageLabel}</div>
-    <div><strong>Старт:</strong> ${formatDateTime(latestRun.startedAt)}</div>
-    <div><strong>Завершение:</strong> ${latestRun.finishedAt ? formatDateTime(latestRun.finishedAt) : "еще выполняется"}</div>
-    <div><strong>Папка результата:</strong> ${latestRun.outputDir || "-"}</div>
-    <div><strong>Строк в merged.csv:</strong> ${latestRun.mergedRowCount}</div>
-    <div><strong>Источников успешно:</strong> ${Object.values(sourceStates).filter(state => state.status === "SUCCESS").length}</div>
-    <div><strong>Источников с ошибкой:</strong> ${Object.values(sourceStates).filter(state => state.status === "FAILED" || state.status === "SKIPPED_SCHEMA_MISMATCH").length}</div>
-    <div><strong>Ошибка:</strong> ${latestRun.errorMessage || "-"}</div>
-  `;
+  runSummary.innerHTML = renderRunSummary(latestRun, sourceStates);
 
   sourceProgress.innerHTML = Object.entries(latestRun.sourceProgress || {})
     .map(([source, count]) => `<div class="progress-row"><span>${source}</span><strong>${count} строк</strong></div>`)
@@ -1017,7 +1058,299 @@ function renderState(state) {
 
   sourceStatusTable.innerHTML = renderSourceStatusTable(sourceStates);
 
+  renderSummaryStructured(latestRun);
   summaryJson.textContent = latestRun.summaryJson || "Summary еще не сформирован.";
+}
+
+function resolveSelectedRun(state) {
+  const history = state.history || [];
+  if (history.length === 0) {
+    selectedHistoryRunId = null;
+    return null;
+  }
+
+  const selected = history.find(run => run.id === selectedHistoryRunId);
+  if (selected) {
+    return selected;
+  }
+
+  const preferred = state.activeRun || history[0];
+  selectedHistoryRunId = preferred.id;
+  return preferred;
+}
+
+function renderRunHistory(history, activeRunId) {
+  renderRunHistoryFilters();
+
+  if (!history || history.length === 0) {
+    runHistory.innerHTML = `<div class="text-secondary small">История запусков пока пуста.</div>`;
+    return;
+  }
+
+  const filteredHistory = history.filter(matchesRunHistoryFilter);
+  if (filteredHistory.length === 0) {
+    runHistory.innerHTML = `<div class="text-secondary small">По выбранному фильтру запусков нет.</div>`;
+    return;
+  }
+
+  runHistory.innerHTML = filteredHistory.slice(0, 20).map(run => `
+    <button
+      type="button"
+      class="run-history-item ${run.id === activeRunId ? "run-history-item-active" : ""}"
+      data-run-id="${escapeHtml(run.id)}"
+    >
+      <div class="run-history-head">
+        <span class="run-history-title">${escapeHtml(run.moduleTitle)}</span>
+        <span class="status-badge status-${(run.status || "PENDING").toLowerCase()}">${translateStatus(run.status)}</span>
+      </div>
+      <div class="run-history-meta">${formatDateTime(run.startedAt)}</div>
+      <div class="run-history-meta">merged.csv: ${run.mergedRowCount || 0} строк</div>
+      <div class="run-history-meta">${run.finishedAt ? `Завершен: ${formatDateTime(run.finishedAt)}` : "Еще выполняется"}</div>
+    </button>
+  `).join("");
+
+  runHistory.querySelectorAll("[data-run-id]").forEach(button => {
+    button.addEventListener("click", () => {
+      selectedHistoryRunId = button.dataset.runId;
+      renderState({
+        credentialsStatus: currentCredentialsStatus,
+        activeRun: history.find(run => run.id === selectedHistoryRunId && run.status !== "SUCCESS" && run.status !== "FAILED") || null,
+        history
+      });
+    });
+  });
+}
+
+function renderRunHistoryFilters() {
+  const filters = [
+    ["ALL", "Все"],
+    ["RUNNING", "Активные"],
+    ["SUCCESS", "Успешные"],
+    ["FAILED", "С ошибкой"]
+  ];
+  runHistoryFilters.innerHTML = filters.map(([value, label]) => `
+    <button
+      type="button"
+      class="run-history-filter ${runHistoryFilter === value ? "run-history-filter-active" : ""}"
+      data-run-history-filter="${value}"
+    >
+      ${label}
+    </button>
+  `).join("");
+
+  runHistoryFilters.querySelectorAll("[data-run-history-filter]").forEach(button => {
+    button.addEventListener("click", () => {
+      runHistoryFilter = button.dataset.runHistoryFilter;
+      if (latestUiState) {
+        renderState(latestUiState);
+      }
+    });
+  });
+}
+
+function matchesRunHistoryFilter(run) {
+  switch (runHistoryFilter) {
+    case "RUNNING":
+      return run.status === "RUNNING";
+    case "SUCCESS":
+      return run.status === "SUCCESS";
+    case "FAILED":
+      return run.status === "FAILED";
+    default:
+      return true;
+  }
+}
+
+function renderRunSummary(run, sourceStates) {
+  const overallStatus = translateStatus(run.status);
+  const stageLabel = detectCurrentStage(run);
+  const successCount = Object.values(sourceStates).filter(state => state.status === "SUCCESS").length;
+  const failedCount = Object.values(sourceStates).filter(state => state.status === "FAILED" || state.status === "SKIPPED_SCHEMA_MISMATCH").length;
+
+  return `
+    <div class="run-summary-header">
+      <div>
+        <div class="run-summary-title">${escapeHtml(run.moduleTitle)}</div>
+        <div class="run-summary-subtitle">${escapeHtml(stageLabel)}</div>
+      </div>
+      <span class="status-badge status-${(run.status || "PENDING").toLowerCase()}">${overallStatus}</span>
+    </div>
+
+    <div class="run-summary-metrics">
+      <div class="run-summary-metric">
+        <div class="run-summary-metric-label">Строк в merged</div>
+        <div class="run-summary-metric-value">${formatNumber(run.mergedRowCount || 0)}</div>
+      </div>
+      <div class="run-summary-metric">
+        <div class="run-summary-metric-label">Успешные sources</div>
+        <div class="run-summary-metric-value">${formatNumber(successCount)}</div>
+      </div>
+      <div class="run-summary-metric">
+        <div class="run-summary-metric-label">Ошибки sources</div>
+        <div class="run-summary-metric-value">${formatNumber(failedCount)}</div>
+      </div>
+    </div>
+
+    <div class="run-summary-list">
+      ${renderSummaryKeyValue("Старт", formatDateTime(run.startedAt))}
+      ${renderSummaryKeyValue("Завершение", run.finishedAt ? formatDateTime(run.finishedAt) : "еще выполняется")}
+      ${renderSummaryKeyValue("Папка результата", run.outputDir || "-")}
+      ${renderSummaryKeyValue("Ошибка", run.errorMessage || "-")}
+    </div>
+  `;
+}
+
+function renderSummaryStructured(run) {
+  if (!run.summaryJson) {
+    summaryStructured.innerHTML = `
+      <div class="text-secondary">Summary еще не сформирован.</div>
+    `;
+    return;
+  }
+
+  let summary;
+  try {
+    summary = JSON.parse(run.summaryJson);
+  } catch (_) {
+    summaryStructured.innerHTML = `
+      <div class="text-secondary">Не удалось разобрать summary.json. Raw JSON доступен ниже.</div>
+    `;
+    return;
+  }
+
+  const targetLoad = summary.targetLoad || {};
+  const allocations = summary.mergeDetails?.sourceAllocations || [];
+  const successfulSources = summary.successfulSources || [];
+  const failedSources = summary.failedSources || [];
+
+  summaryStructured.innerHTML = `
+    <div class="summary-metric-grid">
+      ${renderSummaryMetricCard("Merge mode", summary.mergeMode || "-")}
+      ${renderSummaryMetricCard("Строк в merged", formatNumber(summary.mergedRowCount))}
+      ${renderSummaryMetricCard("Max merged rows", summary.maxMergedRows == null ? "без ограничения" : formatNumber(summary.maxMergedRows))}
+      ${renderSummaryMetricCard("Target status", `<span class="status-badge status-${String(targetLoad.status || "PENDING").toLowerCase()}">${translateStatus(targetLoad.status)}</span>`, true)}
+      ${renderSummaryMetricCard("Target table", targetLoad.table || "-")}
+      ${renderSummaryMetricCard("Загружено в target", formatNumber(targetLoad.rowCount || 0))}
+    </div>
+
+    <div class="summary-section-grid mt-4">
+      <div class="summary-section-card">
+        <div class="summary-section-title">Итог запуска</div>
+        <div class="summary-key-value-list">
+          ${renderSummaryKeyValue("Старт", formatDateTime(summary.startedAt))}
+          ${renderSummaryKeyValue("Завершение", formatDateTime(summary.finishedAt))}
+          ${renderSummaryKeyValue("Файл merged", summary.mergedFile || "-")}
+          ${renderSummaryKeyValue("Output", run.outputDir || "-")}
+          ${renderSummaryKeyValue("Успешных sources", formatNumber(successfulSources.length))}
+          ${renderSummaryKeyValue("Ошибочных sources", formatNumber(failedSources.length))}
+          ${renderSummaryKeyValue("Ошибка target", targetLoad.errorMessage || "-")}
+        </div>
+      </div>
+
+      <div class="summary-section-card">
+        <div class="summary-section-title">Успешные источники</div>
+        ${successfulSources.length === 0 ? `<div class="text-secondary small">Нет данных.</div>` : `
+          <div class="summary-chip-list">
+            ${successfulSources.map(source => `
+              <span class="summary-chip">
+                ${escapeHtml(source.sourceName)} · ${formatNumber(source.rowCount)} строк
+              </span>
+            `).join("")}
+          </div>
+        `}
+      </div>
+    </div>
+
+    <div class="summary-section-card mt-4">
+      <div class="summary-section-title">Распределение merged по источникам</div>
+      ${renderSummaryAllocations(allocations)}
+    </div>
+
+    <div class="summary-section-card mt-4">
+      <div class="summary-section-title">Проблемные источники</div>
+      ${renderSummaryFailedSources(failedSources)}
+    </div>
+  `;
+}
+
+function renderSummaryMetricCard(label, value, html = false) {
+  return `
+    <div class="summary-metric-card">
+      <div class="summary-metric-label">${escapeHtml(label)}</div>
+      <div class="summary-metric-value">${html ? value : escapeHtml(value)}</div>
+    </div>
+  `;
+}
+
+function renderSummaryKeyValue(label, value) {
+  return `
+    <div class="summary-key-value-row">
+      <span class="summary-key-value-label">${escapeHtml(label)}</span>
+      <span class="summary-key-value-value">${escapeHtml(value)}</span>
+    </div>
+  `;
+}
+
+function renderSummaryAllocations(allocations) {
+  if (!allocations || allocations.length === 0) {
+    return `<div class="text-secondary small">Нет данных по распределению строк.</div>`;
+  }
+
+  return `
+    <div class="table-responsive">
+      <table class="table source-status-table align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Источник</th>
+            <th>Доступно строк</th>
+            <th>Попало в merged</th>
+            <th>Доля</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${allocations.map(item => `
+            <tr>
+              <td><strong>${escapeHtml(item.sourceName)}</strong></td>
+              <td>${formatNumber(item.availableRows)}</td>
+              <td>${formatNumber(item.mergedRows)}</td>
+              <td>${formatPercent(item.mergedPercent)}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function renderSummaryFailedSources(failedSources) {
+  if (!failedSources || failedSources.length === 0) {
+    return `<div class="text-secondary small">Ошибочных источников нет.</div>`;
+  }
+
+  return `
+    <div class="table-responsive">
+      <table class="table source-status-table align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Источник</th>
+            <th>Статус</th>
+            <th>Строк</th>
+            <th>Ошибка</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${failedSources.map(source => `
+            <tr>
+              <td><strong>${escapeHtml(source.sourceName)}</strong></td>
+              <td><span class="status-badge status-${String(source.status || "PENDING").toLowerCase()}">${translateStatus(source.status)}</span></td>
+              <td>${formatNumber(source.rowCount || 0)}</td>
+              <td>${escapeHtml(source.errorMessage || "-")}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
 }
 
 function buildSourceStates(run) {
@@ -1200,6 +1533,20 @@ function formatDateTime(value) {
   return date.toLocaleString("ru-RU");
 }
 
+function formatNumber(value) {
+  if (value == null || value === "") return "-";
+  const numeric = Number(value);
+  if (Number.isNaN(numeric)) return String(value);
+  return numeric.toLocaleString("ru-RU");
+}
+
+function formatPercent(value) {
+  if (value == null || value === "") return "-";
+  const numeric = Number(value);
+  if (Number.isNaN(numeric)) return String(value);
+  return `${numeric.toLocaleString("ru-RU", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}%`;
+}
+
 function renderCredentialsStatus(status) {
   if (!status) {
     credentialsStatus.textContent = "Файл не задан.";
@@ -1213,14 +1560,25 @@ function renderCredentialsStatus(status) {
 function renderCredentialsWarning() {
   if (!currentModule) {
     credentialsWarning.classList.add("d-none");
-    return;
-  }
-  const missingCredentials = currentModule.requiresCredentials && (!currentCredentialsStatus || !currentCredentialsStatus.fileAvailable);
-  if (!missingCredentials) {
-    credentialsWarning.classList.add("d-none");
     credentialsWarning.textContent = "";
     return;
   }
+
+  if (!currentModule.requiresCredentials) {
+    credentialsWarning.classList.remove("d-none");
+    credentialsWarning.className = "alert alert-light mt-3 mb-0";
+    credentialsWarning.textContent = "У этого модуля нет обязательных placeholders ${...}. credential.properties нужен только для модулей и SQL-источников, где параметры вынесены во внешний файл.";
+    return;
+  }
+
+  const available = currentCredentialsStatus && currentCredentialsStatus.fileAvailable;
   credentialsWarning.classList.remove("d-none");
-  credentialsWarning.textContent = "В конфиге модуля найдены placeholders ${...}, но credential.properties не загружен и не найден по fallback-настройкам UI.";
+  if (available) {
+    credentialsWarning.className = "alert alert-success mt-3 mb-0";
+    credentialsWarning.textContent = "Для модуля нужен credential.properties, и сейчас подходящий файл доступен. При необходимости его можно заменить загрузкой через UI.";
+    return;
+  }
+
+  credentialsWarning.className = "alert alert-warning mt-3 mb-0";
+  credentialsWarning.textContent = "В конфиге модуля найдены placeholders ${...}, но credential.properties не найден. Сначала ищется ui.defaultCredentialsFile, затем gradle/credential.properties в проекте, затем ~/.gradle/credential.properties. Если файл не найден, загрузи его через UI.";
 }

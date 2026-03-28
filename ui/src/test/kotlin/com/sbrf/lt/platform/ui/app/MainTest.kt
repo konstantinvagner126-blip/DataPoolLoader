@@ -1,6 +1,8 @@
-package com.sbrf.lt.datapool.ui
+package com.sbrf.lt.platform.ui.app
 
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleConfig
+import com.sbrf.lt.platform.ui.config.UiAppConfig
+import com.sbrf.lt.platform.ui.config.UiConfigLoader
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -8,7 +10,7 @@ class MainTest {
 
     @Test
     fun `runUi starts server on configured port`() {
-        var port: Int? = null
+        var config: UiAppConfig? = null
 
         runUi(
             configLoader = object : UiConfigLoader() {
@@ -19,9 +21,9 @@ class MainTest {
                     )
                 }
             },
-            starter = { startedPort -> port = startedPort },
+            starter = { loadedConfig -> config = loadedConfig },
         )
 
-        assertEquals(9090, port)
+        assertEquals(9090, config?.port)
     }
 }

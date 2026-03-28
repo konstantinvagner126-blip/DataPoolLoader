@@ -1,6 +1,12 @@
-package com.sbrf.lt.datapool.ui
+package com.sbrf.lt.platform.ui.module
 
 import com.sbrf.lt.datapool.config.ConfigLoader
+import com.sbrf.lt.platform.ui.model.AppsRootStatusResponse
+import com.sbrf.lt.platform.ui.model.CredentialsStatusResponse
+import com.sbrf.lt.platform.ui.model.ModuleDescriptor
+import com.sbrf.lt.platform.ui.model.ModuleDetailsResponse
+import com.sbrf.lt.platform.ui.model.ModuleFileContent
+import com.sbrf.lt.platform.ui.model.SaveModuleRequest
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.createDirectories
@@ -9,14 +15,12 @@ import kotlin.io.path.writeText
 
 class ModuleRegistry(
     private val configLoader: ConfigLoader = ConfigLoader(),
-    private val projectRoot: Path? = null,
+    private val appsRoot: Path? = null,
 ) {
     private val mapper = configLoader.objectMapper()
 
     fun listModules(): List<ModuleDescriptor> {
-        val root = findProjectRoot()
-        val appsDir = root.resolve("apps")
-        if (!Files.exists(appsDir)) return emptyList()
+        val appsDir = appsRoot?.takeIf { Files.exists(it) && Files.isDirectory(it) } ?: return emptyList()
 
         val appDirs = Files.list(appsDir).use { paths -> paths.toList() }
         return appDirs
@@ -38,6 +42,41 @@ class ModuleRegistry(
                 }
             }
             .sortedBy { it.id }
+    }
+
+    fun appsRootStatus(): AppsRootStatusResponse {
+        val root = appsRoot
+        if (root == null) {
+            return AppsRootStatusResponse(
+                mode = "NOT_CONFIGURED",
+                message = "Путь ui.appsRoot не задан. Укажи абсолютный путь к каталогу apps в ui-application.yml.",
+            )
+        }
+        if (!Files.exists(root)) {
+            return AppsRootStatusResponse(
+                mode = "NOT_FOUND",
+                configuredPath = root.toString(),
+                message = "Каталог apps по указанному пути не найден. Проверь ui.appsRoot в ui-application.yml.",
+            )
+        }
+        if (!Files.isDirectory(root)) {
+            return AppsRootStatusResponse(
+                mode = "NOT_DIRECTORY",
+                configuredPath = root.toString(),
+                message = "ui.appsRoot должен указывать на каталог apps, а не на файл.",
+            )
+        }
+
+        val moduleCount = listModules().size
+        return AppsRootStatusResponse(
+            mode = "READY",
+            configuredPath = root.toString(),
+            message = if (moduleCount > 0) {
+                "Каталог apps найден. Доступно модулей: $moduleCount."
+            } else {
+                "Каталог apps найден, но подходящие модули в нем не обнаружены."
+            },
+        )
     }
 
     fun getModule(moduleId: String): ModuleDescriptor =
@@ -114,18 +153,6 @@ class ModuleRegistry(
             val path = Path.of(trimmed)
             if (path.isAbsolute) path else module.configFile.parent.resolve(path).normalize()
         }
-    }
-
-    fun findProjectRoot(): Path {
-        projectRoot?.let { return it }
-        var current = Path.of("").toAbsolutePath().normalize()
-        while (current.parent != null) {
-            if (Files.exists(current.resolve("settings.gradle.kts"))) {
-                return current
-            }
-            current = current.parent
-        }
-        error("Не удалось определить корень проекта по settings.gradle.kts")
     }
 
     private data class SqlFileEntry(

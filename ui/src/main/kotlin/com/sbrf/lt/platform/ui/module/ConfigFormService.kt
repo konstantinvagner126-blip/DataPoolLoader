@@ -1,4 +1,4 @@
-package com.sbrf.lt.datapool.ui
+package com.sbrf.lt.platform.ui.module
 
 import com.fasterxml.jackson.databind.node.ArrayNode
 import com.fasterxml.jackson.databind.node.ObjectNode
@@ -6,6 +6,10 @@ import com.sbrf.lt.datapool.config.ConfigLoader
 import com.sbrf.lt.datapool.model.ErrorMode
 import com.sbrf.lt.datapool.model.MergeMode
 import com.sbrf.lt.datapool.model.RootConfig
+import com.sbrf.lt.platform.ui.model.ConfigFormQuotaState
+import com.sbrf.lt.platform.ui.model.ConfigFormSourceState
+import com.sbrf.lt.platform.ui.model.ConfigFormStateResponse
+import com.sbrf.lt.platform.ui.model.ConfigFormUpdateResponse
 
 class ConfigFormService(
     configLoader: ConfigLoader = ConfigLoader(),

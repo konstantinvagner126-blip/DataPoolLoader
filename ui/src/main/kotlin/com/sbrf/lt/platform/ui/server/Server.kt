@@ -1,11 +1,28 @@
-package com.sbrf.lt.datapool.ui
+package com.sbrf.lt.platform.ui.server
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleService
+import com.sbrf.lt.platform.ui.config.UiAppConfig
+import com.sbrf.lt.platform.ui.config.UiConfigLoader
+import com.sbrf.lt.platform.ui.config.appsRootPath
+import com.sbrf.lt.platform.ui.model.ConfigFormParseRequest
+import com.sbrf.lt.platform.ui.model.ConfigFormUpdateRequest
+import com.sbrf.lt.platform.ui.model.ModulesCatalogResponse
+import com.sbrf.lt.platform.ui.model.SaveModuleRequest
+import com.sbrf.lt.platform.ui.model.SaveResultResponse
+import com.sbrf.lt.platform.ui.model.SqlConsoleQueryRequest
+import com.sbrf.lt.platform.ui.model.StartRunRequest
+import com.sbrf.lt.platform.ui.model.toResponse
+import com.sbrf.lt.platform.ui.model.toStartResponse
+import com.sbrf.lt.platform.ui.module.ConfigFormService
+import com.sbrf.lt.platform.ui.module.ModuleRegistry
+import com.sbrf.lt.platform.ui.run.RunManager
+import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleQueryManager
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.content.PartData
 import io.ktor.serialization.jackson.jackson
 import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationStarted
@@ -27,7 +44,6 @@ import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
 import io.ktor.server.websocket.WebSockets
 import io.ktor.server.websocket.webSocket
-import io.ktor.http.content.PartData
 import io.ktor.websocket.Frame
 import io.ktor.utils.io.readRemaining
 import io.ktor.utils.io.core.readText
@@ -35,21 +51,29 @@ import kotlinx.coroutines.flow.collect
 import org.slf4j.LoggerFactory
 import org.slf4j.event.Level
 
-fun startUiServer(port: Int = UiConfigLoader().load().port) {
-    val logger = LoggerFactory.getLogger("com.sbrf.lt.datapool.ui.Startup")
+fun startUiServer(uiConfig: UiAppConfig = UiConfigLoader().load()) {
+    val port = uiConfig.port
+    val logger = LoggerFactory.getLogger("com.sbrf.lt.platform.ui.Startup")
+    val appsRoot = uiConfig.appsRootPath()
+    if (appsRoot != null) {
+        logger.info("Apps root определен: {}", appsRoot)
+    } else {
+        logger.warn("Apps root не определен. Список app-модулей будет пустым, пока не задан ui.appsRoot.")
+    }
     embeddedServer(Netty, port = port) {
         environment.monitor.subscribe(ApplicationStarted) {
             logger.info("UI успешно запущен. Переходи по ссылке для открытия страницы с интерфейсом: http://localhost:$port")
         }
-        uiModule()
+        uiModule(uiConfig = uiConfig)
     }.start(wait = true)
 }
 
 fun Application.uiModule(
-    moduleRegistry: ModuleRegistry = ModuleRegistry(),
-    runManager: RunManager = RunManager(moduleRegistry = moduleRegistry),
+    uiConfig: UiAppConfig = UiConfigLoader().load(),
+    moduleRegistry: ModuleRegistry = ModuleRegistry(appsRoot = uiConfig.appsRootPath()),
+    runManager: RunManager = RunManager(moduleRegistry = moduleRegistry, uiConfig = uiConfig),
     configFormService: ConfigFormService = ConfigFormService(),
-    sqlConsoleService: SqlConsoleService = SqlConsoleService(UiConfigLoader().load().sqlConsole),
+    sqlConsoleService: SqlConsoleService = SqlConsoleService(uiConfig.sqlConsole),
     sqlConsoleQueryManager: SqlConsoleQueryManager = SqlConsoleQueryManager(sqlConsoleService),
 ) {
     val mapper = ObjectMapper()
@@ -74,10 +98,30 @@ fun Application.uiModule(
 
     routing {
         get("/") {
+            val content = javaClass.classLoader.getResourceAsStream("static/home.html")
+                ?.bufferedReader()
+                ?.use { it.readText() }
+                ?: error("Ресурс static/home.html не найден")
+            call.respondText(
+                content,
+                ContentType.Text.Html,
+            )
+        }
+        get("/modules") {
             val content = javaClass.classLoader.getResourceAsStream("static/index.html")
                 ?.bufferedReader()
                 ?.use { it.readText() }
                 ?: error("Ресурс static/index.html не найден")
+            call.respondText(
+                content,
+                ContentType.Text.Html,
+            )
+        }
+        get("/help") {
+            val content = javaClass.classLoader.getResourceAsStream("static/help.html")
+                ?.bufferedReader()
+                ?.use { it.readText() }
+                ?: error("Ресурс static/help.html не найден")
             call.respondText(
                 content,
                 ContentType.Text.Html,
@@ -97,6 +141,15 @@ fun Application.uiModule(
 
         get("/api/modules") {
             call.respond(moduleRegistry.listModules().map { mapOf("id" to it.id, "title" to it.title) })
+        }
+
+        get("/api/modules/catalog") {
+            call.respond(
+                ModulesCatalogResponse(
+                    appsRootStatus = moduleRegistry.appsRootStatus(),
+                    modules = moduleRegistry.listModules().map { mapOf("id" to it.id, "title" to it.title) },
+                ),
+            )
         }
 
         get("/api/modules/{id}") {

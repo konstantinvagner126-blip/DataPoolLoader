@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>DataPool Loader UI</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link href="/static/styles.css" rel="stylesheet">
+  <link href="/static/styles.css?v=20260328a" rel="stylesheet">
 </head>
 <body>
   <div class="container-fluid py-4">
@@ -40,9 +40,10 @@
       <div class="col-12 col-xl-3">
         <div class="panel h-100">
           <div class="mb-3">
-            <a class="btn btn-outline-dark w-100" href="/sql-console">Открыть SQL-консоль</a>
+            <a class="btn btn-outline-dark w-100" href="/">На главную</a>
           </div>
           <div class="panel-title">Модули</div>
+          <div id="moduleCatalogStatus" class="module-catalog-status mt-3 mb-3 text-secondary small"></div>
           <div id="moduleList" class="list-group module-list"></div>
         </div>
       </div>
@@ -60,6 +61,25 @@
             </div>
           </div>
           <div id="credentialsWarning" class="alert alert-warning mt-3 mb-0 d-none"></div>
+        </div>
+
+        <div class="tips-grid mb-4">
+          <div class="tip-card">
+            <div class="tip-card-title">credential.properties</div>
+            <div class="tip-card-text">Можно загрузить файл через UI. Если файл не загружен, используются fallback-источники проекта.</div>
+          </div>
+          <div class="tip-card">
+            <div class="tip-card-title">Запуск модуля</div>
+            <div class="tip-card-text">Кнопка <code>Запустить</code> использует текущие правки даже без сохранения в файлы модуля.</div>
+          </div>
+          <div class="tip-card">
+            <div class="tip-card-title">Timeout</div>
+            <div class="tip-card-text"><code>queryTimeoutSec</code> задается в конфиге модуля. Пустое значение означает запуск без явного timeout.</div>
+          </div>
+          <div class="tip-card">
+            <div class="tip-card-title">Output</div>
+            <div class="tip-card-text">Результаты запуска сохраняются в каталоге <code>output</code> от корня проекта, если не задан другой путь.</div>
+          </div>
         </div>
 
         <div class="panel mb-4">
@@ -127,9 +147,22 @@
           </div>
         </div>
 
-        <div class="panel mt-4">
-          <div class="panel-title">Состояние источников</div>
-          <div id="sourceStatusTable" class="table-responsive"></div>
+        <div class="row g-4 mt-1">
+          <div class="col-12 col-xl-4">
+            <div class="panel h-100">
+              <div class="d-flex align-items-center justify-content-between gap-3 mb-3">
+                <div class="panel-title mb-0">История запусков</div>
+                <div id="runHistoryFilters" class="run-history-filters"></div>
+              </div>
+              <div id="runHistory" class="run-history-list"></div>
+            </div>
+          </div>
+          <div class="col-12 col-xl-8">
+            <div class="panel h-100">
+              <div class="panel-title">Состояние источников</div>
+              <div id="sourceStatusTable" class="table-responsive"></div>
+            </div>
+          </div>
         </div>
 
         <div class="panel mt-4">
@@ -146,7 +179,18 @@
 
         <div class="panel mt-4">
           <div class="panel-title">Summary</div>
-          <pre id="summaryJson" class="summary-box">Пока нет данных summary.</pre>
+          <div id="summaryStructured" class="summary-structured">
+            <div class="text-secondary">Пока нет данных summary.</div>
+          </div>
+          <div class="d-flex align-items-center justify-content-between gap-3 mt-4">
+            <div class="small text-secondary">Технический raw JSON summary</div>
+            <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#summaryRawCollapse" aria-expanded="false" aria-controls="summaryRawCollapse">
+              Показать / скрыть
+            </button>
+          </div>
+          <div class="collapse mt-3" id="summaryRawCollapse">
+            <pre id="summaryJson" class="summary-box">Пока нет данных summary.</pre>
+          </div>
         </div>
       </div>
     </div>
@@ -158,6 +202,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs/loader.min.js"></script>
-  <script src="/static/app.js"></script>
+  <script src="/static/app.js?v=20260328a"></script>
 </body>
 </html>

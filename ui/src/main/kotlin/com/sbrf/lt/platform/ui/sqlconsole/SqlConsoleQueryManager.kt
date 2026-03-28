@@ -1,4 +1,4 @@
-package com.sbrf.lt.datapool.ui
+package com.sbrf.lt.platform.ui.sqlconsole
 
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleExecutionCancelledException
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleExecutionControl
