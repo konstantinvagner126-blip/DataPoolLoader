@@ -168,9 +168,229 @@
   - других потенциально опасных DDL/DML;
 - подумать над режимом “строгой защиты”.
 
+### 9. Режим `database`: foundation
+
+Статус:
+
+- частично реализовано
+
+Цель:
+
+- добавить полноценный режим работы UI с модулями из PostgreSQL без смешения с файловым режимом.
+
+Фичи:
+
+- поддержка двух режимов:
+  - `files`
+  - `database`
+- slider `FILES / DB` в UI;
+- fallback в `FILES`, если PostgreSQL недоступна;
+- отдельный DB-context backend:
+  - доступность БД;
+  - состояние `appsRoot`;
+  - активный import;
+  - actor;
+- отдельные DB-страницы и DB-роутинг без смешения с file-flow.
+
+Выполнено:
+
+- `2026-04-15`: добавлен backend runtime context:
+  - `ui.moduleStore.mode`;
+  - PostgreSQL availability check;
+  - actor detection;
+  - fallback в `FILES`;
+  - endpoint `GET /api/ui/runtime-context`.
+
+Осталось:
+
+- slider `FILES / DB` в UI;
+- отдельные DB-страницы;
+- отображение active import / DB-context в UI.
+
+### 10. Flyway и схема `ui_registry`
+
+Статус:
+
+- частично реализовано
+
+Цель:
+
+- создать устойчивую DB-схему для registry, drafts, sync и истории запусков.
+
+Фичи:
+
+- `Flyway` для режима `database`;
+- baseline migration:
+  - `V1__create_ui_registry.sql`
+- таблицы:
+  - `module`
+  - `module_revision`
+  - `module_revision_source`
+  - `module_revision_target`
+  - `module_revision_quota`
+  - `module_revision_sql_asset`
+  - `module_working_copy`
+  - `execution_snapshot`
+  - `module_sync_run`
+  - `module_sync_run_item`
+  - `module_run`
+  - `module_run_source_result`
+  - `module_run_event`
+  - `module_run_artifact`
+- индексы, FK и `check`-ограничения;
+- генерация `uuid` в приложении, а не в БД.
+
+Выполнено:
+
+- `2026-04-15`: подключены зависимости `Flyway` и PostgreSQL driver в `ui`;
+- `2026-04-15`: добавлена baseline migration `V1__create_ui_registry.sql`;
+- `2026-04-15`: добавлен `UiDatabaseSchemaMigrator`.
+
+Осталось:
+
+- проверить миграцию на реальном PostgreSQL;
+- подключить schema migration к реальному `database` rollout-сценарию.
+
+### 11. `DatabaseModuleStore` и lifecycle DB-модуля
+
+Статус:
+
+- частично реализовано
+
+Цель:
+
+- дать UI полноценный CRUD/lifecycle для DB-модулей.
+
+Фичи:
+
+- `DatabaseModuleStore`;
+- загрузка каталога DB-модулей;
+- загрузка `EditableModule` для DB-модуля;
+- сохранение personal `working copy`;
+- `Publish`;
+- `Discard working copy`;
+- отдельное поле `module_origin_kind`;
+- сохранение канонического YAML/JSON для revision и working copy;
+- actor-aware поведение для multi-user режима.
+
+Выполнено:
+
+- `2026-04-15`: добавлен первый `DatabaseModuleStore` для чтения каталога DB-модулей из `current_revision`;
+- `2026-04-15`: добавлен endpoint `GET /api/db/modules/catalog`.
+- `2026-04-15`: добавлена загрузка editable DB-модуля:
+  - `GET /api/db/modules/{id}`;
+  - чтение `current revision`;
+  - чтение personal `working copy`, если она есть;
+  - чтение SQL assets из `module_revision_sql_asset` / snapshot JSON.
+
+Осталось:
+
+- сохранение personal `working copy`;
+- `Publish`;
+- `Discard working copy`;
+- runtime snapshot для запуска DB-модуля.
+
+### 12. Создание и удаление DB-модуля
+
+Статус:
+
+- не реализовано
+
+Цель:
+
+- дать возможность жить DB-модулям как самостоятельным сущностям.
+
+Фичи:
+
+- отдельная страница `Новый модуль`;
+- создание:
+  - `module`
+  - первой `revision`
+  - personal `working copy`
+- baseline `Пустой модуль`;
+- `hiddenFromUi = true` по умолчанию;
+- отдельная операция `Удалить модуль из БД`;
+- hard delete DB-модуля;
+- запрет удаления при активном run/import.
+
+### 13. Импорт `files -> database`
+
+Статус:
+
+- не реализовано
+
+Цель:
+
+- загружать файловые модули в DB-реестр через явный import-flow.
+
+Фичи:
+
+- отдельная страница `Импорт моделей в БД`;
+- `syncAllFromFiles`;
+- `syncOneFromFiles`;
+- диагностика `appsRoot`;
+- `module_sync_run` и `module_sync_run_item`;
+- `content_hash` + precheck по `mtime/size`;
+- conflict policy по `moduleCode`:
+  - `SKIPPED_CODE_CONFLICT`
+  - без перезаписи существующего DB-модуля;
+- advisory locks:
+  - глобальный lock для full sync
+  - per-module lock для single sync;
+- maintenance mode для `syncAllFromFiles`;
+- multi-user UX для активного import.
+
+### 14. Запуск DB-модулей и история запусков
+
+Статус:
+
+- не реализовано
+
+Цель:
+
+- запускать DB-модули и хранить их историю независимо от file-history.
+
+Фичи:
+
+- запуск DB-модуля по:
+  - `working copy`
+  - или `current revision`
+- обязательный `execution_snapshot`;
+- таблицы run-history:
+  - `module_run`
+  - `module_run_source_result`
+  - `module_run_event`
+  - `module_run_artifact`
+- отдельная страница истории запусков DB-модуля;
+- structured summary;
+- timeline;
+- source results;
+- execution snapshot как технический блок.
+
+### 15. Cleanup истории запусков DB-модулей
+
+Статус:
+
+- не реализовано
+
+Цель:
+
+- очищать старую DB-run-history и артефакты контролируемо и безопасно.
+
+Фичи:
+
+- `ModuleRunHistoryCleanupService`;
+- общая cleanup-операция по всем DB-модулям;
+- default cleanup:
+  - старше одного месяца
+  - сохранять минимум `30` запусков на модуль;
+- опция отключения safeguard;
+- удаление run records, orphan snapshots и run artifacts;
+- сервисный UI-блок cleanup на странице `Импорт моделей в БД`.
+
 ## P2
 
-### 9. Retention output-каталогов
+### 16. Retention output-каталогов
 
 Цель:
 
@@ -182,7 +402,7 @@
 - или удалять output старше `X` дней;
 - добавить настройки retention в конфиг.
 
-### 10. Расширенный summary по длительностям
+### 17. Расширенный summary по длительностям
 
 Цель:
 
@@ -195,7 +415,7 @@
 - длительность target import;
 - фактический timeout и параметры запуска.
 
-### 11. Metadata модулей
+### 18. Metadata модулей
 
 Цель:
 
@@ -211,7 +431,7 @@
   - `tags`
 - уметь скрывать тестовые/служебные модули из UI.
 
-### 12. Валидация модулей при старте UI
+### 19. Валидация модулей при старте UI
 
 Цель:
 
@@ -225,7 +445,7 @@
 
 ## P3
 
-### 13. `multi-statement SQL` в SQL-консоли
+### 20. `multi-statement SQL` в SQL-консоли
 
 Статус:
 
@@ -241,7 +461,7 @@
 - транзакционный режим;
 - UI для отображения результата по statement и по source.
 
-### 14. Refactoring крупных классов
+### 21. Refactoring крупных классов
 
 Кандидаты:
 
@@ -256,7 +476,7 @@
 - выделить более узкие сервисы;
 - упростить API между `core` и `ui`.
 
-### 15. Launcher-скрипты и onboarding
+### 22. Launcher-скрипты и onboarding
 
 Цель:
 

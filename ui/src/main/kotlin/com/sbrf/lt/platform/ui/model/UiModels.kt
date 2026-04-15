@@ -6,6 +6,7 @@ import com.sbrf.lt.datapool.sqlconsole.RawShardConnectionCheckResult
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleConnectionCheckResult
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleInfo
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleQueryResult
+import com.sbrf.lt.platform.ui.config.UiRuntimeContext
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleExecutionSnapshot
 import java.nio.file.Path
 import java.time.Instant
@@ -45,6 +46,21 @@ data class AppsRootStatusResponse(
 data class ModulesCatalogResponse(
     val appsRootStatus: AppsRootStatusResponse,
     val modules: List<ModuleCatalogItemResponse>,
+)
+
+data class DatabaseModulesCatalogResponse(
+    val runtimeContext: UiRuntimeContext,
+    val modules: List<ModuleCatalogItemResponse>,
+)
+
+data class DatabaseModuleDetailsResponse(
+    val runtimeContext: UiRuntimeContext,
+    val module: ModuleDetailsResponse,
+    val sourceKind: String,
+    val currentRevisionId: String,
+    val workingCopyId: String? = null,
+    val workingCopyStatus: String? = null,
+    val baseRevisionId: String? = null,
 )
 
 data class ModuleFileContent(

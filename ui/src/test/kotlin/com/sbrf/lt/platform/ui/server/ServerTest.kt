@@ -14,8 +14,25 @@ import com.sbrf.lt.datapool.sqlconsole.SqlConsoleService
 import com.sbrf.lt.datapool.app.ApplicationRunner
 import com.sbrf.lt.datapool.db.PostgresExporter
 import com.sbrf.lt.platform.ui.config.UiAppConfig
+import com.sbrf.lt.platform.ui.config.UiActorIdentity
+import com.sbrf.lt.platform.ui.config.UiActorResolver
+import com.sbrf.lt.platform.ui.config.UiActorSource
+import com.sbrf.lt.platform.ui.config.UiDatabaseConnectionChecker
+import com.sbrf.lt.platform.ui.config.UiDatabaseConnectionStatus
+import com.sbrf.lt.platform.ui.config.UiDatabaseSchemaMigrator
 import com.sbrf.lt.platform.ui.config.UiConfigPersistenceService
+import com.sbrf.lt.platform.ui.config.UiModuleStoreConfig
+import com.sbrf.lt.platform.ui.config.UiModuleStoreMode
+import com.sbrf.lt.platform.ui.config.UiModuleStorePostgresConfig
+import com.sbrf.lt.platform.ui.config.UiRuntimeContextService
+import com.sbrf.lt.platform.ui.config.schemaName
+import com.sbrf.lt.platform.ui.model.ModuleCatalogItemResponse
+import com.sbrf.lt.platform.ui.model.ModuleDetailsResponse
+import com.sbrf.lt.platform.ui.model.ModuleFileContent
 import com.sbrf.lt.platform.ui.model.SqlConsoleQueryRequest
+import com.sbrf.lt.platform.ui.module.DatabaseConnectionProvider
+import com.sbrf.lt.platform.ui.module.DatabaseEditableModule
+import com.sbrf.lt.platform.ui.module.DatabaseModuleStore
 import com.sbrf.lt.platform.ui.module.ModuleRegistry
 import com.sbrf.lt.platform.ui.run.RunManager
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleQueryManager
@@ -255,6 +272,11 @@ class ServerTest {
         assertTrue(catalog.contains("demo-app"))
         assertTrue(catalog.contains("Учебный модуль для UI-тестов."))
         assertTrue(catalog.contains("\"tags\":[\"postgres\",\"demo\"]"))
+
+        val runtimeContext = client.get("/api/ui/runtime-context").bodyAsText()
+        assertTrue(runtimeContext.contains("\"requestedMode\":\"files\""))
+        assertTrue(runtimeContext.contains("\"effectiveMode\":\"files\""))
+        assertTrue(runtimeContext.contains("\"resolved\":true"))
 
         val details = client.get("/api/modules/demo-app").bodyAsText()
         assertTrue(details.contains("Общий SQL"))
@@ -602,6 +624,193 @@ class ServerTest {
         assertTrue(catalog.contains("\"mode\":\"NOT_CONFIGURED\""))
         assertTrue(catalog.contains("Путь ui.appsRoot не задан"))
         assertTrue(catalog.contains("\"modules\":[]"))
+    }
+
+    @Test
+    fun `runtime context endpoint reports fallback to files when database mode is unavailable`() = testApplication {
+        val uiConfig = UiAppConfig(
+            moduleStore = UiModuleStoreConfig(
+                mode = UiModuleStoreMode.DATABASE,
+                postgres = UiModuleStorePostgresConfig(),
+            ),
+            storageDir = Files.createTempDirectory("ui-runtime-context-state-").toString(),
+            sqlConsole = SqlConsoleConfig(),
+        )
+        application {
+            uiModule(
+                uiConfig = uiConfig,
+                runtimeContextService = UiRuntimeContextService(
+                    actorResolver = object : com.sbrf.lt.platform.ui.config.UiActorResolver() {
+                        override fun resolveAutomaticActor() = null
+                    },
+                    connectionChecker = object : UiDatabaseConnectionChecker() {
+                        override fun check(config: UiModuleStorePostgresConfig): UiDatabaseConnectionStatus {
+                            return UiDatabaseConnectionStatus(
+                                configured = false,
+                                available = false,
+                                schema = config.schemaName(),
+                                message = "Параметры PostgreSQL registry не настроены.",
+                            )
+                        }
+                    },
+                ),
+            )
+        }
+
+        val runtimeContext = client.get("/api/ui/runtime-context").bodyAsText()
+
+        assertTrue(runtimeContext.contains("\"requestedMode\":\"database\""))
+        assertTrue(runtimeContext.contains("\"effectiveMode\":\"files\""))
+        assertTrue(runtimeContext.contains("\"requiresManualInput\":true"))
+        assertTrue(runtimeContext.contains("Параметры PostgreSQL registry не настроены."))
+    }
+
+    @Test
+    fun `db catalog endpoint returns modules when effective mode is database`() = testApplication {
+        val uiConfig = UiAppConfig(
+            moduleStore = UiModuleStoreConfig(
+                mode = UiModuleStoreMode.DATABASE,
+                postgres = UiModuleStorePostgresConfig(
+                    jdbcUrl = "jdbc:postgresql://localhost:5432/modules",
+                    username = "registry_user",
+                    password = "registry_pwd",
+                ),
+            ),
+            storageDir = Files.createTempDirectory("ui-db-catalog-state-").toString(),
+            sqlConsole = SqlConsoleConfig(),
+        )
+        val runtimeContextService = UiRuntimeContextService(
+            actorResolver = object : UiActorResolver() {
+                override fun resolveAutomaticActor(): UiActorIdentity =
+                    UiActorIdentity("kwdev", UiActorSource.OS_LOGIN)
+            },
+            connectionChecker = object : UiDatabaseConnectionChecker() {
+                override fun check(config: UiModuleStorePostgresConfig): UiDatabaseConnectionStatus =
+                    UiDatabaseConnectionStatus(
+                        configured = true,
+                        available = true,
+                        schema = config.schemaName(),
+                        message = "PostgreSQL registry доступен.",
+                    )
+            },
+            schemaMigrator = object : UiDatabaseSchemaMigrator() {
+                override fun migrate(config: UiModuleStorePostgresConfig) = Unit
+            },
+        )
+        val databaseModuleStore = object : DatabaseModuleStore(
+            connectionProvider = DatabaseConnectionProvider { error("connection must not be requested") },
+        ) {
+            override fun listModules(includeHidden: Boolean): List<ModuleCatalogItemResponse> =
+                listOf(
+                    ModuleCatalogItemResponse(
+                        id = "db-demo",
+                        title = "DB Demo",
+                        description = "Модуль из БД",
+                        tags = listOf("database"),
+                    )
+                )
+        }
+        application {
+            uiModule(
+                uiConfig = uiConfig,
+                runtimeContextService = runtimeContextService,
+                databaseModuleStore = databaseModuleStore,
+            )
+        }
+
+        val catalog = client.get("/api/db/modules/catalog").bodyAsText()
+
+        assertTrue(catalog.contains("\"requestedMode\":\"database\""))
+        assertTrue(catalog.contains("\"effectiveMode\":\"database\""))
+        assertTrue(catalog.contains("\"id\":\"db-demo\""))
+        assertTrue(catalog.contains("\"tags\":[\"database\"]"))
+    }
+
+    @Test
+    fun `db module details endpoint returns editable module for current actor`() = testApplication {
+        val uiConfig = UiAppConfig(
+            moduleStore = UiModuleStoreConfig(
+                mode = UiModuleStoreMode.DATABASE,
+                postgres = UiModuleStorePostgresConfig(
+                    jdbcUrl = "jdbc:postgresql://localhost:5432/modules",
+                    username = "registry_user",
+                    password = "registry_pwd",
+                ),
+            ),
+            storageDir = Files.createTempDirectory("ui-db-details-state-").toString(),
+            sqlConsole = SqlConsoleConfig(),
+        )
+        val runtimeContextService = UiRuntimeContextService(
+            actorResolver = object : UiActorResolver() {
+                override fun resolveAutomaticActor(): UiActorIdentity =
+                    UiActorIdentity("kwdev", UiActorSource.OS_LOGIN)
+            },
+            connectionChecker = object : UiDatabaseConnectionChecker() {
+                override fun check(config: UiModuleStorePostgresConfig): UiDatabaseConnectionStatus =
+                    UiDatabaseConnectionStatus(
+                        configured = true,
+                        available = true,
+                        schema = config.schemaName(),
+                        message = "PostgreSQL registry доступен.",
+                    )
+            },
+            schemaMigrator = object : UiDatabaseSchemaMigrator() {
+                override fun migrate(config: UiModuleStorePostgresConfig) = Unit
+            },
+        )
+        val databaseModuleStore = object : DatabaseModuleStore(
+            connectionProvider = DatabaseConnectionProvider { error("connection must not be requested") },
+        ) {
+            override fun loadModuleDetails(
+                moduleCode: String,
+                actorId: String,
+                actorSource: String,
+            ): DatabaseEditableModule {
+                assertEquals("db-demo", moduleCode)
+                assertEquals("kwdev", actorId)
+                assertEquals("OS_LOGIN", actorSource)
+                return DatabaseEditableModule(
+                    module = ModuleDetailsResponse(
+                        id = "db-demo",
+                        title = "DB Demo",
+                        configPath = "db:db-demo",
+                        configText = "app:\n  mergeMode: plain\n",
+                        sqlFiles = listOf(
+                            ModuleFileContent(
+                                label = "Общий SQL",
+                                path = "common",
+                                content = "select 1",
+                                exists = true,
+                            )
+                        ),
+                        requiresCredentials = false,
+                        credentialsStatus = com.sbrf.lt.platform.ui.model.CredentialsStatusResponse(
+                            mode = "NONE",
+                            displayName = "Файл не задан",
+                            fileAvailable = false,
+                            uploaded = false,
+                        ),
+                    ),
+                    sourceKind = "CURRENT_REVISION",
+                    currentRevisionId = "11111111-1111-1111-1111-111111111111",
+                )
+            }
+        }
+        application {
+            uiModule(
+                uiConfig = uiConfig,
+                runtimeContextService = runtimeContextService,
+                databaseModuleStore = databaseModuleStore,
+            )
+        }
+
+        val details = client.get("/api/db/modules/db-demo").bodyAsText()
+
+        assertTrue(details.contains("\"effectiveMode\":\"database\""))
+        assertTrue(details.contains("\"sourceKind\":\"CURRENT_REVISION\""))
+        assertTrue(details.contains("\"currentRevisionId\":\"11111111-1111-1111-1111-111111111111\""))
+        assertTrue(details.contains("\"configPath\":\"db:db-demo\""))
+        assertTrue(details.contains("\"content\":\"select 1\""))
     }
 
     @Test

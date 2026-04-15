@@ -3,6 +3,13 @@ ui:
   port: 8080
   appsRoot: "/Users/kwdev/DataPoolLoader/apps"
   storageDir: "/Users/kwdev/.datapool-loader/ui/storage"
+  moduleStore:
+    mode: files
+    postgres:
+      jdbcUrl: null
+      username: null
+      password: null
+      schema: ui_registry
   showTechnicalDiagnostics: false
   showRawSummaryJson: false
   defaultCredentialsFile: null

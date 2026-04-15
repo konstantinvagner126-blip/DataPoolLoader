@@ -8,6 +8,8 @@ version = rootProject.version
 
 dependencies {
     implementation(project(":core"))
+    implementation("org.flywaydb:flyway-core:10.20.1")
+    implementation("org.postgresql:postgresql:42.7.7")
     implementation("io.ktor:ktor-server-core-jvm:3.2.3")
     implementation("io.ktor:ktor-server-netty-jvm:3.2.3")
     implementation("io.ktor:ktor-server-websockets-jvm:3.2.3")

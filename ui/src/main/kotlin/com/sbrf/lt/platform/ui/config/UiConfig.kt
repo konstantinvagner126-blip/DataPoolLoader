@@ -1,6 +1,8 @@
 package com.sbrf.lt.platform.ui.config
 
+import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonIgnore
+import com.fasterxml.jackson.annotation.JsonValue
 import com.sbrf.lt.datapool.config.ConfigLoader
 import com.sbrf.lt.datapool.config.CredentialsFileLocator
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleConfig
@@ -17,12 +19,49 @@ data class UiAppConfig(
     val port: Int = 8080,
     val appsRoot: String? = null,
     val storageDir: String? = null,
+    val moduleStore: UiModuleStoreConfig = UiModuleStoreConfig(),
     val showTechnicalDiagnostics: Boolean = true,
     val showRawSummaryJson: Boolean = false,
     val defaultCredentialsFile: String? = null,
     val sqlConsole: SqlConsoleConfig = SqlConsoleConfig(),
     @JsonIgnore val configBaseDir: String? = null,
 )
+
+data class UiModuleStoreConfig(
+    val mode: UiModuleStoreMode = UiModuleStoreMode.FILES,
+    val postgres: UiModuleStorePostgresConfig = UiModuleStorePostgresConfig(),
+)
+
+enum class UiModuleStoreMode(
+    private val configValue: String,
+) {
+    FILES("files"),
+    DATABASE("database"),
+    ;
+
+    @JsonValue
+    fun toConfigValue(): String = configValue
+
+    companion object {
+        @JvmStatic
+        @JsonCreator
+        fun fromConfigValue(rawValue: String): UiModuleStoreMode {
+            return entries.firstOrNull { it.configValue.equals(rawValue.trim(), ignoreCase = true) }
+                ?: throw IllegalArgumentException("Неизвестный режим moduleStore.mode: $rawValue")
+        }
+    }
+}
+
+data class UiModuleStorePostgresConfig(
+    val jdbcUrl: String? = null,
+    val username: String? = null,
+    val password: String? = null,
+    val schema: String = DEFAULT_SCHEMA,
+) {
+    companion object {
+        const val DEFAULT_SCHEMA = "ui_registry"
+    }
+}
 
 open class UiConfigLoader(
     private val configLoader: ConfigLoader = ConfigLoader(),
@@ -118,6 +157,14 @@ fun UiAppConfig.appsRootPath(): Path? {
         Path.of(it).toAbsolutePath().normalize()
     }
 }
+
+fun UiModuleStoreConfig.isDatabaseMode(): Boolean = mode == UiModuleStoreMode.DATABASE
+
+fun UiModuleStorePostgresConfig.isConfigured(): Boolean =
+    !jdbcUrl.isNullOrBlank() && !username.isNullOrBlank() && !password.isNullOrBlank()
+
+fun UiModuleStorePostgresConfig.schemaName(): String =
+    schema.trim().ifEmpty { UiModuleStorePostgresConfig.DEFAULT_SCHEMA }
 
 fun UiAppConfig.storageDirPath(): Path {
     storageDir?.trim()?.takeIf { it.isNotEmpty() }?.let { configuredStorageDir ->

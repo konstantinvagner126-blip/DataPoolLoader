@@ -7,10 +7,16 @@ import com.sbrf.lt.datapool.sqlconsole.SqlConsoleService
 import com.sbrf.lt.platform.ui.config.UiAppConfig
 import com.sbrf.lt.platform.ui.config.UiConfigLoader
 import com.sbrf.lt.platform.ui.config.UiConfigPersistenceService
+import com.sbrf.lt.platform.ui.config.UiRuntimeContext
+import com.sbrf.lt.platform.ui.config.UiRuntimeContextService
 import com.sbrf.lt.platform.ui.config.appsRootPath
+import com.sbrf.lt.platform.ui.config.UiModuleStoreMode
+import com.sbrf.lt.platform.ui.config.isConfigured
 import com.sbrf.lt.platform.ui.config.storageDirPath
 import com.sbrf.lt.platform.ui.model.ConfigFormParseRequest
 import com.sbrf.lt.platform.ui.model.ConfigFormUpdateRequest
+import com.sbrf.lt.platform.ui.model.DatabaseModuleDetailsResponse
+import com.sbrf.lt.platform.ui.model.DatabaseModulesCatalogResponse
 import com.sbrf.lt.platform.ui.model.ModulesCatalogResponse
 import com.sbrf.lt.platform.ui.model.SaveModuleRequest
 import com.sbrf.lt.platform.ui.model.SaveResultResponse
@@ -22,6 +28,7 @@ import com.sbrf.lt.platform.ui.model.toCatalogItemResponse
 import com.sbrf.lt.platform.ui.model.toResponse
 import com.sbrf.lt.platform.ui.model.toStartResponse
 import com.sbrf.lt.platform.ui.module.ConfigFormService
+import com.sbrf.lt.platform.ui.module.DatabaseModuleStore
 import com.sbrf.lt.platform.ui.module.ModuleRegistry
 import com.sbrf.lt.platform.ui.run.RunManager
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleExportService
@@ -84,7 +91,8 @@ internal fun loadStaticText(
 internal fun uiStartupModule(
     uiConfig: UiAppConfig,
     logger: Logger,
-    moduleInstaller: Application.() -> Unit = { uiModule(uiConfig = uiConfig) },
+    runtimeContext: UiRuntimeContext = UiRuntimeContextService().resolve(uiConfig),
+    moduleInstaller: Application.() -> Unit = { uiModule(uiConfig = uiConfig, runtimeContext = runtimeContext) },
 ): Application.() -> Unit = {
     environment.monitor.subscribe(ApplicationStarted) {
         logger.info("UI успешно запущен. Переходи по ссылке для открытия страницы с интерфейсом: http://localhost:${uiConfig.port}")
@@ -96,22 +104,39 @@ fun startUiServer(
     uiConfig: UiAppConfig = UiConfigLoader().load(),
     logger: Logger = LoggerFactory.getLogger("com.sbrf.lt.platform.ui.Startup"),
     starter: UiServerStarter = defaultUiServerStarter(),
+    runtimeContextService: UiRuntimeContextService = UiRuntimeContextService(),
 ) {
     val port = uiConfig.port
     val appsRoot = uiConfig.appsRootPath()
     val storageDir = uiConfig.storageDirPath()
+    val runtimeContext = runtimeContextService.resolve(uiConfig)
     if (appsRoot != null) {
         logger.info("Apps root определен: {}", appsRoot)
     } else {
         logger.warn("Apps root не определен. Список app-модулей будет пустым, пока не задан ui.appsRoot.")
     }
     logger.info("Каталог состояния UI: {}", storageDir)
-    starter.start(port, uiStartupModule(uiConfig, logger))
+    logger.info(
+        "Runtime context UI: requestedMode={}, effectiveMode={}, dbConfigured={}, dbAvailable={}",
+        runtimeContext.requestedMode,
+        runtimeContext.effectiveMode,
+        runtimeContext.database.configured,
+        runtimeContext.database.available,
+    )
+    runtimeContext.fallbackReason?.let { reason ->
+        logger.warn("Режим UI переведен в FILES: {}", reason)
+    }
+    starter.start(port, uiStartupModule(uiConfig, logger, runtimeContext))
 }
 
 fun Application.uiModule(
     uiConfig: UiAppConfig = UiConfigLoader().load(),
+    runtimeContextService: UiRuntimeContextService = UiRuntimeContextService(),
+    runtimeContext: UiRuntimeContext = runtimeContextService.resolve(uiConfig),
     moduleRegistry: ModuleRegistry = ModuleRegistry(appsRoot = uiConfig.appsRootPath()),
+    databaseModuleStore: DatabaseModuleStore? = uiConfig.moduleStore.postgres
+        .takeIf { it.isConfigured() }
+        ?.let { DatabaseModuleStore.fromConfig(it) },
     runManager: RunManager = RunManager(moduleRegistry = moduleRegistry, uiConfig = uiConfig),
     configFormService: ConfigFormService = ConfigFormService(),
     sqlConsoleService: SqlConsoleService = SqlConsoleService(uiConfig.sqlConsole),
@@ -173,6 +198,50 @@ fun Application.uiModule(
 
         get("/api/modules") {
             call.respond(moduleRegistry.listModules().map { it.toCatalogItemResponse() })
+        }
+
+        get("/api/ui/runtime-context") {
+            call.respond(runtimeContext)
+        }
+
+        get("/api/db/modules/catalog") {
+            val modules = if (runtimeContext.effectiveMode == UiModuleStoreMode.DATABASE && databaseModuleStore != null) {
+                databaseModuleStore.listModules()
+            } else {
+                emptyList()
+            }
+            call.respond(DatabaseModulesCatalogResponse(runtimeContext = runtimeContext, modules = modules))
+        }
+
+        get("/api/db/modules/{id}") {
+            require(runtimeContext.effectiveMode == UiModuleStoreMode.DATABASE) {
+                "DB-режим недоступен: ${runtimeContext.fallbackReason ?: "effective mode is ${runtimeContext.effectiveMode.toConfigValue()}"}"
+            }
+            val store = requireNotNull(databaseModuleStore) {
+                "DB module store не настроен."
+            }
+            val actorId = requireNotNull(runtimeContext.actor.actorId) {
+                "Для DB-режима нужно определить actorId."
+            }
+            val actorSource = requireNotNull(runtimeContext.actor.actorSource) {
+                "Для DB-режима нужно определить actorSource."
+            }
+            val module = store.loadModuleDetails(
+                moduleCode = requireNotNull(call.parameters["id"]),
+                actorId = actorId,
+                actorSource = actorSource,
+            )
+            call.respond(
+                DatabaseModuleDetailsResponse(
+                    runtimeContext = runtimeContext,
+                    module = module.module,
+                    sourceKind = module.sourceKind,
+                    currentRevisionId = module.currentRevisionId,
+                    workingCopyId = module.workingCopyId,
+                    workingCopyStatus = module.workingCopyStatus,
+                    baseRevisionId = module.baseRevisionId,
+                ),
+            )
         }
 
         get("/api/modules/catalog") {

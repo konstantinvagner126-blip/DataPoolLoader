@@ -2,6 +2,13 @@ ui:
   port: 8080
   appsRoot: __APPS_ROOT__
   storageDir: storage
+  moduleStore:
+    mode: files
+    postgres:
+      jdbcUrl: null
+      username: null
+      password: null
+      schema: ui_registry
   showTechnicalDiagnostics: false
   showRawSummaryJson: false
   defaultCredentialsFile: credential.properties

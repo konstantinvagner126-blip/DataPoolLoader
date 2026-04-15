@@ -17,6 +17,8 @@ class UiConfigTest {
         val config = UiConfigLoader().load()
 
         assertEquals(8080, config.port)
+        assertEquals(UiModuleStoreMode.FILES, config.moduleStore.mode)
+        assertEquals(UiModuleStorePostgresConfig.DEFAULT_SCHEMA, config.moduleStore.postgres.schemaName())
         assertEquals(1000, config.sqlConsole.fetchSize)
         assertEquals(200, config.sqlConsole.maxRowsPerShard)
     }
@@ -79,6 +81,12 @@ class UiConfigTest {
                     ui:
                       port: 9191
                       appsRoot: /tmp/apps-root
+                      moduleStore:
+                        mode: database
+                        postgres:
+                          jdbcUrl: jdbc:postgresql://localhost:5432/modules
+                          username: registry_user
+                          password: registry_pwd
                       defaultCredentialsFile: /tmp/credentials.properties
                     """.trimIndent()
                 )
@@ -90,8 +98,34 @@ class UiConfigTest {
 
         assertEquals(9191, config.port)
         assertEquals("/tmp/apps-root", config.appsRoot)
+        assertEquals(UiModuleStoreMode.DATABASE, config.moduleStore.mode)
+        assertEquals("jdbc:postgresql://localhost:5432/modules", config.moduleStore.postgres.jdbcUrl)
+        assertEquals("registry_user", config.moduleStore.postgres.username)
+        assertEquals("registry_pwd", config.moduleStore.postgres.password)
         assertEquals("/tmp/credentials.properties", config.defaultCredentialsFile)
         assertEquals(configFile.parent.toAbsolutePath().normalize().toString(), config.configBaseDir)
+    }
+
+    @Test
+    fun `module store mode supports lowercase config values`() {
+        val configFile = Files.createTempDirectory("ui-db-mode-config")
+            .resolve("application.yml")
+            .apply {
+                parent?.toFile()?.mkdirs()
+                writeText(
+                    """
+                    ui:
+                      moduleStore:
+                        mode: database
+                    """.trimIndent()
+                )
+            }
+
+        val config = object : UiConfigLoader() {
+            override fun resolveExternalConfigPath() = configFile
+        }.load()
+
+        assertEquals(UiModuleStoreMode.DATABASE, config.moduleStore.mode)
     }
 
     @Test
@@ -276,5 +310,25 @@ class UiConfigTest {
                 System.clearProperty("user.home")
             }
         }
+    }
+
+    @Test
+    fun `postgres config is configured only when jdbc url username and password are present`() {
+        assertTrue(
+            UiModuleStorePostgresConfig(
+                jdbcUrl = "jdbc:postgresql://localhost:5432/modules",
+                username = "registry_user",
+                password = "registry_pwd",
+            ).isConfigured()
+        )
+        assertTrue(!UiModuleStorePostgresConfig(jdbcUrl = "jdbc:postgresql://localhost:5432/modules").isConfigured())
+        assertTrue(!UiModuleStorePostgresConfig(username = "registry_user", password = "registry_pwd").isConfigured())
+    }
+
+    @Test
+    fun `blank postgres schema falls back to default schema name`() {
+        val schemaName = UiModuleStorePostgresConfig(schema = "  ").schemaName()
+
+        assertEquals(UiModuleStorePostgresConfig.DEFAULT_SCHEMA, schemaName)
     }
 }
