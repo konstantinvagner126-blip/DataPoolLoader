@@ -814,6 +814,143 @@ class ServerTest {
     }
 
     @Test
+    fun `db module save endpoint stores personal working copy for current actor`() = testApplication {
+        val uiConfig = UiAppConfig(
+            moduleStore = UiModuleStoreConfig(
+                mode = UiModuleStoreMode.DATABASE,
+                postgres = UiModuleStorePostgresConfig(
+                    jdbcUrl = "jdbc:postgresql://localhost:5432/modules",
+                    username = "registry_user",
+                    password = "registry_pwd",
+                ),
+            ),
+            storageDir = Files.createTempDirectory("ui-db-save-state-").toString(),
+            sqlConsole = SqlConsoleConfig(),
+        )
+        val runtimeContextService = UiRuntimeContextService(
+            actorResolver = object : UiActorResolver() {
+                override fun resolveAutomaticActor(): UiActorIdentity =
+                    UiActorIdentity("kwdev", UiActorSource.OS_LOGIN)
+            },
+            connectionChecker = object : UiDatabaseConnectionChecker() {
+                override fun check(config: UiModuleStorePostgresConfig): UiDatabaseConnectionStatus =
+                    UiDatabaseConnectionStatus(
+                        configured = true,
+                        available = true,
+                        schema = config.schemaName(),
+                        message = "PostgreSQL registry доступен.",
+                    )
+            },
+            schemaMigrator = object : UiDatabaseSchemaMigrator() {
+                override fun migrate(config: UiModuleStorePostgresConfig) = Unit
+            },
+        )
+        var savedModuleCode: String? = null
+        var savedActorId: String? = null
+        var savedConfigText: String? = null
+        val databaseModuleStore = object : DatabaseModuleStore(
+            connectionProvider = DatabaseConnectionProvider { error("connection must not be requested") },
+        ) {
+            override fun saveWorkingCopy(
+                moduleCode: String,
+                actorId: String,
+                actorSource: String,
+                actorDisplayName: String?,
+                request: com.sbrf.lt.platform.ui.model.SaveModuleRequest,
+            ) {
+                savedModuleCode = moduleCode
+                savedActorId = actorId
+                savedConfigText = request.configText
+                assertEquals("OS_LOGIN", actorSource)
+                assertEquals("kwdev", actorDisplayName)
+                assertEquals(mapOf("common" to "select 1"), request.sqlFiles)
+            }
+        }
+        application {
+            uiModule(
+                uiConfig = uiConfig,
+                runtimeContextService = runtimeContextService,
+                databaseModuleStore = databaseModuleStore,
+            )
+        }
+
+        val response = client.post("/api/db/modules/db-demo/save") {
+            contentType(ContentType.Application.Json)
+            setBody(
+                """
+                {
+                  "configText": "app:\n  mergeMode: plain\n",
+                  "sqlFiles": {
+                    "common": "select 1"
+                  }
+                }
+                """.trimIndent()
+            )
+        }
+
+        assertEquals(HttpStatusCode.OK, response.status)
+        assertTrue(response.bodyAsText().contains("working copy"))
+        assertEquals("db-demo", savedModuleCode)
+        assertEquals("kwdev", savedActorId)
+        assertEquals("app:\n  mergeMode: plain\n", savedConfigText)
+    }
+
+    @Test
+    fun `db module discard endpoint removes personal working copy for current actor`() = testApplication {
+        val uiConfig = UiAppConfig(
+            moduleStore = UiModuleStoreConfig(
+                mode = UiModuleStoreMode.DATABASE,
+                postgres = UiModuleStorePostgresConfig(
+                    jdbcUrl = "jdbc:postgresql://localhost:5432/modules",
+                    username = "registry_user",
+                    password = "registry_pwd",
+                ),
+            ),
+            storageDir = Files.createTempDirectory("ui-db-discard-state-").toString(),
+            sqlConsole = SqlConsoleConfig(),
+        )
+        val runtimeContextService = UiRuntimeContextService(
+            actorResolver = object : UiActorResolver() {
+                override fun resolveAutomaticActor(): UiActorIdentity =
+                    UiActorIdentity("kwdev", UiActorSource.OS_LOGIN)
+            },
+            connectionChecker = object : UiDatabaseConnectionChecker() {
+                override fun check(config: UiModuleStorePostgresConfig): UiDatabaseConnectionStatus =
+                    UiDatabaseConnectionStatus(
+                        configured = true,
+                        available = true,
+                        schema = config.schemaName(),
+                        message = "PostgreSQL registry доступен.",
+                    )
+            },
+            schemaMigrator = object : UiDatabaseSchemaMigrator() {
+                override fun migrate(config: UiModuleStorePostgresConfig) = Unit
+            },
+        )
+        var discarded: Triple<String, String, String>? = null
+        val databaseModuleStore = object : DatabaseModuleStore(
+            connectionProvider = DatabaseConnectionProvider { error("connection must not be requested") },
+        ) {
+            override fun discardWorkingCopy(moduleCode: String, actorId: String, actorSource: String) {
+                discarded = Triple(moduleCode, actorId, actorSource)
+            }
+        }
+        application {
+            uiModule(
+                uiConfig = uiConfig,
+                runtimeContextService = runtimeContextService,
+                databaseModuleStore = databaseModuleStore,
+            )
+        }
+
+        val response = client.post("/api/db/modules/db-demo/discard-working-copy")
+
+        assertEquals(HttpStatusCode.OK, response.status)
+        assertTrue(response.bodyAsText().contains("working copy"))
+        assertEquals(Triple("db-demo", "kwdev", "OS_LOGIN"), discarded)
+    }
+
+    @Test
     fun `starts run through api and returns bad request for invalid requests`() = testApplication {
         val root = createProject()
         val registry = ModuleRegistry(appsRoot = root.resolve("apps"))

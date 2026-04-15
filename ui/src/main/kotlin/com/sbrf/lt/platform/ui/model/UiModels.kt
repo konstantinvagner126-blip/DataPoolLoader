@@ -177,6 +177,18 @@ data class SaveResultResponse(
     val message: String,
 )
 
+data class CreateDbModuleRequest(
+    val moduleCode: String,
+    val title: String,
+    val description: String? = null,
+    val tags: List<String> = emptyList(),
+    val configText: String = "",
+)
+
+data class SyncOneModuleRequest(
+    val moduleCode: String,
+)
+
 data class CredentialsStatusResponse(
     val mode: String,
     val displayName: String,

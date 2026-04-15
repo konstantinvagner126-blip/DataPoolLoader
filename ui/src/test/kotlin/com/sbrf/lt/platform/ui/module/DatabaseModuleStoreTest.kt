@@ -4,6 +4,7 @@ import java.lang.reflect.Proxy
 import java.sql.Connection
 import java.sql.PreparedStatement
 import java.sql.ResultSet
+import com.sbrf.lt.platform.ui.model.SaveModuleRequest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -174,6 +175,77 @@ class DatabaseModuleStoreTest {
     }
 
     @Test
+    fun `saves personal working copy without changing shared revision`() {
+        val preparedSql = mutableListOf<String>()
+        val stringParams = mutableListOf<String>()
+        val store = DatabaseModuleStore(
+            connectionProvider = DatabaseConnectionProvider {
+                fakeConnection(
+                    rows = listOf(
+                        mapOf(
+                            "module_id" to "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+                            "current_revision_id" to "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+                            "working_copy_id" to null,
+                            "working_copy_status" to null,
+                        ),
+                    ),
+                    preparedSql = preparedSql,
+                    stringParams = stringParams,
+                )
+            },
+        )
+
+        store.saveWorkingCopy(
+            moduleCode = "db-demo",
+            actorId = "kwdev",
+            actorSource = "OS_LOGIN",
+            actorDisplayName = "kwdev",
+            request = SaveModuleRequest(
+                configText = "app:\n  mergeMode: plain\n",
+                sqlFiles = mapOf("common" to "select 1"),
+            ),
+        )
+
+        assertTrue(preparedSql.any { it.contains("from ui_registry.module m") })
+        assertTrue(preparedSql.any { it.contains("insert into ui_registry.module_working_copy") })
+        assertEquals("kwdev", stringParams[0])
+        assertEquals("OS_LOGIN", stringParams[1])
+        assertEquals("db-demo", stringParams[2])
+        assertEquals("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", stringParams[4])
+        assertEquals("kwdev", stringParams[5])
+        assertEquals("OS_LOGIN", stringParams[6])
+        assertEquals("kwdev", stringParams[7])
+        assertEquals("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", stringParams[8])
+        assertTrue(stringParams[9].contains("\"configText\""))
+        assertEquals("app:\n  mergeMode: plain\n", stringParams[10])
+        assertEquals(64, stringParams[11].length)
+    }
+
+    @Test
+    fun `discards personal working copy by module and actor`() {
+        val preparedSql = mutableListOf<String>()
+        val stringParams = mutableListOf<String>()
+        val store = DatabaseModuleStore(
+            connectionProvider = DatabaseConnectionProvider {
+                fakeConnection(
+                    rows = emptyList(),
+                    preparedSql = preparedSql,
+                    stringParams = stringParams,
+                )
+            },
+        )
+
+        store.discardWorkingCopy(
+            moduleCode = "db-demo",
+            actorId = "kwdev",
+            actorSource = "OS_LOGIN",
+        )
+
+        assertTrue(preparedSql.single().contains("delete from ui_registry.module_working_copy"))
+        assertEquals(listOf("kwdev", "OS_LOGIN", "db-demo"), stringParams)
+    }
+
+    @Test
     fun `rejects invalid schema name`() {
         val store = DatabaseModuleStore(
             connectionProvider = DatabaseConnectionProvider { error("connection must not be requested") },
@@ -233,6 +305,7 @@ class DatabaseModuleStoreTest {
                     null
                 }
                 "executeQuery" -> fakeResultSet(rows)
+                "executeUpdate" -> 1
                 "close" -> null
                 else -> defaultReturnValue(method.returnType)
             }

@@ -282,12 +282,18 @@
   - чтение `current revision`;
   - чтение personal `working copy`, если она есть;
   - чтение SQL assets из `module_revision_sql_asset` / snapshot JSON.
+- `2026-04-15`: добавлено сохранение personal `working copy`:
+  - `POST /api/db/modules/{id}/save`;
+  - upsert в `module_working_copy`;
+  - сохранение YAML и SQL assets в snapshot JSON;
+  - сохранение `STALE`-статуса при повторном save.
+- `2026-04-15`: добавлено удаление personal `working copy`:
+  - `POST /api/db/modules/{id}/discard-working-copy`;
+  - удаление только draft текущего actor.
 
 Осталось:
 
-- сохранение personal `working copy`;
 - `Publish`;
-- `Discard working copy`;
 - runtime snapshot для запуска DB-модуля.
 
 ### 12. Создание и удаление DB-модуля

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>DataPool Loader UI</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link href="/static/styles.css?v=20260328a" rel="stylesheet">
+  <link href="/static/styles.css?v=20260328b" rel="stylesheet">
 </head>
 <body>
   <div class="container-fluid py-4">
@@ -34,6 +34,14 @@
       </div>
     </div>
 
+    <div id="dbModeIndicator" class="db-mode-indicator d-none">
+      <div class="db-mode-indicator-inner">
+        <span class="db-mode-indicator-dot" id="dbModeDot"></span>
+        <span id="dbModeText">Режим: FILES</span>
+        <button type="button" class="btn btn-sm btn-link db-mode-toggle-btn" id="dbModeToggle">Переключить</button>
+      </div>
+    </div>
+
     <div class="home-grid">
       <a class="home-card" href="/modules">
         <div class="home-card-label">Модули</div>
@@ -49,6 +57,13 @@
         <div class="home-card-action">Открыть SQL-консоль</div>
       </a>
 
+      <a class="home-card" href="/db-modules" id="dbModulesCard">
+        <div class="home-card-label">Database</div>
+        <div class="home-card-title">DB-модули</div>
+        <div class="home-card-text">Управление модулями в PostgreSQL: просмотр, редактирование, публикация и запуск DB-модулей.</div>
+        <div class="home-card-action">Открыть DB-модули</div>
+      </a>
+
       <a class="home-card" href="/help">
         <div class="home-card-label">Docs</div>
         <div class="home-card-title">Справка</div>
@@ -61,5 +76,57 @@
       Разработано командой MLP
     </footer>
   </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/static/js/common/http.js?v=20260328n"></script>
+  <script>
+    (function initDbModeIndicator() {
+      const indicator = document.getElementById('dbModeIndicator');
+      const dot = document.getElementById('dbModeDot');
+      const text = document.getElementById('dbModeText');
+      const toggleBtn = document.getElementById('dbModeToggle');
+      const dbModulesCard = document.getElementById('dbModulesCard');
+
+      async function loadRuntimeContext() {
+        try {
+          const ctx = await fetch('/api/ui/runtime-context').then(r => r.json());
+          indicator.classList.remove('d-none');
+          
+          const isDb = ctx.effectiveMode === 'DATABASE';
+          dot.className = 'db-mode-indicator-dot' + (isDb ? ' db-mode-active' : ' db-mode-inactive');
+          text.textContent = `Режим: ${isDb ? 'DATABASE' : 'FILES'}`;
+          
+          if (ctx.fallbackReason) {
+            text.textContent += ` (fallback: ${ctx.fallbackReason})`;
+          }
+          
+          if (ctx.database.available) {
+            toggleBtn.textContent = isDb ? 'Переключить на FILES' : 'Переключить на DB';
+            toggleBtn.disabled = false;
+          } else {
+            toggleBtn.textContent = 'DB недоступен';
+            toggleBtn.disabled = true;
+          }
+          
+          if (dbModulesCard && !isDb) {
+            dbModulesCard.style.opacity = '0.5';
+            dbModulesCard.title = 'DB-модули доступны только в режиме DATABASE';
+          }
+        } catch (e) {
+          console.error('Failed to load runtime context:', e);
+        }
+      }
+
+      toggleBtn?.addEventListener('click', () => {
+        const isDb = text.textContent.includes('DATABASE');
+        const instruction = isDb 
+          ? 'Для переключения на FILES: измените ui.moduleStore.mode на "files" в application.yml и перезапустите UI.'
+          : 'Для переключения на DB: измените ui.moduleStore.mode на "database" и настройте PostgreSQL connection в application.yml, затем перезапустите UI.';
+        alert(instruction);
+      });
+
+      loadRuntimeContext();
+    })();
+  </script>
 </body>
 </html>

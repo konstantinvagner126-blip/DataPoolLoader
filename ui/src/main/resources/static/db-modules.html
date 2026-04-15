@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DataPool Loader UI — DB-модули</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/static/styles.css?v=20260328n" rel="stylesheet">
+</head>
+<body>
+  <div class="container-fluid py-4">
+    <div class="hero-card mb-4">
+      <div>
+        <div class="eyebrow">Database Mode</div>
+        <h1 class="display-6 mb-1">Управление DB-модулями</h1>
+        <p class="text-secondary mb-0">Просмотр, редактирование и запуск модулей из PostgreSQL. Работа с working copy и публикация изменений.</p>
+      </div>
+      <div class="hero-art" aria-hidden="true">
+        <div class="platform-stage">
+          <div class="platform-node platform-node-db">POSTGRESQL</div>
+          <div class="platform-node platform-node-kafka">REGISTRY</div>
+          <div class="platform-node platform-node-pool">MODULES</div>
+
+          <div class="platform-core">
+            <div class="platform-core-title">DB</div>
+            <div class="platform-core-subtitle">MODULE STORE</div>
+          </div>
+
+          <div class="platform-rail platform-rail-db"><span class="platform-packet packet-db"></span></div>
+          <div class="platform-rail platform-rail-kafka"><span class="platform-packet packet-kafka"></span></div>
+          <div class="platform-rail platform-rail-pool"><span class="platform-packet packet-pool"></span></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="dbModeIndicator" class="db-mode-indicator d-none">
+      <div class="db-mode-indicator-inner">
+        <span class="db-mode-indicator-dot" id="dbModeDot"></span>
+        <span id="dbModeText">Режим: FILES</span>
+        <a href="/" class="btn btn-sm btn-link db-mode-toggle-btn">На главную</a>
+      </div>
+    </div>
+
+    <div id="dbContextAlert" class="alert alert-warning d-none mb-4">
+      <div class="fw-semibold mb-1" id="dbContextAlertTitle">DB-режим недоступен</div>
+      <div id="dbContextAlertText">Для работы с DB-модулями нужно переключить режим на DATABASE и убедиться, что PostgreSQL доступен.</div>
+    </div>
+
+    <div class="row g-4">
+      <div class="col-12 col-xl-3">
+        <div class="panel h-100">
+          <div class="mb-3">
+            <a class="btn btn-outline-dark w-100" href="/">На главную</a>
+          </div>
+          <div class="panel-title">DB-модули</div>
+          <div id="dbCatalogStatus" class="module-catalog-status mt-3 mb-3 text-secondary small"></div>
+          <div id="dbModuleList" class="list-group module-list"></div>
+        </div>
+      </div>
+
+      <div class="col-12 col-xl-9">
+        <div class="panel mb-4">
+          <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div>
+              <div class="panel-title mb-1">Просмотр модуля</div>
+              <div id="selectedModuleLabel" class="text-secondary small">Модуль не выбран</div>
+              <div id="selectedModuleDescription" class="text-secondary small mt-1 d-none"></div>
+              <div id="moduleSourceKind" class="small mt-1 text-secondary"></div>
+            </div>
+            <div class="d-flex flex-wrap gap-2">
+              <button id="reloadButton" class="btn btn-outline-secondary">Обновить</button>
+              <button id="saveWorkingCopyButton" class="btn btn-outline-primary" disabled>Сохранить working copy</button>
+              <button id="discardWorkingCopyButton" class="btn btn-outline-danger" disabled>Discard working copy</button>
+              <button id="publishButton" class="btn btn-success" disabled>Publish</button>
+            </div>
+          </div>
+
+          <div class="d-flex flex-wrap gap-2 mb-3">
+            <button id="createModuleButton" class="btn btn-outline-primary btn-sm">+ Новый модуль</button>
+            <button id="deleteModuleButton" class="btn btn-outline-danger btn-sm" disabled>Удалить модуль</button>
+            <a href="/db-sync" class="btn btn-outline-secondary btn-sm">Импорт из файлов</a>
+          </div>
+          </div>
+
+          <div id="moduleValidationAlert" class="alert d-none mb-3"></div>
+
+          <ul class="nav nav-tabs mb-3" id="editorTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+              <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#configTab" type="button">application.yml</button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link" data-bs-toggle="tab" data-bs-target="#sqlTab" type="button">SQL</button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link" data-bs-toggle="tab" data-bs-target="#metaTab" type="button">Метаданные</button>
+            </li>
+          </ul>
+
+          <div class="tab-content">
+            <div class="tab-pane fade show active" id="configTab">
+              <div id="configEditor" class="editor-frame"></div>
+            </div>
+            <div class="tab-pane fade" id="sqlTab">
+              <div class="mb-2">
+                <select id="sqlFileSelect" class="form-select"></select>
+              </div>
+              <div id="sqlEditor" class="editor-frame"></div>
+            </div>
+            <div class="tab-pane fade" id="metaTab">
+              <div id="moduleMetadata" class="module-metadata"></div>
+            </div>
+          </div>
+        </div>
+
+        <div id="workingCopyInfo" class="panel">
+          <div class="panel-title">Информация о working copy</div>
+          <div id="workingCopyDetails" class="text-secondary small">Working copy не загружена.</div>
+        </div>
+      </div>
+    </div>
+
+    <footer class="footer-note text-center mt-4">
+      Разработано командой MLP
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs/loader.min.js"></script>
+  <script src="/static/js/common/dom.js?v=20260328n"></script>
+  <script src="/static/js/common/http.js?v=20260328n"></script>
+  <script src="/static/js/common/monaco.js?v=20260328n"></script>
+  <script src="/static/js/db/db-modules.js?v=20260328n"></script>
+</body>
+</html>
