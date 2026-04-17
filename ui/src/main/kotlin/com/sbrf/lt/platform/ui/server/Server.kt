@@ -68,6 +68,7 @@ import io.ktor.server.request.receiveMultipart
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondBytes
+import io.ktor.server.response.respondRedirect
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
 import io.ktor.server.routing.delete
@@ -125,11 +126,15 @@ fun startUiServer(
     logger: Logger = LoggerFactory.getLogger("com.sbrf.lt.platform.ui.Startup"),
     starter: UiServerStarter = defaultUiServerStarter(),
     runtimeContextService: UiRuntimeContextService = UiRuntimeContextService(),
-    runtimeConfigResolver: UiRuntimeConfigResolver = UiRuntimeConfigResolver(),
 ) {
     val port = uiConfig.port
     val appsRoot = uiConfig.appsRootPath()
     val storageDir = uiConfig.storageDirPath()
+    val uiConfigLoader = UiConfigLoader()
+    val credentialsService = UiCredentialsService(
+        uiConfigProvider = { runCatching { uiConfigLoader.load() }.getOrDefault(uiConfig) },
+    )
+    val runtimeConfigResolver = UiRuntimeConfigResolver(credentialsService)
     val runtimeContext = runtimeContextService.resolve(runtimeConfigResolver.resolve(uiConfig))
     if (appsRoot != null) {
         logger.info("Apps root определен: {}", appsRoot)
@@ -147,7 +152,24 @@ fun startUiServer(
     runtimeContext.fallbackReason?.let { reason ->
         logger.warn("Режим UI переведен в FILES: {}", reason)
     }
-    starter.start(port, uiStartupModule(uiConfig, logger, runtimeConfigResolver, runtimeContext))
+    starter.start(
+        port,
+        uiStartupModule(
+            uiConfig = uiConfig,
+            logger = logger,
+            runtimeConfigResolver = runtimeConfigResolver,
+            runtimeContext = runtimeContext,
+            moduleInstaller = {
+                uiModule(
+                    uiConfig = uiConfig,
+                    uiConfigLoader = uiConfigLoader,
+                    credentialsService = credentialsService,
+                    runtimeConfigResolver = runtimeConfigResolver,
+                    runtimeContext = runtimeContext,
+                )
+            },
+        ),
+    )
 }
 
 fun Application.uiModule(
@@ -269,6 +291,10 @@ fun Application.uiModule(
             )
         }
         get("/modules") {
+            if (currentRuntimeContext().effectiveMode != UiModuleStoreMode.FILES) {
+                call.respondRedirect("/?modeAccessError=modules", permanent = false)
+                return@get
+            }
             val content = loadStaticText("static/index.html")
             call.respondText(
                 content,
@@ -290,6 +316,10 @@ fun Application.uiModule(
             )
         }
         get("/db-modules") {
+            if (currentRuntimeContext().effectiveMode != UiModuleStoreMode.DATABASE) {
+                call.respondRedirect("/?modeAccessError=db-modules", permanent = false)
+                return@get
+            }
             val content = loadStaticText("static/db-modules.html")
             call.respondText(
                 content,
@@ -297,6 +327,10 @@ fun Application.uiModule(
             )
         }
         get("/db-sync") {
+            if (currentRuntimeContext().effectiveMode != UiModuleStoreMode.DATABASE) {
+                call.respondRedirect("/?modeAccessError=db-sync", permanent = false)
+                return@get
+            }
             val content = loadStaticText("static/db-sync.html")
             call.respondText(
                 content,

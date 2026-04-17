@@ -1,6 +1,5 @@
 (function initDbModulesPage() {
   const { escapeHtml, fetchJson, postJson, withMonacoReady, createMonacoEditor } = window.DataPoolCommon || {};
-  const { createRuntimeModeController } = window.DataPoolRuntimeMode || {};
 
   let configEditor = null;
   let sqlEditor = null;
@@ -12,11 +11,6 @@
   let syncState = null;
   let currentRuns = [];
 
-  const dbModeIndicator = document.getElementById('dbModeIndicator');
-  const dbModeDot = document.getElementById('dbModeDot');
-  const dbModeText = document.getElementById('dbModeText');
-  const dbModeStatus = document.getElementById('dbModeStatus');
-  const dbModeToggle = document.getElementById('dbModeToggle');
   const dbContextAlert = document.getElementById('dbContextAlert');
   const dbModuleList = document.getElementById('dbModuleList');
   const dbCatalogStatus = document.getElementById('dbCatalogStatus');
@@ -34,15 +28,6 @@
   const deleteModuleButton = document.getElementById('deleteModuleButton');
   const workingCopyDetails = document.getElementById('workingCopyDetails');
   const dbRunsList = document.getElementById('dbRunsList');
-  const runtimeModeController = createRuntimeModeController ? createRuntimeModeController({
-    indicatorEl: dbModeIndicator,
-    dotEl: dbModeDot,
-    textEl: dbModeText,
-    statusEl: dbModeStatus,
-    toggleEl: dbModeToggle,
-    onContextChanged: handleRuntimeContextChanged,
-  }) : null;
-
   reloadButton.addEventListener('click', () => {
     if (!selectedModuleId) return;
     loadModule(selectedModuleId);
@@ -186,11 +171,7 @@
 
   async function loadRuntimeContext() {
     try {
-      if (runtimeModeController) {
-        runtimeContext = await runtimeModeController.loadContext();
-      } else {
-        runtimeContext = await fetchJson('/api/ui/runtime-context', {}, 'Не удалось загрузить runtime context.');
-      }
+      runtimeContext = await fetchJson('/api/ui/runtime-context', {}, 'Не удалось загрузить runtime context.');
     } catch (e) {
       console.error(e);
       showDbContextError('Не удалось определить состояние DB-режима.');
@@ -213,23 +194,8 @@
     renderDbCatalogStatus(runtimeContext);
   }
 
-  async function handleRuntimeContextChanged(context) {
-    runtimeContext = context;
-    await loadSyncState();
-    renderRuntimeContext();
-    renderDbCatalogStatus(runtimeContext);
-    if (canWorkWithDbModules()) {
-      await loadDbModuleCatalog();
-      if (selectedModuleId) {
-        await loadModuleRuns(selectedModuleId);
-      }
-      return;
-    }
-    renderUnavailableCatalogState('Каталог DB-модулей временно недоступен.');
-  }
-
   function canWorkWithDbModules() {
-    return runtimeContext?.effectiveMode === 'DATABASE' && syncState?.maintenanceMode !== true;
+    return String(runtimeContext?.effectiveMode || '').toLowerCase() === 'database' && syncState?.maintenanceMode !== true;
   }
 
   function hasActiveSingleSyncs() {
@@ -260,7 +226,7 @@
   }
 
   function renderRuntimeContext() {
-    const isDb = runtimeContext?.effectiveMode === 'DATABASE';
+    const isDb = String(runtimeContext?.effectiveMode || '').toLowerCase() === 'database';
     const maintenanceMode = syncState?.maintenanceMode === true;
 
     if (!isDb) {
@@ -412,7 +378,7 @@
 
   function renderDbCatalogStatus(ctx) {
     if (!ctx) return;
-    const isDb = ctx.effectiveMode === 'DATABASE';
+    const isDb = String(ctx.effectiveMode || '').toLowerCase() === 'database';
     const maintenanceMode = syncState?.maintenanceMode === true;
     const activeSingleSyncCount = hasActiveSingleSyncs() ? syncState.activeSingleSyncs.length : 0;
     dbCatalogStatus.className = `module-catalog-status mt-3 mb-3 small ${(isDb && !maintenanceMode) ? 'module-catalog-ready' : 'module-catalog-warning'}`;

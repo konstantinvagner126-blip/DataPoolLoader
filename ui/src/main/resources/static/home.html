@@ -34,40 +34,52 @@
       </div>
     </div>
 
-    <div id="dbModeIndicator" class="db-mode-indicator d-none">
-      <div class="db-mode-indicator-inner">
-        <span class="db-mode-indicator-dot" id="dbModeDot"></span>
-        <span id="dbModeText">Режим: FILES</span>
-        <span id="dbModeStatus" class="db-mode-status"></span>
-        <label class="runtime-mode-switch" aria-label="Переключатель режима UI">
-          <span class="runtime-mode-switch-label">FILES</span>
-          <input type="checkbox" id="dbModeToggle">
-          <span class="runtime-mode-switch-track"></span>
-          <span class="runtime-mode-switch-label">DB</span>
-        </label>
-      </div>
-    </div>
+    <div id="modeAccessAlert" class="alert alert-warning d-none mt-3 mb-4"></div>
 
     <div class="home-grid">
-      <a class="home-card" href="/modules">
-        <div class="home-card-label">Модули</div>
-        <div class="home-card-title">Загрузка данных</div>
-        <div class="home-card-text">Запуск app-модулей, редактирование конфига и SQL, просмотр истории запусков и summary.</div>
-        <div class="home-card-action">Открыть модуль загрузки</div>
-      </a>
+      <section class="home-group-card">
+        <div class="home-group-header">
+          <div class="home-group-header-main">
+            <div class="home-card-label">Data Pools</div>
+            <div class="home-group-title">Загрузка дата пулов</div>
+            <div class="home-group-text">Выбери источник конфигурации модулей и открой соответствующий режим работы.</div>
+          </div>
+          <div id="dbModeIndicator" class="db-mode-indicator d-none">
+            <div class="db-mode-indicator-inner">
+              <span class="db-mode-indicator-dot" id="dbModeDot"></span>
+              <span id="dbModeText">Режим: FILES</span>
+              <span id="dbModeStatus" class="db-mode-status"></span>
+              <label class="runtime-mode-switch" aria-label="Переключатель режима UI">
+                <span class="runtime-mode-switch-label">FILES</span>
+                <input type="checkbox" id="dbModeToggle">
+                <span class="runtime-mode-switch-track"></span>
+                <span class="runtime-mode-switch-label">DB</span>
+              </label>
+            </div>
+          </div>
+        </div>
+        <div class="home-group-grid">
+          <a class="home-card home-mode-card" href="/modules" id="filesModulesCard">
+            <div class="home-card-label">Mode</div>
+            <div class="home-card-title">Файловый режим</div>
+            <div class="home-card-text">Запуск app-модулей из файловой структуры проекта, редактирование YAML и SQL, история запусков и summary.</div>
+            <div class="home-card-action">Открыть файловые модули</div>
+          </a>
+
+          <a class="home-card home-mode-card" href="/db-modules" id="dbModulesCard">
+            <div class="home-card-label">Mode</div>
+            <div class="home-card-title">DB режим</div>
+            <div class="home-card-text">Управление модулями в PostgreSQL registry: просмотр, редактирование, публикация и запуск DB-модулей.</div>
+            <div class="home-card-action">Открыть DB-модули</div>
+          </a>
+        </div>
+      </section>
 
       <a class="home-card" href="/sql-console">
         <div class="home-card-label">SQL</div>
         <div class="home-card-title">SQL-консоль</div>
         <div class="home-card-text">Ручное выполнение SQL по выбранным источникам, просмотр результатов по shard/source и служебные операции.</div>
         <div class="home-card-action">Открыть SQL-консоль</div>
-      </a>
-
-      <a class="home-card" href="/db-modules" id="dbModulesCard">
-        <div class="home-card-label">Database</div>
-        <div class="home-card-title">DB-модули</div>
-        <div class="home-card-text">Управление модулями в PostgreSQL: просмотр, редактирование, публикация и запуск DB-модулей.</div>
-        <div class="home-card-action">Открыть DB-модули</div>
       </a>
 
       <a class="home-card" href="/help">
@@ -93,7 +105,9 @@
       const text = document.getElementById('dbModeText');
       const status = document.getElementById('dbModeStatus');
       const toggle = document.getElementById('dbModeToggle');
+      const filesModulesCard = document.getElementById('filesModulesCard');
       const dbModulesCard = document.getElementById('dbModulesCard');
+      const modeAccessAlert = document.getElementById('modeAccessAlert');
       const runtimeMode = window.DataPoolRuntimeMode || {};
       const controller = runtimeMode.createRuntimeModeController({
         indicatorEl: indicator,
@@ -104,17 +118,59 @@
         onContextChanged: renderHomeState,
       });
 
+      [filesModulesCard, dbModulesCard].filter(Boolean).forEach(card => {
+        card.addEventListener('click', event => {
+          if (card.dataset.disabled === 'true') {
+            event.preventDefault();
+          }
+        });
+      });
+
       function renderHomeState(ctx) {
-        const isDb = ctx.effectiveMode === 'DATABASE';
-        if (dbModulesCard && !isDb) {
-          dbModulesCard.style.opacity = '0.5';
-          dbModulesCard.title = ctx.fallbackReason || 'DB-модули доступны только в режиме DATABASE';
+        const isDb = String(ctx.effectiveMode || '').toLowerCase() === 'database';
+        setCardAvailability(
+          filesModulesCard,
+          !isDb,
+          'Страница файловых модулей доступна только в режиме FILES.'
+        );
+        setCardAvailability(
+          dbModulesCard,
+          isDb,
+          ctx.fallbackReason || 'Страница DB-модулей доступна только в режиме DATABASE.'
+        );
+        renderModeAccessAlert(ctx);
+      }
+
+      function setCardAvailability(card, enabled, disabledTitle) {
+        if (!card) {
           return;
         }
-        if (dbModulesCard) {
-          dbModulesCard.style.opacity = '1';
-          dbModulesCard.title = '';
+        card.dataset.disabled = enabled ? 'false' : 'true';
+        card.classList.toggle('home-card-disabled', !enabled);
+        card.setAttribute('aria-disabled', enabled ? 'false' : 'true');
+        card.title = enabled ? '' : disabledTitle;
+      }
+
+      function renderModeAccessAlert(ctx) {
+        if (!modeAccessAlert) {
+          return;
         }
+        const params = new URLSearchParams(window.location.search);
+        const modeAccessError = params.get('modeAccessError');
+        if (!modeAccessError) {
+          modeAccessAlert.classList.add('d-none');
+          modeAccessAlert.textContent = '';
+          return;
+        }
+        if (modeAccessError === 'modules') {
+          modeAccessAlert.textContent = 'Страница файловых модулей доступна только в режиме FILES.';
+        } else if (modeAccessError === 'db-modules' || modeAccessError === 'db-sync') {
+          const fallbackReason = ctx.fallbackReason ? ` Текущий fallback: ${ctx.fallbackReason}` : '';
+          modeAccessAlert.textContent = `Страницы DB-режима доступны только в режиме DATABASE.${fallbackReason}`;
+        } else {
+          modeAccessAlert.textContent = 'Страница недоступна в текущем режиме UI.';
+        }
+        modeAccessAlert.classList.remove('d-none');
       }
 
       controller.loadContext().catch(e => {

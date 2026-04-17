@@ -20,7 +20,6 @@
 
   const moduleList = document.getElementById("moduleList");
   const moduleCatalogStatus = document.getElementById("moduleCatalogStatus");
-  const dbModeBadge = document.getElementById("dbModeBadge");
   const selectedModuleLabel = document.getElementById("selectedModuleLabel");
   const selectedModuleDescription = document.getElementById("selectedModuleDescription");
   const moduleDraftStatus = document.getElementById("moduleDraftStatus");
@@ -158,34 +157,10 @@
     });
 
     formController.initialize();
-    await loadRuntimeContext();
     await loadModules();
     await refreshCredentialsStatus();
     connectWebSocket();
   });
-
-  async function loadRuntimeContext() {
-    try {
-      const ctx = await fetchJson("/api/ui/runtime-context", {}, "Не удалось загрузить runtime context.");
-      renderDbModeBadge(ctx);
-    } catch (e) {
-      console.error(e);
-    }
-  }
-
-  function renderDbModeBadge(ctx) {
-    if (!dbModeBadge) return;
-    dbModeBadge.classList.remove('d-none');
-    const isDb = ctx.effectiveMode === 'DATABASE';
-    dbModeBadge.innerHTML = `
-      <div class="db-mode-badge-inner">
-        <span class="db-mode-badge-dot ${isDb ? 'active' : 'inactive'}"></span>
-        <span>${isDb ? 'DB Mode' : 'Files Mode'}</span>
-      </div>
-      ${ctx.database.available ? `<div class="db-mode-badge-db"><span class="db-mode-badge-db-dot active"></span> PostgreSQL доступен</div>` : ''}
-      ${ctx.fallbackReason ? `<div class="db-mode-badge-warning">Fallback: ${escapeHtml(ctx.fallbackReason)}</div>` : ''}
-    `;
-  }
 
   async function loadModules() {
     try {

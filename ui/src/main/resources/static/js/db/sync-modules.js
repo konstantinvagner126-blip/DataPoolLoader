@@ -1,12 +1,6 @@
 (function initDbSyncPage() {
   const { fetchJson, postJson, escapeHtml } = window.DataPoolCommon || {};
-  const { createRuntimeModeController } = window.DataPoolRuntimeMode || {};
 
-  const dbModeIndicator = document.getElementById('dbModeIndicator');
-  const dbModeDot = document.getElementById('dbModeDot');
-  const dbModeText = document.getElementById('dbModeText');
-  const dbModeStatus = document.getElementById('dbModeStatus');
-  const dbModeToggle = document.getElementById('dbModeToggle');
   const dbContextAlert = document.getElementById('dbContextAlert');
   const dbContextAlertTitle = document.getElementById('dbContextAlertTitle');
   const dbContextAlertText = document.getElementById('dbContextAlertText');
@@ -21,14 +15,6 @@
 
   let runtimeContext = null;
   let syncState = null;
-  const runtimeModeController = createRuntimeModeController ? createRuntimeModeController({
-    indicatorEl: dbModeIndicator,
-    dotEl: dbModeDot,
-    textEl: dbModeText,
-    statusEl: dbModeStatus,
-    toggleEl: dbModeToggle,
-    onContextChanged: handleRuntimeContextChanged,
-  }) : null;
 
   syncAllButton.addEventListener('click', async () => {
     if (!confirm('Синхронизировать все файловые модули в PostgreSQL?')) return;
@@ -63,11 +49,7 @@
 
   async function loadRuntimeContext() {
     try {
-      if (runtimeModeController) {
-        runtimeContext = await runtimeModeController.loadContext();
-      } else {
-        runtimeContext = await fetchJson('/api/ui/runtime-context', {}, 'Не удалось загрузить runtime context.');
-      }
+      runtimeContext = await fetchJson('/api/ui/runtime-context', {}, 'Не удалось загрузить runtime context.');
     } catch (e) {
       console.error(e);
     }
@@ -83,7 +65,7 @@
   }
 
   function renderRuntimeContext() {
-    const isDb = runtimeContext?.effectiveMode === 'DATABASE';
+    const isDb = String(runtimeContext?.effectiveMode || '').toLowerCase() === 'database';
     const maintenanceMode = syncState?.maintenanceMode === true;
     const activeSingleSyncs = Array.isArray(syncState?.activeSingleSyncs) ? syncState.activeSingleSyncs : [];
 
@@ -161,12 +143,6 @@
       ? new Date(activeSync.startedAt).toLocaleString()
       : null;
     return `Модуль ${moduleCode} импортируется пользователем ${actorName}${startedAt ? ` с ${startedAt}.` : '.'}`;
-  }
-
-  async function handleRuntimeContextChanged(context) {
-    runtimeContext = context;
-    await loadSyncState();
-    renderRuntimeContext();
   }
 
   async function refreshPageState() {

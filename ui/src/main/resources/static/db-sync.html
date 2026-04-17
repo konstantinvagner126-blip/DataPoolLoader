@@ -17,21 +17,6 @@
       </div>
     </div>
 
-    <div id="dbModeIndicator" class="db-mode-indicator d-none">
-      <div class="db-mode-indicator-inner">
-        <span class="db-mode-indicator-dot" id="dbModeDot"></span>
-        <span id="dbModeText">Режим: FILES</span>
-        <span id="dbModeStatus" class="db-mode-status"></span>
-        <label class="runtime-mode-switch" aria-label="Переключатель режима UI">
-          <span class="runtime-mode-switch-label">FILES</span>
-          <input type="checkbox" id="dbModeToggle">
-          <span class="runtime-mode-switch-track"></span>
-          <span class="runtime-mode-switch-label">DB</span>
-        </label>
-        <a href="/db-modules" class="btn btn-sm btn-link db-mode-action-link">К DB-модулям</a>
-      </div>
-    </div>
-
     <div id="dbContextAlert" class="alert alert-warning d-none mb-4">
       <div class="fw-semibold mb-1" id="dbContextAlertTitle">DB-режим недоступен</div>
       <div id="dbContextAlertText">Для импорта нужен активный DB-режим.</div>
@@ -84,7 +69,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
   <script src="/static/js/common/http.js?v=20260328n"></script>
-  <script src="/static/js/common/runtime-mode.js?v=20260417a"></script>
   <script src="/static/js/db/sync-modules.js?v=20260328n"></script>
 </body>
 </html>

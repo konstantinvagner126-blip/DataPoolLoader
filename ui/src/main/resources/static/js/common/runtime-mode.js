@@ -13,6 +13,10 @@
     let runtimeContext = null;
     let pending = false;
 
+    function normalizedMode(mode) {
+      return String(mode || "").trim().toLowerCase();
+    }
+
     function canRequestDatabaseMode(context) {
       return context?.database?.available === true;
     }
@@ -24,8 +28,8 @@
 
       indicatorEl.classList.remove("d-none");
 
-      const isDb = runtimeContext?.effectiveMode === "DATABASE";
-      const requestedDb = runtimeContext?.requestedMode === "DATABASE";
+      const isDb = normalizedMode(runtimeContext?.effectiveMode) === "database";
+      const requestedDb = normalizedMode(runtimeContext?.requestedMode) === "database";
       dotEl.className = "db-mode-indicator-dot" + (isDb ? " db-mode-active" : " db-mode-inactive");
       textEl.textContent = `Режим: ${isDb ? "DATABASE" : "FILES"}`;
 

@@ -25,6 +25,8 @@ import com.sbrf.lt.platform.ui.config.UiConfigPersistenceService
 import com.sbrf.lt.platform.ui.config.UiModuleStoreConfig
 import com.sbrf.lt.platform.ui.config.UiModuleStoreMode
 import com.sbrf.lt.platform.ui.config.UiModuleStorePostgresConfig
+import com.sbrf.lt.platform.ui.config.UiRuntimeActorState
+import com.sbrf.lt.platform.ui.config.UiRuntimeContext
 import com.sbrf.lt.platform.ui.config.UiRuntimeContextService
 import com.sbrf.lt.platform.ui.config.UiRuntimeConfigResolver
 import com.sbrf.lt.platform.ui.config.schemaName
@@ -257,7 +259,9 @@ class ServerTest {
 
         val homeHtml = client.get("/").bodyAsText()
         assertTrue(homeHtml.contains("Load Testing Data Platform"))
-        assertTrue(homeHtml.contains("Загрузка данных"))
+        assertTrue(homeHtml.contains("Загрузка дата пулов"))
+        assertTrue(homeHtml.contains("Файловый режим"))
+        assertTrue(homeHtml.contains("DB режим"))
         assertTrue(homeHtml.contains("SQL-консоль"))
         assertTrue(homeHtml.contains("Справка"))
 
@@ -635,6 +639,61 @@ class ServerTest {
         assertTrue(catalog.contains("\"mode\":\"NOT_CONFIGURED\""))
         assertTrue(catalog.contains("Путь ui.appsRoot не задан"))
         assertTrue(catalog.contains("\"modules\":[]"))
+    }
+
+    @Test
+    fun `modules page redirects to home when effective mode is database`() = testApplication {
+        val noRedirectClient = createClient {
+            followRedirects = false
+        }
+        val uiConfig = UiAppConfig(
+            storageDir = Files.createTempDirectory("ui-server-state-").toString(),
+            moduleStore = UiModuleStoreConfig(mode = UiModuleStoreMode.DATABASE),
+            sqlConsole = SqlConsoleConfig(),
+        )
+        application {
+            uiModule(
+                uiConfig = uiConfig,
+                runtimeContextService = object : UiRuntimeContextService() {
+                    override fun resolve(uiConfig: UiAppConfig): UiRuntimeContext =
+                        testRuntimeContext(UiModuleStoreMode.DATABASE)
+                },
+            )
+        }
+
+        val response = noRedirectClient.get("/modules")
+
+        assertEquals(HttpStatusCode.Found, response.status)
+        assertEquals("/?modeAccessError=modules", response.headers[HttpHeaders.Location])
+    }
+
+    @Test
+    fun `db pages redirect to home when effective mode is files`() = testApplication {
+        val noRedirectClient = createClient {
+            followRedirects = false
+        }
+        val uiConfig = UiAppConfig(
+            storageDir = Files.createTempDirectory("ui-server-state-").toString(),
+            moduleStore = UiModuleStoreConfig(mode = UiModuleStoreMode.FILES),
+            sqlConsole = SqlConsoleConfig(),
+        )
+        application {
+            uiModule(
+                uiConfig = uiConfig,
+                runtimeContextService = object : UiRuntimeContextService() {
+                    override fun resolve(uiConfig: UiAppConfig): UiRuntimeContext =
+                        testRuntimeContext(UiModuleStoreMode.FILES)
+                },
+            )
+        }
+
+        val dbModulesResponse = noRedirectClient.get("/db-modules")
+        val dbSyncResponse = noRedirectClient.get("/db-sync")
+
+        assertEquals(HttpStatusCode.Found, dbModulesResponse.status)
+        assertEquals("/?modeAccessError=db-modules", dbModulesResponse.headers[HttpHeaders.Location])
+        assertEquals(HttpStatusCode.Found, dbSyncResponse.status)
+        assertEquals("/?modeAccessError=db-sync", dbSyncResponse.headers[HttpHeaders.Location])
     }
 
     @Test
@@ -1610,6 +1669,25 @@ class ServerTest {
         type == java.lang.Long.TYPE -> 0L
         else -> null
     }
+
+    private fun testRuntimeContext(mode: UiModuleStoreMode): UiRuntimeContext =
+        UiRuntimeContext(
+            requestedMode = mode,
+            effectiveMode = mode,
+            actor = UiRuntimeActorState(
+                resolved = true,
+                actorId = "kwdev",
+                actorSource = "OS_LOGIN",
+                actorDisplayName = "kwdev",
+                message = "ok",
+            ),
+            database = UiDatabaseConnectionStatus(
+                configured = mode == UiModuleStoreMode.DATABASE,
+                available = mode == UiModuleStoreMode.DATABASE,
+                schema = "ui_registry",
+                message = if (mode == UiModuleStoreMode.DATABASE) "ok" else "db unavailable",
+            ),
+        )
 
     private fun createProject() = Files.createTempDirectory("ui-server").apply {
         resolve("settings.gradle.kts").writeText("rootProject.name = \"test\"")
