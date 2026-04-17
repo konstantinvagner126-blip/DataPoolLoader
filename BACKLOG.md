@@ -548,7 +548,7 @@
 
 Статус:
 
-- частично реализовано
+- реализовано
 
 Цель:
 
@@ -616,16 +616,17 @@
   - страница DB-модулей помечает импортируемые модули и блокирует запись только для выбранного занятого модуля;
   - страница импорта показывает активные `single sync` и не дает повторно импортировать тот же модуль;
   - backend блокирует `save/discard/publish/delete` только для модуля, который сейчас импортируется.
-
-Осталось:
-
-- при необходимости расширить отображение истории/деталей import-run на UI.
+- `2026-04-17`: добавлена история и detail-view import-run на странице `/db-sync`:
+  - `GET /api/db/sync/runs`;
+  - `GET /api/db/sync/runs/{syncRunId}`;
+  - UI показывает историю запусков импорта, сводку выбранного запуска и детали по каждому модулю;
+  - persisted `errorMessage` теперь доступен в истории import-run.
 
 ### 14. Запуск DB-модулей и история запусков
 
 Статус:
 
-- частично реализовано
+- реализовано
 
 Цель:
 
@@ -724,11 +725,11 @@
   - endpoint `GET /api/db/modules/{id}/runs/{runId}`;
   - UI показывает structured summary, source results, timeline событий и артефакты;
   - в детальном блоке доступны `runId`, `executionSnapshotId`, target status и raw `summary.json`.
-
-Осталось:
-
-- при необходимости вынести историю DB-запусков в отдельную страницу вместо текущей детальной панели на странице модуля;
-- расширить фильтрацию и навигацию по длинной истории запусков.
+- `2026-04-17`: DB run-history доведен до общего экрана `История и результаты`:
+  - единый route `/module-runs`;
+  - одинаковый экран для `FILES` и `DATABASE`;
+  - на editor-экранах оставлен только компактный live-блок прогресса;
+  - общий экран поддерживает limit, поиск и фильтры по предупреждениям.
 
 ### 15. Cleanup истории запусков DB-модулей
 
@@ -885,6 +886,10 @@
 
 ### 21. Refactoring крупных классов
 
+Статус:
+
+- частично реализовано
+
 Кандидаты:
 
 - `core/src/main/kotlin/com/sbrf/lt/datapool/app/ApplicationRunner.kt`
@@ -898,6 +903,26 @@
 - снизить сложность сопровождения;
 - выделить более узкие сервисы;
 - упростить API между `core` и `ui`.
+
+Что уже сделано:
+
+- `2026-04-17`: `Server.kt` декомпозирован:
+  - выделен `UiServerContext` с runtime/service wiring;
+  - route-группы вынесены в отдельные файлы:
+    - `PageRoutes.kt`;
+    - `ModuleRunRoutes.kt`;
+    - `DatabaseRoutes.kt`;
+    - `CommonRoutes.kt`;
+    - `SqlConsoleRoutes.kt`;
+  - `uiModule` теперь содержит только bootstrap Ktor и регистрацию route-групп.
+
+Осталось:
+
+- довести рефакторинг остальных кандидатов:
+  - `ApplicationRunner.kt`;
+  - `SqlConsoleService.kt`;
+  - `DatabaseModuleStore.kt`;
+  - при необходимости дополнительно упростить `RunManager.kt`.
 
 ### 22. Launcher-скрипты и onboarding
 
@@ -915,7 +940,7 @@
 
 Статус:
 
-- частично реализовано
+- реализовано
 
 Цель:
 
@@ -959,17 +984,23 @@
 - `2026-04-15`: `data class` вынесены из `DatabaseModuleStore` в отдельные файлы;
 - `2026-04-16`: `data class` вынесены из `ModuleRegistry`, `ModuleSyncService`, `RunManager`, `RunStateStore`, `SqlConsoleQueryManager`, `SqlConsoleStateStore`.
 - `2026-04-17`: вынесены модели DB run-history detail-view и связанные response-классы в отдельные `.kt`-файлы.
-
-Осталось:
-
-- разнести текущий большой `UiModels.kt` по тематическим пакетам;
-- довести группировку DTO до целевого package layout из этого backlog-пункта.
+- `2026-04-17`: распилен большой `UiModels.kt`:
+  - модели разнесены по отдельным `.kt`-файлам;
+  - файлы сгруппированы по тематическим каталогам:
+    - `model/module`;
+    - `model/config`;
+    - `model/run`;
+    - `model/sqlconsole`;
+    - `model/common`;
+    - `model/sync`;
+  - mapping-функции вынесены из общего файла в тематические `*Mappings.kt`;
+  - всем новым `data class` добавлены короткие русские KDoc-комментарии.
 
 ### 24. Интерфейсы для основных механизмов ядра
 
 Статус:
 
-- частично реализовано
+- реализовано
 
 Цель:
 
@@ -1044,6 +1075,11 @@
 - `2026-04-16`: добавлен базовый `RuntimeModuleSnapshot` как единый runtime-контракт ядра.
 - `2026-04-16`: file-based подготовка запуска вынесена в `FilesModuleExecutionSource`.
 - `2026-04-17`: DB-запуск переведен на тот же snapshot-based контракт через `DatabaseModuleExecutionSource` и `DatabaseModuleRunService`.
+- `2026-04-17`: concrete-инфраструктурные реализации приведены к явным именам:
+  - `PostgresExporter` -> `PostgresSourceExporter`;
+  - `PostgresImporter` -> `PostgresTargetImporter`;
+  - `ApplicationRunner` и тесты переведены на новые имена;
+  - deprecated aliases оставлены только для мягкой обратной совместимости.
 
 Что считаем неправильным:
 

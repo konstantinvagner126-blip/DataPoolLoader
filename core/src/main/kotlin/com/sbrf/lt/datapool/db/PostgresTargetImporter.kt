@@ -12,7 +12,10 @@ import java.sql.Connection
 import java.sql.DriverManager
 import java.time.Instant
 
-class PostgresImporter(
+/**
+ * PostgreSQL-реализация порта загрузки merged CSV в target-таблицу.
+ */
+class PostgresTargetImporter(
     private val connectionProvider: (String, String, String) -> Connection = { jdbcUrl, username, password ->
         DriverManager.getConnection(jdbcUrl, username, password)
     },
@@ -108,3 +111,6 @@ class PostgresImporter(
         return "\"$identifier\""
     }
 }
+
+@Deprecated("Используй PostgresTargetImporter", ReplaceWith("PostgresTargetImporter"))
+typealias PostgresImporter = PostgresTargetImporter

@@ -1,5 +1,6 @@
 package com.sbrf.lt.datapool.module.sync
 
+import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.sbrf.lt.datapool.config.ConfigLoader
@@ -55,6 +56,64 @@ open class ModuleSyncService(
                 activeFullSync = activeFullSync,
                 activeSingleSyncs = activeSingleSyncs,
             )
+        }
+    }
+
+    open fun listSyncRuns(limit: Int = 20): List<ModuleSyncRunSummary> {
+        val normalizedSchema = normalizeRegistrySchemaName(schema)
+        connectionProvider.getConnection().use { connection ->
+            val sql = """
+                select
+                    r.sync_run_id::text as sync_run_id,
+                    r.scope,
+                    r.module_code,
+                    r.status,
+                    r.started_at,
+                    r.finished_at,
+                    r.started_by_actor_id,
+                    r.started_by_actor_source,
+                    r.started_by_actor_display_name,
+                    coalesce(count(i.sync_run_item_id), 0) as total_processed,
+                    coalesce(sum(case when i.action = 'CREATED' then 1 else 0 end), 0) as total_created,
+                    coalesce(sum(case when i.action = 'UPDATED' then 1 else 0 end), 0) as total_updated,
+                    coalesce(sum(case when i.action like 'SKIPPED%%' then 1 else 0 end), 0) as total_skipped,
+                    coalesce(sum(case when i.status = 'FAILED' then 1 else 0 end), 0) as total_failed
+                from $normalizedSchema.module_sync_run r
+                left join $normalizedSchema.module_sync_run_item i
+                    on i.sync_run_id = r.sync_run_id
+                group by
+                    r.sync_run_id,
+                    r.scope,
+                    r.module_code,
+                    r.status,
+                    r.started_at,
+                    r.finished_at,
+                    r.started_by_actor_id,
+                    r.started_by_actor_source,
+                    r.started_by_actor_display_name
+                order by r.started_at desc
+                limit ?
+            """.trimIndent()
+
+            connection.prepareStatement(sql).use { stmt ->
+                stmt.setInt(1, limit.coerceIn(1, 200))
+                stmt.executeQuery().use { rs ->
+                    val result = mutableListOf<ModuleSyncRunSummary>()
+                    while (rs.next()) {
+                        result += rs.toSyncRunSummary()
+                    }
+                    return result
+                }
+            }
+        }
+    }
+
+    open fun loadSyncRunDetails(syncRunId: String): ModuleSyncRunDetails? {
+        val normalizedSchema = normalizeRegistrySchemaName(schema)
+        connectionProvider.getConnection().use { connection ->
+            val summary = loadSyncRunSummary(connection, normalizedSchema, syncRunId) ?: return null
+            val items = loadSyncRunItems(connection, normalizedSchema, syncRunId)
+            return ModuleSyncRunDetails(run = summary, items = items)
         }
     }
 
@@ -682,6 +741,93 @@ open class ModuleSyncService(
         )
     }
 
+    private fun loadSyncRunSummary(
+        connection: Connection,
+        normalizedSchema: String,
+        syncRunId: String,
+    ): ModuleSyncRunSummary? {
+        val sql = """
+            select
+                r.sync_run_id::text as sync_run_id,
+                r.scope,
+                r.module_code,
+                r.status,
+                r.started_at,
+                r.finished_at,
+                r.started_by_actor_id,
+                r.started_by_actor_source,
+                r.started_by_actor_display_name,
+                coalesce(count(i.sync_run_item_id), 0) as total_processed,
+                coalesce(sum(case when i.action = 'CREATED' then 1 else 0 end), 0) as total_created,
+                coalesce(sum(case when i.action = 'UPDATED' then 1 else 0 end), 0) as total_updated,
+                coalesce(sum(case when i.action like 'SKIPPED%%' then 1 else 0 end), 0) as total_skipped,
+                coalesce(sum(case when i.status = 'FAILED' then 1 else 0 end), 0) as total_failed
+            from $normalizedSchema.module_sync_run r
+            left join $normalizedSchema.module_sync_run_item i
+                on i.sync_run_id = r.sync_run_id
+            where r.sync_run_id = ?::uuid
+            group by
+                r.sync_run_id,
+                r.scope,
+                r.module_code,
+                r.status,
+                r.started_at,
+                r.finished_at,
+                r.started_by_actor_id,
+                r.started_by_actor_source,
+                r.started_by_actor_display_name
+        """.trimIndent()
+
+        connection.prepareStatement(sql).use { stmt ->
+            stmt.setString(1, syncRunId)
+            stmt.executeQuery().use { rs ->
+                if (!rs.next()) {
+                    return null
+                }
+                return rs.toSyncRunSummary()
+            }
+        }
+    }
+
+    private fun loadSyncRunItems(
+        connection: Connection,
+        normalizedSchema: String,
+        syncRunId: String,
+    ): List<SyncItemResult> {
+        val sql = """
+            select
+                module_code,
+                action,
+                status,
+                detected_hash,
+                result_revision_id::text as result_revision_id,
+                details::text as details
+            from $normalizedSchema.module_sync_run_item
+            where sync_run_id = ?::uuid
+            order by module_code asc, sync_run_item_id asc
+        """.trimIndent()
+
+        connection.prepareStatement(sql).use { stmt ->
+            stmt.setString(1, syncRunId)
+            stmt.executeQuery().use { rs ->
+                val result = mutableListOf<SyncItemResult>()
+                while (rs.next()) {
+                    val details = readDetailsMap(rs.getString("details"))
+                    result += SyncItemResult(
+                        moduleCode = rs.getString("module_code"),
+                        action = rs.getString("action"),
+                        status = rs.getString("status"),
+                        detectedHash = rs.getString("detected_hash"),
+                        resultRevisionId = rs.getString("result_revision_id"),
+                        errorMessage = details["errorMessage"]?.toString(),
+                        details = details,
+                    )
+                }
+                return result
+            }
+        }
+    }
+
     private fun loadExistingModule(
         normalizedSchema: String,
         moduleCode: String,
@@ -916,7 +1062,7 @@ open class ModuleSyncService(
             stmt.setString(5, item.status)
             stmt.setString(6, item.detectedHash)
             stmt.setString(7, item.resultRevisionId)
-            stmt.setString(8, objectMapper.writeValueAsString(item.details))
+            stmt.setString(8, objectMapper.writeValueAsString(syncItemDetailsPayload(item)))
             stmt.executeUpdate()
         }
     }
@@ -953,6 +1099,40 @@ open class ModuleSyncService(
             ?.map { it.toPath() }
             ?.filter { moduleConfigFile(it).toFile().exists() }
             ?: emptyList()
+    }
+
+    private fun java.sql.ResultSet.toSyncRunSummary(): ModuleSyncRunSummary =
+        ModuleSyncRunSummary(
+            syncRunId = getString("sync_run_id"),
+            scope = getString("scope"),
+            moduleCode = getString("module_code"),
+            status = getString("status"),
+            startedAt = getTimestamp("started_at").toInstant(),
+            finishedAt = getTimestamp("finished_at")?.toInstant(),
+            startedByActorId = getString("started_by_actor_id"),
+            startedByActorSource = getString("started_by_actor_source"),
+            startedByActorDisplayName = getString("started_by_actor_display_name"),
+            totalProcessed = getInt("total_processed"),
+            totalCreated = getInt("total_created"),
+            totalUpdated = getInt("total_updated"),
+            totalSkipped = getInt("total_skipped"),
+            totalFailed = getInt("total_failed"),
+        )
+
+    private fun syncItemDetailsPayload(item: SyncItemResult): Map<String, Any?> =
+        LinkedHashMap<String, Any?>(item.details).apply {
+            if (!item.errorMessage.isNullOrBlank()) {
+                put("errorMessage", item.errorMessage)
+            }
+        }
+
+    private fun readDetailsMap(detailsJson: String?): Map<String, Any?> {
+        if (detailsJson.isNullOrBlank()) {
+            return emptyMap()
+        }
+        return runCatching {
+            objectMapper.readValue(detailsJson, object : TypeReference<LinkedHashMap<String, Any?>>() {})
+        }.getOrDefault(emptyMap())
     }
 
     private fun loadModuleUiMetadata(moduleDir: Path, moduleCode: String): ModuleUiMetadata {

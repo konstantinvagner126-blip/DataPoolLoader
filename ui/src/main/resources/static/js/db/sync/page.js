@@ -10,12 +10,17 @@
   const syncOneModuleInput = document.getElementById('syncOneModuleInput');
   const syncOneModuleCode = document.getElementById('syncOneModuleCode');
   const syncOneConfirmButton = document.getElementById('syncOneConfirmButton');
-  const syncResultPanel = document.getElementById('syncResultPanel');
+  const syncRunsLimit = document.getElementById('syncRunsLimit');
+  const syncRunsHistory = document.getElementById('syncRunsHistory');
   const syncResultSummary = document.getElementById('syncResultSummary');
   const syncResultItems = document.getElementById('syncResultItems');
 
   let runtimeContext = null;
   let syncState = null;
+  let syncRuns = [];
+  let selectedSyncRunId = null;
+  let selectedSyncRunDetails = null;
+  let syncHistoryLimit = Number(syncRunsLimit?.value || 20);
 
   function translateSyncStatus(status) {
     switch (String(status || '').toUpperCase()) {
@@ -25,6 +30,8 @@
         return 'Ошибка';
       case 'RUNNING':
         return 'Выполняется';
+      case 'PARTIAL_SUCCESS':
+        return 'Частично успешно';
       default:
         return status || '-';
     }
@@ -60,6 +67,38 @@
     }
   }
 
+  function statusBadgeClass(status) {
+    switch (String(status || '').toUpperCase()) {
+      case 'SUCCESS':
+        return 'bg-success';
+      case 'FAILED':
+        return 'bg-danger';
+      case 'RUNNING':
+        return 'bg-primary';
+      case 'PARTIAL_SUCCESS':
+        return 'bg-warning text-dark';
+      default:
+        return 'bg-secondary';
+    }
+  }
+
+  function actionBadgeClass(action) {
+    switch (String(action || '').toUpperCase()) {
+      case 'CREATED':
+        return 'bg-success';
+      case 'UPDATED':
+        return 'bg-primary';
+      case 'SKIPPED':
+      case 'SKIPPED_NO_CHANGES':
+      case 'SKIPPED_CODE_CONFLICT':
+        return 'bg-secondary';
+      case 'FAILED':
+        return 'bg-danger';
+      default:
+        return 'bg-secondary';
+    }
+  }
+
   syncAllButton.addEventListener('click', async () => {
     if (!confirm('Синхронизировать все файловые модули в базу данных?')) return;
     await syncAll();
@@ -91,6 +130,11 @@
     renderRuntimeContext();
   });
 
+  syncRunsLimit?.addEventListener('change', async () => {
+    syncHistoryLimit = Number(syncRunsLimit.value || 20);
+    await refreshPageState(selectedSyncRunId);
+  });
+
   async function loadRuntimeContext() {
     try {
       runtimeContext = await fetchJson('/api/ui/runtime-context', {}, 'Не удалось загрузить состояние режима UI.');
@@ -106,6 +150,20 @@
       console.error(e);
       syncState = null;
     }
+  }
+
+  async function loadSyncRuns() {
+    const query = new URLSearchParams({ limit: String(syncHistoryLimit || 20) });
+    const payload = await fetchJson(`/api/db/sync/runs?${query.toString()}`, {}, 'Не удалось загрузить историю импортов.');
+    syncRuns = Array.isArray(payload?.runs) ? payload.runs : [];
+  }
+
+  async function loadSyncRunDetails(syncRunId) {
+    return fetchJson(
+      `/api/db/sync/runs/${encodeURIComponent(syncRunId)}`,
+      {},
+      'Не удалось загрузить детали импорта.',
+    );
   }
 
   function renderRuntimeContext() {
@@ -133,7 +191,10 @@
         ].filter(Boolean).join(' '),
       );
       setSyncActionsState({ canSyncAll: false, canSyncOne: false, canConfirmSyncOne: false });
-    } else if (activeSingleSyncs.length > 0) {
+      return;
+    }
+
+    if (activeSingleSyncs.length > 0) {
       showAlert(
         'Идут точечные импорты модулей',
         activeSingleSyncs.map(shared.describeActiveSingleSync).join(' '),
@@ -144,10 +205,11 @@
         canSyncOne: true,
         canConfirmSyncOne: !isSelectedModuleSyncing(),
       });
-    } else {
-      dbContextAlert.classList.add('d-none');
-      setSyncActionsState({ canSyncAll: true, canSyncOne: true, canConfirmSyncOne: true });
+      return;
     }
+
+    dbContextAlert.classList.add('d-none');
+    setSyncActionsState({ canSyncAll: true, canSyncOne: true, canConfirmSyncOne: true });
   }
 
   function showAlert(title, message, kind = 'warning') {
@@ -174,10 +236,59 @@
     return shared.activeSingleSyncFor(syncState, moduleCode) != null;
   }
 
-  async function refreshPageState() {
+  async function refreshPageState(preferredSyncRunId = null) {
     await loadRuntimeContext();
     await loadSyncState();
+
+    if (!shared.isDatabaseMode(runtimeContext)) {
+      syncRuns = [];
+      selectedSyncRunId = null;
+      selectedSyncRunDetails = null;
+      renderRuntimeContext();
+      renderSyncHistory();
+      renderSyncDetails();
+      return;
+    }
+
+    try {
+      await loadSyncRuns();
+      await selectSyncRun(preferredSyncRunId);
+    } catch (e) {
+      console.error(e);
+      syncRuns = [];
+      selectedSyncRunId = null;
+      selectedSyncRunDetails = null;
+    }
+
     renderRuntimeContext();
+    renderSyncHistory();
+    renderSyncDetails();
+  }
+
+  async function selectSyncRun(preferredSyncRunId = null) {
+    if (!syncRuns.length) {
+      selectedSyncRunId = null;
+      selectedSyncRunDetails = null;
+      return;
+    }
+
+    const activePreferredSyncRunId = preferredSyncRunId
+      || syncState?.activeFullSync?.syncRunId
+      || syncState?.activeSingleSyncs?.[0]?.syncRunId
+      || null;
+
+    if (activePreferredSyncRunId && syncRuns.some(run => run.syncRunId === activePreferredSyncRunId)) {
+      selectedSyncRunId = activePreferredSyncRunId;
+    } else if (!selectedSyncRunId || !syncRuns.some(run => run.syncRunId === selectedSyncRunId)) {
+      selectedSyncRunId = syncRuns[0].syncRunId;
+    }
+
+    if (!selectedSyncRunId) {
+      selectedSyncRunDetails = null;
+      return;
+    }
+
+    selectedSyncRunDetails = await loadSyncRunDetails(selectedSyncRunId);
   }
 
   async function syncAll() {
@@ -186,7 +297,7 @@
 
     try {
       const result = await postJson('/api/db/sync/all', {}, 'Не удалось синхронизировать модули.');
-      renderSyncResult(result);
+      await refreshPageState(result.syncRunId);
     } catch (e) {
       alert('Ошибка синхронизации: ' + (e.message || e));
     } finally {
@@ -196,7 +307,7 @@
         </svg>
         Синхронизировать все модули
       `;
-      await refreshPageState();
+      renderRuntimeContext();
     }
   }
 
@@ -221,76 +332,174 @@
 
     try {
       const result = await postJson('/api/db/sync/one', { moduleCode }, 'Не удалось синхронизировать модуль.');
-      renderSyncResult(result);
+      await refreshPageState(result.syncRunId);
     } catch (e) {
       alert('Ошибка синхронизации: ' + (e.message || e));
     } finally {
       syncOneConfirmButton.textContent = 'Синхронизировать';
-      await refreshPageState();
+      renderRuntimeContext();
     }
   }
 
-  function renderSyncResult(result) {
-    syncResultPanel.classList.remove('d-none');
+  function renderSyncHistory() {
+    if (!shared.isDatabaseMode(runtimeContext)) {
+      syncRunsHistory.innerHTML = '<div class="text-secondary small">История импорта станет доступна после переключения в режим «База данных».</div>';
+      return;
+    }
 
-    const statusBadge = result.status === 'SUCCESS' ? 'bg-success' : (result.status === 'FAILED' ? 'bg-danger' : 'bg-warning');
-    syncResultSummary.innerHTML = `
-      <div class="d-flex flex-wrap gap-3 mb-2">
-        <span class="badge ${statusBadge}">${escapeHtml(translateSyncStatus(result.status))}</span>
-        <span>Обработано: <strong>${result.totalProcessed}</strong></span>
-        <span>Создано: <strong>${result.totalCreated}</strong></span>
-        <span>Обновлено: <strong>${result.totalUpdated}</strong></span>
-        <span>Пропущено: <strong>${result.totalSkipped}</strong></span>
-        <span>С ошибкой: <strong>${result.totalFailed}</strong></span>
-      </div>
-      <div class="small text-secondary">
-        Область: ${escapeHtml(translateSyncScope(result.scope))} | Начало: ${new Date(result.startedAt).toLocaleString()} | Завершение: ${new Date(result.finishedAt).toLocaleString()}
-      </div>
-    `;
+    if (!syncRuns.length) {
+      syncRunsHistory.innerHTML = '<div class="text-secondary small">Импорты пока не запускались.</div>';
+      return;
+    }
 
-    syncResultItems.innerHTML = result.items.map(item => {
-      const actionBadge = item.action === 'CREATED' ? 'bg-success' :
-        (item.action === 'UPDATED' ? 'bg-primary' :
-          (item.action.startsWith('SKIPPED') ? 'bg-secondary' : 'bg-danger'));
-      return `
-        <div class="card mb-2">
-          <div class="card-body py-2 px-3">
-            <div class="d-flex flex-wrap align-items-center gap-2">
-              <code class="fw-semibold">${escapeHtml(item.moduleCode)}</code>
-              <span class="badge ${actionBadge}">${escapeHtml(translateSyncAction(item.action))}</span>
-              ${item.errorMessage ? `<span class="text-danger small">${escapeHtml(item.errorMessage)}</span>` : ''}
-              ${item.resultRevisionId ? `<span class="small text-secondary">Ревизия: ${escapeHtml(item.resultRevisionId)}</span>` : ''}
-            </div>
-            ${renderItemDetails(item.details)}
-          </div>
+    syncRunsHistory.innerHTML = syncRuns.map(run => `
+      <button
+        type="button"
+        class="run-history-item ${run.syncRunId === selectedSyncRunId ? 'run-history-item-active' : ''}"
+        data-sync-run-id="${escapeHtml(run.syncRunId)}"
+      >
+        <div class="run-history-head">
+          <span class="run-history-title">${escapeHtml(syncRunTitle(run))}</span>
+          <span class="badge ${statusBadgeClass(run.status)}">${escapeHtml(translateSyncStatus(run.status))}</span>
         </div>
-      `;
-    }).join('');
+        <div class="run-history-meta">${escapeHtml(formatDateTime(run.startedAt))}</div>
+        <div class="run-history-meta">
+          Обработано: ${escapeHtml(String(run.totalProcessed || 0))}
+          · создано: ${escapeHtml(String(run.totalCreated || 0))}
+          · пропущено: ${escapeHtml(String(run.totalSkipped || 0))}
+          · ошибок: ${escapeHtml(String(run.totalFailed || 0))}
+        </div>
+        <div class="run-history-meta">
+          ${escapeHtml(syncRunMeta(run))}
+        </div>
+      </button>
+    `).join('');
+
+    syncRunsHistory.querySelectorAll('[data-sync-run-id]').forEach(button => {
+      button.addEventListener('click', async () => {
+        await refreshPageState(button.dataset.syncRunId);
+      });
+    });
   }
 
-  function renderItemDetails(details) {
-    if (!details || typeof details !== 'object') {
-      return '';
+  function renderSyncDetails() {
+    if (!selectedSyncRunDetails?.run) {
+      syncResultSummary.innerHTML = '<div class="text-secondary small">Выбери запуск из истории слева, чтобы посмотреть детали.</div>';
+      syncResultItems.innerHTML = '';
+      return;
     }
-    const actorName = details.activeSyncStartedByActorDisplayName || details.activeSyncStartedByActorId;
-    const activeModuleCode = details.activeSyncModuleCode;
-    const startedAt = details.activeSyncStartedAt
-      ? new Date(details.activeSyncStartedAt).toLocaleString()
-      : null;
-    if (!actorName && !activeModuleCode && !startedAt) {
-      return '';
+
+    const run = selectedSyncRunDetails.run;
+    syncResultSummary.innerHTML = `
+      <div class="d-flex flex-wrap gap-3 mb-3">
+        <span class="badge ${statusBadgeClass(run.status)}">${escapeHtml(translateSyncStatus(run.status))}</span>
+        <span>Область: <strong>${escapeHtml(translateSyncScope(run.scope))}</strong></span>
+        <span>Обработано: <strong>${escapeHtml(String(run.totalProcessed || 0))}</strong></span>
+        <span>Создано: <strong>${escapeHtml(String(run.totalCreated || 0))}</strong></span>
+        <span>Обновлено: <strong>${escapeHtml(String(run.totalUpdated || 0))}</strong></span>
+        <span>Пропущено: <strong>${escapeHtml(String(run.totalSkipped || 0))}</strong></span>
+        <span>С ошибкой: <strong>${escapeHtml(String(run.totalFailed || 0))}</strong></span>
+      </div>
+      <div class="run-summary-list">
+        ${renderKeyValue('Запуск', syncRunTitle(run))}
+        ${renderKeyValue('Инициатор', run.startedByActorDisplayName || run.startedByActorId || '-')}
+        ${renderKeyValue('Старт', formatDateTime(run.startedAt))}
+        ${renderKeyValue('Завершение', run.finishedAt ? formatDateTime(run.finishedAt) : 'еще выполняется')}
+        ${renderKeyValue('Идентификатор', run.syncRunId)}
+      </div>
+    `;
+
+    const items = Array.isArray(selectedSyncRunDetails.items) ? selectedSyncRunDetails.items : [];
+    if (!items.length) {
+      syncResultItems.innerHTML = '<div class="text-secondary small">Детали по модулям появятся после завершения импорта.</div>';
+      return;
     }
+
+    syncResultItems.innerHTML = items.map(item => `
+      <div class="card mb-3">
+        <div class="card-body py-3 px-3">
+          <div class="d-flex flex-wrap align-items-center gap-2">
+            <code class="fw-semibold">${escapeHtml(item.moduleCode)}</code>
+            <span class="badge ${actionBadgeClass(item.action)}">${escapeHtml(translateSyncAction(item.action))}</span>
+            <span class="badge ${statusBadgeClass(item.status)}">${escapeHtml(translateSyncStatus(item.status))}</span>
+            ${item.resultRevisionId ? `<span class="small text-secondary">Ревизия: ${escapeHtml(item.resultRevisionId)}</span>` : ''}
+          </div>
+          ${item.errorMessage ? `<div class="small text-danger mt-2">${escapeHtml(item.errorMessage)}</div>` : ''}
+          ${renderSyncItemDetails(item.details)}
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function renderKeyValue(label, value) {
     return `
-      <div class="small text-secondary mt-2">
-        ${activeModuleCode ? `Активный импорт: <code>${escapeHtml(activeModuleCode)}</code>. ` : ''}
-        ${actorName ? `Пользователь: ${escapeHtml(actorName)}. ` : ''}
-        ${startedAt ? `Запуск: ${escapeHtml(startedAt)}.` : ''}
+      <div class="run-summary-item">
+        <div class="run-summary-label">${escapeHtml(label)}</div>
+        <div class="run-summary-value">${escapeHtml(value || '-')}</div>
       </div>
     `;
   }
 
-  refreshPageState();
+  function renderSyncItemDetails(details) {
+    if (!details || typeof details !== 'object' || Object.keys(details).length === 0) {
+      return '';
+    }
+
+    const reason = details.reason ? `<div class="small text-secondary mt-2">Причина: ${escapeHtml(String(details.reason))}</div>` : '';
+    const message = details.message ? `<div class="small text-secondary">${escapeHtml(String(details.message))}</div>` : '';
+    const activeActor = details.activeSyncStartedByActorDisplayName || details.activeSyncStartedByActorId;
+    const activeSyncNote = activeActor || details.activeSyncModuleCode
+      ? `
+        <div class="small text-secondary">
+          ${details.activeSyncModuleCode ? `Активный импорт: ${escapeHtml(String(details.activeSyncModuleCode))}. ` : ''}
+          ${activeActor ? `Пользователь: ${escapeHtml(String(activeActor))}.` : ''}
+        </div>
+      `
+      : '';
+    const rawJson = JSON.stringify(details, null, 2);
+
+    return `
+      <div class="mt-2">
+        ${reason}
+        ${message}
+        ${activeSyncNote}
+        <details class="mt-2">
+          <summary class="small text-secondary">Технические детали</summary>
+          <pre class="bg-body-tertiary rounded p-2 mt-2 small mb-0">${escapeHtml(rawJson)}</pre>
+        </details>
+      </div>
+    `;
+  }
+
+  function syncRunTitle(run) {
+    if (String(run.scope || '').toUpperCase() === 'ONE' && run.moduleCode) {
+      return `Модуль ${run.moduleCode}`;
+    }
+    return translateSyncScope(run.scope);
+  }
+
+  function syncRunMeta(run) {
+    const actor = run.startedByActorDisplayName || run.startedByActorId;
+    const finishedAt = run.finishedAt ? `Завершение: ${formatDateTime(run.finishedAt)}` : 'Запуск еще выполняется';
+    return [
+      actor ? `Инициатор: ${actor}` : null,
+      finishedAt,
+    ].filter(Boolean).join(' · ');
+  }
+
+  function formatDateTime(value) {
+    if (!value) {
+      return '-';
+    }
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return String(value);
+    }
+    return date.toLocaleString();
+  }
+
+  refreshPageState().catch(console.error);
   setInterval(() => {
-    refreshPageState().catch(console.error);
+    refreshPageState(selectedSyncRunId).catch(console.error);
   }, 5000);
 })(window);

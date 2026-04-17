@@ -17,9 +17,12 @@ import com.sbrf.lt.datapool.db.registry.model.RegistryModuleCreationResult
 import com.sbrf.lt.datapool.db.registry.model.RegistryModuleDraft
 import com.sbrf.lt.datapool.module.sync.ActiveModuleSyncRun
 import com.sbrf.lt.datapool.module.sync.ModuleRegistryImporter
+import com.sbrf.lt.datapool.module.sync.ModuleSyncRunDetails
+import com.sbrf.lt.datapool.module.sync.ModuleSyncRunSummary
 import com.sbrf.lt.datapool.module.sync.ModuleSyncService
 import com.sbrf.lt.datapool.module.sync.ModuleSyncState
-import com.sbrf.lt.datapool.db.PostgresExporter
+import com.sbrf.lt.datapool.module.sync.SyncItemResult
+import com.sbrf.lt.datapool.db.PostgresSourceExporter
 import com.sbrf.lt.platform.ui.config.UiAppConfig
 import com.sbrf.lt.platform.ui.config.UiActorIdentity
 import com.sbrf.lt.platform.ui.config.UiActorResolver
@@ -792,7 +795,7 @@ class ServerTest {
         val runManager = RunManager(
             moduleRegistry = registry,
             applicationRunner = ApplicationRunner(
-                exporter = PostgresExporter { _, _, _ ->
+                exporter = PostgresSourceExporter { _, _, _ ->
                     exportConnection(
                         columns = listOf("id"),
                         rows = listOf(listOf(1)),
@@ -1503,6 +1506,103 @@ class ServerTest {
     }
 
     @Test
+    fun `db sync history endpoints return runs and details`() = testApplication {
+        val uiConfig = UiAppConfig(
+            moduleStore = UiModuleStoreConfig(
+                mode = UiModuleStoreMode.DATABASE,
+                postgres = UiModuleStorePostgresConfig(
+                    jdbcUrl = "jdbc:postgresql://localhost:5432/modules",
+                    username = "registry_user",
+                    password = "registry_pwd",
+                ),
+            ),
+            storageDir = Files.createTempDirectory("ui-db-sync-history-state-").toString(),
+            sqlConsole = SqlConsoleConfig(),
+        )
+        val runtimeContextService = UiRuntimeContextService(
+            actorResolver = object : UiActorResolver() {
+                override fun resolveAutomaticActor(): UiActorIdentity =
+                    UiActorIdentity("kwdev", UiActorSource.OS_LOGIN)
+            },
+            connectionChecker = object : UiDatabaseConnectionChecker() {
+                override fun check(config: UiModuleStorePostgresConfig): UiDatabaseConnectionStatus =
+                    UiDatabaseConnectionStatus(
+                        configured = true,
+                        available = true,
+                        schema = config.schemaName(),
+                        message = "Подключение к базе данных доступно.",
+                    )
+            },
+            schemaMigrator = object : UiDatabaseSchemaMigrator() {
+                override fun migrate(config: UiModuleStorePostgresConfig) = Unit
+            },
+        )
+        val runSummary = ModuleSyncRunSummary(
+            syncRunId = "99999999-9999-9999-9999-999999999999",
+            scope = "ALL",
+            status = "PARTIAL_SUCCESS",
+            startedAt = Instant.parse("2026-04-17T09:00:00Z"),
+            finishedAt = Instant.parse("2026-04-17T09:03:00Z"),
+            startedByActorId = "kwdev",
+            startedByActorSource = "OS_LOGIN",
+            startedByActorDisplayName = "kwdev",
+            totalProcessed = 3,
+            totalCreated = 1,
+            totalUpdated = 0,
+            totalSkipped = 1,
+            totalFailed = 1,
+        )
+        val moduleSyncService = object : ModuleSyncService(
+            connectionProvider = DatabaseConnectionProvider { error("connection must not be requested") },
+            moduleRegistryImporter = object : ModuleRegistryImporter {
+                override fun createModule(
+                    moduleCode: String,
+                    actorId: String,
+                    actorSource: String,
+                    actorDisplayName: String?,
+                    originKind: String,
+                    draft: RegistryModuleDraft,
+                ): RegistryModuleCreationResult = error("createModule must not be requested")
+            },
+        ) {
+            override fun listSyncRuns(limit: Int): List<ModuleSyncRunSummary> = listOf(runSummary)
+
+            override fun loadSyncRunDetails(syncRunId: String): ModuleSyncRunDetails? =
+                ModuleSyncRunDetails(
+                    run = runSummary,
+                    items = listOf(
+                        SyncItemResult(
+                            moduleCode = "db-demo",
+                            action = "CREATED",
+                            status = "SUCCESS",
+                            detectedHash = "hash-1",
+                            resultRevisionId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+                            details = mapOf("reason" to "module_created"),
+                        ),
+                    ),
+                )
+        }
+        application {
+            uiModule(
+                uiConfig = uiConfig,
+                runtimeContextService = runtimeContextService,
+                moduleSyncService = moduleSyncService,
+            )
+        }
+
+        val historyResponse = client.get("/api/db/sync/runs?limit=50")
+        val detailsResponse = client.get("/api/db/sync/runs/99999999-9999-9999-9999-999999999999")
+
+        assertEquals(HttpStatusCode.OK, historyResponse.status)
+        assertTrue(historyResponse.bodyAsText().contains("\"runs\":["))
+        assertTrue(historyResponse.bodyAsText().contains("\"syncRunId\":\"99999999-9999-9999-9999-999999999999\""))
+        assertTrue(historyResponse.bodyAsText().contains("\"totalProcessed\":3"))
+        assertEquals(HttpStatusCode.OK, detailsResponse.status)
+        assertTrue(detailsResponse.bodyAsText().contains("\"items\":["))
+        assertTrue(detailsResponse.bodyAsText().contains("\"moduleCode\":\"db-demo\""))
+    }
+
+    @Test
     fun `db module details endpoint returns editable module for current actor`() = testApplication {
         val uiConfig = UiAppConfig(
             moduleStore = UiModuleStoreConfig(
@@ -2070,7 +2170,7 @@ class ServerTest {
         val runManager = RunManager(
             moduleRegistry = registry,
             applicationRunner = ApplicationRunner(
-                exporter = PostgresExporter { _, _, _ ->
+                exporter = PostgresSourceExporter { _, _, _ ->
                     exportConnection(
                         columns = listOf("id"),
                         rows = listOf(listOf(1)),

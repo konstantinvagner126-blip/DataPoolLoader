@@ -17,7 +17,10 @@ import java.sql.ResultSet
 import java.sql.Statement
 import java.time.Instant
 
-class PostgresExporter(
+/**
+ * PostgreSQL-реализация порта выгрузки источника в CSV.
+ */
+class PostgresSourceExporter(
     private val connectionProvider: (String, String, String) -> Connection = { jdbcUrl, username, password ->
         DriverManager.getConnection(jdbcUrl, username, password)
     },
@@ -31,7 +34,7 @@ class PostgresExporter(
             SourceExportStartedEvent(
                 timestamp = startedAt,
                 sourceName = task.source.name,
-            )
+            ),
         )
 
         return try {
@@ -82,7 +85,7 @@ class PostgresExporter(
                                         rowCount = result.rowCount,
                                         columns = result.columns,
                                         outputFile = result.outputFile?.toString(),
-                                    )
+                                    ),
                                 )
                                 result
                             }
@@ -112,7 +115,7 @@ class PostgresExporter(
                     columns = result.columns,
                     outputFile = null,
                     errorMessage = result.errorMessage,
-                )
+                ),
             )
             result
         }
@@ -136,8 +139,11 @@ class PostgresExporter(
                     timestamp = Instant.now(),
                     sourceName = task.source.name,
                     rowCount = rowCount,
-                )
+                ),
             )
         }
     }
 }
+
+@Deprecated("Используй PostgresSourceExporter", ReplaceWith("PostgresSourceExporter"))
+typealias PostgresExporter = PostgresSourceExporter

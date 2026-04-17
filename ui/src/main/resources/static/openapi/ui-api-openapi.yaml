@@ -399,12 +399,114 @@ paths:
                 activeFullSync: null
                 activeSingleSyncs:
                   - syncRunId: "sync-run-001"
-                    scope: SINGLE
+                    scope: ONE
                     moduleCode: local-manual-test
                     startedAt: "2026-04-17T10:00:00Z"
                     startedByActorId: kwdev
                     startedByActorSource: OS_LOGIN
                     startedByActorDisplayName: kwdev
+
+  /api/db/sync/runs:
+    get:
+      tags: [DB Sync]
+      summary: История import-run `files -> database`
+      operationId: listDbSyncRuns
+      parameters:
+        - $ref: "#/components/parameters/LimitQuery"
+      responses:
+        "200":
+          description: Список запусков импорта
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModuleSyncRunsResponse"
+              example:
+                runs:
+                  - syncRunId: "sync-run-101"
+                    scope: ALL
+                    moduleCode: null
+                    status: PARTIAL_SUCCESS
+                    startedAt: "2026-04-17T10:00:00Z"
+                    finishedAt: "2026-04-17T10:01:10Z"
+                    startedByActorId: kwdev
+                    startedByActorSource: OS_LOGIN
+                    startedByActorDisplayName: kwdev
+                    totalProcessed: 6
+                    totalCreated: 2
+                    totalUpdated: 0
+                    totalSkipped: 3
+                    totalFailed: 1
+                  - syncRunId: "sync-run-100"
+                    scope: ONE
+                    moduleCode: local-manual-test
+                    status: SUCCESS
+                    startedAt: "2026-04-17T09:40:00Z"
+                    finishedAt: "2026-04-17T09:40:09Z"
+                    startedByActorId: kwdev
+                    startedByActorSource: OS_LOGIN
+                    startedByActorDisplayName: kwdev
+                    totalProcessed: 1
+                    totalCreated: 1
+                    totalUpdated: 0
+                    totalSkipped: 0
+                    totalFailed: 0
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /api/db/sync/runs/{syncRunId}:
+    get:
+      tags: [DB Sync]
+      summary: Детали конкретного import-run
+      operationId: getDbSyncRunDetails
+      parameters:
+        - name: syncRunId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Детали запуска импорта
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModuleSyncRunDetails"
+              example:
+                run:
+                  syncRunId: "sync-run-101"
+                  scope: ALL
+                  moduleCode: null
+                  status: PARTIAL_SUCCESS
+                  startedAt: "2026-04-17T10:00:00Z"
+                  finishedAt: "2026-04-17T10:01:10Z"
+                  startedByActorId: kwdev
+                  startedByActorSource: OS_LOGIN
+                  startedByActorDisplayName: kwdev
+                  totalProcessed: 6
+                  totalCreated: 2
+                  totalUpdated: 0
+                  totalSkipped: 3
+                  totalFailed: 1
+                items:
+                  - moduleCode: local-manual-test
+                    action: CREATED
+                    status: SUCCESS
+                    detectedHash: "sha256:..."
+                    resultRevisionId: "11111111-1111-1111-1111-111111111111"
+                    errorMessage: null
+                    details:
+                      reason: module_created
+                  - moduleCode: db-conflict
+                    action: SKIPPED_CODE_CONFLICT
+                    status: WARNING
+                    detectedHash: "sha256:..."
+                    resultRevisionId: "22222222-2222-2222-2222-222222222222"
+                    errorMessage: null
+                    details:
+                      reason: module_code_already_exists
+                      message: "DB-модуль с таким кодом уже существует. Импорт не перезаписывает существующие модули."
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
 
   /api/db/sync/one:
     post:
@@ -2193,6 +2295,70 @@ components:
             $ref: "#/components/schemas/ActiveModuleSyncRun"
         message:
           type: string
+
+    ModuleSyncRunsResponse:
+      type: object
+      required: [runs]
+      properties:
+        runs:
+          type: array
+          items:
+            $ref: "#/components/schemas/ModuleSyncRunSummary"
+
+    ModuleSyncRunSummary:
+      type: object
+      required:
+        - syncRunId
+        - scope
+        - status
+        - startedAt
+        - totalProcessed
+        - totalCreated
+        - totalUpdated
+        - totalSkipped
+        - totalFailed
+      properties:
+        syncRunId:
+          type: string
+        scope:
+          type: string
+        moduleCode:
+          type: [string, "null"]
+        status:
+          type: string
+        startedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: [string, "null"]
+          format: date-time
+        startedByActorId:
+          type: [string, "null"]
+        startedByActorSource:
+          type: [string, "null"]
+        startedByActorDisplayName:
+          type: [string, "null"]
+        totalProcessed:
+          type: integer
+        totalCreated:
+          type: integer
+        totalUpdated:
+          type: integer
+        totalSkipped:
+          type: integer
+        totalFailed:
+          type: integer
+
+    ModuleSyncRunDetails:
+      type: object
+      required: [run, items]
+      properties:
+        run:
+          $ref: "#/components/schemas/ModuleSyncRunSummary"
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/SyncItemResult"
 
     ModuleSyncTrackedFile:
       type: object

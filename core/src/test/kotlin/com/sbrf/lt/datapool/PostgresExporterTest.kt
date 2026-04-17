@@ -5,7 +5,7 @@ import com.sbrf.lt.datapool.app.ExecutionListener
 import com.sbrf.lt.datapool.app.SourceExportFinishedEvent
 import com.sbrf.lt.datapool.app.SourceExportProgressEvent
 import com.sbrf.lt.datapool.app.SourceExportStartedEvent
-import com.sbrf.lt.datapool.db.PostgresExporter
+import com.sbrf.lt.datapool.db.PostgresSourceExporter
 import com.sbrf.lt.datapool.model.ExecutionStatus
 import com.sbrf.lt.datapool.model.ExportTask
 import com.sbrf.lt.datapool.model.SourceConfig
@@ -22,7 +22,7 @@ class PostgresExporterTest {
     @Test
     fun `exports rows to csv and emits progress events`() {
         val events = mutableListOf<ExecutionEvent>()
-        val exporter = PostgresExporter { _, _, _ ->
+        val exporter = PostgresSourceExporter { _, _, _ ->
             exportConnection(
                 columns = listOf("id", "name"),
                 rows = listOf(
@@ -60,7 +60,7 @@ class PostgresExporterTest {
     @Test
     fun `returns failed result when export throws`() {
         val events = mutableListOf<ExecutionEvent>()
-        val exporter = PostgresExporter { _, _, _ -> throw SQLException("boom") }
+        val exporter = PostgresSourceExporter { _, _, _ -> throw SQLException("boom") }
         val outputFile = Files.createTempFile("export-error", ".csv")
 
         val result = exporter.export(

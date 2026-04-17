@@ -1,7 +1,7 @@
 package com.sbrf.lt.platform.ui.run
 
 import com.sbrf.lt.datapool.app.ApplicationRunner
-import com.sbrf.lt.datapool.db.PostgresExporter
+import com.sbrf.lt.datapool.db.PostgresSourceExporter
 import com.sbrf.lt.datapool.model.ExecutionStatus
 import com.sbrf.lt.platform.ui.config.UiAppConfig
 import com.sbrf.lt.platform.ui.model.StartRunRequest
@@ -59,7 +59,7 @@ class RunManagerTest {
         val firstRunManager = RunManager(
             moduleRegistry = registry,
             applicationRunner = ApplicationRunner(
-                exporter = PostgresExporter { _, _, _ ->
+                exporter = PostgresSourceExporter { _, _, _ ->
                     exportConnection(
                         columns = listOf("id"),
                         rows = listOf(listOf(1)),
@@ -166,7 +166,7 @@ class RunManagerTest {
         val runManager = RunManager(
             moduleRegistry = registry,
             applicationRunner = ApplicationRunner(
-                exporter = PostgresExporter { _, _, _ ->
+                exporter = PostgresSourceExporter { _, _, _ ->
                     exportConnection(
                         columns = listOf("id", "name"),
                         rows = listOf(listOf(1, "A")),
@@ -216,7 +216,7 @@ class RunManagerTest {
         val runManager = RunManager(
             moduleRegistry = registry,
             applicationRunner = ApplicationRunner(
-                exporter = PostgresExporter { _, _, _ ->
+                exporter = PostgresSourceExporter { _, _, _ ->
                     exportConnection(
                         columns = listOf("id"),
                         rows = listOf(listOf(1)),
@@ -287,7 +287,7 @@ class RunManagerTest {
         val runManager = RunManager(
             moduleRegistry = registry,
             applicationRunner = ApplicationRunner(
-                exporter = PostgresExporter { _, _, _ ->
+                exporter = PostgresSourceExporter { _, _, _ ->
                     Thread.sleep(400)
                     error("runner boom")
                 },

@@ -2388,6 +2388,30 @@ body {
   margin-top: 1rem;
 }
 
+.run-summary-item {
+  display: grid;
+  grid-template-columns: minmax(160px, 220px) minmax(0, 1fr);
+  gap: 0.75rem;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid rgba(19, 34, 56, 0.08);
+}
+
+.run-summary-item:last-child {
+  border-bottom: none;
+}
+
+.run-summary-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #5f6f84;
+}
+
+.run-summary-value {
+  min-width: 0;
+  color: #132238;
+  word-break: break-word;
+}
+
 .run-result-actions {
   display: flex;
   flex-wrap: wrap;

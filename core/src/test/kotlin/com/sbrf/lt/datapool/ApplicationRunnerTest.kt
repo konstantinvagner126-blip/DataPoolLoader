@@ -8,7 +8,7 @@ import com.sbrf.lt.datapool.app.RunFinishedEvent
 import com.sbrf.lt.datapool.app.RunStartedEvent
 import com.sbrf.lt.datapool.app.SourceSchemaMismatchEvent
 import com.sbrf.lt.datapool.config.ConfigLoader
-import com.sbrf.lt.datapool.db.PostgresExporter
+import com.sbrf.lt.datapool.db.PostgresSourceExporter
 import com.sbrf.lt.datapool.model.ExecutionStatus
 import kotlin.io.path.exists
 import kotlin.io.path.readText
@@ -49,7 +49,7 @@ class ApplicationRunnerTest {
         )
 
         val runner = ApplicationRunner(
-            exporter = PostgresExporter { _, _, _ ->
+            exporter = PostgresSourceExporter { _, _, _ ->
                 exportConnection(
                     columns = listOf("id", "name"),
                     rows = listOf(listOf(1, "A")),
@@ -106,7 +106,7 @@ class ApplicationRunnerTest {
             """.trimIndent(),
         )
 
-        val exporter = PostgresExporter { url, _, _ ->
+        val exporter = PostgresSourceExporter { url, _, _ ->
             when (url) {
                 "jdbc:test:db1" -> exportConnection(
                     columns = listOf("id", "name"),
@@ -167,7 +167,7 @@ class ApplicationRunnerTest {
         )
 
         val runner = ApplicationRunner(
-            exporter = PostgresExporter { _, _, _ ->
+            exporter = PostgresSourceExporter { _, _, _ ->
                 exportConnection(
                     columns = listOf("id", "name"),
                     rows = listOf(listOf(1, "A")),
@@ -209,7 +209,7 @@ class ApplicationRunnerTest {
 
         val events = mutableListOf<ExecutionEvent>()
         val runner = ApplicationRunner(
-            exporter = PostgresExporter { _, _, _ -> throw SQLException("db down") },
+            exporter = PostgresSourceExporter { _, _, _ -> throw SQLException("db down") },
         )
 
         val error = assertFailsWith<IllegalArgumentException> {

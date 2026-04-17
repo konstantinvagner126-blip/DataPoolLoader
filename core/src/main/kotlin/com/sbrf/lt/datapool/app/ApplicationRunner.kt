@@ -8,8 +8,8 @@ import com.sbrf.lt.datapool.app.port.ResultMerger
 import com.sbrf.lt.datapool.app.port.SourceExporter
 import com.sbrf.lt.datapool.app.port.TargetImporter
 import com.sbrf.lt.datapool.app.port.TargetSchemaValidator
-import com.sbrf.lt.datapool.db.PostgresExporter
-import com.sbrf.lt.datapool.db.PostgresImporter
+import com.sbrf.lt.datapool.db.PostgresSourceExporter
+import com.sbrf.lt.datapool.db.PostgresTargetImporter
 import com.sbrf.lt.datapool.db.TargetTableValidator
 import com.sbrf.lt.datapool.merge.MergeService
 import com.sbrf.lt.datapool.model.AppConfig
@@ -36,10 +36,10 @@ import java.util.concurrent.Future
 
 class ApplicationRunner(
     private val configLoader: ConfigLoader = ConfigLoader(),
-    private val exporter: SourceExporter = PostgresExporter(),
+    private val exporter: SourceExporter = PostgresSourceExporter(),
     private val mergeService: ResultMerger = MergeService(),
     private val targetTableValidator: TargetSchemaValidator = TargetTableValidator(),
-    private val importer: TargetImporter = PostgresImporter(),
+    private val importer: TargetImporter = PostgresTargetImporter(),
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
     private val summaryMapper = ObjectMapper()

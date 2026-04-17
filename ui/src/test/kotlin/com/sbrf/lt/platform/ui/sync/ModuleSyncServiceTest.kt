@@ -447,6 +447,103 @@ class ModuleSyncServiceTest {
         assertTrue(preparedSql.any { it.contains("update ui_registry.module_sync_run") })
     }
 
+    @Test
+    fun `list sync runs returns aggregated history`() {
+        val service = ModuleSyncService(
+            connectionProvider = DatabaseConnectionProvider {
+                fakeConnection(
+                    preparedSql = mutableListOf(),
+                    stringParams = mutableListOf(),
+                    existingRows = emptyList(),
+                    syncRunRows = listOf(
+                        mapOf(
+                            "sync_run_id" to "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+                            "scope" to "ALL",
+                            "module_code" to null,
+                            "status" to "PARTIAL_SUCCESS",
+                            "started_at" to "2026-04-17T09:00:00Z",
+                            "finished_at" to "2026-04-17T09:03:00Z",
+                            "started_by_actor_id" to "kwdev",
+                            "started_by_actor_source" to "OS_LOGIN",
+                            "started_by_actor_display_name" to "kwdev",
+                            "total_processed" to "4",
+                            "total_created" to "2",
+                            "total_updated" to "0",
+                            "total_skipped" to "1",
+                            "total_failed" to "1",
+                        ),
+                    ),
+                )
+            },
+            moduleRegistryImporter = noopImporter,
+        )
+
+        val result = service.listSyncRuns()
+
+        val run = assertNotNull(result.single())
+        assertEquals("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", run.syncRunId)
+        assertEquals("ALL", run.scope)
+        assertEquals("PARTIAL_SUCCESS", run.status)
+        assertEquals(4, run.totalProcessed)
+        assertEquals(2, run.totalCreated)
+        assertEquals(1, run.totalSkipped)
+        assertEquals(1, run.totalFailed)
+        assertEquals("kwdev", run.startedByActorDisplayName)
+    }
+
+    @Test
+    fun `load sync run details returns persisted items and restored error message`() {
+        val service = ModuleSyncService(
+            connectionProvider = DatabaseConnectionProvider {
+                fakeConnection(
+                    preparedSql = mutableListOf(),
+                    stringParams = mutableListOf(),
+                    existingRows = emptyList(),
+                    syncRunRows = listOf(
+                        mapOf(
+                            "sync_run_id" to "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+                            "scope" to "ONE",
+                            "module_code" to "db-demo",
+                            "status" to "FAILED",
+                            "started_at" to "2026-04-17T09:00:00Z",
+                            "finished_at" to "2026-04-17T09:01:00Z",
+                            "started_by_actor_id" to "kwdev",
+                            "started_by_actor_source" to "OS_LOGIN",
+                            "started_by_actor_display_name" to "kwdev",
+                            "total_processed" to "1",
+                            "total_created" to "0",
+                            "total_updated" to "0",
+                            "total_skipped" to "0",
+                            "total_failed" to "1",
+                        ),
+                    ),
+                    syncRunItemRows = listOf(
+                        mapOf(
+                            "module_code" to "db-demo",
+                            "action" to "FAILED",
+                            "status" to "FAILED",
+                            "detected_hash" to "hash-1",
+                            "result_revision_id" to null,
+                            "details" to """{"reason":"application_yml_missing","errorMessage":"application.yml не найден"}""",
+                        ),
+                    ),
+                )
+            },
+            moduleRegistryImporter = noopImporter,
+        )
+
+        val result = service.loadSyncRunDetails("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
+
+        val details = assertNotNull(result)
+        assertEquals("ONE", details.run.scope)
+        assertEquals("db-demo", details.run.moduleCode)
+        assertEquals("FAILED", details.run.status)
+        val item = details.items.single()
+        assertEquals("FAILED", item.action)
+        assertEquals("application.yml не найден", item.errorMessage)
+        assertEquals("application_yml_missing", item.details["reason"])
+    }
+
     private fun fakeConnection(
         preparedSql: MutableList<String>,
         stringParams: MutableList<String?>,
@@ -456,6 +553,8 @@ class ModuleSyncServiceTest {
         runningFullSyncRows: List<Map<String, String?>> = emptyList(),
         runningSingleSyncRows: List<Map<String, String?>> = emptyList(),
         previousSyncRows: List<Map<String, String?>> = emptyList(),
+        syncRunRows: List<Map<String, String?>> = emptyList(),
+        syncRunItemRows: List<Map<String, String?>> = emptyList(),
     ): Connection =
         Proxy.newProxyInstance(
             Connection::class.java.classLoader,
@@ -475,6 +574,9 @@ class ModuleSyncServiceTest {
                                 }
                                 listOf(mapOf("acquired" to acquired.toString()))
                             }
+                            sql.contains("group by") && sql.contains("from ui_registry.module_sync_run r") -> syncRunRows
+                            sql.contains("from ui_registry.module_sync_run_item") &&
+                                sql.contains("where sync_run_id = ?::uuid") -> syncRunItemRows
                             sql.contains("from ui_registry.module_sync_run_item i") -> previousSyncRows
                             sql.contains("from ui_registry.module_sync_run") && sql.contains("scope = 'ONE'") -> runningSingleSyncRows
                             sql.contains("from ui_registry.module_sync_run") -> runningFullSyncRows
@@ -522,6 +624,7 @@ class ModuleSyncServiceTest {
                     index < rows.size
                 }
                 "getString" -> rows[index][args?.first() as String]
+                "getInt" -> rows[index][args?.first() as String]?.toInt() ?: 0
                 "getBoolean" -> rows[index][args?.first() as String].toBoolean()
                 "getTimestamp" -> rows[index][args?.first() as String]?.let { Timestamp.from(java.time.Instant.parse(it)) }
                 "close" -> null

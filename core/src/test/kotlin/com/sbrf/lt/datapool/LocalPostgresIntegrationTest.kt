@@ -1,8 +1,8 @@
 package com.sbrf.lt.datapool
 
 import com.sbrf.lt.datapool.app.ApplicationRunner
-import com.sbrf.lt.datapool.db.PostgresExporter
-import com.sbrf.lt.datapool.db.PostgresImporter
+import com.sbrf.lt.datapool.db.PostgresSourceExporter
+import com.sbrf.lt.datapool.db.PostgresTargetImporter
 import com.sbrf.lt.datapool.db.TargetTableValidator
 import com.sbrf.lt.datapool.model.ExecutionStatus
 import com.sbrf.lt.datapool.model.ExportTask
@@ -44,7 +44,7 @@ class LocalPostgresIntegrationTest {
             }
 
             val outputFile = Files.createTempFile("local-pg-export", ".csv")
-            val exporter = PostgresExporter()
+            val exporter = PostgresSourceExporter()
             val result = exporter.export(
                 ExportTask(
                     source = SourceConfig(name = "local-db"),
@@ -106,7 +106,7 @@ class LocalPostgresIntegrationTest {
             val mergedFile = Files.createTempFile("local-pg-merged", ".csv").apply {
                 Files.writeString(this, "id,payload\n1,A\n2,B\n")
             }
-            val importer = PostgresImporter()
+            val importer = PostgresTargetImporter()
             val result = importer.importCsv(
                 target = TargetConfig(table = "$schema.target_data", truncateBeforeLoad = true),
                 resolvedJdbcUrl = LocalPostgresTestSupport.jdbcUrl,

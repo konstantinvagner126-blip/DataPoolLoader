@@ -1,6 +1,6 @@
 package com.sbrf.lt.datapool
 
-import com.sbrf.lt.datapool.db.PostgresImporter
+import com.sbrf.lt.datapool.db.PostgresTargetImporter
 import com.sbrf.lt.datapool.model.ExecutionStatus
 import com.sbrf.lt.datapool.model.TargetConfig
 import kotlin.test.Test
@@ -11,7 +11,7 @@ import java.nio.file.Files
 import java.sql.SQLException
 
 class PostgresImporterTest {
-    private val importer = PostgresImporter()
+    private val importer = PostgresTargetImporter()
 
     @Test
     fun `builds copy sql for schema qualified table`() {
@@ -46,7 +46,7 @@ class PostgresImporterTest {
     @Test
     fun `imports csv in one transaction with truncate`() {
         val state = FakeConnectionState()
-        val importer = PostgresImporter(
+        val importer = PostgresTargetImporter(
             connectionProvider = { _, _, _ -> importerConnection(state) },
             copyExecutor = { _, _, _ -> 3L },
         )
@@ -73,7 +73,7 @@ class PostgresImporterTest {
     @Test
     fun `rolls back when copy fails`() {
         val state = FakeConnectionState()
-        val importer = PostgresImporter(
+        val importer = PostgresTargetImporter(
             connectionProvider = { _, _, _ -> importerConnection(state) },
             copyExecutor = { _, _, _ -> throw SQLException("copy failed") },
         )
