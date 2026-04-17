@@ -1,4 +1,4 @@
-package com.sbrf.lt.platform.ui.sync
+package com.sbrf.lt.datapool.module.sync
 
 /**
  * Последний сохраненный результат sync по модулю, нужный для быстрого precheck без чтения содержимого файлов.

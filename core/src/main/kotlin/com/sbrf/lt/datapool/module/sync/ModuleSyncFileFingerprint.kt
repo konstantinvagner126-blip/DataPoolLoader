@@ -1,4 +1,4 @@
-package com.sbrf.lt.platform.ui.sync
+package com.sbrf.lt.datapool.module.sync
 
 /**
  * Быстрый файловый fingerprint модуля, используемый до пересчета канонического `content_hash`.

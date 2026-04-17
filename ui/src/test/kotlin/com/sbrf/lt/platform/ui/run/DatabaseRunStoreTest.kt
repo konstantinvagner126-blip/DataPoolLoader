@@ -5,7 +5,7 @@ import com.sbrf.lt.datapool.model.AppConfig
 import com.sbrf.lt.datapool.model.MergeMode
 import com.sbrf.lt.datapool.model.SourceConfig
 import com.sbrf.lt.datapool.model.TargetConfig
-import com.sbrf.lt.platform.ui.module.DatabaseConnectionProvider
+import com.sbrf.lt.datapool.db.registry.DatabaseConnectionProvider
 import java.lang.reflect.Proxy
 import java.sql.Connection
 import java.sql.PreparedStatement

@@ -13,6 +13,7 @@ import com.sbrf.lt.platform.ui.config.UiRuntimeContextService
 import com.sbrf.lt.platform.ui.config.appsRootPath
 import com.sbrf.lt.platform.ui.config.UiModuleStoreMode
 import com.sbrf.lt.platform.ui.config.isConfigured
+import com.sbrf.lt.platform.ui.config.schemaName
 import com.sbrf.lt.platform.ui.config.storageDirPath
 import com.sbrf.lt.platform.ui.model.ConfigFormParseRequest
 import com.sbrf.lt.platform.ui.model.ConfigFormUpdateRequest
@@ -42,12 +43,15 @@ import com.sbrf.lt.platform.ui.run.DatabaseModuleRunService
 import com.sbrf.lt.platform.ui.run.DatabaseRunStore
 import com.sbrf.lt.platform.ui.run.RunManager
 import com.sbrf.lt.platform.ui.run.UiCredentialsService
-import com.sbrf.lt.platform.ui.sync.ModuleSyncService
-import com.sbrf.lt.platform.ui.sync.SyncRunResult
+import com.sbrf.lt.datapool.db.registry.DriverManagerDatabaseConnectionProvider
+import com.sbrf.lt.datapool.module.sync.ModuleSyncService
+import com.sbrf.lt.datapool.module.sync.ModuleSyncState
+import com.sbrf.lt.datapool.module.sync.SyncRunResult
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleExportService
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleQueryManager
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleStateService
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleStateStore
+import com.sbrf.lt.platform.ui.sync.DatabaseModuleSyncImporter
 import io.ktor.http.ContentDisposition
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
@@ -238,7 +242,18 @@ fun Application.uiModule(
         databaseModuleBackend ?: currentDatabaseModuleStore()?.let { DatabaseModuleBackend(it) }
 
     fun currentModuleSyncService(): ModuleSyncService? =
-        moduleSyncService ?: currentDatabasePostgresConfig()?.let { ModuleSyncService.fromConfig(it) }
+        moduleSyncService ?: currentDatabasePostgresConfig()?.let { postgres ->
+            val store = currentDatabaseModuleStore() ?: DatabaseModuleStore.fromConfig(postgres)
+            ModuleSyncService(
+                connectionProvider = DriverManagerDatabaseConnectionProvider(
+                    requireNotNull(postgres.jdbcUrl),
+                    requireNotNull(postgres.username),
+                    requireNotNull(postgres.password),
+                ),
+                moduleRegistryImporter = DatabaseModuleSyncImporter(store),
+                schema = postgres.schemaName(),
+            )
+        }
 
     fun currentDatabaseModuleRunService(): DatabaseModuleRunService? =
         databaseModuleRunService ?: currentDatabasePostgresConfig()?.let { postgres ->
@@ -251,17 +266,17 @@ fun Application.uiModule(
             )
         }
 
-    fun readSyncStateSafely(): com.sbrf.lt.platform.ui.sync.ModuleSyncState =
+    fun readSyncStateSafely(): ModuleSyncState =
         runCatching {
             val runtimeContext = currentRuntimeContext()
             val syncService = currentModuleSyncService()
             if (runtimeContext.effectiveMode == UiModuleStoreMode.DATABASE && syncService != null) {
                 syncService.currentSyncState()
             } else {
-                com.sbrf.lt.platform.ui.sync.ModuleSyncState()
+                ModuleSyncState()
             }
         }.getOrElse {
-            com.sbrf.lt.platform.ui.sync.ModuleSyncState()
+            ModuleSyncState()
         }
 
     fun requireDatabaseMaintenanceIsInactive() {

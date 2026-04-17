@@ -1,9 +1,9 @@
-package com.sbrf.lt.platform.ui.run
+package com.sbrf.lt.datapool.db.registry.sql
 
 /**
  * SQL-запросы для DB run-history (`module_run*`).
  */
-internal object DatabaseRunStoreSql {
+object RunHistorySql {
     fun hasActiveRun(schema: String): String =
         """
         select count(*) as active_runs

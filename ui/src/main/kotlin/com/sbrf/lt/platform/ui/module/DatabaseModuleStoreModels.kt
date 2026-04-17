@@ -1,5 +1,7 @@
 package com.sbrf.lt.platform.ui.module
 
+import com.sbrf.lt.datapool.db.registry.model.RegistryModuleCreationResult
+import com.sbrf.lt.datapool.db.registry.model.RegistryModuleDraft
 import com.sbrf.lt.platform.ui.model.ModuleDetailsResponse
 import com.sbrf.lt.platform.ui.model.ModuleValidationIssueResponse
 
@@ -87,28 +89,6 @@ data class PublishResult(
 )
 
 /**
- * Запрос на создание DB-модуля в PostgreSQL registry.
- */
-data class CreateModuleRequest(
-    val title: String,
-    val description: String? = null,
-    val tags: List<String>? = null,
-    val configText: String,
-    val sqlFiles: Map<String, String> = emptyMap(),
-    val hiddenFromUi: Boolean = true,
-)
-
-/**
- * Результат создания DB-модуля вместе с первой revision и personal working copy.
- */
-data class CreateModuleResult(
-    val moduleId: String,
-    val moduleCode: String,
-    val revisionId: String,
-    val workingCopyId: String,
-)
-
-/**
  * Результат удаления DB-модуля из PostgreSQL registry.
  */
 data class DeleteModuleResult(
@@ -116,3 +96,7 @@ data class DeleteModuleResult(
     val moduleId: String,
     val deletedBy: String,
 )
+
+typealias CreateModuleRequest = RegistryModuleDraft
+
+typealias CreateModuleResult = RegistryModuleCreationResult

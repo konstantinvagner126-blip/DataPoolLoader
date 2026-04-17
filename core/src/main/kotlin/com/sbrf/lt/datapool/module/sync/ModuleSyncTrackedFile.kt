@@ -1,4 +1,4 @@
-package com.sbrf.lt.platform.ui.sync
+package com.sbrf.lt.datapool.module.sync
 
 /**
  * Метаданные одного отслеживаемого файла модуля для быстрого precheck по `mtime/size`.

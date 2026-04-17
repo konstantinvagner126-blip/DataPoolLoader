@@ -1,4 +1,4 @@
-package com.sbrf.lt.platform.ui.sync
+package com.sbrf.lt.datapool.module.sync
 
 /**
  * Результат обработки одного модуля в рамках запуска импорта `files -> database`.

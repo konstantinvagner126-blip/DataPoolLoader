@@ -3,6 +3,8 @@ package com.sbrf.lt.platform.ui.module
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.sbrf.lt.datapool.config.ConfigLoader
+import com.sbrf.lt.datapool.config.sql.SqlFileReferenceExtractor
+import com.sbrf.lt.datapool.db.registry.sql.ModuleRegistrySql
 import com.sbrf.lt.datapool.model.AppConfig
 import com.sbrf.lt.datapool.model.RootConfig
 import com.sbrf.lt.datapool.model.SourceConfig
@@ -34,7 +36,7 @@ internal class DatabaseModuleRevisionWriter(
         contentHash: String,
     ) {
         val appConfig = parseAppConfig(workingCopyYaml)
-        connection.prepareStatement(insertPublishedRevisionSql(normalizedSchema)).use { stmt ->
+        connection.prepareStatement(ModuleRegistrySql.insertPublishedRevision(normalizedSchema)).use { stmt ->
             stmt.setString(1, revisionId)
             stmt.setLong(2, revisionNo)
             stmt.setString(3, actorDisplayName ?: actorId)
@@ -74,7 +76,7 @@ internal class DatabaseModuleRevisionWriter(
         val appConfig = parseAppConfig(request.configText)
         val snapshotJson = buildSnapshotJson(request.configText, request.sqlFiles)
 
-        connection.prepareStatement(insertRevisionSql(normalizedSchema)).use { stmt ->
+        connection.prepareStatement(ModuleRegistrySql.insertRevision(normalizedSchema)).use { stmt ->
             stmt.setString(1, revisionId)
             stmt.setString(2, moduleId)
             stmt.setLong(3, 1)
@@ -177,7 +179,7 @@ internal class DatabaseModuleRevisionWriter(
                 .digest(draft.sqlText.toByteArray(Charsets.UTF_8))
                 .joinToString("") { "%02x".format(it) }
 
-            connection.prepareStatement(copySqlAssetsSql(normalizedSchema)).use { stmt ->
+            connection.prepareStatement(ModuleRegistrySql.copySqlAssets(normalizedSchema)).use { stmt ->
                 stmt.setString(1, assetId)
                 stmt.setString(2, revisionId)
                 stmt.setString(3, draft.assetKind)
@@ -212,7 +214,7 @@ internal class DatabaseModuleRevisionWriter(
                 return@forEachIndexed
             }
 
-            connection.prepareStatement(insertRevisionSourceSql(normalizedSchema)).use { stmt ->
+            connection.prepareStatement(ModuleRegistrySql.insertRevisionSource(normalizedSchema)).use { stmt ->
                 stmt.setString(1, revisionId)
                 stmt.setString(2, sourceName)
                 stmt.setInt(3, index)
@@ -232,7 +234,7 @@ internal class DatabaseModuleRevisionWriter(
             if (sourceName.isBlank() || sourceName !in insertedSourceNames || quota.percent <= 0.0 || quota.percent > 100.0) {
                 return@forEachIndexed
             }
-            connection.prepareStatement(insertRevisionQuotaSql(normalizedSchema)).use { stmt ->
+            connection.prepareStatement(ModuleRegistrySql.insertRevisionQuota(normalizedSchema)).use { stmt ->
                 stmt.setString(1, revisionId)
                 stmt.setString(2, sourceName)
                 stmt.setBigDecimal(3, BigDecimal.valueOf(quota.percent))
@@ -267,7 +269,7 @@ internal class DatabaseModuleRevisionWriter(
             target.username.isNotBlank() &&
             target.password.isNotBlank() &&
             target.table.isNotBlank()
-        connection.prepareStatement(insertRevisionTargetSql(normalizedSchema)).use { stmt ->
+        connection.prepareStatement(ModuleRegistrySql.insertRevisionTarget(normalizedSchema)).use { stmt ->
             stmt.setString(1, revisionId)
             stmt.setBoolean(2, target.enabled && hasCompleteTarget)
             stmt.setString(3, target.jdbcUrl)
@@ -303,7 +305,7 @@ internal class DatabaseModuleRevisionWriter(
         }
 
     private fun buildSnapshotJson(configText: String, sqlFileContents: Map<String, String>): String {
-        val sqlLabels = SqlFileEntries.labelsByPathOrEmpty(configText, objectMapper)
+        val sqlLabels = SqlFileReferenceExtractor.labelsByPathOrEmpty(configText, objectMapper)
         val sqlFiles = sqlFileContents.entries
             .sortedBy { it.key }
             .map { (path, content) ->

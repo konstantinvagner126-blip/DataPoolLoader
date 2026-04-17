@@ -5,14 +5,15 @@ import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.sbrf.lt.datapool.app.RuntimeModuleSnapshot
+import com.sbrf.lt.datapool.config.sql.SqlFileReferenceExtractor
+import com.sbrf.lt.datapool.db.registry.DatabaseConnectionProvider
+import com.sbrf.lt.datapool.db.registry.DriverManagerDatabaseConnectionProvider
+import com.sbrf.lt.datapool.db.registry.sql.ExecutionSnapshotSql
+import com.sbrf.lt.datapool.db.registry.sql.ModuleRegistrySql
+import com.sbrf.lt.datapool.db.registry.sql.normalizeRegistrySchemaName
 import com.sbrf.lt.platform.ui.config.UiModuleStorePostgresConfig
 import com.sbrf.lt.platform.ui.config.schemaName
 import com.sbrf.lt.platform.ui.model.ModuleFileContent
-import com.sbrf.lt.platform.ui.module.DatabaseConnectionProvider
-import com.sbrf.lt.platform.ui.module.DriverManagerDatabaseConnectionProvider
-import com.sbrf.lt.platform.ui.module.SqlFileEntries
-import com.sbrf.lt.platform.ui.module.normalizeSchemaName
-import com.sbrf.lt.platform.ui.module.sqlAssetsSql
 import java.security.MessageDigest
 import java.sql.Connection
 import java.util.UUID
@@ -32,7 +33,11 @@ class DatabaseModuleExecutionSource(
     companion object {
         fun fromConfig(config: UiModuleStorePostgresConfig): DatabaseModuleExecutionSource =
             DatabaseModuleExecutionSource(
-                connectionProvider = DriverManagerDatabaseConnectionProvider(config),
+                connectionProvider = DriverManagerDatabaseConnectionProvider(
+                    requireNotNull(config.jdbcUrl),
+                    requireNotNull(config.username),
+                    requireNotNull(config.password),
+                ),
                 schema = config.schemaName(),
             )
     }
@@ -43,7 +48,7 @@ class DatabaseModuleExecutionSource(
         actorSource: String,
         actorDisplayName: String?,
     ): RuntimeModuleSnapshot {
-        val normalizedSchema = normalizeSchemaName(schema)
+        val normalizedSchema = normalizeRegistrySchemaName(schema)
         connectionProvider.getConnection().use { connection ->
             val previousAutoCommit = connection.autoCommit
             connection.autoCommit = false
@@ -92,7 +97,7 @@ class DatabaseModuleExecutionSource(
         actorId: String,
         actorSource: String,
     ): DatabaseExecutionSourceRow {
-        connection.prepareStatement(DatabaseModuleExecutionSourceSql.source(normalizedSchema)).use { stmt ->
+        connection.prepareStatement(ExecutionSnapshotSql.source(normalizedSchema)).use { stmt ->
             stmt.setString(1, actorId)
             stmt.setString(2, actorSource)
             stmt.setString(3, moduleCode)
@@ -122,7 +127,7 @@ class DatabaseModuleExecutionSource(
         return if (source.sourceKind == "WORKING_COPY") {
             readWorkingCopySqlFiles(source.workingCopyJson).associate { it.path to it.content }
         } else {
-            connection.prepareStatement(sqlAssetsSql(normalizedSchema)).use { stmt ->
+            connection.prepareStatement(ModuleRegistrySql.sqlAssets(normalizedSchema)).use { stmt ->
                 stmt.setString(1, source.sourceRevisionId)
                 stmt.executeQuery().use { rs ->
                     buildMap {
@@ -146,7 +151,7 @@ class DatabaseModuleExecutionSource(
         snapshotJson: String,
         contentHash: String,
     ) {
-        connection.prepareStatement(DatabaseModuleExecutionSourceSql.insertExecutionSnapshot(normalizedSchema)).use { stmt ->
+        connection.prepareStatement(ExecutionSnapshotSql.insertExecutionSnapshot(normalizedSchema)).use { stmt ->
             stmt.setString(1, executionSnapshotId)
             stmt.setString(2, source.moduleId)
             stmt.setString(3, actorId)
@@ -169,7 +174,7 @@ class DatabaseModuleExecutionSource(
     }
 
     private fun buildSnapshotJson(configText: String, sqlFileContents: Map<String, String>): String {
-        val sqlLabels = SqlFileEntries.labelsByPathOrEmpty(configText, objectMapper)
+        val sqlLabels = SqlFileReferenceExtractor.labelsByPathOrEmpty(configText, objectMapper)
         val sqlFiles = sqlFileContents.entries
             .sortedBy { it.key }
             .map { (path, content) ->

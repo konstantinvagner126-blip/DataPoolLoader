@@ -12,6 +12,13 @@ import com.sbrf.lt.datapool.sqlconsole.SqlConsoleExecutionCancelledException
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleSourceConfig
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleService
 import com.sbrf.lt.datapool.app.ApplicationRunner
+import com.sbrf.lt.datapool.db.registry.DatabaseConnectionProvider
+import com.sbrf.lt.datapool.db.registry.model.RegistryModuleCreationResult
+import com.sbrf.lt.datapool.db.registry.model.RegistryModuleDraft
+import com.sbrf.lt.datapool.module.sync.ActiveModuleSyncRun
+import com.sbrf.lt.datapool.module.sync.ModuleRegistryImporter
+import com.sbrf.lt.datapool.module.sync.ModuleSyncService
+import com.sbrf.lt.datapool.module.sync.ModuleSyncState
 import com.sbrf.lt.datapool.db.PostgresExporter
 import com.sbrf.lt.platform.ui.config.UiAppConfig
 import com.sbrf.lt.platform.ui.config.UiActorIdentity
@@ -34,7 +41,6 @@ import com.sbrf.lt.platform.ui.model.ModuleCatalogItemResponse
 import com.sbrf.lt.platform.ui.model.ModuleDetailsResponse
 import com.sbrf.lt.platform.ui.model.ModuleFileContent
 import com.sbrf.lt.platform.ui.model.SqlConsoleQueryRequest
-import com.sbrf.lt.platform.ui.module.DatabaseConnectionProvider
 import com.sbrf.lt.platform.ui.module.DatabaseEditableModule
 import com.sbrf.lt.platform.ui.module.DatabaseModuleStore
 import com.sbrf.lt.platform.ui.module.ModuleRegistry
@@ -45,9 +51,6 @@ import com.sbrf.lt.platform.ui.run.RunManager
 import com.sbrf.lt.platform.ui.run.UiCredentialsService
 import com.sbrf.lt.platform.ui.run.UiCredentialsProvider
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleQueryManager
-import com.sbrf.lt.platform.ui.sync.ActiveModuleSyncRun
-import com.sbrf.lt.platform.ui.sync.ModuleSyncState
-import com.sbrf.lt.platform.ui.sync.ModuleSyncService
 import io.ktor.client.request.get
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
@@ -985,6 +988,16 @@ class ServerTest {
         )
         val moduleSyncService = object : ModuleSyncService(
             connectionProvider = DatabaseConnectionProvider { error("connection must not be requested") },
+            moduleRegistryImporter = object : ModuleRegistryImporter {
+                override fun createModule(
+                    moduleCode: String,
+                    actorId: String,
+                    actorSource: String,
+                    actorDisplayName: String?,
+                    originKind: String,
+                    draft: RegistryModuleDraft,
+                ): RegistryModuleCreationResult = error("createModule must not be requested")
+            },
         ) {
             override fun currentSyncState(): ModuleSyncState = ModuleSyncState(
                 maintenanceMode = true,
@@ -1057,6 +1070,16 @@ class ServerTest {
         )
         val moduleSyncService = object : ModuleSyncService(
             connectionProvider = DatabaseConnectionProvider { error("connection must not be requested") },
+            moduleRegistryImporter = object : ModuleRegistryImporter {
+                override fun createModule(
+                    moduleCode: String,
+                    actorId: String,
+                    actorSource: String,
+                    actorDisplayName: String?,
+                    originKind: String,
+                    draft: RegistryModuleDraft,
+                ): RegistryModuleCreationResult = error("createModule must not be requested")
+            },
         ) {
             override fun currentSyncState(): ModuleSyncState = ModuleSyncState(
                 activeSingleSyncs = listOf(

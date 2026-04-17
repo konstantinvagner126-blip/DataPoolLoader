@@ -1,11 +1,10 @@
-package com.sbrf.lt.platform.ui.module
+package com.sbrf.lt.datapool.db.registry
 
-import com.sbrf.lt.platform.ui.config.UiModuleStorePostgresConfig
 import java.sql.Connection
 import java.sql.DriverManager
 
 /**
- * Поставщик JDBC-соединений для PostgreSQL registry UI.
+ * Поставщик JDBC-соединений для PostgreSQL registry.
  */
 fun interface DatabaseConnectionProvider {
     fun getConnection(): Connection
@@ -15,8 +14,10 @@ fun interface DatabaseConnectionProvider {
  * Реализация поставщика соединений через стандартный `DriverManager`.
  */
 class DriverManagerDatabaseConnectionProvider(
-    private val config: UiModuleStorePostgresConfig,
+    private val jdbcUrl: String,
+    private val username: String,
+    private val password: String,
 ) : DatabaseConnectionProvider {
     override fun getConnection(): Connection =
-        DriverManager.getConnection(config.jdbcUrl, config.username, config.password)
+        DriverManager.getConnection(jdbcUrl, username, password)
 }

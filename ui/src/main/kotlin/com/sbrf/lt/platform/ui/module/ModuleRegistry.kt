@@ -9,6 +9,7 @@ import com.sbrf.lt.platform.ui.model.ModuleFileContent
 import com.sbrf.lt.platform.ui.model.ModuleValidationIssueResponse
 import com.sbrf.lt.platform.ui.model.SaveModuleRequest
 import com.fasterxml.jackson.databind.JsonNode
+import com.sbrf.lt.datapool.config.sql.SqlFileReferenceExtractor
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.deleteIfExists
@@ -137,7 +138,7 @@ class ModuleRegistry(
     }
 
     fun extractSqlReferences(configText: String): List<String> {
-        return SqlFileEntries.extractOrEmpty(configText, mapper).map { it.path }
+        return SqlFileReferenceExtractor.extractOrEmpty(configText, mapper).map { it.path }
     }
 
     fun resolveSqlPath(module: ModuleDescriptor, sqlRef: String): Path? {
@@ -153,11 +154,11 @@ class ModuleRegistry(
 
     private fun loadManagedSqlFiles(module: ModuleDescriptor, configText: String): List<ModuleFileContent> {
         val discoveredKeys = discoverSqlCatalogKeys(module)
-        val referencedEntries = SqlFileEntries.extractOrEmpty(configText, mapper)
+        val referencedEntries = SqlFileReferenceExtractor.extractOrEmpty(configText, mapper)
         val referencedKeys = referencedEntries.map { it.path }.filter { sqlRef ->
             resolveSqlPath(module, sqlRef)?.let { isManagedSqlPath(module, it) } == true
         }
-        val labelsByPath = SqlFileEntries.labelsByPathOrEmpty(configText, mapper)
+        val labelsByPath = SqlFileReferenceExtractor.labelsByPathOrEmpty(configText, mapper)
         val allKeys = (discoveredKeys + referencedKeys).toSortedSet()
         return allKeys.map { sqlRef ->
             val path = resolveSqlPath(module, sqlRef)
@@ -189,7 +190,7 @@ class ModuleRegistry(
     }
 
     private fun managedSqlReferences(module: ModuleDescriptor, configText: String): Set<String> =
-        SqlFileEntries.extractOrEmpty(configText, mapper)
+        SqlFileReferenceExtractor.extractOrEmpty(configText, mapper)
             .map { it.path }
             .filter { sqlRef ->
                 resolveSqlPath(module, sqlRef)?.let { isManagedSqlPath(module, it) } == true
@@ -236,7 +237,7 @@ class ModuleRegistry(
         }
 
         if (parsedRoot != null) {
-            val sqlRefs = SqlFileEntries.extractOrEmpty(configText, mapper)
+            val sqlRefs = SqlFileReferenceExtractor.extractOrEmpty(configText, mapper)
             sqlRefs.forEach { entry ->
                 val sqlPath = resolveSqlPath(configFile, resourcesDir, entry.path)
                 if (sqlPath == null || !Files.exists(sqlPath)) {

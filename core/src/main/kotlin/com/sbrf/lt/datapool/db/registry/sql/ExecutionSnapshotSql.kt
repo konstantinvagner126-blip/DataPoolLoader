@@ -1,9 +1,9 @@
-package com.sbrf.lt.platform.ui.run
+package com.sbrf.lt.datapool.db.registry.sql
 
 /**
  * SQL для подготовки runtime snapshot DB-модуля и записи execution snapshot.
  */
-internal object DatabaseModuleExecutionSourceSql {
+object ExecutionSnapshotSql {
     fun source(schema: String): String =
         """
         select

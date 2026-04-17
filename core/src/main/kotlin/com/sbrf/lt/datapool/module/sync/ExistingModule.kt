@@ -1,4 +1,4 @@
-package com.sbrf.lt.platform.ui.sync
+package com.sbrf.lt.datapool.module.sync
 
 /**
  * Текущее состояние DB-модуля, уже существующего в registry, для проверки конфликта импорта.

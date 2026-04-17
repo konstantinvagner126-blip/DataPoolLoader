@@ -1,17 +1,9 @@
-package com.sbrf.lt.platform.ui.module
+package com.sbrf.lt.datapool.db.registry.sql
 
 /**
- * SQL-запросы PostgreSQL registry для `DatabaseModuleStore`.
+ * SQL-запросы PostgreSQL registry для хранилища модулей.
  */
-internal object DatabaseModuleStoreSql {
-    fun normalizeSchemaName(schema: String): String {
-        val normalized = schema.trim()
-        require(Regex("[A-Za-z_][A-Za-z0-9_]*").matches(normalized)) {
-            "Некорректное имя schema PostgreSQL registry: $schema"
-        }
-        return normalized
-    }
-
+object ModuleRegistrySql {
     fun catalog(schema: String): String =
         """
         select
@@ -407,44 +399,3 @@ internal object DatabaseModuleStoreSql {
             and mr.status = 'RUNNING'
         """.trimIndent()
 }
-
-internal fun normalizeSchemaName(schema: String): String = DatabaseModuleStoreSql.normalizeSchemaName(schema)
-
-internal fun catalogSql(schema: String): String = DatabaseModuleStoreSql.catalog(schema)
-
-internal fun detailsSql(schema: String): String = DatabaseModuleStoreSql.details(schema)
-
-internal fun sqlAssetsSql(schema: String): String = DatabaseModuleStoreSql.sqlAssets(schema)
-
-internal fun moduleForSaveSql(schema: String): String = DatabaseModuleStoreSql.moduleForSave(schema)
-
-internal fun upsertWorkingCopySql(schema: String): String = DatabaseModuleStoreSql.upsertWorkingCopy(schema)
-
-internal fun discardWorkingCopySql(schema: String): String = DatabaseModuleStoreSql.discardWorkingCopy(schema)
-
-internal fun moduleForPublishSql(schema: String): String = DatabaseModuleStoreSql.moduleForPublish(schema)
-
-internal fun insertRevisionSql(schema: String): String = DatabaseModuleStoreSql.insertRevision(schema)
-
-internal fun insertPublishedRevisionSql(schema: String): String = DatabaseModuleStoreSql.insertPublishedRevision(schema)
-
-internal fun copySqlAssetsSql(schema: String): String = DatabaseModuleStoreSql.copySqlAssets(schema)
-
-internal fun insertRevisionSourceSql(schema: String): String = DatabaseModuleStoreSql.insertRevisionSource(schema)
-
-internal fun insertRevisionTargetSql(schema: String): String = DatabaseModuleStoreSql.insertRevisionTarget(schema)
-
-internal fun insertRevisionQuotaSql(schema: String): String = DatabaseModuleStoreSql.insertRevisionQuota(schema)
-
-internal fun updateCurrentRevisionSql(schema: String): String = DatabaseModuleStoreSql.updateCurrentRevision(schema)
-
-internal fun deleteWorkingCopyAfterPublishSql(schema: String): String =
-    DatabaseModuleStoreSql.deleteWorkingCopyAfterPublish(schema)
-
-internal fun insertModuleSql(schema: String): String = DatabaseModuleStoreSql.insertModule(schema)
-
-internal fun deleteWorkingCopyForModuleSql(schema: String): String = DatabaseModuleStoreSql.deleteWorkingCopyForModule(schema)
-
-internal fun deleteModuleSql(schema: String): String = DatabaseModuleStoreSql.deleteModule(schema)
-
-internal fun checkActiveRunSql(schema: String): String = DatabaseModuleStoreSql.checkActiveRun(schema)

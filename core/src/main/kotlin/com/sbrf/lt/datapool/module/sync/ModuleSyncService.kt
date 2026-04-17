@@ -1,15 +1,13 @@
-package com.sbrf.lt.platform.ui.sync
+package com.sbrf.lt.datapool.module.sync
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.sbrf.lt.datapool.config.ConfigLoader
-import com.sbrf.lt.platform.ui.config.UiModuleStorePostgresConfig
-import com.sbrf.lt.platform.ui.config.schemaName
-import com.sbrf.lt.platform.ui.module.DatabaseConnectionProvider
-import com.sbrf.lt.platform.ui.module.DatabaseModuleStore
-import com.sbrf.lt.platform.ui.module.DriverManagerDatabaseConnectionProvider
-import com.sbrf.lt.platform.ui.module.CreateModuleRequest
-import com.sbrf.lt.platform.ui.module.CreateModuleResult
+import com.sbrf.lt.datapool.config.sql.SqlFileReferenceExtractor
+import com.sbrf.lt.datapool.db.registry.DatabaseConnectionProvider
+import com.sbrf.lt.datapool.db.registry.model.RegistryModuleCreationResult
+import com.sbrf.lt.datapool.db.registry.model.RegistryModuleDraft
+import com.sbrf.lt.datapool.db.registry.sql.normalizeRegistrySchemaName
 import java.nio.file.Path
 import java.nio.file.Files
 import java.security.MessageDigest
@@ -20,19 +18,14 @@ import java.util.UUID
 
 open class ModuleSyncService(
     private val connectionProvider: DatabaseConnectionProvider,
+    private val moduleRegistryImporter: ModuleRegistryImporter,
     private val schema: String = "ui_registry",
     private val objectMapper: ObjectMapper = jacksonObjectMapper(),
 ) {
-    companion object {
-        fun fromConfig(config: UiModuleStorePostgresConfig): ModuleSyncService =
-            ModuleSyncService(
-                connectionProvider = DriverManagerDatabaseConnectionProvider(config),
-                schema = config.schemaName(),
-            )
-    }
+    private val configMapper: ObjectMapper = ConfigLoader().objectMapper()
 
     open fun currentSyncState(): ModuleSyncState {
-        val normalizedSchema = normalizeSchemaName(schema)
+        val normalizedSchema = normalizeRegistrySchemaName(schema)
         connectionProvider.getConnection().use { connection ->
             val maintenanceLockKey = advisoryLockKey("module-sync:maintenance")
             val maintenanceMode = !tryAcquireExclusiveAdvisoryLock(connection, maintenanceLockKey)
@@ -74,7 +67,7 @@ open class ModuleSyncService(
     ): SyncRunResult {
         val syncRunId = UUID.randomUUID().toString()
         val startedAt = Instant.now()
-        val normalizedSchema = normalizeSchemaName(schema)
+        val normalizedSchema = normalizeRegistrySchemaName(schema)
 
         val syncItem = connectionProvider.getConnection().use { lockConnection ->
             val globalLockKey = advisoryLockKey("module-sync:global")
@@ -114,7 +107,6 @@ open class ModuleSyncService(
                         actorDisplayName = actorDisplayName,
                     )
                     syncSingleModule(
-                        connection = null,
                         normalizedSchema = normalizedSchema,
                         moduleCode = moduleCode,
                         appsRoot = appsRoot,
@@ -181,7 +173,7 @@ open class ModuleSyncService(
     ): SyncRunResult {
         val syncRunId = UUID.randomUUID().toString()
         val startedAt = Instant.now()
-        val normalizedSchema = normalizeSchemaName(schema)
+        val normalizedSchema = normalizeRegistrySchemaName(schema)
 
         val moduleDirs = findModuleDirectories(appsRoot)
         val items = mutableListOf<SyncItemResult>()
@@ -223,7 +215,6 @@ open class ModuleSyncService(
                         val moduleCode = moduleDir.fileName?.toString()
                             ?: error("Не удалось определить module code для директории: $moduleDir")
                         val syncItem = syncSingleModule(
-                            connection = null,
                             normalizedSchema = normalizedSchema,
                             moduleCode = moduleCode,
                             appsRoot = appsRoot,
@@ -503,7 +494,6 @@ open class ModuleSyncService(
     }
 
     private fun syncSingleModule(
-        connection: Connection?,
         normalizedSchema: String,
         moduleCode: String,
         appsRoot: Path,
@@ -513,7 +503,7 @@ open class ModuleSyncService(
     ): SyncItemResult {
         val moduleDir = appsRoot.resolve(moduleCode)
         val configFile = moduleConfigFile(moduleDir)
-        val previousSyncItem = loadPreviousSyncItem(connection, normalizedSchema, moduleCode)
+        val previousSyncItem = loadPreviousSyncItem(normalizedSchema, moduleCode)
         val precheckFingerprint = collectFilesystemFingerprint(
             moduleDir = moduleDir,
             trackedPaths = linkedSetOf<String>().apply {
@@ -538,7 +528,7 @@ open class ModuleSyncService(
             )
         }
 
-        val existingModule = loadExistingModule(connection, normalizedSchema, moduleCode)
+        val existingModule = loadExistingModule(normalizedSchema, moduleCode)
         val fastResult = buildFastPrecheckResult(
             moduleCode = moduleCode,
             existingModule = existingModule,
@@ -589,7 +579,6 @@ open class ModuleSyncService(
         }
 
         val newModuleResult = createNewModuleFromFiles(
-            connection = connection,
             normalizedSchema = normalizedSchema,
             moduleCode = moduleCode,
             configText = configText,
@@ -663,7 +652,6 @@ open class ModuleSyncService(
     }
 
     private fun createNewModuleFromFiles(
-        connection: Connection?,
         normalizedSchema: String,
         moduleCode: String,
         configText: String,
@@ -672,10 +660,10 @@ open class ModuleSyncService(
         actorId: String,
         actorSource: String,
         actorDisplayName: String?,
-    ): CreateModuleResult {
+    ): RegistryModuleCreationResult {
         val metadata = loadModuleUiMetadata(moduleDir, moduleCode)
 
-        val request = CreateModuleRequest(
+        val request = RegistryModuleDraft(
             title = metadata.title,
             description = metadata.description,
             tags = metadata.tags,
@@ -684,40 +672,22 @@ open class ModuleSyncService(
             hiddenFromUi = metadata.hiddenFromUi,
         )
 
-        return if (connection != null) {
-            val store = DatabaseModuleStore(connectionProvider = object : DatabaseConnectionProvider {
-                override fun getConnection() = connection
-            }, schema = normalizedSchema)
-            store.createModule(
-                moduleCode = moduleCode,
-                actorId = actorId,
-                actorSource = actorSource,
-                actorDisplayName = actorDisplayName,
-                originKind = "IMPORTED_FROM_FILES",
-                request = request,
-            )
-        } else {
-            createModuleDirectly(
-                normalizedSchema = normalizedSchema,
-                moduleCode = moduleCode,
-                request = request,
-                actorId = actorId,
-                actorSource = actorSource,
-                actorDisplayName = actorDisplayName,
-                originKind = "IMPORTED_FROM_FILES",
-            )
-        }
+        return moduleRegistryImporter.createModule(
+            moduleCode = moduleCode,
+            actorId = actorId,
+            actorSource = actorSource,
+            actorDisplayName = actorDisplayName,
+            originKind = "IMPORTED_FROM_FILES",
+            draft = request,
+        )
     }
 
     private fun loadExistingModule(
-        connection: Connection?,
         normalizedSchema: String,
         moduleCode: String,
     ): ExistingModule? {
-        return if (connection != null) {
-            loadExistingModuleWithConnection(connection, normalizedSchema, moduleCode)
-        } else {
-            loadExistingModuleDirectly(normalizedSchema, moduleCode)
+        connectionProvider.getConnection().use { connection ->
+            return loadExistingModuleWithConnection(connection, normalizedSchema, moduleCode)
         }
     }
 
@@ -751,26 +721,12 @@ open class ModuleSyncService(
         }
     }
 
-    private fun loadExistingModuleDirectly(
-        normalizedSchema: String,
-        moduleCode: String,
-    ): ExistingModule? {
-        connectionProvider.getConnection().use { connection ->
-            return loadExistingModuleWithConnection(connection, normalizedSchema, moduleCode)
-        }
-    }
-
     private fun loadPreviousSyncItem(
-        connection: Connection?,
         normalizedSchema: String,
         moduleCode: String,
     ): PreviousModuleSyncItem? {
-        return if (connection != null) {
-            loadPreviousSyncItemWithConnection(connection, normalizedSchema, moduleCode)
-        } else {
-            connectionProvider.getConnection().use { localConnection ->
-                loadPreviousSyncItemWithConnection(localConnection, normalizedSchema, moduleCode)
-            }
+        connectionProvider.getConnection().use { localConnection ->
+            return loadPreviousSyncItemWithConnection(localConnection, normalizedSchema, moduleCode)
         }
     }
 
@@ -812,91 +768,6 @@ open class ModuleSyncService(
                     resultRevisionId = rs.getString("result_revision_id"),
                     filesystemFingerprint = fingerprint,
                 )
-            }
-        }
-    }
-
-    private fun createModuleDirectly(
-        normalizedSchema: String,
-        moduleCode: String,
-        request: CreateModuleRequest,
-        actorId: String,
-        actorSource: String,
-        actorDisplayName: String?,
-        originKind: String,
-    ): CreateModuleResult {
-        connectionProvider.getConnection().use { connection ->
-            val previousAutoCommit = connection.autoCommit
-            connection.autoCommit = false
-            try {
-                val store = DatabaseModuleStore(connectionProvider = object : DatabaseConnectionProvider {
-                    override fun getConnection() = connection
-                }, schema = normalizedSchema)
-                val result = store.createModule(
-                    moduleCode = moduleCode,
-                    actorId = actorId,
-                    actorSource = actorSource,
-                    actorDisplayName = actorDisplayName,
-                    originKind = originKind,
-                    request = request,
-                )
-                connection.commit()
-                return result
-            } catch (e: Exception) {
-                connection.rollback()
-                throw e
-            } finally {
-                connection.autoCommit = previousAutoCommit
-            }
-        }
-    }
-
-    private fun recordSyncRun(
-        normalizedSchema: String,
-        syncRunId: String,
-        scope: String,
-        moduleCode: String?,
-        startedAt: Instant,
-        finishedAt: Instant,
-        status: String,
-        actorId: String,
-        actorSource: String,
-        actorDisplayName: String?,
-        items: List<SyncItemResult>,
-    ) {
-        connectionProvider.getConnection().use { connection ->
-            val previousAutoCommit = connection.autoCommit
-            connection.autoCommit = false
-            try {
-                insertCompletedSyncRunRecord(
-                    connection = connection,
-                    normalizedSchema = normalizedSchema,
-                    syncRunId = syncRunId,
-                    scope = scope,
-                    moduleCode = moduleCode,
-                    startedAt = startedAt,
-                    finishedAt = finishedAt,
-                    status = status,
-                    actorId = actorId,
-                    actorSource = actorSource,
-                    actorDisplayName = actorDisplayName,
-                )
-
-                items.forEach { item ->
-                    insertSyncItemRecord(
-                        connection = connection,
-                        normalizedSchema = normalizedSchema,
-                        syncRunId = syncRunId,
-                        item = item,
-                    )
-                }
-
-                connection.commit()
-            } catch (e: Exception) {
-                connection.rollback()
-                throw e
-            } finally {
-                connection.autoCommit = previousAutoCommit
             }
         }
     }
@@ -980,41 +851,6 @@ open class ModuleSyncService(
             } finally {
                 connection.autoCommit = previousAutoCommit
             }
-        }
-    }
-
-    private fun insertCompletedSyncRunRecord(
-        connection: Connection,
-        normalizedSchema: String,
-        syncRunId: String,
-        scope: String,
-        moduleCode: String?,
-        startedAt: Instant,
-        finishedAt: Instant,
-        status: String,
-        actorId: String,
-        actorSource: String,
-        actorDisplayName: String?,
-    ) {
-        val sql = """
-            insert into $normalizedSchema.module_sync_run (
-                sync_run_id, started_at, finished_at, started_by_actor_id,
-                started_by_actor_source, started_by_actor_display_name,
-                status, scope, module_code
-            ) values (?::uuid, ?, ?, ?, ?, ?, ?, ?, ?)
-        """.trimIndent()
-
-        connection.prepareStatement(sql).use { stmt ->
-            stmt.setString(1, syncRunId)
-            stmt.setTimestamp(2, Timestamp.from(startedAt))
-            stmt.setTimestamp(3, Timestamp.from(finishedAt))
-            stmt.setString(4, actorId)
-            stmt.setString(5, actorSource)
-            stmt.setString(6, actorDisplayName)
-            stmt.setString(7, status)
-            stmt.setString(8, scope)
-            stmt.setString(9, moduleCode)
-            stmt.executeUpdate()
         }
     }
 
@@ -1126,7 +962,7 @@ open class ModuleSyncService(
         }
 
         return try {
-            val root = ConfigLoader().objectMapper().readTree(metadataFile)
+            val root = configMapper.readTree(metadataFile)
             ModuleUiMetadata(
                 title = root.path("title")
                     .takeIf { it.isTextual }
@@ -1158,32 +994,12 @@ open class ModuleSyncService(
     private fun loadSqlFiles(moduleDir: Path, configText: String): Map<String, String> {
         val configFile = moduleConfigFile(moduleDir)
         val resourcesDir = moduleResourcesDir(moduleDir)
-        return extractSqlFileEntries(configText)
+        return SqlFileReferenceExtractor.extractOrEmpty(configText, configMapper)
             .mapNotNull { entry ->
                 val file = resolveSqlPath(configFile, resourcesDir, entry.path)?.toFile()
                 if (file != null && file.isFile) entry.path to file.readText() else null
             }
             .toMap()
-    }
-
-    private fun extractSqlFileEntries(configText: String): List<ModuleSqlFileEntry> {
-        if (configText.isBlank()) return emptyList()
-        return try {
-            val root = ConfigLoader().objectMapper().readTree(configText) ?: return emptyList()
-            val app = root.path("app")
-            val refs = linkedMapOf<String, ModuleSqlFileEntry>()
-            app.path("commonSqlFile").takeIf { it.isTextual }?.asText()?.takeIf { it.isNotBlank() }?.let { path ->
-                refs[path] = ModuleSqlFileEntry(path = path)
-            }
-            app.path("sources").takeIf { it.isArray }?.forEach { source ->
-                source.path("sqlFile").takeIf { it.isTextual }?.asText()?.takeIf { it.isNotBlank() }?.let { path ->
-                    refs[path] = ModuleSqlFileEntry(path = path)
-                }
-            }
-            refs.values.toList()
-        } catch (_: Exception) {
-            emptyList()
-        }
     }
 
     private fun trackedPathsFromConfig(moduleDir: Path, configText: String): LinkedHashSet<String> {
@@ -1192,7 +1008,7 @@ open class ModuleSyncService(
         return linkedSetOf<String>().apply {
             add(moduleConfigRelativePath())
             add("ui-module.yml")
-            extractSqlFileEntries(configText).forEach { entry ->
+            SqlFileReferenceExtractor.extractOrEmpty(configText, configMapper).forEach { entry ->
                 resolveSqlPath(configFile, resourcesDir, entry.path)?.let { resolvedPath ->
                     add(trackedPathKey(moduleDir, resolvedPath))
                 }
@@ -1302,13 +1118,5 @@ open class ModuleSyncService(
         }
         val digest = MessageDigest.getInstance("SHA-256").digest(input.toByteArray(Charsets.UTF_8))
         return digest.joinToString("") { "%02x".format(it) }
-    }
-
-    private fun normalizeSchemaName(schema: String): String {
-        val normalized = schema.trim()
-        require(Regex("[A-Za-z_][A-Za-z0-9_]*").matches(normalized)) {
-            "Некорректное имя schema PostgreSQL registry: $schema"
-        }
-        return normalized
     }
 }

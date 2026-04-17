@@ -1,6 +1,10 @@
 package com.sbrf.lt.platform.ui.sync
 
-import com.sbrf.lt.platform.ui.module.DatabaseConnectionProvider
+import com.sbrf.lt.datapool.db.registry.DatabaseConnectionProvider
+import com.sbrf.lt.datapool.db.registry.model.RegistryModuleCreationResult
+import com.sbrf.lt.datapool.db.registry.model.RegistryModuleDraft
+import com.sbrf.lt.datapool.module.sync.ModuleSyncService
+import com.sbrf.lt.datapool.module.sync.ModuleRegistryImporter
 import java.lang.reflect.Proxy
 import java.nio.file.Files
 import java.sql.Connection
@@ -16,6 +20,22 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class ModuleSyncServiceTest {
+
+    private val noopImporter = object : ModuleRegistryImporter {
+        override fun createModule(
+            moduleCode: String,
+            actorId: String,
+            actorSource: String,
+            actorDisplayName: String?,
+            originKind: String,
+            draft: RegistryModuleDraft,
+        ): RegistryModuleCreationResult = RegistryModuleCreationResult(
+            moduleId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+            moduleCode = moduleCode,
+            revisionId = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+            workingCopyId = "cccccccc-cccc-cccc-cccc-cccccccccccc",
+        )
+    }
 
     private fun moduleResourcesDir(moduleDir: java.nio.file.Path): java.nio.file.Path =
         moduleDir.resolve("src/main/resources").createDirectories()
@@ -48,6 +68,7 @@ class ModuleSyncServiceTest {
                     ),
                 )
             },
+            moduleRegistryImporter = noopImporter,
         )
 
         val result = service.syncOneFromFiles(
@@ -101,6 +122,8 @@ class ModuleSyncServiceTest {
 
         val preparedSql = mutableListOf<String>()
         val stringParams = mutableListOf<String?>()
+        var importedDraft: RegistryModuleDraft? = null
+        var importedOriginKind: String? = null
         val service = ModuleSyncService(
             connectionProvider = DatabaseConnectionProvider {
                 fakeConnection(
@@ -108,6 +131,25 @@ class ModuleSyncServiceTest {
                     stringParams = stringParams,
                     existingRows = emptyList(),
                 )
+            },
+            moduleRegistryImporter = object : ModuleRegistryImporter {
+                override fun createModule(
+                    moduleCode: String,
+                    actorId: String,
+                    actorSource: String,
+                    actorDisplayName: String?,
+                    originKind: String,
+                    draft: RegistryModuleDraft,
+                ): RegistryModuleCreationResult {
+                    importedOriginKind = originKind
+                    importedDraft = draft
+                    return RegistryModuleCreationResult(
+                        moduleId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+                        moduleCode = moduleCode,
+                        revisionId = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+                        workingCopyId = "cccccccc-cccc-cccc-cccc-cccccccccccc",
+                    )
+                }
             },
         )
 
@@ -121,17 +163,13 @@ class ModuleSyncServiceTest {
 
         assertEquals("SUCCESS", result.status)
         assertEquals("CREATED", result.items.single().action)
-        assertTrue(preparedSql.any { it.contains("insert into ui_registry.module_revision_sql_asset") })
-        assertTrue(preparedSql.any { it.contains("insert into ui_registry.module_revision_source") })
-        assertTrue(preparedSql.any { it.contains("insert into ui_registry.module_revision_target") })
-        assertTrue(preparedSql.any { it.contains("insert into ui_registry.module_revision_quota") })
-        assertTrue(stringParams.any { it == "IMPORTED_FROM_FILES" })
-        assertTrue(stringParams.any { it == "SYNC_FROM_FILES" })
-        assertTrue(stringParams.any { it == "select 1" })
-        assertTrue(stringParams.any { it == "select 2" })
-        assertTrue(stringParams.any { it == "db1" })
-        assertTrue(stringParams.any { it == "target_table" })
-        assertTrue(stringParams.any { it?.contains("\"sqlFiles\"") == true && it.contains("classpath:sql/common.sql") })
+        assertEquals("IMPORTED_FROM_FILES", importedOriginKind)
+        val draft = kotlin.test.assertNotNull(importedDraft)
+        assertEquals("db-new", draft.title)
+        assertTrue(draft.sqlFiles["classpath:sql/common.sql"] == "select 1")
+        assertTrue(draft.sqlFiles["classpath:sql/db1.sql"] == "select 2")
+        assertTrue(draft.configText.contains("target_table"))
+        assertTrue(preparedSql.any { it.contains("insert into ui_registry.module_sync_run_item") })
     }
 
     @Test
@@ -193,6 +231,7 @@ class ModuleSyncServiceTest {
                     ),
                 )
             },
+            moduleRegistryImporter = noopImporter,
         )
 
         val result = service.syncOneFromFiles(
@@ -233,6 +272,7 @@ class ModuleSyncServiceTest {
                     advisoryLockAcquired = false,
                 )
             },
+            moduleRegistryImporter = noopImporter,
         )
 
         val result = service.syncOneFromFiles(
@@ -282,6 +322,7 @@ class ModuleSyncServiceTest {
                     ),
                 )
             },
+            moduleRegistryImporter = noopImporter,
         )
 
         val result = service.syncOneFromFiles(
@@ -324,6 +365,7 @@ class ModuleSyncServiceTest {
                     advisoryLockResults = ArrayDeque(listOf(false)),
                 )
             },
+            moduleRegistryImporter = noopImporter,
         )
 
         val state = service.currentSyncState()
@@ -359,6 +401,7 @@ class ModuleSyncServiceTest {
                     ),
                 )
             },
+            moduleRegistryImporter = noopImporter,
         )
 
         val state = service.currentSyncState()
@@ -394,6 +437,7 @@ class ModuleSyncServiceTest {
                     ),
                 )
             },
+            moduleRegistryImporter = noopImporter,
         )
 
         val state = service.currentSyncState()

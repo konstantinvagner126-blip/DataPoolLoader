@@ -1,5 +1,6 @@
 package com.sbrf.lt.platform.ui.module
 
+import com.sbrf.lt.datapool.db.registry.DatabaseConnectionProvider
 import java.lang.reflect.Proxy
 import java.sql.Connection
 import java.sql.PreparedStatement

@@ -4,6 +4,10 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.sbrf.lt.datapool.db.registry.DatabaseConnectionProvider
+import com.sbrf.lt.datapool.db.registry.DriverManagerDatabaseConnectionProvider
+import com.sbrf.lt.datapool.db.registry.sql.RunHistorySql
+import com.sbrf.lt.datapool.db.registry.sql.normalizeRegistrySchemaName
 import com.sbrf.lt.platform.ui.model.DatabaseModuleRunDetailsResponse
 import com.sbrf.lt.platform.ui.config.UiModuleStorePostgresConfig
 import com.sbrf.lt.platform.ui.config.schemaName
@@ -11,9 +15,6 @@ import com.sbrf.lt.platform.ui.model.DatabaseRunArtifactResponse
 import com.sbrf.lt.platform.ui.model.DatabaseRunEventResponse
 import com.sbrf.lt.platform.ui.model.DatabaseRunSourceResultResponse
 import com.sbrf.lt.platform.ui.model.DatabaseModuleRunSummaryResponse
-import com.sbrf.lt.platform.ui.module.DatabaseConnectionProvider
-import com.sbrf.lt.platform.ui.module.DriverManagerDatabaseConnectionProvider
-import com.sbrf.lt.platform.ui.module.normalizeSchemaName
 import java.nio.file.Files
 import java.nio.file.Path
 import java.sql.PreparedStatement
@@ -37,15 +38,19 @@ open class DatabaseRunStore(
     companion object {
         fun fromConfig(config: UiModuleStorePostgresConfig): DatabaseRunStore =
             DatabaseRunStore(
-                connectionProvider = DriverManagerDatabaseConnectionProvider(config),
+                connectionProvider = DriverManagerDatabaseConnectionProvider(
+                    requireNotNull(config.jdbcUrl),
+                    requireNotNull(config.username),
+                    requireNotNull(config.password),
+                ),
                 schema = config.schemaName(),
             )
     }
 
     open fun hasActiveRun(moduleCode: String): Boolean {
-        val normalizedSchema = normalizeSchemaName(schema)
+        val normalizedSchema = normalizeRegistrySchemaName(schema)
         connectionProvider.getConnection().use { connection ->
-            connection.prepareStatement(DatabaseRunStoreSql.hasActiveRun(normalizedSchema)).use { stmt ->
+            connection.prepareStatement(RunHistorySql.hasActiveRun(normalizedSchema)).use { stmt ->
                 stmt.setString(1, moduleCode)
                 stmt.executeQuery().use { rs ->
                     return rs.next() && rs.getInt("active_runs") > 0
@@ -55,9 +60,9 @@ open class DatabaseRunStore(
     }
 
     open fun activeRunIds(moduleCode: String): List<String> {
-        val normalizedSchema = normalizeSchemaName(schema)
+        val normalizedSchema = normalizeRegistrySchemaName(schema)
         connectionProvider.getConnection().use { connection ->
-            connection.prepareStatement(DatabaseRunStoreSql.listActiveRunIds(normalizedSchema)).use { stmt ->
+            connection.prepareStatement(RunHistorySql.listActiveRunIds(normalizedSchema)).use { stmt ->
                 stmt.setString(1, moduleCode)
                 stmt.executeQuery().use { rs ->
                     val result = mutableListOf<String>()
@@ -75,12 +80,12 @@ open class DatabaseRunStore(
         startedAt: Instant,
         outputDir: String,
     ) {
-        val normalizedSchema = normalizeSchemaName(schema)
+        val normalizedSchema = normalizeRegistrySchemaName(schema)
         connectionProvider.getConnection().use { connection ->
             val previousAutoCommit = connection.autoCommit
             connection.autoCommit = false
             try {
-                connection.prepareStatement(DatabaseRunStoreSql.insertRun(normalizedSchema)).use { stmt ->
+                connection.prepareStatement(RunHistorySql.insertRun(normalizedSchema)).use { stmt ->
                     stmt.setString(1, context.runId)
                     stmt.setString(2, context.actorId)
                     stmt.setString(3, context.actorSource)
@@ -100,7 +105,7 @@ open class DatabaseRunStore(
                 }
 
                 context.sourceOrder.entries.sortedBy { it.value }.forEach { (sourceName, sortOrder) ->
-                    connection.prepareStatement(DatabaseRunStoreSql.insertSourceResult(normalizedSchema)).use { stmt ->
+                    connection.prepareStatement(RunHistorySql.insertSourceResult(normalizedSchema)).use { stmt ->
                         stmt.setString(1, UUID.randomUUID().toString())
                         stmt.setString(2, context.runId)
                         stmt.setString(3, sourceName)
@@ -119,9 +124,9 @@ open class DatabaseRunStore(
     }
 
     open fun markSourceStarted(runId: String, sourceName: String, startedAt: Instant) {
-        val normalizedSchema = normalizeSchemaName(schema)
+        val normalizedSchema = normalizeRegistrySchemaName(schema)
         connectionProvider.getConnection().use { connection ->
-            connection.prepareStatement(DatabaseRunStoreSql.updateSourceStarted(normalizedSchema)).use { stmt ->
+            connection.prepareStatement(RunHistorySql.updateSourceStarted(normalizedSchema)).use { stmt ->
                 stmt.setTimestamp(1, Timestamp.from(startedAt))
                 stmt.setString(2, runId)
                 stmt.setString(3, sourceName)
@@ -138,9 +143,9 @@ open class DatabaseRunStore(
         exportedRowCount: Long?,
         errorMessage: String?,
     ) {
-        val normalizedSchema = normalizeSchemaName(schema)
+        val normalizedSchema = normalizeRegistrySchemaName(schema)
         connectionProvider.getConnection().use { connection ->
-            connection.prepareStatement(DatabaseRunStoreSql.updateSourceFinished(normalizedSchema)).use { stmt ->
+            connection.prepareStatement(RunHistorySql.updateSourceFinished(normalizedSchema)).use { stmt ->
                 stmt.setString(1, status)
                 stmt.setTimestamp(2, Timestamp.from(finishedAt))
                 setNullableLong(stmt, 3, exportedRowCount)
@@ -153,9 +158,9 @@ open class DatabaseRunStore(
     }
 
     open fun markSourceSkipped(runId: String, sourceName: String, finishedAt: Instant, message: String) {
-        val normalizedSchema = normalizeSchemaName(schema)
+        val normalizedSchema = normalizeRegistrySchemaName(schema)
         connectionProvider.getConnection().use { connection ->
-            connection.prepareStatement(DatabaseRunStoreSql.updateSourceMismatch(normalizedSchema)).use { stmt ->
+            connection.prepareStatement(RunHistorySql.updateSourceMismatch(normalizedSchema)).use { stmt ->
                 stmt.setTimestamp(1, Timestamp.from(finishedAt))
                 stmt.setString(2, message)
                 stmt.setString(3, runId)
@@ -166,9 +171,9 @@ open class DatabaseRunStore(
     }
 
     open fun updateSourceMergedRows(runId: String, sourceName: String, mergedRowCount: Long) {
-        val normalizedSchema = normalizeSchemaName(schema)
+        val normalizedSchema = normalizeRegistrySchemaName(schema)
         connectionProvider.getConnection().use { connection ->
-            connection.prepareStatement(DatabaseRunStoreSql.updateSourceMergedRows(normalizedSchema)).use { stmt ->
+            connection.prepareStatement(RunHistorySql.updateSourceMergedRows(normalizedSchema)).use { stmt ->
                 stmt.setLong(1, mergedRowCount)
                 stmt.setString(2, runId)
                 stmt.setString(3, sourceName)
@@ -178,9 +183,9 @@ open class DatabaseRunStore(
     }
 
     open fun updateMergedRowCount(runId: String, mergedRowCount: Long) {
-        val normalizedSchema = normalizeSchemaName(schema)
+        val normalizedSchema = normalizeRegistrySchemaName(schema)
         connectionProvider.getConnection().use { connection ->
-            connection.prepareStatement(DatabaseRunStoreSql.updateMergedRowCount(normalizedSchema)).use { stmt ->
+            connection.prepareStatement(RunHistorySql.updateMergedRowCount(normalizedSchema)).use { stmt ->
                 stmt.setLong(1, mergedRowCount)
                 stmt.setString(2, runId)
                 stmt.executeUpdate()
@@ -189,9 +194,9 @@ open class DatabaseRunStore(
     }
 
     open fun updateTargetStatus(runId: String, targetStatus: String, targetTableName: String?, targetRowsLoaded: Long?) {
-        val normalizedSchema = normalizeSchemaName(schema)
+        val normalizedSchema = normalizeRegistrySchemaName(schema)
         connectionProvider.getConnection().use { connection ->
-            connection.prepareStatement(DatabaseRunStoreSql.updateTargetStatus(normalizedSchema)).use { stmt ->
+            connection.prepareStatement(RunHistorySql.updateTargetStatus(normalizedSchema)).use { stmt ->
                 stmt.setString(1, targetStatus)
                 stmt.setString(2, targetTableName)
                 setNullableLong(stmt, 3, targetRowsLoaded)
@@ -211,9 +216,9 @@ open class DatabaseRunStore(
         message: String,
         payload: Map<String, Any?>,
     ) {
-        val normalizedSchema = normalizeSchemaName(schema)
+        val normalizedSchema = normalizeRegistrySchemaName(schema)
         connectionProvider.getConnection().use { connection ->
-            connection.prepareStatement(DatabaseRunStoreSql.insertEvent(normalizedSchema)).use { stmt ->
+            connection.prepareStatement(RunHistorySql.insertEvent(normalizedSchema)).use { stmt ->
                 stmt.setString(1, UUID.randomUUID().toString())
                 stmt.setString(2, runId)
                 stmt.setInt(3, seqNo)
@@ -237,9 +242,9 @@ open class DatabaseRunStore(
         fileSizeBytes: Long?,
         contentHash: String?,
     ) {
-        val normalizedSchema = normalizeSchemaName(schema)
+        val normalizedSchema = normalizeRegistrySchemaName(schema)
         connectionProvider.getConnection().use { connection ->
-            connection.prepareStatement(DatabaseRunStoreSql.upsertArtifact(normalizedSchema)).use { stmt ->
+            connection.prepareStatement(RunHistorySql.upsertArtifact(normalizedSchema)).use { stmt ->
                 stmt.setString(1, UUID.randomUUID().toString())
                 stmt.setString(2, runId)
                 stmt.setString(3, artifactKind)
@@ -254,9 +259,9 @@ open class DatabaseRunStore(
     }
 
     open fun markArtifactDeleted(runId: String, artifactKind: String, artifactKey: String) {
-        val normalizedSchema = normalizeSchemaName(schema)
+        val normalizedSchema = normalizeRegistrySchemaName(schema)
         connectionProvider.getConnection().use { connection ->
-            connection.prepareStatement(DatabaseRunStoreSql.markArtifactDeleted(normalizedSchema)).use { stmt ->
+            connection.prepareStatement(RunHistorySql.markArtifactDeleted(normalizedSchema)).use { stmt ->
                 stmt.setString(1, runId)
                 stmt.setString(2, artifactKind)
                 stmt.setString(3, artifactKey)
@@ -279,9 +284,9 @@ open class DatabaseRunStore(
         summaryJson: String,
         errorMessage: String?,
     ) {
-        val normalizedSchema = normalizeSchemaName(schema)
+        val normalizedSchema = normalizeRegistrySchemaName(schema)
         connectionProvider.getConnection().use { connection ->
-            connection.prepareStatement(DatabaseRunStoreSql.finishRun(normalizedSchema)).use { stmt ->
+            connection.prepareStatement(RunHistorySql.finishRun(normalizedSchema)).use { stmt ->
                 stmt.setTimestamp(1, Timestamp.from(finishedAt))
                 stmt.setString(2, status)
                 setNullableLong(stmt, 3, mergedRowCount)
@@ -300,9 +305,9 @@ open class DatabaseRunStore(
     }
 
     open fun listRuns(moduleCode: String, limit: Int = 20): List<DatabaseModuleRunSummaryResponse> {
-        val normalizedSchema = normalizeSchemaName(schema)
+        val normalizedSchema = normalizeRegistrySchemaName(schema)
         connectionProvider.getConnection().use { connection ->
-            connection.prepareStatement(DatabaseRunStoreSql.listRuns(normalizedSchema)).use { stmt ->
+            connection.prepareStatement(RunHistorySql.listRuns(normalizedSchema)).use { stmt ->
                 stmt.setString(1, moduleCode)
                 stmt.setInt(2, limit)
                 stmt.executeQuery().use { rs ->
@@ -336,9 +341,9 @@ open class DatabaseRunStore(
     }
 
     open fun loadRunDetails(moduleCode: String, runId: String): DatabaseModuleRunDetailsResponse {
-        val normalizedSchema = normalizeSchemaName(schema)
+        val normalizedSchema = normalizeRegistrySchemaName(schema)
         connectionProvider.getConnection().use { connection ->
-            val summary = connection.prepareStatement(DatabaseRunStoreSql.loadRunDetails(normalizedSchema)).use { stmt ->
+            val summary = connection.prepareStatement(RunHistorySql.loadRunDetails(normalizedSchema)).use { stmt ->
                 stmt.setString(1, moduleCode)
                 stmt.setString(2, runId)
                 stmt.executeQuery().use { rs ->
@@ -379,7 +384,7 @@ open class DatabaseRunStore(
                 "История запуска '$runId' для DB-модуля '$moduleCode' не найдена."
             }
 
-            val sourceResults = connection.prepareStatement(DatabaseRunStoreSql.listRunSourceResults(normalizedSchema)).use { stmt ->
+            val sourceResults = connection.prepareStatement(RunHistorySql.listRunSourceResults(normalizedSchema)).use { stmt ->
                 stmt.setString(1, runId)
                 stmt.executeQuery().use { rs ->
                     val result = mutableListOf<DatabaseRunSourceResultResponse>()
@@ -400,7 +405,7 @@ open class DatabaseRunStore(
                 }
             }
 
-            val events = connection.prepareStatement(DatabaseRunStoreSql.listRunEvents(normalizedSchema)).use { stmt ->
+            val events = connection.prepareStatement(RunHistorySql.listRunEvents(normalizedSchema)).use { stmt ->
                 stmt.setString(1, runId)
                 stmt.executeQuery().use { rs ->
                     val result = mutableListOf<DatabaseRunEventResponse>()
@@ -421,7 +426,7 @@ open class DatabaseRunStore(
                 }
             }
 
-            val artifacts = connection.prepareStatement(DatabaseRunStoreSql.listRunArtifacts(normalizedSchema)).use { stmt ->
+            val artifacts = connection.prepareStatement(RunHistorySql.listRunArtifacts(normalizedSchema)).use { stmt ->
                 stmt.setString(1, runId)
                 stmt.executeQuery().use { rs ->
                     val result = mutableListOf<DatabaseRunArtifactResponse>()
@@ -454,18 +459,18 @@ open class DatabaseRunStore(
         finishedAt: Instant,
         errorMessage: String,
     ) {
-        val normalizedSchema = normalizeSchemaName(schema)
+        val normalizedSchema = normalizeRegistrySchemaName(schema)
         connectionProvider.getConnection().use { connection ->
             val previousAutoCommit = connection.autoCommit
             connection.autoCommit = false
             try {
-                connection.prepareStatement(DatabaseRunStoreSql.markIncompleteSourcesFailed(normalizedSchema)).use { stmt ->
+                connection.prepareStatement(RunHistorySql.markIncompleteSourcesFailed(normalizedSchema)).use { stmt ->
                     stmt.setTimestamp(1, Timestamp.from(finishedAt))
                     stmt.setString(2, errorMessage)
                     stmt.setString(3, runId)
                     stmt.executeUpdate()
                 }
-                connection.prepareStatement(DatabaseRunStoreSql.markRunFailed(normalizedSchema)).use { stmt ->
+                connection.prepareStatement(RunHistorySql.markRunFailed(normalizedSchema)).use { stmt ->
                     stmt.setTimestamp(1, Timestamp.from(finishedAt))
                     stmt.setString(2, errorMessage)
                     stmt.setString(3, runId)

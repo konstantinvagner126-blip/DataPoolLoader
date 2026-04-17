@@ -3,6 +3,11 @@ package com.sbrf.lt.platform.ui.module
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.sbrf.lt.datapool.config.sql.SqlFileReferenceExtractor
+import com.sbrf.lt.datapool.db.registry.DatabaseConnectionProvider
+import com.sbrf.lt.datapool.db.registry.DriverManagerDatabaseConnectionProvider
+import com.sbrf.lt.datapool.db.registry.sql.ModuleRegistrySql
+import com.sbrf.lt.datapool.db.registry.sql.normalizeRegistrySchemaName
 import com.sbrf.lt.platform.ui.config.UiModuleStorePostgresConfig
 import com.sbrf.lt.platform.ui.config.schemaName
 import com.sbrf.lt.platform.ui.model.CredentialsStatusResponse
@@ -27,9 +32,9 @@ open class DatabaseModuleStore(
     private val revisionWriter = DatabaseModuleRevisionWriter(objectMapper)
 
     open fun listModules(includeHidden: Boolean = false): List<ModuleCatalogItemResponse> {
-        val normalizedSchema = normalizeSchemaName(schema)
+        val normalizedSchema = normalizeRegistrySchemaName(schema)
         connectionProvider.getConnection().use { connection ->
-            connection.prepareStatement(catalogSql(normalizedSchema)).use { statement ->
+            connection.prepareStatement(ModuleRegistrySql.catalog(normalizedSchema)).use { statement ->
                 statement.setBoolean(1, includeHidden)
                 statement.executeQuery().use { resultSet ->
                     val modules = mutableListOf<ModuleCatalogItemResponse>()
@@ -47,9 +52,9 @@ open class DatabaseModuleStore(
         actorId: String,
         actorSource: String,
     ): DatabaseEditableModule {
-        val normalizedSchema = normalizeSchemaName(schema)
+        val normalizedSchema = normalizeRegistrySchemaName(schema)
         connectionProvider.getConnection().use { connection ->
-            val row = connection.prepareStatement(detailsSql(normalizedSchema)).use { statement ->
+            val row = connection.prepareStatement(ModuleRegistrySql.details(normalizedSchema)).use { statement ->
                 statement.setString(1, actorId)
                 statement.setString(2, actorSource)
                 statement.setString(3, moduleCode)
@@ -104,7 +109,7 @@ open class DatabaseModuleStore(
         actorDisplayName: String?,
         request: SaveModuleRequest,
     ) {
-        val normalizedSchema = normalizeSchemaName(schema)
+        val normalizedSchema = normalizeRegistrySchemaName(schema)
         connectionProvider.getConnection().use { connection ->
             val previousAutoCommit = connection.autoCommit
             connection.autoCommit = false
@@ -134,9 +139,9 @@ open class DatabaseModuleStore(
         actorId: String,
         actorSource: String,
     ) {
-        val normalizedSchema = normalizeSchemaName(schema)
+        val normalizedSchema = normalizeRegistrySchemaName(schema)
         connectionProvider.getConnection().use { connection ->
-            connection.prepareStatement(discardWorkingCopySql(normalizedSchema)).use { statement ->
+            connection.prepareStatement(ModuleRegistrySql.discardWorkingCopy(normalizedSchema)).use { statement ->
                 statement.setString(1, actorId)
                 statement.setString(2, actorSource)
                 statement.setString(3, moduleCode)
@@ -151,7 +156,7 @@ open class DatabaseModuleStore(
         actorSource: String,
         actorDisplayName: String?,
     ): PublishResult {
-        val normalizedSchema = normalizeSchemaName(schema)
+        val normalizedSchema = normalizeRegistrySchemaName(schema)
         connectionProvider.getConnection().use { connection ->
             val previousAutoCommit = connection.autoCommit
             connection.autoCommit = false
@@ -223,7 +228,7 @@ open class DatabaseModuleStore(
         originKind: String = "CREATED_IN_UI",
         request: CreateModuleRequest,
     ): CreateModuleResult {
-        val normalizedSchema = normalizeSchemaName(schema)
+        val normalizedSchema = normalizeRegistrySchemaName(schema)
         connectionProvider.getConnection().use { connection ->
             val previousAutoCommit = connection.autoCommit
             connection.autoCommit = false
@@ -299,7 +304,7 @@ open class DatabaseModuleStore(
         moduleCode: String,
         actorId: String,
     ): DeleteModuleResult {
-        val normalizedSchema = normalizeSchemaName(schema)
+        val normalizedSchema = normalizeRegistrySchemaName(schema)
         connectionProvider.getConnection().use { connection ->
             val previousAutoCommit = connection.autoCommit
             connection.autoCommit = false
@@ -336,7 +341,7 @@ open class DatabaseModuleStore(
         actorId: String,
         actorSource: String,
     ): DatabaseModuleForSave {
-        connection.prepareStatement(moduleForSaveSql(normalizedSchema)).use { statement ->
+        connection.prepareStatement(ModuleRegistrySql.moduleForSave(normalizedSchema)).use { statement ->
             statement.setString(1, actorId)
             statement.setString(2, actorSource)
             statement.setString(3, moduleCode)
@@ -364,7 +369,7 @@ open class DatabaseModuleStore(
         request: SaveModuleRequest,
     ) {
         val snapshotJson = buildWorkingCopyJson(request)
-        connection.prepareStatement(upsertWorkingCopySql(normalizedSchema)).use { statement ->
+        connection.prepareStatement(ModuleRegistrySql.upsertWorkingCopy(normalizedSchema)).use { statement ->
             statement.setString(1, module.workingCopyId ?: UUID.randomUUID().toString())
             statement.setString(2, module.moduleId)
             statement.setString(3, actorId)
@@ -383,7 +388,7 @@ open class DatabaseModuleStore(
     }
 
     private fun buildSnapshotJson(configText: String, sqlFileContents: Map<String, String>): String {
-        val sqlLabels = SqlFileEntries.labelsByPathOrEmpty(configText, objectMapper)
+        val sqlLabels = SqlFileReferenceExtractor.labelsByPathOrEmpty(configText, objectMapper)
         val sqlFiles = sqlFileContents.entries
             .sortedBy { it.key }
             .map { (path, content) ->
@@ -419,7 +424,7 @@ open class DatabaseModuleStore(
         normalizedSchema: String,
         revisionId: String,
     ): List<ModuleFileContent> {
-        connection.prepareStatement(sqlAssetsSql(normalizedSchema)).use { statement ->
+        connection.prepareStatement(ModuleRegistrySql.sqlAssets(normalizedSchema)).use { statement ->
             statement.setString(1, revisionId)
             statement.executeQuery().use { resultSet ->
                 val sqlFiles = mutableListOf<ModuleFileContent>()
@@ -441,7 +446,7 @@ open class DatabaseModuleStore(
         val sqlFilesNode = root.path("sqlFiles").takeIf { it.isArray } ?: return emptyList()
         val sqlFiles = objectMapper.readValue<List<ModuleFileContent>>(sqlFilesNode.traverse(objectMapper), sqlFilesType)
         val configText = root.path("configText").takeIf { it.isTextual }?.asText().orEmpty()
-        return SqlFileEntries.relabel(configText, sqlFiles, objectMapper)
+        return relabelSqlFiles(configText, sqlFiles)
     }
 
     private fun readSqlFileContents(workingCopyJson: String?): Map<String, String> {
@@ -456,7 +461,7 @@ open class DatabaseModuleStore(
         actorId: String,
         actorSource: String,
     ): ModuleForPublish {
-        connection.prepareStatement(moduleForPublishSql(normalizedSchema)).use { stmt ->
+        connection.prepareStatement(ModuleRegistrySql.moduleForPublish(normalizedSchema)).use { stmt ->
             stmt.setString(1, actorId)
             stmt.setString(2, actorSource)
             stmt.setString(3, moduleCode)
@@ -483,7 +488,7 @@ open class DatabaseModuleStore(
         moduleId: String,
         revisionId: String,
     ) {
-        connection.prepareStatement(updateCurrentRevisionSql(normalizedSchema)).use { stmt ->
+        connection.prepareStatement(ModuleRegistrySql.updateCurrentRevision(normalizedSchema)).use { stmt ->
             stmt.setString(1, revisionId)
             stmt.setString(2, moduleId)
             stmt.executeUpdate()
@@ -497,7 +502,7 @@ open class DatabaseModuleStore(
         actorId: String,
         actorSource: String,
     ) {
-        connection.prepareStatement(deleteWorkingCopyAfterPublishSql(normalizedSchema)).use { stmt ->
+        connection.prepareStatement(ModuleRegistrySql.deleteWorkingCopyAfterPublish(normalizedSchema)).use { stmt ->
             stmt.setString(1, actorId)
             stmt.setString(2, actorSource)
             stmt.setString(3, moduleId)
@@ -520,7 +525,7 @@ open class DatabaseModuleStore(
         }
 
         var hasActiveRun = false
-        connection.prepareStatement(checkActiveRunSql(normalizedSchema)).use { stmt ->
+        connection.prepareStatement(ModuleRegistrySql.checkActiveRun(normalizedSchema)).use { stmt ->
             stmt.setString(1, moduleCode)
             stmt.executeQuery().use { rs ->
                 if (rs.next()) {
@@ -539,7 +544,7 @@ open class DatabaseModuleStore(
         moduleCode: String,
         originKind: String,
     ) {
-        connection.prepareStatement(insertModuleSql(normalizedSchema)).use { stmt ->
+        connection.prepareStatement(ModuleRegistrySql.insertModule(normalizedSchema)).use { stmt ->
             stmt.setString(1, moduleId)
             stmt.setString(2, moduleCode)
             stmt.setString(3, originKind)
@@ -560,7 +565,7 @@ open class DatabaseModuleStore(
     ) {
         val snapshotJson = buildSnapshotJson(request.configText, request.sqlFiles)
 
-        connection.prepareStatement(upsertWorkingCopySql(normalizedSchema)).use { stmt ->
+        connection.prepareStatement(ModuleRegistrySql.upsertWorkingCopy(normalizedSchema)).use { stmt ->
             stmt.setString(1, workingCopyId)
             stmt.setString(2, moduleId)
             stmt.setString(3, actorId)
@@ -579,7 +584,7 @@ open class DatabaseModuleStore(
         normalizedSchema: String,
         moduleId: String,
     ) {
-        connection.prepareStatement(deleteWorkingCopyForModuleSql(normalizedSchema)).use { stmt ->
+        connection.prepareStatement(ModuleRegistrySql.deleteWorkingCopyForModule(normalizedSchema)).use { stmt ->
             stmt.setString(1, moduleId)
             stmt.executeUpdate()
         }
@@ -590,7 +595,7 @@ open class DatabaseModuleStore(
         normalizedSchema: String,
         moduleId: String,
     ) {
-        connection.prepareStatement(deleteModuleSql(normalizedSchema)).use { stmt ->
+        connection.prepareStatement(ModuleRegistrySql.deleteModule(normalizedSchema)).use { stmt ->
             stmt.setString(1, moduleId)
             stmt.executeUpdate()
         }
@@ -633,8 +638,27 @@ open class DatabaseModuleStore(
     companion object {
         fun fromConfig(config: UiModuleStorePostgresConfig): DatabaseModuleStore =
             DatabaseModuleStore(
-                connectionProvider = DriverManagerDatabaseConnectionProvider(config),
+                connectionProvider = DriverManagerDatabaseConnectionProvider(
+                    requireNotNull(config.jdbcUrl),
+                    requireNotNull(config.username),
+                    requireNotNull(config.password),
+                ),
                 schema = config.schemaName(),
             )
+    }
+
+    private fun relabelSqlFiles(configText: String, sqlFiles: List<ModuleFileContent>): List<ModuleFileContent> {
+        if (sqlFiles.isEmpty()) {
+            return sqlFiles
+        }
+        val labelsByPath = SqlFileReferenceExtractor.labelsByPathOrEmpty(configText, objectMapper)
+        return sqlFiles.map { file ->
+            val expectedLabel = labelsByPath[file.path]
+            if (expectedLabel != null && (file.label.isBlank() || file.label == file.path)) {
+                file.copy(label = expectedLabel)
+            } else {
+                file
+            }
+        }
     }
 }

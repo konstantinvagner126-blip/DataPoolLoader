@@ -1,4 +1,4 @@
-package com.sbrf.lt.platform.ui.sync
+package com.sbrf.lt.datapool.module.sync
 
 /**
  * Метаданные UI-модуля, прочитанные из `ui-module.yml` перед импортом в DB-режим.
