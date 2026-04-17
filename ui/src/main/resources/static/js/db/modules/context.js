@@ -7,6 +7,10 @@
     return {
       common: global.DataPoolCommon || {},
       refs: {
+        credentialsStatus: document.getElementById('credentialsStatus'),
+        credentialsWarning: document.getElementById('credentialsWarning'),
+        credentialsFileInput: document.getElementById('credentialsFileInput'),
+        uploadCredentialsButton: document.getElementById('uploadCredentialsButton'),
         dbContextAlert: document.getElementById('dbContextAlert'),
         dbContextAlertTitle: document.getElementById('dbContextAlertTitle'),
         dbContextAlertText: document.getElementById('dbContextAlertText'),
@@ -14,9 +18,19 @@
         dbCatalogStatus: document.getElementById('dbCatalogStatus'),
         selectedModuleLabel: document.getElementById('selectedModuleLabel'),
         selectedModuleDescription: document.getElementById('selectedModuleDescription'),
+        moduleDraftStatus: document.getElementById('moduleDraftStatus'),
         moduleSourceKind: document.getElementById('moduleSourceKind'),
         moduleValidationAlert: document.getElementById('moduleValidationAlert'),
-        sqlFileSelect: document.getElementById('sqlFileSelect'),
+        moduleMetadata: document.getElementById('moduleMetadata'),
+        configForm: document.getElementById('configForm'),
+        configFormWarning: document.getElementById('configFormWarning'),
+        sqlCatalogList: document.getElementById('sqlCatalogList'),
+        sqlCreateButton: document.getElementById('sqlCreateButton'),
+        sqlRenameButton: document.getElementById('sqlRenameButton'),
+        sqlDeleteButton: document.getElementById('sqlDeleteButton'),
+        sqlResourceTitle: document.getElementById('sqlResourceTitle'),
+        sqlResourceMeta: document.getElementById('sqlResourceMeta'),
+        sqlResourceUsage: document.getElementById('sqlResourceUsage'),
         reloadButton: document.getElementById('reloadButton'),
         runModuleButton: document.getElementById('runModuleButton'),
         saveWorkingCopyButton: document.getElementById('saveWorkingCopyButton'),
@@ -25,9 +39,8 @@
         createModuleButton: document.getElementById('createModuleButton'),
         deleteModuleButton: document.getElementById('deleteModuleButton'),
         workingCopyDetails: document.getElementById('workingCopyDetails'),
+        dbRunHistoryFilters: document.getElementById('dbRunHistoryFilters'),
         dbRunsList: document.getElementById('dbRunsList'),
-        dbRunDetailsEmpty: document.getElementById('dbRunDetailsEmpty'),
-        dbRunDetails: document.getElementById('dbRunDetails'),
         dbRunSummary: document.getElementById('dbRunSummary'),
         dbRunStructuredSummary: document.getElementById('dbRunStructuredSummary'),
         dbRunSummaryJson: document.getElementById('dbRunSummaryJson'),
@@ -39,18 +52,45 @@
         configEditor: null,
         sqlEditor: null,
       },
+      formController: null,
       state: {
         selectedModuleId: null,
         currentModule: null,
         currentSqlPath: null,
         sqlContents: {},
+        persistedConfigText: '',
+        persistedSqlContents: {},
         runtimeContext: null,
         syncState: null,
         currentRuns: [],
+        runHistoryFilter: 'ALL',
         selectedRunId: null,
         selectedRunDetails: null,
       },
     };
+  }
+
+  function cloneSqlContents(source) {
+    return JSON.parse(JSON.stringify(source || {}));
+  }
+
+  function hasUnsavedChanges(ctx) {
+    const { state, editors } = ctx;
+    if (!state.currentModule || !editors.configEditor) {
+      return false;
+    }
+
+    if ((state.persistedConfigText || '') !== editors.configEditor.getValue()) {
+      return true;
+    }
+
+    const currentKeys = Object.keys(state.sqlContents || {}).sort();
+    const persistedKeys = Object.keys(state.persistedSqlContents || {}).sort();
+    if (JSON.stringify(currentKeys) !== JSON.stringify(persistedKeys)) {
+      return true;
+    }
+
+    return currentKeys.some(key => (state.sqlContents[key] || '') !== (state.persistedSqlContents[key] || ''));
   }
 
   function canWorkWithDbModules(ctx) {
@@ -79,4 +119,6 @@
   modules.activeSingleSyncFor = activeSingleSyncFor;
   modules.selectedModuleIsSyncing = selectedModuleIsSyncing;
   modules.hasRunningDbRun = hasRunningDbRun;
+  modules.cloneSqlContents = cloneSqlContents;
+  modules.hasUnsavedChanges = hasUnsavedChanges;
 })(window);

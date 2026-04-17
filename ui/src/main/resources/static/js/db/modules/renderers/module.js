@@ -2,10 +2,16 @@
   const root = global.DataPoolDb = global.DataPoolDb || {};
   const modules = root.modules = root.modules || {};
   const shared = root.shared || {};
+  const moduleEditorSharedNamespace = global.DataPoolModuleEditorShared || {};
+  const { renderModuleMetadata: renderSharedModuleMetadata } = moduleEditorSharedNamespace;
 
   function createModuleRenderer(ctx, runtimeRenderer) {
     const { refs, editors, state } = ctx;
     const { escapeHtml } = ctx.common;
+
+    function translateModuleSourceKind(sourceKind) {
+      return sourceKind === 'WORKING_COPY' ? 'Рабочая копия' : (sourceKind === 'CURRENT_REVISION' ? 'Текущая ревизия' : (sourceKind || '-'));
+    }
 
     function renderCatalog(modulesList, onSelectModule) {
       refs.dbModuleList.innerHTML = '';
@@ -37,8 +43,8 @@
       }
 
       refs.moduleSourceKind.innerHTML = `
-        <span class="badge bg-${state.currentModule.sourceKind === 'WORKING_COPY' ? 'warning' : 'success'}">
-          ${state.currentModule.sourceKind === 'WORKING_COPY' ? 'Working Copy' : 'Current Revision'}
+        <span class="source-kind-badge ${state.currentModule.sourceKind === 'WORKING_COPY' ? 'source-kind-badge-working-copy' : 'source-kind-badge-revision'}">
+          ${state.currentModule.sourceKind === 'WORKING_COPY' ? 'Рабочая копия' : 'Текущая ревизия'}
         </span>
       `;
 
@@ -46,32 +52,16 @@
         editors.configEditor.setValue(module.configText);
       }
 
-      renderSqlSelect();
+      ctx.sqlCatalogController?.render();
       renderModuleValidation(module);
       renderWorkingCopyInfo();
+      renderModuleMetadata();
+      renderDraftStatus();
+      ctx.credentialsController?.renderWarning();
       runtimeRenderer.updateSaveDiscardButtons();
       runtimeRenderer.renderRuntimeContext();
       runtimeRenderer.renderDbCatalogStatus();
       runtimeRenderer.highlightSelectedModule();
-    }
-
-    function renderSqlSelect() {
-      refs.sqlFileSelect.innerHTML = '';
-      state.currentSqlPath = null;
-      (state.currentModule?.module.sqlFiles || []).forEach((file, index) => {
-        const option = document.createElement('option');
-        option.value = file.path;
-        option.textContent = `${file.label} · ${file.path}`;
-        refs.sqlFileSelect.appendChild(option);
-        if (index === 0) {
-          state.currentSqlPath = file.path;
-        }
-      });
-      if (editors.sqlEditor && state.currentSqlPath) {
-        editors.sqlEditor.setValue(state.sqlContents[state.currentSqlPath] || '');
-      } else if (editors.sqlEditor) {
-        editors.sqlEditor.setValue('');
-      }
     }
 
     function renderModuleListItem(module) {
@@ -105,7 +95,7 @@
 
     function renderValidationBadge(status) {
       const normalized = String(status || 'VALID').toUpperCase();
-      const label = normalized === 'VALID' ? 'OK' : (normalized === 'WARNING' ? 'Warning' : 'Invalid');
+      const label = normalized === 'VALID' ? 'OK' : (normalized === 'WARNING' ? 'Предупреждение' : 'Ошибка');
       return `<span class="module-validation-badge module-validation-badge-${normalized.toLowerCase()}">${label}</span>`;
     }
 
@@ -140,13 +130,60 @@
       const hasWorkingCopy = state.currentModule?.workingCopyId != null;
       refs.workingCopyDetails.innerHTML = `
         <div class="mt-2">
-          <div><strong>Source:</strong> ${escapeHtml(state.currentModule?.sourceKind || '-')}</div>
-          <div><strong>Current Revision:</strong> <code>${escapeHtml(state.currentModule?.currentRevisionId || '-')}</code></div>
+          <div><strong>Источник:</strong> ${escapeHtml(translateModuleSourceKind(state.currentModule?.sourceKind))}</div>
+          <div><strong>Текущая ревизия:</strong> <code>${escapeHtml(state.currentModule?.currentRevisionId || '-')}</code></div>
           ${hasWorkingCopy ? `
-            <div><strong>Working Copy ID:</strong> <code>${escapeHtml(state.currentModule.workingCopyId)}</code></div>
-            <div><strong>Working Copy Status:</strong> <span class="badge bg-warning">${escapeHtml(state.currentModule.workingCopyStatus)}</span></div>
-            <div><strong>Base Revision:</strong> <code>${escapeHtml(state.currentModule.baseRevisionId)}</code></div>
-          ` : '<div class="text-success mt-1">Нет личной working copy — вы просматриваете текущую ревизию.</div>'}
+            <div><strong>ID рабочей копии:</strong> <code>${escapeHtml(state.currentModule.workingCopyId)}</code></div>
+            <div><strong>Статус рабочей копии:</strong> <span class="badge bg-warning">${escapeHtml(state.currentModule.workingCopyStatus)}</span></div>
+            <div><strong>Базовая ревизия:</strong> <code>${escapeHtml(state.currentModule.baseRevisionId)}</code></div>
+          ` : '<div class="text-success mt-1">Личной рабочей копии нет. Сейчас открыта текущая ревизия.</div>'}
+        </div>
+      `;
+    }
+
+    function renderModuleMetadata() {
+      renderSharedModuleMetadata?.(refs.moduleMetadata, state.currentModule);
+    }
+
+    function renderDraftStatus() {
+      if (!refs.moduleDraftStatus) {
+        return;
+      }
+
+      if (!state.currentModule) {
+        refs.moduleDraftStatus.innerHTML = `
+          <span class="module-draft-dot module-draft-dot-neutral" aria-hidden="true"></span>
+          <span>Модуль не выбран.</span>
+        `;
+        refs.moduleDraftStatus.className = 'module-draft-status small mt-1 text-secondary';
+      } else if (modules.hasUnsavedChanges(ctx)) {
+        refs.moduleDraftStatus.innerHTML = `
+          <span class="module-draft-dot module-draft-dot-dirty" aria-hidden="true"></span>
+          <span>Есть несохраненные изменения. Сначала сохрани рабочую копию, затем запускай модуль.</span>
+        `;
+        refs.moduleDraftStatus.className = 'module-draft-status small mt-1 text-primary';
+      } else if (state.currentModule.workingCopyId) {
+        refs.moduleDraftStatus.innerHTML = `
+          <span class="module-draft-dot module-draft-dot-saved" aria-hidden="true"></span>
+          <span>Изменения сохранены в рабочей копии.</span>
+        `;
+        refs.moduleDraftStatus.className = 'module-draft-status small mt-1 text-secondary';
+      } else {
+        refs.moduleDraftStatus.innerHTML = `
+          <span class="module-draft-dot module-draft-dot-saved" aria-hidden="true"></span>
+          <span>Изменений нет. Сейчас открыта текущая ревизия.</span>
+        `;
+        refs.moduleDraftStatus.className = 'module-draft-status small mt-1 text-secondary';
+      }
+
+      runtimeRenderer.updateSaveDiscardButtons();
+    }
+
+    function renderMetadataRow(label, value, html = false) {
+      return `
+        <div class="module-metadata-row">
+          <div class="module-metadata-label">${escapeHtml(label)}</div>
+          <div class="module-metadata-value">${html ? value : escapeHtml(value)}</div>
         </div>
       `;
     }
@@ -154,6 +191,8 @@
     return {
       renderCatalog,
       applyCurrentModule,
+      renderDraftStatus,
+      renderModuleMetadata,
     };
   }
 

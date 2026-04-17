@@ -16,7 +16,6 @@ import com.sbrf.lt.platform.ui.config.isConfigured
 import com.sbrf.lt.platform.ui.config.storageDirPath
 import com.sbrf.lt.platform.ui.model.ConfigFormParseRequest
 import com.sbrf.lt.platform.ui.model.ConfigFormUpdateRequest
-import com.sbrf.lt.platform.ui.model.DatabaseModuleDetailsResponse
 import com.sbrf.lt.platform.ui.model.DatabaseModulesCatalogResponse
 import com.sbrf.lt.platform.ui.model.DatabaseRunStartRequest
 import com.sbrf.lt.platform.ui.model.ModulesCatalogResponse
@@ -30,12 +29,14 @@ import com.sbrf.lt.platform.ui.model.SqlConsoleQueryRequest
 import com.sbrf.lt.platform.ui.model.StartRunRequest
 import com.sbrf.lt.platform.ui.model.CreateDbModuleRequest
 import com.sbrf.lt.platform.ui.model.SyncOneModuleRequest
-import com.sbrf.lt.platform.ui.model.toCatalogItemResponse
 import com.sbrf.lt.platform.ui.model.toResponse
 import com.sbrf.lt.platform.ui.model.toStartResponse
 import com.sbrf.lt.platform.ui.module.ConfigFormService
 import com.sbrf.lt.platform.ui.module.DatabaseModuleStore
 import com.sbrf.lt.platform.ui.module.ModuleRegistry
+import com.sbrf.lt.platform.ui.module.backend.DatabaseModuleBackend
+import com.sbrf.lt.platform.ui.module.backend.FilesModuleBackend
+import com.sbrf.lt.platform.ui.module.backend.ModuleActor
 import com.sbrf.lt.platform.ui.run.DatabaseModuleExecutionSource
 import com.sbrf.lt.platform.ui.run.DatabaseModuleRunService
 import com.sbrf.lt.platform.ui.run.DatabaseRunStore
@@ -185,7 +186,9 @@ fun Application.uiModule(
     runtimeUiConfig: UiAppConfig = runtimeConfigResolver.resolve(uiConfig),
     runtimeContext: UiRuntimeContext = runtimeContextService.resolve(runtimeUiConfig),
     moduleRegistry: ModuleRegistry = ModuleRegistry(appsRoot = uiConfig.appsRootPath()),
+    filesModuleBackend: FilesModuleBackend = FilesModuleBackend(moduleRegistry),
     databaseModuleStore: DatabaseModuleStore? = null,
+    databaseModuleBackend: DatabaseModuleBackend? = null,
     runManager: RunManager = RunManager(moduleRegistry = moduleRegistry, uiConfig = uiConfig, credentialsService = credentialsService),
     configFormService: ConfigFormService = ConfigFormService(),
     sqlConsoleService: SqlConsoleService = SqlConsoleService(runtimeUiConfig.sqlConsole),
@@ -230,6 +233,9 @@ fun Application.uiModule(
 
     fun currentDatabaseModuleStore(): DatabaseModuleStore? =
         databaseModuleStore ?: currentDatabasePostgresConfig()?.let { DatabaseModuleStore.fromConfig(it) }
+
+    fun currentDatabaseModuleBackend(): DatabaseModuleBackend? =
+        databaseModuleBackend ?: currentDatabaseModuleStore()?.let { DatabaseModuleBackend(it) }
 
     fun currentModuleSyncService(): ModuleSyncService? =
         moduleSyncService ?: currentDatabasePostgresConfig()?.let { ModuleSyncService.fromConfig(it) }
@@ -340,7 +346,7 @@ fun Application.uiModule(
         staticResources("/static", "static")
 
         get("/api/modules") {
-            call.respond(moduleRegistry.listModules().map { it.toCatalogItemResponse() })
+            call.respond(filesModuleBackend.listModules())
         }
 
         get("/api/ui/runtime-context") {
@@ -368,7 +374,7 @@ fun Application.uiModule(
             val runtimeContext = currentRuntimeContext()
             val store = currentDatabaseModuleStore()
             val modules = if (runtimeContext.effectiveMode == UiModuleStoreMode.DATABASE && store != null) {
-                store.listModules()
+                currentDatabaseModuleBackend()?.listModules().orEmpty()
             } else {
                 emptyList()
             }
@@ -381,29 +387,21 @@ fun Application.uiModule(
             require(runtimeContext.effectiveMode == UiModuleStoreMode.DATABASE) {
                 "DB-режим недоступен: ${runtimeContext.fallbackReason ?: "effective mode is ${runtimeContext.effectiveMode.toConfigValue()}"}"
             }
-            val store = requireNotNull(currentDatabaseModuleStore()) {
-                "DB module store не настроен."
+            val backend = requireNotNull(currentDatabaseModuleBackend()) {
+                "DB module backend не настроен."
             }
-            val actorId = requireNotNull(runtimeContext.actor.actorId) {
-                "Для DB-режима нужно определить actorId."
-            }
-            val actorSource = requireNotNull(runtimeContext.actor.actorSource) {
-                "Для DB-режима нужно определить actorSource."
-            }
-            val module = store.loadModuleDetails(
-                moduleCode = requireNotNull(call.parameters["id"]),
-                actorId = actorId,
-                actorSource = actorSource,
-            )
             call.respond(
-                DatabaseModuleDetailsResponse(
-                    runtimeContext = runtimeContext,
-                    module = module.module,
-                    sourceKind = module.sourceKind,
-                    currentRevisionId = module.currentRevisionId,
-                    workingCopyId = module.workingCopyId,
-                    workingCopyStatus = module.workingCopyStatus,
-                    baseRevisionId = module.baseRevisionId,
+                backend.loadModule(
+                    moduleId = requireNotNull(call.parameters["id"]),
+                    actor = ModuleActor(
+                        actorId = requireNotNull(runtimeContext.actor.actorId) {
+                            "Для DB-режима нужно определить actorId."
+                        },
+                        actorSource = requireNotNull(runtimeContext.actor.actorSource) {
+                            "Для DB-режима нужно определить actorSource."
+                        },
+                        actorDisplayName = runtimeContext.actor.actorDisplayName,
+                    ),
                 ),
             )
         }
@@ -445,21 +443,21 @@ fun Application.uiModule(
             }
             val moduleCode = requireNotNull(call.parameters["id"])
             requireDatabaseModuleIsNotSyncing(moduleCode)
-            val store = requireNotNull(currentDatabaseModuleStore()) {
-                "DB module store не настроен."
+            val backend = requireNotNull(currentDatabaseModuleBackend()) {
+                "DB module backend не настроен."
             }
-            val actorId = requireNotNull(runtimeContext.actor.actorId) {
-                "Для DB-режима нужно определить actorId."
-            }
-            val actorSource = requireNotNull(runtimeContext.actor.actorSource) {
-                "Для DB-режима нужно определить actorSource."
-            }
-            store.saveWorkingCopy(
-                moduleCode = moduleCode,
-                actorId = actorId,
-                actorSource = actorSource,
-                actorDisplayName = runtimeContext.actor.actorDisplayName,
+            backend.saveModule(
+                moduleId = moduleCode,
                 request = call.receive<SaveModuleRequest>(),
+                actor = ModuleActor(
+                    actorId = requireNotNull(runtimeContext.actor.actorId) {
+                        "Для DB-режима нужно определить actorId."
+                    },
+                    actorSource = requireNotNull(runtimeContext.actor.actorSource) {
+                        "Для DB-режима нужно определить actorSource."
+                    },
+                    actorDisplayName = runtimeContext.actor.actorDisplayName,
+                ),
             )
             call.respond(SaveResultResponse("Изменения сохранены в личную working copy."))
         }
@@ -667,20 +665,20 @@ fun Application.uiModule(
         get("/api/modules/catalog") {
             call.respond(
                 ModulesCatalogResponse(
-                    appsRootStatus = moduleRegistry.appsRootStatus(),
-                    modules = moduleRegistry.listModules().map { it.toCatalogItemResponse() },
+                    appsRootStatus = requireNotNull(filesModuleBackend.catalogStatus()),
+                    modules = filesModuleBackend.listModules(),
                 ),
             )
         }
 
         get("/api/modules/{id}") {
-            call.respond(runManager.loadModuleDetails(requireNotNull(call.parameters["id"])))
+            call.respond(filesModuleBackend.loadModule(requireNotNull(call.parameters["id"])))
         }
 
         post("/api/modules/{id}/save") {
-            moduleRegistry.saveModule(
-                requireNotNull(call.parameters["id"]),
-                call.receive<SaveModuleRequest>(),
+            filesModuleBackend.saveModule(
+                moduleId = requireNotNull(call.parameters["id"]),
+                request = call.receive<SaveModuleRequest>(),
             )
             call.respond(SaveResultResponse("Изменения модуля сохранены."))
         }

@@ -131,9 +131,9 @@ class ModuleRegistryTest {
         val registry = ModuleRegistry(appsRoot = root.resolve("apps"))
 
         val details = registry.loadModuleDetails("demo-app")
-        assertEquals(2, details.sqlFiles.size)
-        assertFalse(details.sqlFiles.first().exists)
-        assertTrue(details.sqlFiles.first().content.isEmpty())
+        assertTrue(details.sqlFiles.any { it.path == "classpath:sql/missing.sql" && !it.exists && it.content.isEmpty() })
+        assertTrue(details.sqlFiles.any { it.path == "relative/db1.sql" && !it.exists })
+        assertTrue(details.sqlFiles.any { it.path == "classpath:sql/common.sql" && it.exists })
         assertEquals("INVALID", details.validationStatus)
         assertTrue(details.validationIssues.any { it.message.contains("missing.sql") })
 

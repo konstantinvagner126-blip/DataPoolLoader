@@ -11,7 +11,7 @@
   <div class="container-fluid py-4">
     <div class="hero-card mb-4">
       <div>
-        <div class="eyebrow">Database Mode</div>
+        <div class="eyebrow">Режим базы данных</div>
         <h1 class="display-6 mb-1">Управление DB-модулями</h1>
         <p class="text-secondary mb-0">Просмотр, редактирование и запуск модулей из PostgreSQL. Работа с working copy и публикация изменений.</p>
       </div>
@@ -51,20 +51,26 @@
       </div>
 
       <div class="col-12 col-xl-9">
+        <div id="credentialsPanelHost"></div>
+
         <div class="panel mb-4">
           <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
             <div>
-              <div class="panel-title mb-1">Просмотр модуля</div>
+              <div class="panel-title mb-1">Редактор модуля</div>
               <div id="selectedModuleLabel" class="text-secondary small">Модуль не выбран</div>
               <div id="selectedModuleDescription" class="text-secondary small mt-1 d-none"></div>
+              <div id="moduleDraftStatus" class="module-draft-status small mt-1 text-secondary">
+                <span class="module-draft-dot module-draft-dot-neutral" aria-hidden="true"></span>
+                <span>Модуль не выбран.</span>
+              </div>
               <div id="moduleSourceKind" class="small mt-1 text-secondary"></div>
             </div>
             <div class="d-flex flex-wrap gap-2">
-              <button id="reloadButton" class="btn btn-outline-secondary">Обновить</button>
+              <button id="reloadButton" class="btn btn-outline-secondary">Отменить изменения</button>
               <button id="runModuleButton" class="btn btn-success" disabled>Запустить</button>
-              <button id="saveWorkingCopyButton" class="btn btn-outline-primary" disabled>Сохранить working copy</button>
-              <button id="discardWorkingCopyButton" class="btn btn-outline-danger" disabled>Discard working copy</button>
-              <button id="publishButton" class="btn btn-success" disabled>Publish</button>
+              <button id="saveWorkingCopyButton" class="btn btn-outline-primary" disabled>Сохранить рабочую копию</button>
+              <button id="discardWorkingCopyButton" class="btn btn-outline-danger" disabled>Удалить рабочую копию</button>
+              <button id="publishButton" class="btn btn-success" disabled>Опубликовать</button>
             </div>
           </div>
 
@@ -78,10 +84,13 @@
 
           <ul class="nav nav-tabs mb-3" id="editorTabs" role="tablist">
             <li class="nav-item" role="presentation">
-              <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#configTab" type="button">application.yml</button>
+              <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#configFormTab" type="button">Настройки модуля</button>
             </li>
             <li class="nav-item" role="presentation">
               <button class="nav-link" data-bs-toggle="tab" data-bs-target="#sqlTab" type="button">SQL</button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link" data-bs-toggle="tab" data-bs-target="#configTab" type="button">application.yml</button>
             </li>
             <li class="nav-item" role="presentation">
               <button class="nav-link" data-bs-toggle="tab" data-bs-target="#metaTab" type="button">Метаданные</button>
@@ -89,14 +98,41 @@
           </ul>
 
           <div class="tab-content">
-            <div class="tab-pane fade show active" id="configTab">
-              <div id="configEditor" class="editor-frame"></div>
+            <div class="tab-pane fade show active" id="configFormTab">
+              <div id="configFormWarning" class="alert alert-warning d-none mb-3"></div>
+              <div class="config-form-note text-secondary small mb-3">
+                В этой вкладке визуально редактируется конфиг DB-модуля. Изменения синхронизируются с <code>application.yml</code> в реальном времени.
+              </div>
+              <div id="configForm" class="config-form-shell"></div>
             </div>
             <div class="tab-pane fade" id="sqlTab">
-              <div class="mb-2">
-                <select id="sqlFileSelect" class="form-select"></select>
+              <div class="sql-catalog-layout">
+                <div class="sql-catalog-sidebar">
+                  <div class="sql-catalog-toolbar">
+                    <div>
+                      <div class="sql-catalog-title">Каталог SQL-ресурсов</div>
+                      <div class="sql-catalog-note">Создание, переименование и удаление SQL выполняется здесь.</div>
+                    </div>
+                    <div class="d-flex flex-wrap gap-2">
+                      <button id="sqlCreateButton" class="btn btn-outline-primary btn-sm" type="button">Создать SQL</button>
+                      <button id="sqlRenameButton" class="btn btn-outline-secondary btn-sm" type="button" disabled>Переименовать</button>
+                      <button id="sqlDeleteButton" class="btn btn-outline-danger btn-sm" type="button" disabled>Удалить</button>
+                    </div>
+                  </div>
+                  <div id="sqlCatalogList" class="sql-catalog-list"></div>
+                </div>
+                <div class="sql-catalog-workspace">
+                  <div class="sql-catalog-workspace-header">
+                    <div id="sqlResourceTitle" class="sql-catalog-resource-title">SQL-ресурс не выбран</div>
+                    <div id="sqlResourceMeta" class="sql-catalog-resource-meta text-secondary small"></div>
+                    <div id="sqlResourceUsage" class="sql-catalog-resource-usage"></div>
+                  </div>
+                  <div id="sqlEditor" class="editor-frame"></div>
+                </div>
               </div>
-              <div id="sqlEditor" class="editor-frame"></div>
+            </div>
+            <div class="tab-pane fade" id="configTab">
+              <div id="configEditor" class="editor-frame"></div>
             </div>
             <div class="tab-pane fade" id="metaTab">
               <div id="moduleMetadata" class="module-metadata"></div>
@@ -104,57 +140,12 @@
           </div>
         </div>
 
-        <div id="workingCopyInfo" class="panel">
-          <div class="panel-title">Информация о working copy</div>
-          <div id="workingCopyDetails" class="text-secondary small">Working copy не загружена.</div>
-        </div>
-
-        <div id="dbRunsInfo" class="panel mt-4">
-          <div class="panel-title">История DB-запусков</div>
-          <div class="row g-4 mt-1">
-            <div class="col-12 col-xxl-4">
-              <div id="dbRunsList" class="run-history-list">
-                <div class="text-secondary small">Запусков пока нет.</div>
-              </div>
-            </div>
-            <div class="col-12 col-xxl-8">
-              <div id="dbRunDetailsEmpty" class="text-secondary small">Выбери запуск из списка слева, чтобы посмотреть детали.</div>
-              <div id="dbRunDetails" class="d-none">
-                <div id="dbRunSummary"></div>
-
-                <div class="mt-4">
-                  <div class="panel-title">Summary</div>
-                  <div id="dbRunStructuredSummary" class="summary-structured mt-3">
-                    <div class="text-secondary">Summary еще не сформирован.</div>
-                  </div>
-                  <div class="mt-3">
-                    <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#dbRunSummaryJsonCollapse" aria-expanded="false" aria-controls="dbRunSummaryJsonCollapse">
-                      Показать raw JSON
-                    </button>
-                    <div class="collapse mt-3" id="dbRunSummaryJsonCollapse">
-                      <pre id="dbRunSummaryJson" class="summary-box">Summary еще не сформирован.</pre>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="mt-4">
-                  <div class="panel-title">Состояние источников</div>
-                  <div id="dbRunSourceResults" class="mt-3 text-secondary small">Данные по источникам пока недоступны.</div>
-                </div>
-
-                <div class="mt-4">
-                  <div class="panel-title">Ход выполнения</div>
-                  <div id="dbRunEventTimeline" class="mt-3 text-secondary small">События запуска пока недоступны.</div>
-                </div>
-
-                <div class="mt-4">
-                  <div class="panel-title">Артефакты</div>
-                  <div id="dbRunArtifacts" class="mt-3 text-secondary small">Артефакты запуска пока недоступны.</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <div id="dbLifecyclePanelHost"></div>
+        <div id="dbExecutionLogPanelHost"></div>
+        <div id="dbHistoryCurrentPanelHost"></div>
+        <div id="dbSummaryPanelHost"></div>
+        <div id="dbSourceResultsPanelHost"></div>
+        <div id="dbArtifactsPanelHost"></div>
       </div>
     </div>
 
@@ -167,15 +158,21 @@
   <script src="/static/vendor/monaco-editor/min/vs/loader.js"></script>
   <script src="/static/js/common/dom.js?v=20260328n"></script>
   <script src="/static/js/common/http.js?v=20260328n"></script>
+  <script src="/static/js/common/storage.js?v=20260328n"></script>
   <script src="/static/js/common/monaco.js?v=20260417b"></script>
+  <script src="/static/js/common/blocks/credentials-panel.js?v=20260417g"></script>
+  <script src="/static/js/common/blocks/editor-panels.js?v=20260417i"></script>
+  <script src="/static/js/common/credentials-ui.js?v=20260417h"></script>
+  <script src="/static/js/common/module-editor-shared.js?v=20260417j"></script>
+  <script src="/static/js/modules/module-form.js?v=20260328n"></script>
   <script src="/static/js/db/shared/runtime-state.js?v=20260417c"></script>
-  <script src="/static/js/db/modules/context.js?v=20260417c"></script>
-  <script src="/static/js/db/modules/formatters.js?v=20260417c"></script>
-  <script src="/static/js/db/modules/renderers/runtime.js?v=20260417d"></script>
-  <script src="/static/js/db/modules/renderers/module.js?v=20260417d"></script>
-  <script src="/static/js/db/modules/renderers/runs.js?v=20260417d"></script>
-  <script src="/static/js/db/modules/renderers.js?v=20260417d"></script>
-  <script src="/static/js/db/modules/controller.js?v=20260417d"></script>
-  <script src="/static/js/db/modules/page.js?v=20260417d"></script>
+  <script src="/static/js/db/modules/context.js?v=20260417h"></script>
+  <script src="/static/js/db/modules/formatters.js?v=20260417h"></script>
+  <script src="/static/js/db/modules/renderers/runtime.js?v=20260417h"></script>
+  <script src="/static/js/db/modules/renderers/module.js?v=20260417h"></script>
+  <script src="/static/js/db/modules/renderers/runs.js?v=20260417h"></script>
+  <script src="/static/js/db/modules/renderers.js?v=20260417h"></script>
+  <script src="/static/js/db/modules/controller.js?v=20260417h"></script>
+  <script src="/static/js/db/modules/page.js?v=20260417i"></script>
 </body>
 </html>

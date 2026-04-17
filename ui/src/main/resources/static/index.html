@@ -49,19 +49,7 @@
       </div>
 
       <div class="col-12 col-xl-9">
-        <div class="panel mb-4">
-          <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
-            <div>
-              <div class="panel-title mb-1">credential.properties</div>
-              <div id="credentialsStatus" class="text-secondary small">Файл не загружен.</div>
-            </div>
-            <div class="d-flex flex-wrap align-items-center gap-2">
-              <input id="credentialsFileInput" class="form-control" type="file" accept=".properties,text/plain">
-              <button id="uploadCredentialsButton" class="btn btn-outline-dark">Загрузить файл</button>
-            </div>
-          </div>
-          <div id="credentialsWarning" class="alert alert-warning mt-3 mb-0 d-none"></div>
-        </div>
+        <div id="credentialsPanelHost"></div>
 
         <div class="panel mb-4">
           <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3">
@@ -88,10 +76,13 @@
                 <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#configFormTab" type="button">Настройки модуля</button>
               </li>
               <li class="nav-item" role="presentation">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#sqlTab" type="button">SQL</button>
+              </li>
+              <li class="nav-item" role="presentation">
                 <button class="nav-link" data-bs-toggle="tab" data-bs-target="#configTab" type="button">application.yml</button>
               </li>
               <li class="nav-item" role="presentation">
-                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#sqlTab" type="button">SQL</button>
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#metaTab" type="button">Метаданные</button>
               </li>
             </ul>
 
@@ -103,74 +94,45 @@
                 </div>
                 <div id="configForm" class="config-form-shell"></div>
               </div>
+              <div class="tab-pane fade" id="sqlTab">
+                <div class="sql-catalog-layout">
+                  <div class="sql-catalog-sidebar">
+                    <div class="sql-catalog-toolbar">
+                      <div>
+                        <div class="sql-catalog-title">Каталог SQL-ресурсов</div>
+                        <div class="sql-catalog-note">Создание, переименование и удаление SQL выполняется здесь.</div>
+                      </div>
+                      <div class="d-flex flex-wrap gap-2">
+                        <button id="sqlCreateButton" class="btn btn-outline-primary btn-sm" type="button">Создать SQL</button>
+                        <button id="sqlRenameButton" class="btn btn-outline-secondary btn-sm" type="button" disabled>Переименовать</button>
+                        <button id="sqlDeleteButton" class="btn btn-outline-danger btn-sm" type="button" disabled>Удалить</button>
+                      </div>
+                    </div>
+                    <div id="sqlCatalogList" class="sql-catalog-list"></div>
+                  </div>
+                  <div class="sql-catalog-workspace">
+                    <div class="sql-catalog-workspace-header">
+                      <div id="sqlResourceTitle" class="sql-catalog-resource-title">SQL-ресурс не выбран</div>
+                      <div id="sqlResourceMeta" class="sql-catalog-resource-meta text-secondary small"></div>
+                      <div id="sqlResourceUsage" class="sql-catalog-resource-usage"></div>
+                    </div>
+                    <div id="sqlEditor" class="editor-frame"></div>
+                  </div>
+                </div>
+              </div>
               <div class="tab-pane fade" id="configTab">
                 <div id="configEditor" class="editor-frame"></div>
               </div>
-              <div class="tab-pane fade" id="sqlTab">
-                <div class="mb-2">
-                  <select id="sqlFileSelect" class="form-select"></select>
-                </div>
-                <div id="sqlEditor" class="editor-frame"></div>
+              <div class="tab-pane fade" id="metaTab">
+                <div id="moduleMetadata" class="module-metadata"></div>
               </div>
           </div>
         </div>
 
-        <div class="row g-4">
-          <div class="col-12">
-            <div class="panel">
-              <div class="panel-title">Ход выполнения</div>
-              <div id="eventLog" class="event-log human-log"></div>
-            </div>
-          </div>
-        </div>
-
-        <div class="row g-4 mt-1">
-          <div class="col-12 col-xl-4">
-            <div class="panel h-100">
-              <div class="d-flex align-items-center justify-content-between gap-3 mb-3">
-                <div class="panel-title mb-0">История запусков</div>
-                <div id="runHistoryFilters" class="run-history-filters"></div>
-              </div>
-              <div id="runHistory" class="run-history-list"></div>
-            </div>
-          </div>
-          <div class="col-12 col-xl-8">
-            <div class="panel">
-              <div class="panel-title">Текущий запуск</div>
-              <div id="runSummary" class="small text-secondary">Запусков пока нет.</div>
-            </div>
-          </div>
-        </div>
-
-        <div id="technicalDiagnosticsPanel" class="panel mt-4">
-          <div class="d-flex align-items-center justify-content-between gap-3">
-            <div class="panel-title mb-0">Техническая диагностика</div>
-            <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#technicalEventsCollapse" aria-expanded="false" aria-controls="technicalEventsCollapse">
-              Показать / скрыть
-            </button>
-          </div>
-          <div class="collapse mt-3" id="technicalEventsCollapse">
-            <div id="technicalEventLog" class="event-log technical-log"></div>
-          </div>
-        </div>
-
-        <div class="panel mt-4">
-          <div class="panel-title">Summary</div>
-          <div id="summaryStructured" class="summary-structured">
-            <div class="text-secondary">Пока нет данных summary.</div>
-          </div>
-          <div id="summaryRawPanel" class="mt-4 d-none">
-            <div class="d-flex align-items-center justify-content-between gap-3">
-              <div class="small text-secondary">Технический raw JSON summary</div>
-              <button class="btn btn-outline-secondary btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#summaryRawCollapse" aria-expanded="false" aria-controls="summaryRawCollapse">
-                Показать / скрыть
-              </button>
-            </div>
-            <div class="collapse mt-3" id="summaryRawCollapse">
-              <pre id="summaryJson" class="summary-box">Пока нет данных summary.</pre>
-            </div>
-          </div>
-        </div>
+        <div id="executionLogPanelHost"></div>
+        <div id="historyCurrentPanelHost"></div>
+        <div id="technicalDiagnosticsPanelHost"></div>
+        <div id="summaryPanelHost"></div>
       </div>
     </div>
 
@@ -185,8 +147,12 @@
   <script src="/static/js/common/http.js?v=20260328m"></script>
   <script src="/static/js/common/storage.js?v=20260328m"></script>
   <script src="/static/js/common/monaco.js?v=20260417b"></script>
+  <script src="/static/js/common/blocks/credentials-panel.js?v=20260417g"></script>
+  <script src="/static/js/common/blocks/editor-panels.js?v=20260417i"></script>
+  <script src="/static/js/common/credentials-ui.js?v=20260417h"></script>
+  <script src="/static/js/common/module-editor-shared.js?v=20260417j"></script>
   <script src="/static/js/modules/module-form.js?v=20260328m"></script>
   <script src="/static/js/modules/run-panels.js?v=20260328m"></script>
-  <script src="/static/app.js?v=20260328m"></script>
+  <script src="/static/app.js?v=20260417i"></script>
 </body>
 </html>

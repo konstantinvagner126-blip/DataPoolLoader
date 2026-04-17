@@ -104,7 +104,7 @@ open class DatabaseModuleRunService(
             requestedAt = requestedAt,
             launchSourceKind = runtimeSnapshot.launchSourceKind,
             executionSnapshotId = runtimeSnapshot.executionSnapshotId ?: error("executionSnapshotId is required for DB run"),
-            message = "DB-модуль '$moduleCode' поставлен в выполнение.",
+            message = "Запуск DB-модуля '$moduleCode' начат.",
         )
     }
 

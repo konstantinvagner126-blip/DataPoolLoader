@@ -73,6 +73,8 @@
     getConfigText,
     setConfigText,
     getCurrentModuleId,
+    getSqlResources,
+    getStorageMode,
     onDraftStateChange,
     onPersistUiState,
     openYamlEditor
@@ -86,6 +88,7 @@
     let expandedConfigCards = defaultExpandedConfigCards();
     let expandedSourceCards = new Set();
     let expandedQuotaCards = new Set();
+    let lastFormState = buildDefaultFormState();
     const moduleExpansionState = new Map();
 
     function notifyStateChange() {
@@ -93,7 +96,8 @@
     }
 
     function initialize() {
-      renderConfigForm(buildDefaultFormState());
+      lastFormState = buildDefaultFormState();
+      renderConfigForm(lastFormState);
     }
 
     function isApplyingFromForm() {
@@ -209,22 +213,29 @@
         if (requestId !== configSyncRequestId) {
           return;
         }
+        lastFormState = formState;
         renderConfigForm(formState);
         setFormWarning(null);
+        onDraftStateChange?.();
       } catch (error) {
         if (requestId !== configSyncRequestId) {
           return;
         }
         renderConfigForm(buildDefaultFormState(), true);
         setFormWarning(error.message || "Не удалось разобрать application.yml для визуальной формы.");
+        onDraftStateChange?.();
       }
     }
 
     function renderConfigForm(state, disabled = false) {
+      lastFormState = JSON.parse(JSON.stringify(state));
       const currentActiveSection = configForm.querySelector(".config-section-tabs .nav-link.active")?.dataset.configSectionTarget;
       if (currentActiveSection) {
         activeConfigSectionId = currentActiveSection;
       }
+      const sqlResources = normalizeSqlResources(getSqlResources?.());
+      const storageMode = String(getStorageMode?.() || "FILES").toUpperCase();
+      const defaultSqlState = buildDefaultSqlState(state, sqlResources);
 
       if (disabled) {
         configForm.innerHTML = `
@@ -287,8 +298,7 @@
           <div class="tab-pane fade ${activeConfigSectionId === "configSectionSql" ? "show active" : ""}" id="configSectionSql">
             ${renderCollapsibleConfigCard("sql", "SQL по умолчанию", expandedConfigCards.sql !== false, `
               <div class="config-form-fields">
-                ${renderTextareaField("commonSql", "commonSql", state.commonSql, disabled, "Общий SQL для всех sources, если у источника не указан свой sql/sqlFile.", 6)}
-                ${renderTextField("commonSqlFile", "commonSqlFile", state.commonSqlFile, disabled, "Например classpath:sql/common.sql или относительный путь к файлу.")}
+                ${renderDefaultSqlEditor(defaultSqlState, sqlResources, storageMode, disabled)}
               </div>
             `)}
           </div>
@@ -300,7 +310,7 @@
                 <div class="config-form-help ms-auto">${state.sources.length} шт.</div>
               </div>
               <div class="config-form-list">
-                ${state.sources.map((source, index) => renderSourceCard(source, index, disabled, expandedSourceCards.has(index))).join("")}
+                ${state.sources.map((source, index) => renderSourceCard(source, index, disabled, expandedSourceCards.has(index), sqlResources, storageMode)).join("")}
               </div>
             `)}
           </div>
@@ -444,13 +454,17 @@
         return;
       }
 
+      return applyExplicitFormState(readFormState())
+    }
+
+    async function applyExplicitFormState(formState) {
       const requestId = ++configApplyRequestId;
       try {
         const payload = await postJson(
           "/api/config-form/update",
           {
             configText: getConfigText(),
-            formState: readFormState()
+            formState
           },
           "Не удалось синхронизировать YAML с формой."
         );
@@ -461,6 +475,7 @@
         isApplyingConfigFromForm = true;
         setConfigText(payload.configText);
         isApplyingConfigFromForm = false;
+        lastFormState = payload.formState;
         renderConfigForm(payload.formState);
         onDraftStateChange?.();
         setFormWarning(null);
@@ -473,6 +488,8 @@
     function readFormState() {
       const sourceIndexes = uniqueIndexes("data-config-source-index");
       const quotaIndexes = uniqueIndexes("data-config-quota-index");
+      const defaultSqlMode = getFormFieldValue("defaultSqlMode");
+      const defaultSqlExternalRef = emptyToNull(getFormFieldValue("defaultSqlExternalRef"));
       return {
         outputDir: getFormFieldValue("outputDir"),
         fileFormat: getFormFieldValue("fileFormat"),
@@ -484,15 +501,15 @@
         progressLogEveryRows: requiredNumber(getFormFieldValue("progressLogEveryRows"), "progressLogEveryRows"),
         maxMergedRows: optionalNumber(getFormFieldValue("maxMergedRows")),
         deleteOutputFilesAfterCompletion: getCheckboxValue("deleteOutputFilesAfterCompletion"),
-        commonSql: getFormFieldValue("commonSql"),
-        commonSqlFile: emptyToNull(getFormFieldValue("commonSqlFile")),
+        commonSql: serializeDefaultSqlValue(defaultSqlMode),
+        commonSqlFile: serializeDefaultSqlFile(defaultSqlMode, defaultSqlExternalRef),
         sources: sourceIndexes.map(index => ({
           name: getIndexedFieldValue("source", index, "name"),
           jdbcUrl: getIndexedFieldValue("source", index, "jdbcUrl"),
           username: getIndexedFieldValue("source", index, "username"),
           password: getIndexedFieldValue("source", index, "password"),
-          sql: emptyToNull(getIndexedFieldValue("source", index, "sql")),
-          sqlFile: emptyToNull(getIndexedFieldValue("source", index, "sqlFile"))
+          sql: serializeSourceSqlValue(index),
+          sqlFile: serializeSourceSqlFile(index)
         })),
         quotas: quotaIndexes.map(index => ({
           source: getIndexedFieldValue("quota", index, "source"),
@@ -521,6 +538,47 @@
 
     function getIndexedFieldValue(kind, index, fieldName) {
       return configForm.querySelector(`[data-config-${kind}-index="${index}"][data-config-${kind}-field="${fieldName}"]`)?.value ?? "";
+    }
+
+    function serializeDefaultSqlValue(mode) {
+      switch (mode) {
+        case "INLINE":
+          return getFormFieldValue("defaultSqlInlineText");
+        case "NONE":
+        case "CATALOG":
+        case "EXTERNAL":
+        default:
+          return "";
+      }
+    }
+
+    function serializeDefaultSqlFile(mode, externalRef) {
+      switch (mode) {
+        case "CATALOG":
+          return emptyToNull(getFormFieldValue("defaultSqlCatalogPath"));
+        case "EXTERNAL":
+          return externalRef;
+        case "NONE":
+        case "INLINE":
+        default:
+          return null;
+      }
+    }
+
+    function serializeSourceSqlValue(index) {
+      const mode = getIndexedFieldValue("source", index, "sqlMode");
+      return mode === "INLINE" ? emptyToNull(getIndexedFieldValue("source", index, "sqlInlineText")) : null;
+    }
+
+    function serializeSourceSqlFile(index) {
+      const mode = getIndexedFieldValue("source", index, "sqlMode");
+      if (mode === "CATALOG") {
+        return emptyToNull(getIndexedFieldValue("source", index, "sqlCatalogPath"));
+      }
+      if (mode === "EXTERNAL") {
+        return emptyToNull(getIndexedFieldValue("source", index, "sqlExternalRef"));
+      }
+      return null;
     }
 
     function uniqueIndexes(attributeName) {
@@ -575,6 +633,16 @@
       isApplyingFromForm,
       scheduleSyncFromYaml,
       syncFromYaml,
+      currentFormState: () => JSON.parse(JSON.stringify(lastFormState)),
+      refreshSqlResources: () => renderConfigForm(lastFormState),
+      renameSqlResource: (oldPath, newPath) => {
+        const nextState = readFormState();
+        if (nextState.commonSqlFile === oldPath) {
+          nextState.commonSqlFile = newPath;
+        }
+        nextState.sources = nextState.sources.map(source => source.sqlFile === oldPath ? { ...source, sqlFile: newPath } : source);
+        return applyExplicitFormState(nextState);
+      },
       loadSerializedExpansionState,
       serializeExpansionState,
       restoreExpansionStateForModule,
@@ -750,7 +818,7 @@
     `;
   }
 
-  function renderIndexedSelectField(kind, index, fieldName, label, value, options, disabled, helpText = "") {
+  function renderIndexedSelectField(kind, index, fieldName, label, value, options, disabled, helpText = "", includeEmptyOption = true) {
     return `
       <label class="config-form-field">
         <span class="config-form-label">${label}</span>
@@ -761,7 +829,7 @@
           data-config-${kind}-field="${fieldName}"
           ${disabled ? "disabled" : ""}
         >
-          <option value=""></option>
+          ${includeEmptyOption ? '<option value=""></option>' : ''}
           ${options.map(([optionValue, optionLabel]) => `
             <option value="${escapeHtml(optionValue)}" ${value === optionValue ? "selected" : ""}>${escapeHtml(optionLabel)}</option>
           `).join("")}
@@ -770,7 +838,8 @@
     `;
   }
 
-  function renderSourceCard(source, index, disabled, isOpen) {
+  function renderSourceCard(source, index, disabled, isOpen, sqlResources, storageMode) {
+    const sourceSqlState = buildSourceSqlState(source, sqlResources);
     const title = source.name?.trim() ? source.name : `Source ${index + 1}`;
     const subtitle = source.jdbcUrl?.trim() || "jdbcUrl не задан";
     return `
@@ -791,8 +860,7 @@
             ${renderIndexedTextField("source", index, "jdbcUrl", "jdbcUrl", source.jdbcUrl, disabled, "Подключение к source PostgreSQL.")}
             ${renderIndexedTextField("source", index, "username", "username", source.username, disabled)}
             ${renderIndexedTextField("source", index, "password", "password", source.password, disabled)}
-            ${renderIndexedTextField("source", index, "sqlFile", "sqlFile", source.sqlFile, disabled, "Путь к SQL-файлу, если SQL хранится отдельно.")}
-            ${renderIndexedTextareaField("source", index, "sql", "sql", source.sql, disabled, "SQL для конкретного источника. Если пусто, используется commonSql/commonSqlFile.", 5)}
+            ${renderSourceSqlEditor(index, sourceSqlState, sqlResources, storageMode, disabled)}
           </div>
         </div>
       </details>
@@ -827,6 +895,189 @@
           </div>
         </div>
       </details>
+    `;
+  }
+
+  function normalizeSqlResources(sqlResources) {
+    return Array.isArray(sqlResources) ? sqlResources.map(resource => ({
+      label: resource?.label || resource?.path || "",
+      path: resource?.path || "",
+      exists: resource?.exists !== false,
+    })).filter(resource => resource.path) : [];
+  }
+
+  function buildDefaultSqlState(state, sqlResources) {
+    const resourceMap = new Map(sqlResources.map(resource => [resource.path, resource]));
+    const inlineSql = String(state.commonSql || "");
+    const sqlFile = String(state.commonSqlFile || "").trim();
+    if (inlineSql.trim()) {
+      return { mode: "INLINE", inlineText: inlineSql, catalogPath: "", externalRef: null, resource: null };
+    }
+    if (!sqlFile) {
+      return { mode: "NONE", inlineText: "", catalogPath: "", externalRef: null, resource: null };
+    }
+    if (resourceMap.has(sqlFile)) {
+      return { mode: "CATALOG", inlineText: "", catalogPath: sqlFile, externalRef: null, resource: resourceMap.get(sqlFile) };
+    }
+    return { mode: "EXTERNAL", inlineText: "", catalogPath: "", externalRef: sqlFile, resource: null };
+  }
+
+  function buildSourceSqlState(source, sqlResources) {
+    const resourceMap = new Map(sqlResources.map(resource => [resource.path, resource]));
+    const inlineSql = String(source.sql || "");
+    const sqlFile = String(source.sqlFile || "").trim();
+    if (inlineSql.trim()) {
+      return {
+        mode: "INLINE",
+        inlineText: inlineSql,
+        catalogPath: "",
+        externalRef: null,
+        summary: "Использует inline SQL",
+        resource: null
+      };
+    }
+    if (!sqlFile) {
+      return {
+        mode: "INHERIT",
+        inlineText: "",
+        catalogPath: "",
+        externalRef: null,
+        summary: "Наследует SQL по умолчанию",
+        resource: null
+      };
+    }
+    if (resourceMap.has(sqlFile)) {
+      return {
+        mode: "CATALOG",
+        inlineText: "",
+        catalogPath: sqlFile,
+        externalRef: null,
+        summary: `Использует SQL-ресурс: ${resourceMap.get(sqlFile).label || sqlFile}`,
+        resource: resourceMap.get(sqlFile)
+      };
+    }
+    return {
+      mode: "EXTERNAL",
+      inlineText: "",
+      catalogPath: "",
+      externalRef: sqlFile,
+      summary: "Использует внешнюю SQL-ссылку",
+      resource: null
+    };
+  }
+
+  function renderDefaultSqlEditor(sqlState, sqlResources, storageMode, disabled) {
+    return `
+      ${renderSelectField("defaultSqlMode", "Источник SQL", sqlState.mode, [
+        ["NONE", "Не задан"],
+        ["INLINE", "Inline SQL"],
+        ["CATALOG", "SQL из каталога"],
+        ...(sqlState.mode === "EXTERNAL" ? [["EXTERNAL", storageMode === "DATABASE" ? "Внешняя ссылка (нештатно)" : "Внешняя ссылка (только YAML)"]] : [])
+      ], disabled, "SQL по умолчанию используется для sources без собственного SQL.")}
+      ${renderTextHiddenField("defaultSqlExternalRef", sqlState.externalRef || "")}
+      ${sqlState.mode === "INLINE" ? renderTextareaField("defaultSqlInlineText", "SQL по умолчанию", sqlState.inlineText, disabled, "Будет применяться ко всем источникам без собственного SQL.", 6) : ""}
+      ${sqlState.mode === "CATALOG" ? renderSqlCatalogSelectField("defaultSqlCatalogPath", "SQL-ресурс", sqlState.catalogPath, sqlResources, disabled, "Выбирается из вкладки SQL.") : ""}
+      ${sqlState.mode === "EXTERNAL" ? renderSqlExternalReference(sqlState.externalRef, storageMode) : ""}
+      ${sqlState.mode === "CATALOG" && sqlState.resource?.exists === false ? renderSqlMissingWarning(sqlState.catalogPath) : ""}
+      <div class="config-form-inline-note">Используется для источников без собственного SQL.</div>
+    `;
+  }
+
+  function renderSourceSqlEditor(index, sqlState, sqlResources, storageMode, disabled) {
+    return `
+      <div class="config-form-field config-form-field-wide">
+        <span class="config-form-label">SQL источника</span>
+        <span class="config-form-help">${escapeHtml(sqlState.summary)}</span>
+      </div>
+      ${renderIndexedSelectField("source", index, "sqlMode", "Источник SQL", sqlState.mode, [
+        ["INHERIT", "Наследовать SQL по умолчанию"],
+        ["INLINE", "Inline SQL"],
+        ["CATALOG", "SQL из каталога"],
+        ...(sqlState.mode === "EXTERNAL" ? [["EXTERNAL", storageMode === "DATABASE" ? "Внешняя ссылка (нештатно)" : "Внешняя ссылка (только YAML)"]] : [])
+      ], disabled, "Источник SQL для конкретного source.", false)}
+      ${renderIndexedHiddenField("source", index, "sqlExternalRef", sqlState.externalRef || "")}
+      ${sqlState.mode === "INLINE" ? renderIndexedTextareaField("source", index, "sqlInlineText", "Inline SQL", sqlState.inlineText, disabled, "Если задан, перекрывает SQL по умолчанию.", 5) : ""}
+      ${sqlState.mode === "CATALOG" ? renderIndexedSqlCatalogSelectField(index, "sqlCatalogPath", "SQL-ресурс", sqlState.catalogPath, sqlResources, disabled, "Выбирается из вкладки SQL.") : ""}
+      ${sqlState.mode === "EXTERNAL" ? renderSqlExternalReference(sqlState.externalRef, storageMode) : ""}
+      ${sqlState.mode === "CATALOG" && sqlState.resource?.exists === false ? renderSqlMissingWarning(sqlState.catalogPath) : ""}
+    `;
+  }
+
+  function renderSqlCatalogSelectField(fieldName, label, value, sqlResources, disabled, helpText = "") {
+    return `
+      <label class="config-form-field">
+        <span class="config-form-label">${label}</span>
+        ${helpText ? `<span class="config-form-help">${helpText}</span>` : ""}
+        <select class="form-select" data-config-field="${fieldName}" ${disabled ? "disabled" : ""}>
+          <option value=""></option>
+          ${sqlResources.map(resource => `
+            <option value="${escapeHtml(resource.path)}" ${value === resource.path ? "selected" : ""}>
+              ${escapeHtml(resource.exists ? resource.path : `[Отсутствует] ${resource.path}`)}
+            </option>
+          `).join("")}
+        </select>
+      </label>
+    `;
+  }
+
+  function renderIndexedSqlCatalogSelectField(index, fieldName, label, value, sqlResources, disabled, helpText = "") {
+    return `
+      <label class="config-form-field">
+        <span class="config-form-label">${label}</span>
+        ${helpText ? `<span class="config-form-help">${helpText}</span>` : ""}
+        <select
+          class="form-select"
+          data-config-source-index="${index}"
+          data-config-source-field="${fieldName}"
+          ${disabled ? "disabled" : ""}
+        >
+          <option value=""></option>
+          ${sqlResources.map(resource => `
+            <option value="${escapeHtml(resource.path)}" ${value === resource.path ? "selected" : ""}>
+              ${escapeHtml(resource.exists ? resource.path : `[Отсутствует] ${resource.path}`)}
+            </option>
+          `).join("")}
+        </select>
+      </label>
+    `;
+  }
+
+  function renderTextHiddenField(fieldName, value) {
+    return `<input type="hidden" data-config-field="${fieldName}" value="${escapeHtml(value ?? "")}">`;
+  }
+
+  function renderIndexedHiddenField(kind, index, fieldName, value) {
+    return `
+      <input
+        type="hidden"
+        data-config-${kind}-index="${index}"
+        data-config-${kind}-field="${fieldName}"
+        value="${escapeHtml(value ?? "")}"
+      >
+    `;
+  }
+
+  function renderSqlExternalReference(externalRef, storageMode) {
+    if (!externalRef) {
+      return "";
+    }
+    return `
+      <div class="config-form-inline-alert">
+        <div class="fw-semibold mb-1">${storageMode === "DATABASE" ? "Нештатная внешняя SQL-ссылка" : "Внешняя SQL-ссылка"}</div>
+        <div><code>${escapeHtml(externalRef)}</code></div>
+        <div class="config-form-help mt-1">${storageMode === "DATABASE"
+          ? "Для DB-режима visual editor считает нормальным только inline SQL и SQL-ресурсы самого модуля."
+          : "Эта ссылка сохраняется, но полноценно управляется только через application.yml."}</div>
+      </div>
+    `;
+  }
+
+  function renderSqlMissingWarning(path) {
+    return `
+      <div class="config-form-inline-alert config-form-inline-alert-warning">
+        <div class="fw-semibold mb-1">SQL-ресурс не найден</div>
+        <div><code>${escapeHtml(path)}</code></div>
+      </div>
     `;
   }
 

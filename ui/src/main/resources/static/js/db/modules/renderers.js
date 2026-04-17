@@ -16,14 +16,25 @@
       state.selectedRunId = null;
       state.selectedRunDetails = null;
       state.sqlContents = {};
+      state.persistedConfigText = '';
+      state.persistedSqlContents = {};
       refs.selectedModuleLabel.textContent = 'Модуль не выбран';
       refs.selectedModuleDescription.classList.add('d-none');
       refs.selectedModuleDescription.textContent = '';
+      refs.moduleDraftStatus.innerHTML = `
+        <span class="module-draft-dot module-draft-dot-neutral" aria-hidden="true"></span>
+        <span>Модуль не выбран.</span>
+      `;
+      refs.moduleDraftStatus.className = 'module-draft-status small mt-1 text-secondary';
       refs.moduleSourceKind.innerHTML = '';
-      refs.workingCopyDetails.textContent = 'Working copy не загружена.';
+      refs.workingCopyDetails.textContent = 'Рабочая копия пока не загружена.';
+      refs.moduleMetadata.innerHTML = '<div class="text-secondary small">Модуль не выбран.</div>';
       refs.moduleValidationAlert.classList.add('d-none');
       refs.moduleValidationAlert.textContent = '';
-      refs.sqlFileSelect.innerHTML = '';
+      refs.sqlCatalogList.innerHTML = '';
+      refs.sqlResourceTitle.textContent = 'SQL-ресурс не выбран';
+      refs.sqlResourceMeta.innerHTML = '<span class="text-secondary">Создай новый SQL или выбери существующий ресурс.</span>';
+      refs.sqlResourceUsage.innerHTML = '<span class="text-secondary">Usage пока недоступен.</span>';
       refs.dbRunsList.innerHTML = '<div class="text-secondary small">Запусков пока нет.</div>';
       runRenderer.renderSelectedRunDetails();
       if (editors.configEditor) {
@@ -32,6 +43,9 @@
       if (editors.sqlEditor) {
         editors.sqlEditor.setValue('');
       }
+      ctx.formController?.initialize();
+      ctx.sqlCatalogController?.render();
+      ctx.credentialsController?.renderWarning();
       runtimeRenderer.updateSaveDiscardButtons();
     }
 

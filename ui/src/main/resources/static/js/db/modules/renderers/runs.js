@@ -2,18 +2,23 @@
   const root = global.DataPoolDb = global.DataPoolDb || {};
   const modules = root.modules = root.modules || {};
 
-  function createRunRenderer(ctx, runtimeRenderer) {
+  function createRunRenderer(ctx) {
     const { refs, state } = ctx;
     const { escapeHtml } = ctx.common;
     const formatters = modules.formatters;
 
     function renderModuleRuns(onSelectRun) {
-      if (!state.currentRuns.length) {
-        refs.dbRunsList.innerHTML = '<div class="text-secondary small">Запусков пока нет.</div>';
+      renderRunHistoryFilters(onSelectRun);
+
+      const filteredRuns = getFilteredRuns();
+      if (!filteredRuns.length) {
+        refs.dbRunsList.innerHTML = state.currentRuns.length === 0
+          ? '<div class="text-secondary small">Запусков пока нет.</div>'
+          : '<div class="text-secondary small">По выбранному фильтру запусков нет.</div>';
         return;
       }
 
-      refs.dbRunsList.innerHTML = state.currentRuns.slice(0, 20).map(run => `
+      refs.dbRunsList.innerHTML = filteredRuns.slice(0, 20).map(run => `
         <button
           type="button"
           class="run-history-item ${run.runId === state.selectedRunId ? 'run-history-item-active' : ''}"
@@ -26,13 +31,13 @@
           <div class="run-history-meta">${escapeHtml(formatters.formatDateTime(run.requestedAt))}</div>
           <div class="run-history-meta">Источник запуска: ${escapeHtml(formatters.translateLaunchSource(run.launchSourceKind))}</div>
           <div class="run-history-meta">
-            merged: ${escapeHtml(formatters.formatNumber(run.mergedRowCount || 0))}
+            Строк в merged: ${escapeHtml(formatters.formatNumber(run.mergedRowCount || 0))}
             · target: ${escapeHtml(formatters.translateStatus(run.targetStatus))}
           </div>
           <div class="run-history-meta">
-            success: ${escapeHtml(String(run.successfulSourceCount))}
-            · errors: ${escapeHtml(String(run.failedSourceCount))}
-            · skipped: ${escapeHtml(String(run.skippedSourceCount))}
+            Успешных: ${escapeHtml(String(run.successfulSourceCount))}
+            · ошибок: ${escapeHtml(String(run.failedSourceCount))}
+            · пропущено: ${escapeHtml(String(run.skippedSourceCount))}
           </div>
         </button>
       `).join('');
@@ -48,11 +53,12 @@
 
     function renderSelectedRunDetails() {
       if (!state.selectedRunDetails?.run) {
-        refs.dbRunDetails.classList.add('d-none');
-        refs.dbRunDetailsEmpty.classList.remove('d-none');
-        refs.dbRunSummary.innerHTML = '';
-        refs.dbRunStructuredSummary.innerHTML = '<div class="text-secondary">Summary еще не сформирован.</div>';
-        refs.dbRunSummaryJson.textContent = 'Summary еще не сформирован.';
+        const placeholder = state.currentRuns.length === 0
+          ? 'Запусков пока нет.'
+          : 'Выбери запуск из списка слева, чтобы посмотреть детали.';
+        refs.dbRunSummary.innerHTML = `<div class="text-secondary small">${escapeHtml(placeholder)}</div>`;
+        refs.dbRunStructuredSummary.innerHTML = '<div class="text-secondary">Итоги запуска еще не сформированы.</div>';
+        refs.dbRunSummaryJson.textContent = 'Итоги запуска еще не сформированы.';
         refs.dbRunSourceResults.innerHTML = '<div class="text-secondary small">Данные по источникам пока недоступны.</div>';
         refs.dbRunEventTimeline.innerHTML = '<div class="text-secondary small">События запуска пока недоступны.</div>';
         refs.dbRunArtifacts.innerHTML = '<div class="text-secondary small">Артефакты запуска пока недоступны.</div>';
@@ -60,8 +66,6 @@
       }
 
       const run = state.selectedRunDetails.run;
-      refs.dbRunDetails.classList.remove('d-none');
-      refs.dbRunDetailsEmpty.classList.add('d-none');
       refs.dbRunSummary.innerHTML = renderRunSummary(run);
       refs.dbRunStructuredSummary.innerHTML = renderStructuredSummary(run, state.selectedRunDetails.summaryJson);
       refs.dbRunSummaryJson.textContent = formatters.formatRawJson(state.selectedRunDetails.summaryJson);
@@ -77,8 +81,8 @@
           <div>
             <div class="run-summary-title">${escapeHtml(run.moduleTitle || run.moduleCode)}</div>
             <div class="run-summary-subtitle">
-              Run ID: <code>${escapeHtml(run.runId)}</code>
-              · Snapshot: <code>${escapeHtml(run.executionSnapshotId)}</code>
+              Запуск: <code>${escapeHtml(run.runId)}</code>
+              · Снимок: <code>${escapeHtml(run.executionSnapshotId)}</code>
             </div>
           </div>
           <span class="${formatters.statusBadgeClass(run.status)}">${escapeHtml(formatters.translateStatus(run.status))}</span>
@@ -90,15 +94,15 @@
             <div class="run-summary-metric-value">${escapeHtml(formatters.formatNumber(run.mergedRowCount || 0))}</div>
           </div>
           <div class="run-summary-metric">
-            <div class="run-summary-metric-label">Успешные sources</div>
+            <div class="run-summary-metric-label">Успешные источники</div>
             <div class="run-summary-metric-value">${escapeHtml(formatters.formatNumber(run.successfulSourceCount || 0))}</div>
           </div>
           <div class="run-summary-metric">
-            <div class="run-summary-metric-label">Warnings и ошибки</div>
+            <div class="run-summary-metric-label">Предупреждения и ошибки</div>
             <div class="run-summary-metric-value">${escapeHtml(formatters.formatNumber(warningsCount))}</div>
           </div>
           <div class="run-summary-metric">
-            <div class="run-summary-metric-label">Загружено в target</div>
+            <div class="run-summary-metric-label">Загружено</div>
             <div class="run-summary-metric-value">${escapeHtml(formatters.formatNumber(run.targetRowsLoaded || 0))}</div>
           </div>
         </div>
@@ -108,9 +112,9 @@
           ${renderSummaryKeyValue('Старт', formatters.formatDateTime(run.startedAt))}
           ${renderSummaryKeyValue('Завершение', run.finishedAt ? formatters.formatDateTime(run.finishedAt) : 'еще выполняется')}
           ${renderSummaryKeyValue('Источник запуска', formatters.translateLaunchSource(run.launchSourceKind))}
-          ${renderSummaryKeyValue('Target', run.targetTableName || '-')}
+          ${renderSummaryKeyValue('Целевая таблица', run.targetTableName || '-')}
           ${renderSummaryKeyValue('Статус target', formatters.translateStatus(run.targetStatus))}
-          ${renderSummaryKeyValue('Output', run.outputDir || '-')}
+          ${renderSummaryKeyValue('Каталог output', run.outputDir || '-')}
           ${renderSummaryKeyValue('Ошибка', run.errorMessage || '-')}
         </div>
       `;
@@ -118,7 +122,7 @@
 
     function renderStructuredSummary(run, summaryJson) {
       if (!summaryJson || summaryJson === '{}') {
-        return '<div class="text-secondary">Summary еще не сформирован.</div>';
+        return '<div class="text-secondary">Итоги запуска еще не сформированы.</div>';
       }
 
       let summary;
@@ -139,21 +143,21 @@
           ${renderSummaryOverviewTable([
             { label: 'Старт', value: formatters.formatDateTime(summary.startedAt) },
             { label: 'Завершение', value: formatters.formatDateTime(summary.finishedAt) },
-            { label: 'Merge mode', value: summary.mergeMode || '-', tone: 'important' },
+            { label: 'Режим merge', value: summary.mergeMode || '-', tone: 'important' },
             { label: 'Файл merged', value: summary.mergedFile || '-' },
             { label: 'Строк в merged', value: formatters.formatNumber(summary.mergedRowCount), tone: 'important' },
-            { label: 'Max merged rows', value: summary.maxMergedRows == null ? 'без ограничения' : formatters.formatNumber(summary.maxMergedRows) },
+            { label: 'Макс. строк merged', value: summary.maxMergedRows == null ? 'без ограничения' : formatters.formatNumber(summary.maxMergedRows) },
             {
-              label: 'Target status',
+              label: 'Статус target',
               value: `<span class="${formatters.statusBadgeClass(targetLoad.status)}">${escapeHtml(formatters.translateStatus(targetLoad.status))}</span>`,
               html: true,
               tone: formatters.statusTone(targetLoad.status),
             },
-            { label: 'Target table', value: targetLoad.table || '-', tone: targetLoad.table ? 'important' : 'default' },
+            { label: 'Таблица target', value: targetLoad.table || '-', tone: targetLoad.table ? 'important' : 'default' },
             { label: 'Загружено', value: formatters.formatNumber(targetLoad.rowCount || 0), tone: 'important' },
-            { label: 'Успешных sources', value: formatters.formatNumber(successfulSources.length), tone: successfulSources.length > 0 ? 'success' : 'default' },
-            { label: 'Ошибочных sources', value: formatters.formatNumber(failedSources.length), tone: failedSources.length > 0 ? 'failed' : 'success' },
-            { label: 'Output', value: run.outputDir || '-' },
+            { label: 'Успешных источников', value: formatters.formatNumber(successfulSources.length), tone: successfulSources.length > 0 ? 'success' : 'default' },
+            { label: 'Ошибочных источников', value: formatters.formatNumber(failedSources.length), tone: failedSources.length > 0 ? 'failed' : 'success' },
+            { label: 'Каталог output', value: run.outputDir || '-' },
             { label: 'Ошибка target', value: targetLoad.errorMessage || '-', tone: targetLoad.errorMessage ? 'failed' : 'success' },
           ])}
         </div>
@@ -182,8 +186,8 @@
               <tr>
                 <th>Источник</th>
                 <th>Статус</th>
-                <th>Exported</th>
-                <th>Merged</th>
+                <th>Экспортировано</th>
+                <th>Попало в merged</th>
                 <th>Старт</th>
                 <th>Финиш</th>
                 <th>Ошибка</th>
@@ -255,6 +259,59 @@
           </table>
         </div>
       `;
+    }
+
+    function renderRunHistoryFilters(onSelectRun) {
+      const filters = [
+        ['ALL', 'Все'],
+        ['RUNNING', 'Активные'],
+        ['SUCCESS', 'Успешные'],
+        ['FAILED', 'С ошибкой'],
+      ];
+
+      refs.dbRunHistoryFilters.innerHTML = filters.map(([value, label]) => `
+        <button
+          type="button"
+          class="run-history-filter ${state.runHistoryFilter === value ? 'run-history-filter-active' : ''}"
+          data-run-history-filter="${value}"
+        >
+          ${label}
+        </button>
+      `).join('');
+
+      refs.dbRunHistoryFilters.querySelectorAll('[data-run-history-filter]').forEach(button => {
+        button.addEventListener('click', async () => {
+          state.runHistoryFilter = button.dataset.runHistoryFilter || 'ALL';
+          const filteredRuns = getFilteredRuns();
+          if (!filteredRuns.some(run => run.runId === state.selectedRunId)) {
+            state.selectedRunId = filteredRuns[0]?.runId || null;
+            if (state.selectedModuleId && state.selectedRunId) {
+              await onSelectRun(state.selectedModuleId, state.selectedRunId);
+              return;
+            }
+            state.selectedRunDetails = null;
+          }
+          renderModuleRuns(onSelectRun);
+          renderSelectedRunDetails();
+        });
+      });
+    }
+
+    function getFilteredRuns() {
+      return state.currentRuns.filter(matchesRunHistoryFilter);
+    }
+
+    function matchesRunHistoryFilter(run) {
+      switch (state.runHistoryFilter) {
+        case 'RUNNING':
+          return run.status === 'RUNNING';
+        case 'SUCCESS':
+          return run.status === 'SUCCESS' || run.status === 'SUCCESS_WITH_WARNINGS';
+        case 'FAILED':
+          return run.status === 'FAILED';
+        default:
+          return true;
+      }
     }
 
     function renderSummaryOverviewTable(rows) {

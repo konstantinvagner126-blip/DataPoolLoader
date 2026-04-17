@@ -1,12 +1,41 @@
 (function initDataPoolModulePage(global) {
   const common = global.DataPoolCommon || {};
+  const uiBlocksNamespace = global.DataPoolUiBlocks || {};
+  const uiCredentialsNamespace = global.DataPoolUiCredentials || {};
+  const editorBlocksNamespace = global.DataPoolEditorBlocks || {};
   const moduleEditorNamespace = global.DataPoolModuleEditor || {};
+  const moduleEditorSharedNamespace = global.DataPoolModuleEditorShared || {};
   const runPanelsNamespace = global.DataPoolRunPanels || {};
-  const { escapeHtml, fetchJson, postJson, postFormData, withMonacoReady, createMonacoEditor, loadJsonStorage, saveJsonStorage } = common;
+  const { escapeHtml, fetchJson, postJson, withMonacoReady, createMonacoEditor, loadJsonStorage, saveJsonStorage } = common;
+  const { renderCredentialsPanel } = uiBlocksNamespace;
+  const { createCredentialsController } = uiCredentialsNamespace;
   const { createConfigFormController } = moduleEditorNamespace;
+  const { createSqlCatalogController, renderModuleMetadata } = moduleEditorSharedNamespace;
+  const { renderExecutionLogPanel, renderHistoryCurrentPanel, renderTechnicalDiagnosticsPanel, renderSummaryPanel } = editorBlocksNamespace;
   const { createRunPanelsController } = runPanelsNamespace;
 
   const MODULE_UI_STATE_STORAGE_KEY = "datapool.moduleEditor.uiState";
+
+  renderCredentialsPanel?.(document.getElementById("credentialsPanelHost"));
+  renderExecutionLogPanel?.(document.getElementById("executionLogPanelHost"), { eventLogId: "eventLog" });
+  renderHistoryCurrentPanel?.(document.getElementById("historyCurrentPanelHost"), {
+    filtersId: "runHistoryFilters",
+    historyId: "runHistory",
+    summaryId: "runSummary",
+  });
+  renderTechnicalDiagnosticsPanel?.(document.getElementById("technicalDiagnosticsPanelHost"), {
+    panelId: "technicalDiagnosticsPanel",
+    collapseId: "technicalEventsCollapse",
+    logId: "technicalEventLog",
+  });
+  renderSummaryPanel?.(document.getElementById("summaryPanelHost"), {
+    structuredId: "summaryStructured",
+    rawPanelId: "summaryRawPanel",
+    rawCollapseId: "summaryRawCollapse",
+    rawJsonId: "summaryJson",
+    emptyText: "Пока нет данных summary.",
+    rawPanelInitiallyHidden: true,
+  });
 
   let configEditor = null;
   let sqlEditor = null;
@@ -16,7 +45,6 @@
   let sqlContents = {};
   let persistedConfigText = "";
   let persistedSqlContents = {};
-  let currentCredentialsStatus = null;
 
   const moduleList = document.getElementById("moduleList");
   const moduleCatalogStatus = document.getElementById("moduleCatalogStatus");
@@ -24,9 +52,16 @@
   const selectedModuleDescription = document.getElementById("selectedModuleDescription");
   const moduleDraftStatus = document.getElementById("moduleDraftStatus");
   const moduleValidationAlert = document.getElementById("moduleValidationAlert");
-  const sqlFileSelect = document.getElementById("sqlFileSelect");
+  const moduleMetadata = document.getElementById("moduleMetadata");
   const configForm = document.getElementById("configForm");
   const configFormWarning = document.getElementById("configFormWarning");
+  const sqlCatalogList = document.getElementById("sqlCatalogList");
+  const sqlCreateButton = document.getElementById("sqlCreateButton");
+  const sqlRenameButton = document.getElementById("sqlRenameButton");
+  const sqlDeleteButton = document.getElementById("sqlDeleteButton");
+  const sqlResourceTitle = document.getElementById("sqlResourceTitle");
+  const sqlResourceMeta = document.getElementById("sqlResourceMeta");
+  const sqlResourceUsage = document.getElementById("sqlResourceUsage");
   const runSummary = document.getElementById("runSummary");
   const eventLog = document.getElementById("eventLog");
   const technicalEventLog = document.getElementById("technicalEventLog");
@@ -44,6 +79,15 @@
   const runButton = document.getElementById("runButton");
   const uploadCredentialsButton = document.getElementById("uploadCredentialsButton");
 
+  const credentialsController = createCredentialsController({
+    refs: {
+      credentialsStatus,
+      credentialsWarning,
+      credentialsFileInput,
+    },
+    getRequirementTarget: () => currentModule?.module || null,
+  });
+
   const formController = createConfigFormController({
     configForm,
     configFormWarning,
@@ -53,12 +97,49 @@
         configEditor.setValue(value);
       }
     },
-    getCurrentModuleId: () => currentModule?.id || selectedModuleId,
-    onDraftStateChange: () => updateDraftState(),
+    getCurrentModuleId: () => currentModule?.module?.id || selectedModuleId,
+    getSqlResources: () => currentModule?.module?.sqlFiles || [],
+    getStorageMode: () => currentModule?.storageMode || "FILES",
+    onDraftStateChange: () => {
+      updateDraftState();
+      sqlCatalogController.render();
+    },
     onPersistUiState: () => persistModuleUiState(),
     openYamlEditor: () => {
       document.querySelector('[data-bs-target="#configTab"]')?.click();
     }
+  });
+
+  const sqlCatalogController = createSqlCatalogController({
+    refs: {
+      sqlCatalogList,
+      sqlCreateButton,
+      sqlRenameButton,
+      sqlDeleteButton,
+      sqlResourceTitle,
+      sqlResourceMeta,
+      sqlResourceUsage,
+    },
+    editors: {
+      get sqlEditor() {
+        return sqlEditor;
+      }
+    },
+    getSession: () => currentModule,
+    getSqlContents: () => sqlContents,
+    setSqlContents: next => {
+      sqlContents = next;
+    },
+    getCurrentPath: () => currentSqlPath,
+    setCurrentPath: value => {
+      currentSqlPath = value;
+    },
+    getFormState: () => formController.currentFormState?.(),
+    formController,
+    onDraftStateChange: () => updateDraftState(),
+    onCatalogChanged: () => {
+      renderModuleMetadata?.(moduleMetadata, currentModule);
+    },
   });
 
   const runPanelsController = createRunPanelsController({
@@ -106,22 +187,7 @@
   });
 
   uploadCredentialsButton.addEventListener("click", async () => {
-    const file = credentialsFileInput.files[0];
-    if (!file) {
-      return;
-    }
-    const formData = new FormData();
-    formData.append("file", file);
-    currentCredentialsStatus = await postFormData("/api/credentials/upload", formData, "Не удалось загрузить credential.properties.");
-    renderCredentialsStatus(currentCredentialsStatus);
-    renderCredentialsWarning();
-  });
-
-  sqlFileSelect.addEventListener("change", () => {
-    currentSqlPath = sqlFileSelect.value || null;
-    if (sqlEditor) {
-      sqlEditor.setValue(currentSqlPath ? (sqlContents[currentSqlPath] || "") : "");
-    }
+    await credentialsController.uploadSelectedFile();
   });
 
   global.addEventListener("pagehide", () => {
@@ -158,7 +224,7 @@
 
     formController.initialize();
     await loadModules();
-    await refreshCredentialsStatus();
+    await credentialsController.refreshStatus();
     connectWebSocket();
   });
 
@@ -232,9 +298,15 @@
     selectedModuleDescription.textContent = "";
     moduleValidationAlert.classList.add("d-none");
     moduleValidationAlert.textContent = "";
-    sqlFileSelect.innerHTML = "";
+    if (sqlCatalogList) {
+      sqlCatalogList.innerHTML = "";
+    }
+    if (moduleMetadata) {
+      renderModuleMetadata?.(moduleMetadata, null);
+    }
     formController.initialize();
-    renderCredentialsWarning();
+    sqlCatalogController.render();
+    credentialsController.renderWarning();
     updateDraftState();
   }
 
@@ -249,50 +321,35 @@
 
   async function loadModule(moduleId) {
     currentModule = await fetchJson(`/api/modules/${moduleId}`, {}, "Не удалось загрузить модуль.");
-    formController.restoreExpansionStateForModule(currentModule.id);
-    selectedModuleLabel.textContent = `${currentModule.title} · ${currentModule.configPath}`;
-    if (currentModule.description) {
-      selectedModuleDescription.textContent = currentModule.description;
+    formController.restoreExpansionStateForModule(currentModule.module.id);
+    selectedModuleLabel.textContent = `${currentModule.module.title} · ${currentModule.module.configPath}`;
+    if (currentModule.module.description) {
+      selectedModuleDescription.textContent = currentModule.module.description;
       selectedModuleDescription.classList.remove("d-none");
     } else {
       selectedModuleDescription.classList.add("d-none");
       selectedModuleDescription.textContent = "";
     }
-    persistedConfigText = currentModule.configText;
-    configEditor.setValue(currentModule.configText);
+    persistedConfigText = currentModule.module.configText;
+    configEditor.setValue(currentModule.module.configText);
 
     sqlContents = {};
-    currentModule.sqlFiles.forEach(file => {
+    currentModule.module.sqlFiles.forEach(file => {
       sqlContents[file.path] = file.content;
     });
     persistedSqlContents = cloneSqlContents(sqlContents);
-    renderSqlSelect();
-    renderModuleValidation(currentModule);
-    renderCredentialsWarning();
+    sqlCatalogController.render();
+    renderModuleValidation(currentModule.module);
+    renderModuleMetadata?.(moduleMetadata, currentModule);
+    credentialsController.renderWarning();
     updateDraftState();
 
     [...moduleList.children].forEach(button => {
-      button.classList.toggle("active", button.dataset.moduleId === currentModule.id);
+      button.classList.toggle("active", button.dataset.moduleId === currentModule.module.id);
     });
 
     await formController.syncFromYaml();
-  }
-
-  function renderSqlSelect() {
-    sqlFileSelect.innerHTML = "";
-    currentSqlPath = null;
-    (currentModule?.sqlFiles || []).forEach((file, index) => {
-      const option = document.createElement("option");
-      option.value = file.path;
-      option.textContent = `${file.label} · ${file.path}`;
-      sqlFileSelect.appendChild(option);
-      if (index === 0) {
-        currentSqlPath = file.path;
-      }
-    });
-    if (sqlEditor) {
-      sqlEditor.setValue(currentSqlPath ? (sqlContents[currentSqlPath] || "") : "");
-    }
+    sqlCatalogController.render();
   }
 
   function renderModuleListItem(module) {
@@ -319,7 +376,7 @@
 
   function renderValidationBadge(status) {
     const normalized = String(status || "VALID").toUpperCase();
-    const label = normalized === "VALID" ? "OK" : (normalized === "WARNING" ? "Warning" : "Invalid");
+    const label = normalized === "VALID" ? "OK" : (normalized === "WARNING" ? "Предупреждение" : "Ошибка");
     return `<span class="module-validation-badge module-validation-badge-${normalized.toLowerCase()}">${label}</span>`;
   }
 
@@ -373,7 +430,9 @@
 
   function updateDraftState() {
     const dirty = hasUnsavedChanges();
-    saveButton.disabled = !dirty || !selectedModuleId;
+    const capabilities = currentModule?.capabilities || {};
+    saveButton.disabled = !dirty || !selectedModuleId || capabilities.save !== true;
+    runButton.disabled = !selectedModuleId || capabilities.run !== true;
 
     if (!selectedModuleId) {
       moduleDraftStatus.innerHTML = `
@@ -423,63 +482,14 @@
     const ws = new WebSocket(`${protocol}://${window.location.host}/ws`);
     ws.onmessage = event => {
       const state = JSON.parse(event.data);
-      currentCredentialsStatus = state.credentialsStatus;
       renderState(state);
     };
-  }
-
-  async function refreshCredentialsStatus() {
-    currentCredentialsStatus = await fetchJson("/api/credentials", {}, "Не удалось получить статус credential.properties.");
-    renderCredentialsStatus(currentCredentialsStatus);
-    renderCredentialsWarning();
   }
 
   function renderState(state) {
     technicalDiagnosticsPanel.classList.toggle("d-none", state.uiSettings?.showTechnicalDiagnostics === false);
     summaryRawPanel.classList.toggle("d-none", state.uiSettings?.showRawSummaryJson === false);
-    renderCredentialsStatus(state.credentialsStatus);
-    renderCredentialsWarning();
+    credentialsController.setStatus(state.credentialsStatus);
     runPanelsController.renderState(state);
-  }
-
-  function renderCredentialsStatus(status) {
-    if (!status) {
-      credentialsStatus.textContent = "Файл не задан.";
-      return;
-    }
-    const sourceLabel = status.uploaded ? "загружен через UI" : (status.mode === "FILE" ? "файл по умолчанию" : "файл не задан");
-    const availability = status.fileAvailable ? "доступен" : "не найден";
-    credentialsStatus.textContent = `${sourceLabel}: ${status.displayName} (${availability})`;
-  }
-
-  function renderCredentialsWarning() {
-    if (!currentModule) {
-      credentialsWarning.classList.add("d-none");
-      credentialsWarning.textContent = "";
-      return;
-    }
-
-    if (!currentModule.requiresCredentials) {
-      credentialsWarning.classList.remove("d-none");
-      credentialsWarning.className = "alert alert-light mt-3 mb-0";
-      credentialsWarning.textContent = "У этого модуля нет обязательных placeholders ${...}. credential.properties нужен только для модулей и SQL-источников, где параметры вынесены во внешний файл.";
-      return;
-    }
-
-    credentialsWarning.classList.remove("d-none");
-    if (currentModule.credentialsReady) {
-      credentialsWarning.className = "alert alert-success mt-3 mb-0";
-      credentialsWarning.textContent = "Для модуля все обязательные placeholders ${...} сейчас разрешаются. При необходимости credential.properties можно заменить загрузкой через UI.";
-      return;
-    }
-
-    credentialsWarning.className = "alert alert-warning mt-3 mb-0";
-    const missingKeys = Array.isArray(currentModule.missingCredentialKeys) ? currentModule.missingCredentialKeys : [];
-    const missingKeysText = missingKeys.length ? ` Не хватает значений: ${missingKeys.join(", ")}.` : "";
-    if (currentCredentialsStatus && currentCredentialsStatus.fileAvailable) {
-      credentialsWarning.textContent = `Для модуля найден credential.properties, но обязательные placeholders разрешены не полностью.${missingKeysText} Также проверяются переменные окружения и JVM system properties.`;
-      return;
-    }
-    credentialsWarning.textContent = `В конфиге модуля найдены placeholders \${...}, но подходящие значения сейчас не найдены.${missingKeysText} Сначала ищется ui.defaultCredentialsFile, затем gradle/credential.properties в проекте, затем ~/.gradle/credential.properties. Если значений нет, загрузи файл через UI или задай их через env/JVM.`;
   }
 })(window);

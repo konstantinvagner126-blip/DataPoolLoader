@@ -10,6 +10,7 @@ import com.sbrf.lt.platform.ui.config.schemaName
 import com.sbrf.lt.platform.ui.model.ModuleFileContent
 import com.sbrf.lt.platform.ui.module.DatabaseConnectionProvider
 import com.sbrf.lt.platform.ui.module.DriverManagerDatabaseConnectionProvider
+import com.sbrf.lt.platform.ui.module.SqlFileEntries
 import com.sbrf.lt.platform.ui.module.normalizeSchemaName
 import com.sbrf.lt.platform.ui.module.sqlAssetsSql
 import java.security.MessageDigest
@@ -168,11 +169,12 @@ class DatabaseModuleExecutionSource(
     }
 
     private fun buildSnapshotJson(configText: String, sqlFileContents: Map<String, String>): String {
+        val sqlLabels = SqlFileEntries.labelsByPathOrEmpty(configText, objectMapper)
         val sqlFiles = sqlFileContents.entries
             .sortedBy { it.key }
             .map { (path, content) ->
                 ModuleFileContent(
-                    label = path,
+                    label = sqlLabels[path] ?: path,
                     path = path,
                     content = content,
                     exists = true,

@@ -51,7 +51,7 @@
         .join("\n\n");
 
       renderSummaryStructured(latestRun);
-      summaryJsonEl.textContent = latestRun.summaryJson || "Summary еще не сформирован.";
+      summaryJsonEl.textContent = latestRun.summaryJson || "Итоги запуска еще не сформированы.";
     }
 
     function resolveSelectedRun(state) {
@@ -206,7 +206,7 @@
     function renderSummaryStructured(run) {
       if (!run.summaryJson) {
         summaryStructuredEl.innerHTML = `
-          <div class="text-secondary">Summary еще не сформирован.</div>
+          <div class="text-secondary">Итоги запуска еще не сформированы.</div>
         `;
         return;
       }
@@ -237,15 +237,15 @@
             { label: "Merge mode", value: summary.mergeMode || "-", tone: "important" },
             { label: "Файл merged", value: summary.mergedFile || "-" },
             { label: "Строк в merged", value: formatNumber(summary.mergedRowCount), tone: "important" },
-            { label: "Max merged rows", value: summary.maxMergedRows == null ? "без ограничения" : formatNumber(summary.maxMergedRows) },
+            { label: "Макс. строк merged", value: summary.maxMergedRows == null ? "без ограничения" : formatNumber(summary.maxMergedRows) },
             { label: "Output", value: run.outputDir || "-" },
             {
-              label: "Target status",
+              label: "Статус target",
               value: `<span class="status-badge status-${targetStatus}">${translateStatus(targetLoad.status)}</span>`,
               html: true,
               tone: statusTone(targetLoad.status)
             },
-            { label: "Target table", value: targetLoad.table || "-", tone: targetLoad.table ? "important" : "default" },
+            { label: "Таблица target", value: targetLoad.table || "-", tone: targetLoad.table ? "important" : "default" },
             { label: "Загружено", value: formatNumber(targetLoad.rowCount || 0), tone: "important" },
             { label: "Успешных sources", value: formatNumber(successfulSources.length), tone: successfulSources.length > 0 ? "success" : "default" },
             { label: "Ошибочных sources", value: formatNumber(failedSources.length), tone: failedSources.length > 0 ? "failed" : "success" },

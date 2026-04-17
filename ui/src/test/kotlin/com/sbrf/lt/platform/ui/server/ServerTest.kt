@@ -1193,7 +1193,7 @@ class ServerTest {
 
         val details = client.get("/api/db/modules/db-demo").bodyAsText()
 
-        assertTrue(details.contains("\"effectiveMode\":\"database\""))
+        assertTrue(details.contains("\"storageMode\":\"DATABASE\""))
         assertTrue(details.contains("\"sourceKind\":\"CURRENT_REVISION\""))
         assertTrue(details.contains("\"currentRevisionId\":\"11111111-1111-1111-1111-111111111111\""))
         assertTrue(details.contains("\"configPath\":\"db:db-demo\""))
@@ -1406,7 +1406,7 @@ class ServerTest {
                     requestedAt = Instant.parse("2026-04-17T10:00:00Z"),
                     launchSourceKind = "CURRENT_REVISION",
                     executionSnapshotId = "snapshot-1",
-                    message = "DB-модуль '$moduleCode' поставлен в выполнение.",
+                    message = "Запуск DB-модуля '$moduleCode' начат.",
                 )
             }
         }

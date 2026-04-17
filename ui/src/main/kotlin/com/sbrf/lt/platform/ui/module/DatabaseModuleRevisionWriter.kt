@@ -303,11 +303,12 @@ internal class DatabaseModuleRevisionWriter(
         }
 
     private fun buildSnapshotJson(configText: String, sqlFileContents: Map<String, String>): String {
+        val sqlLabels = SqlFileEntries.labelsByPathOrEmpty(configText, objectMapper)
         val sqlFiles = sqlFileContents.entries
             .sortedBy { it.key }
             .map { (path, content) ->
                 ModuleFileContent(
-                    label = path,
+                    label = sqlLabels[path] ?: path,
                     path = path,
                     content = content,
                     exists = true,

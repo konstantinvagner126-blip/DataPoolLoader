@@ -75,6 +75,7 @@
         state.selectedRunDetails = null;
       }
       state.selectedModuleId = moduleId;
+      ctx.persistUiState?.();
       renderer.highlightSelectedModule();
       await loadModule(moduleId);
       await loadModuleRuns(moduleId);
@@ -83,11 +84,17 @@
     async function loadModule(moduleId) {
       if (!modules.canWorkWithDbModules(ctx)) return;
       state.currentModule = await fetchJson(`/api/db/modules/${moduleId}`, {}, 'Не удалось загрузить DB-модуль.');
+      ctx.formController?.restoreExpansionStateForModule(state.currentModule.module.id);
       state.sqlContents = {};
       state.currentModule.module.sqlFiles.forEach(file => {
         state.sqlContents[file.path] = file.content;
       });
+      state.persistedConfigText = state.currentModule.module.configText;
+      state.persistedSqlContents = modules.cloneSqlContents(state.sqlContents);
       renderer.applyCurrentModule();
+      await ctx.formController?.syncFromYaml();
+      ctx.sqlCatalogController?.render();
+      renderer.renderDraftStatus();
     }
 
     async function loadModuleRuns(moduleId) {
@@ -151,6 +158,10 @@
 
     async function runSelectedModule() {
       if (!state.selectedModuleId) return;
+      if (modules.hasUnsavedChanges(ctx)) {
+        alert('Сначала сохрани изменения в рабочую копию или отмени их, затем запускай модуль.');
+        return;
+      }
       try {
         const result = await postJson(
           `/api/db/modules/${state.selectedModuleId}/run`,
@@ -166,6 +177,9 @@
 
     async function saveWorkingCopy() {
       if (!state.selectedModuleId || !editors.configEditor) return;
+      if (!modules.hasUnsavedChanges(ctx)) {
+        return;
+      }
       await postJson(
         `/api/db/modules/${state.selectedModuleId}/save`,
         {
@@ -190,7 +204,11 @@
 
     async function publishWorkingCopy() {
       if (!state.selectedModuleId) return;
-      if (!confirm('Опубликовать working copy как новую ревизию? Working copy будет удалена.')) return;
+      if (modules.hasUnsavedChanges(ctx)) {
+        alert('Сначала сохрани текущие изменения в рабочую копию или отмени их.');
+        return;
+      }
+      if (!confirm('Опубликовать рабочую копию как новую ревизию? Рабочая копия будет удалена.')) return;
       try {
         const result = await postJson(
           `/api/db/modules/${state.selectedModuleId}/publish`,
@@ -245,16 +263,10 @@
         });
         alert(result.message);
         state.selectedModuleId = null;
+        ctx.persistUiState?.();
         await loadDbModuleCatalog();
       } catch (e) {
         alert(`Ошибка удаления: ${e.message || e}`);
-      }
-    }
-
-    function updateSqlSelection(path) {
-      state.currentSqlPath = path || null;
-      if (editors.sqlEditor) {
-        editors.sqlEditor.setValue(state.currentSqlPath ? (state.sqlContents[state.currentSqlPath] || '') : '');
       }
     }
 
@@ -270,7 +282,6 @@
       publishWorkingCopy,
       createModule,
       deleteSelectedModule,
-      updateSqlSelection,
     };
   }
 

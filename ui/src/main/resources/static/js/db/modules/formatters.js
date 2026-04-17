@@ -48,8 +48,8 @@
 
   function translateLaunchSource(sourceKind) {
     switch (String(sourceKind || '').toUpperCase()) {
-      case 'WORKING_COPY': return 'Working copy';
-      case 'CURRENT_REVISION': return 'Current revision';
+      case 'WORKING_COPY': return 'Рабочая копия';
+      case 'CURRENT_REVISION': return 'Текущая ревизия';
       default: return sourceKind || '-';
     }
   }
@@ -59,7 +59,7 @@
       case 'PREPARE': return 'Подготовка';
       case 'SOURCE': return 'Источники';
       case 'MERGE': return 'Объединение';
-      case 'TARGET': return 'Target';
+      case 'TARGET': return 'Загрузка в target';
       case 'RUN': return 'Завершение';
       default: return stage || '-';
     }
@@ -113,7 +113,7 @@
   }
 
   function formatRawJson(value) {
-    if (!value || value === '{}') return 'Summary еще не сформирован.';
+    if (!value || value === '{}') return 'Итоги запуска еще не сформированы.';
     try {
       return JSON.stringify(JSON.parse(value), null, 2);
     } catch (_) {

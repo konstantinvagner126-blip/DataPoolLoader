@@ -383,11 +383,12 @@ open class DatabaseModuleStore(
     }
 
     private fun buildSnapshotJson(configText: String, sqlFileContents: Map<String, String>): String {
+        val sqlLabels = SqlFileEntries.labelsByPathOrEmpty(configText, objectMapper)
         val sqlFiles = sqlFileContents.entries
             .sortedBy { it.key }
             .map { (path, content) ->
                 ModuleFileContent(
-                    label = path,
+                    label = sqlLabels[path] ?: path,
                     path = path,
                     content = content,
                     exists = true,
@@ -438,7 +439,9 @@ open class DatabaseModuleStore(
     private fun readWorkingCopySqlFiles(workingCopyJson: String): List<ModuleFileContent> {
         val root = objectMapper.readTree(workingCopyJson)
         val sqlFilesNode = root.path("sqlFiles").takeIf { it.isArray } ?: return emptyList()
-        return objectMapper.readValue(sqlFilesNode.traverse(objectMapper), sqlFilesType)
+        val sqlFiles = objectMapper.readValue<List<ModuleFileContent>>(sqlFilesNode.traverse(objectMapper), sqlFilesType)
+        val configText = root.path("configText").takeIf { it.isTextual }?.asText().orEmpty()
+        return SqlFileEntries.relabel(configText, sqlFiles, objectMapper)
     }
 
     private fun readSqlFileContents(workingCopyJson: String?): Map<String, String> {

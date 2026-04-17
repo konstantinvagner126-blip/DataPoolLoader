@@ -55,6 +55,9 @@
       refs.reloadButton.disabled = disabled;
       refs.createModuleButton.disabled = disabled;
       refs.deleteModuleButton.disabled = disabled || !state.selectedModuleId;
+      refs.sqlCreateButton.disabled = disabled;
+      refs.sqlRenameButton.disabled = disabled || !state.currentSqlPath;
+      refs.sqlDeleteButton.disabled = disabled || !state.currentSqlPath;
       if (disabled) {
         refs.saveWorkingCopyButton.disabled = true;
         refs.discardWorkingCopyButton.disabled = true;
@@ -86,10 +89,10 @@
       refs.dbCatalogStatus.innerHTML = `
         <div>Режим: <strong>${shared.isDatabaseMode(state.runtimeContext) ? 'DATABASE' : 'FILES'}</strong></div>
         <div>PostgreSQL: ${state.runtimeContext.database.available ? 'доступен' : 'недоступен'}</div>
-        ${state.runtimeContext.actor?.actorId ? `<div>Actor: ${escapeHtml(state.runtimeContext.actor.actorId)}</div>` : ''}
-        ${maintenanceMode ? '<div class="text-warning-emphasis mt-1">Mass import: выполняется</div>' : ''}
-        ${activeSingleSyncCount > 0 ? `<div class="text-info-emphasis mt-1">Single import: ${activeSingleSyncCount}</div>` : ''}
-        ${state.runtimeContext.fallbackReason ? `<div class="text-danger mt-1">Fallback: ${escapeHtml(state.runtimeContext.fallbackReason)}</div>` : ''}
+        ${state.runtimeContext.actor?.actorId ? `<div>Пользователь: ${escapeHtml(state.runtimeContext.actor.actorId)}</div>` : ''}
+        ${maintenanceMode ? '<div class="text-warning-emphasis mt-1">Массовый импорт: выполняется</div>' : ''}
+        ${activeSingleSyncCount > 0 ? `<div class="text-info-emphasis mt-1">Точечный импорт: ${activeSingleSyncCount}</div>` : ''}
+        ${state.runtimeContext.fallbackReason ? `<div class="text-danger mt-1">Причина fallback: ${escapeHtml(state.runtimeContext.fallbackReason)}</div>` : ''}
       `;
     }
 
@@ -100,6 +103,9 @@
         refs.discardWorkingCopyButton.disabled = true;
         refs.publishButton.disabled = true;
         refs.deleteModuleButton.disabled = true;
+        refs.sqlCreateButton.disabled = true;
+        refs.sqlRenameButton.disabled = true;
+        refs.sqlDeleteButton.disabled = true;
         return;
       }
 
@@ -109,24 +115,36 @@
         refs.discardWorkingCopyButton.disabled = true;
         refs.publishButton.disabled = true;
         refs.deleteModuleButton.disabled = !state.selectedModuleId;
+        refs.sqlCreateButton.disabled = true;
+        refs.sqlRenameButton.disabled = true;
+        refs.sqlDeleteButton.disabled = true;
         return;
       }
 
-      refs.runModuleButton.disabled = modules.hasRunningDbRun(ctx);
+      const hasUnsavedChanges = modules.hasUnsavedChanges(ctx);
+      const capabilities = state.currentModule.capabilities || {};
+      refs.runModuleButton.disabled = !capabilities.run || modules.hasRunningDbRun(ctx);
       if (modules.selectedModuleIsSyncing(ctx)) {
         refs.runModuleButton.disabled = true;
         refs.saveWorkingCopyButton.disabled = true;
         refs.discardWorkingCopyButton.disabled = true;
         refs.publishButton.disabled = true;
         refs.deleteModuleButton.disabled = true;
+        refs.sqlCreateButton.disabled = true;
+        refs.sqlRenameButton.disabled = true;
+        refs.sqlDeleteButton.disabled = true;
         return;
       }
 
       const hasWorkingCopy = state.currentModule.workingCopyId !== null;
-      refs.saveWorkingCopyButton.disabled = false;
-      refs.discardWorkingCopyButton.disabled = !hasWorkingCopy;
-      refs.publishButton.disabled = !hasWorkingCopy;
-      refs.deleteModuleButton.disabled = false;
+      refs.runModuleButton.disabled = refs.runModuleButton.disabled || hasUnsavedChanges;
+      refs.saveWorkingCopyButton.disabled = capabilities.saveWorkingCopy !== true || !hasUnsavedChanges;
+      refs.discardWorkingCopyButton.disabled = capabilities.discardWorkingCopy !== true || !hasWorkingCopy;
+      refs.publishButton.disabled = capabilities.publish !== true || !hasWorkingCopy || hasUnsavedChanges;
+      refs.deleteModuleButton.disabled = capabilities.deleteModule !== true;
+      refs.sqlCreateButton.disabled = false;
+      refs.sqlRenameButton.disabled = !state.currentSqlPath;
+      refs.sqlDeleteButton.disabled = !state.currentSqlPath;
     }
 
     return {

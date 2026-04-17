@@ -3,7 +3,7 @@ package com.sbrf.lt.platform.ui.model
 import java.time.Instant
 
 /**
- * Ответ на постановку DB-модуля в выполнение.
+ * Ответ на старт DB-запуска модуля.
  */
 data class DatabaseRunStartResponse(
     val runId: String,
