@@ -69,7 +69,7 @@
       if (!file) {
         refs.sqlResourceTitle.textContent = 'SQL-ресурс не выбран';
         refs.sqlResourceMeta.innerHTML = '<span class="text-secondary">Создай новый SQL или выбери существующий ресурс.</span>';
-        refs.sqlResourceUsage.innerHTML = '<span class="text-secondary">Usage пока недоступен.</span>';
+        refs.sqlResourceUsage.innerHTML = '<span class="text-secondary">Сведения об использовании пока недоступны.</span>';
         refs.sqlRenameButton.disabled = true;
         refs.sqlDeleteButton.disabled = true;
         return;
@@ -272,17 +272,23 @@
     const tags = Array.isArray(module.tags) && module.tags.length > 0
       ? module.tags.map(tag => `<span class="module-tag">${escapeHtml(tag)}</span>`).join('')
       : '<span class="text-secondary">не заданы</span>';
+    const storageModeLabel = session.storageMode === 'DATABASE'
+      ? 'База данных'
+      : (session.storageMode === 'FILES' ? 'Файлы' : (session.storageMode || '-'));
+    const sourceKindLabel = session.sourceKind === 'WORKING_COPY'
+      ? 'Личный черновик'
+      : (session.sourceKind === 'CURRENT_REVISION' ? 'Текущая ревизия' : (session.sourceKind || '-'));
 
     const rows = [
       renderMetadataRow('Код модуля', `<code>${escapeHtml(module.id)}</code>`, true),
       renderMetadataRow('Название', escapeHtml(module.title), true),
       renderMetadataRow('Путь конфигурации', `<code>${escapeHtml(module.configPath)}</code>`, true),
       renderMetadataRow('SQL-ресурсы', escapeHtml(String(module.sqlFiles.length)), true),
-      renderMetadataRow('Storage mode', escapeHtml(session.storageMode || '-'), true),
-      renderMetadataRow('Источник редактора', escapeHtml(session.sourceKind || '-'), true),
+      renderMetadataRow('Режим хранения', escapeHtml(storageModeLabel), true),
+      renderMetadataRow('Источник редактора', escapeHtml(sourceKindLabel), true),
       renderMetadataRow('Текущая ревизия', session.currentRevisionId ? `<code>${escapeHtml(session.currentRevisionId)}</code>` : '<span class="text-secondary">нет</span>', true),
       renderMetadataRow('Базовая ревизия', session.baseRevisionId ? `<code>${escapeHtml(session.baseRevisionId)}</code>` : '<span class="text-secondary">не задана</span>', true),
-      renderMetadataRow('Рабочая копия', session.workingCopyId ? `<code>${escapeHtml(session.workingCopyId)}</code>` : '<span class="text-secondary">нет</span>', true),
+      renderMetadataRow('Личный черновик', session.workingCopyId ? `<code>${escapeHtml(session.workingCopyId)}</code>` : '<span class="text-secondary">нет</span>', true),
       renderMetadataRow('Теги', tags, true),
     ];
 

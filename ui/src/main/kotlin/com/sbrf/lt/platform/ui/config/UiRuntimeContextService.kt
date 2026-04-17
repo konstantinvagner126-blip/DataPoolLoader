@@ -69,7 +69,7 @@ open class UiRuntimeContextService(
         } catch (ex: Exception) {
             initialStatus.copy(
                 available = false,
-                message = "PostgreSQL registry доступен, но schema migration завершилась ошибкой.",
+                message = "Подключение к базе данных доступно, но подготовка схемы завершилась ошибкой.",
                 errorMessage = ex.message,
             )
         }
@@ -107,6 +107,6 @@ open class UiRuntimeContextService(
         if (!actorState.resolved) {
             return actorState.message
         }
-        return "Режим database недоступен, UI переключен в files."
+        return "Режим базы данных недоступен, интерфейс переключен в файловый режим."
     }
 }

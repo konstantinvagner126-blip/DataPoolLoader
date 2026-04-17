@@ -17,8 +17,51 @@
   let runtimeContext = null;
   let syncState = null;
 
+  function translateSyncStatus(status) {
+    switch (String(status || '').toUpperCase()) {
+      case 'SUCCESS':
+        return 'Успешно';
+      case 'FAILED':
+        return 'Ошибка';
+      case 'RUNNING':
+        return 'Выполняется';
+      default:
+        return status || '-';
+    }
+  }
+
+  function translateSyncScope(scope) {
+    switch (String(scope || '').toUpperCase()) {
+      case 'ALL':
+        return 'Все модули';
+      case 'ONE':
+        return 'Один модуль';
+      default:
+        return scope || '-';
+    }
+  }
+
+  function translateSyncAction(action) {
+    switch (String(action || '').toUpperCase()) {
+      case 'CREATED':
+        return 'Создан';
+      case 'UPDATED':
+        return 'Обновлён';
+      case 'SKIPPED':
+        return 'Пропущен';
+      case 'SKIPPED_NO_CHANGES':
+        return 'Пропущен без изменений';
+      case 'SKIPPED_CODE_CONFLICT':
+        return 'Пропущен из-за конфликта кода';
+      case 'FAILED':
+        return 'Ошибка';
+      default:
+        return action || '-';
+    }
+  }
+
   syncAllButton.addEventListener('click', async () => {
-    if (!confirm('Синхронизировать все файловые модули в PostgreSQL?')) return;
+    if (!confirm('Синхронизировать все файловые модули в базу данных?')) return;
     await syncAll();
   });
 
@@ -50,7 +93,7 @@
 
   async function loadRuntimeContext() {
     try {
-      runtimeContext = await fetchJson('/api/ui/runtime-context', {}, 'Не удалось загрузить runtime context.');
+      runtimeContext = await fetchJson('/api/ui/runtime-context', {}, 'Не удалось загрузить состояние режима UI.');
     } catch (e) {
       console.error(e);
     }
@@ -70,7 +113,7 @@
     const activeSingleSyncs = shared.activeSingleSyncs(syncState);
 
     if (!shared.isDatabaseMode(runtimeContext)) {
-      showAlert('DB-режим недоступен', runtimeContext?.fallbackReason || 'Для импорта нужен активный DB-режим.');
+      showAlert('Режим базы данных недоступен', runtimeContext?.fallbackReason || 'Для импорта нужен активный режим «База данных».');
       setSyncActionsState({ canSyncAll: false, canSyncOne: false, canConfirmSyncOne: false });
       return;
     }
@@ -193,15 +236,15 @@
     const statusBadge = result.status === 'SUCCESS' ? 'bg-success' : (result.status === 'FAILED' ? 'bg-danger' : 'bg-warning');
     syncResultSummary.innerHTML = `
       <div class="d-flex flex-wrap gap-3 mb-2">
-        <span class="badge ${statusBadge}">${result.status}</span>
+        <span class="badge ${statusBadge}">${escapeHtml(translateSyncStatus(result.status))}</span>
         <span>Обработано: <strong>${result.totalProcessed}</strong></span>
         <span>Создано: <strong>${result.totalCreated}</strong></span>
         <span>Обновлено: <strong>${result.totalUpdated}</strong></span>
         <span>Пропущено: <strong>${result.totalSkipped}</strong></span>
-        <span>Ошибка: <strong>${result.totalFailed}</strong></span>
+        <span>С ошибкой: <strong>${result.totalFailed}</strong></span>
       </div>
       <div class="small text-secondary">
-        Scope: ${result.scope} | Started: ${new Date(result.startedAt).toLocaleString()} | Finished: ${new Date(result.finishedAt).toLocaleString()}
+        Область: ${escapeHtml(translateSyncScope(result.scope))} | Начало: ${new Date(result.startedAt).toLocaleString()} | Завершение: ${new Date(result.finishedAt).toLocaleString()}
       </div>
     `;
 
@@ -214,9 +257,9 @@
           <div class="card-body py-2 px-3">
             <div class="d-flex flex-wrap align-items-center gap-2">
               <code class="fw-semibold">${escapeHtml(item.moduleCode)}</code>
-              <span class="badge ${actionBadge}">${item.action}</span>
+              <span class="badge ${actionBadge}">${escapeHtml(translateSyncAction(item.action))}</span>
               ${item.errorMessage ? `<span class="text-danger small">${escapeHtml(item.errorMessage)}</span>` : ''}
-              ${item.resultRevisionId ? `<span class="small text-secondary">revision: ${escapeHtml(item.resultRevisionId)}</span>` : ''}
+              ${item.resultRevisionId ? `<span class="small text-secondary">Ревизия: ${escapeHtml(item.resultRevisionId)}</span>` : ''}
             </div>
             ${renderItemDetails(item.details)}
           </div>

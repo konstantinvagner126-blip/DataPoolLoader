@@ -20,10 +20,10 @@
   renderInfoPanel?.(document.getElementById('dbLifecyclePanelHost'), {
     panelId: 'workingCopyInfo',
     panelClass: 'panel',
-    title: 'Информация о рабочей копии',
+    title: 'Информация о личном черновике',
     contentId: 'workingCopyDetails',
     contentClass: 'text-secondary small',
-    emptyText: 'Рабочая копия пока не загружена.',
+    emptyText: 'Личный черновик пока не загружен.',
   });
   renderExecutionLogPanel?.(document.getElementById('dbExecutionLogPanelHost'), {
     eventLogId: 'dbRunEventTimeline',
@@ -32,28 +32,13 @@
     filtersId: 'dbRunHistoryFilters',
     historyId: 'dbRunsList',
     summaryId: 'dbRunSummary',
-  });
-  renderSummaryPanel?.(document.getElementById('dbSummaryPanelHost'), {
-    structuredId: 'dbRunStructuredSummary',
-    rawPanelId: 'dbRunSummaryRawPanel',
-    rawCollapseId: 'dbRunSummaryJsonCollapse',
-    rawJsonId: 'dbRunSummaryJson',
-    emptyText: 'Итоги запуска еще не сформированы.',
-  });
-  renderInfoPanel?.(document.getElementById('dbSourceResultsPanelHost'), {
-    title: 'Результаты по источникам',
-    contentId: 'dbRunSourceResults',
-    contentClass: 'mt-3 text-secondary small',
-    emptyText: 'Данные по источникам пока недоступны.',
-  });
-  renderInfoPanel?.(document.getElementById('dbArtifactsPanelHost'), {
-    title: 'Артефакты',
-    contentId: 'dbRunArtifacts',
-    contentClass: 'mt-3 text-secondary small',
-    emptyText: 'Артефакты запуска пока недоступны.',
+    historyTitle: 'Последние запуски',
   });
 
   const ctx = modules.createPageContext();
+  ctx.viewMode = 'compact';
+  ctx.historyLimit = 5;
+  ctx.eventTimelineLimit = 12;
   ctx.persistUiState = persistDbModuleUiState;
   const renderer = modules.createRenderer(ctx);
   const controller = modules.createController(ctx, renderer);
@@ -129,6 +114,7 @@
   });
 
   ctx.refs.runModuleButton.addEventListener('click', controller.runSelectedModule);
+  ctx.refs.historyButton.addEventListener('click', controller.openRunHistory);
   ctx.refs.saveWorkingCopyButton.addEventListener('click', controller.saveWorkingCopy);
   ctx.refs.discardWorkingCopyButton.addEventListener('click', controller.discardWorkingCopy);
   ctx.refs.publishButton.addEventListener('click', controller.publishWorkingCopy);
@@ -189,14 +175,20 @@
   });
 
   function restorePersistedDbModuleUiState() {
+    const params = new URLSearchParams(global.location.search);
+    const requestedModuleId = params.get('module');
+    const includeHiddenCatalog = params.get('includeHidden') === '1' || params.get('includeHidden') === 'true';
     const parsed = loadJsonStorage(global.localStorage, DB_MODULE_UI_STATE_STORAGE_KEY, null);
-    if (!parsed || typeof parsed !== 'object') {
-      return;
+    if (parsed && typeof parsed === 'object') {
+      ctx.state.selectedModuleId = typeof parsed.selectedModuleId === 'string' && parsed.selectedModuleId
+        ? parsed.selectedModuleId
+        : null;
+      ctx.formController?.loadSerializedExpansionState(parsed.moduleExpansionState);
     }
-    ctx.state.selectedModuleId = typeof parsed.selectedModuleId === 'string' && parsed.selectedModuleId
-      ? parsed.selectedModuleId
-      : null;
-    ctx.formController?.loadSerializedExpansionState(parsed.moduleExpansionState);
+    ctx.state.includeHiddenCatalog = includeHiddenCatalog;
+    if (requestedModuleId) {
+      ctx.state.selectedModuleId = requestedModuleId;
+    }
   }
 
   function persistDbModuleUiState() {

@@ -1,0 +1,205 @@
+{
+  "format": "ui-api-reference",
+  "title": "DataPool Loader UI API",
+  "version": "2026-04-17",
+  "description": "Машиночитаемое описание серверного API UI. Это не полный OpenAPI-контракт, а практический reference по актуальным endpoint-ам.",
+  "basePath": "/",
+  "groups": [
+    {
+      "id": "runtime",
+      "title": "Runtime и режим UI",
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/api/ui/runtime-context",
+          "summary": "Текущий runtime-контекст UI",
+          "response": "requestedMode, effectiveMode, actor, database, fallbackReason"
+        },
+        {
+          "method": "POST",
+          "path": "/api/ui/runtime-mode",
+          "summary": "Сохранение предпочитаемого режима UI",
+          "requestFields": ["mode"],
+          "response": "message, runtimeContext"
+        }
+      ]
+    },
+    {
+      "id": "files-modules",
+      "title": "Файловые модули",
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/api/modules",
+          "summary": "Упрощенный список файловых модулей"
+        },
+        {
+          "method": "GET",
+          "path": "/api/modules/catalog",
+          "summary": "Каталог файловых модулей и состояние appsRoot"
+        },
+        {
+          "method": "GET",
+          "path": "/api/modules/{id}",
+          "summary": "Детали файлового модуля"
+        },
+        {
+          "method": "POST",
+          "path": "/api/modules/{id}/save",
+          "summary": "Сохранение application.yml и SQL-файлов",
+          "requestFields": ["configText", "sqlFiles"]
+        }
+      ]
+    },
+    {
+      "id": "db-modules",
+      "title": "DB-модули",
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/api/db/modules/catalog",
+          "summary": "Каталог DB-модулей",
+          "queryParams": ["includeHidden"]
+        },
+        {
+          "method": "GET",
+          "path": "/api/db/modules/{id}",
+          "summary": "Editor session DB-модуля"
+        },
+        {
+          "method": "POST",
+          "path": "/api/db/modules/{id}/save",
+          "summary": "Сохранение изменений в личный черновик",
+          "requestFields": ["configText", "sqlFiles"]
+        },
+        {
+          "method": "POST",
+          "path": "/api/db/modules/{id}/discard-working-copy",
+          "summary": "Сброс личного черновика"
+        },
+        {
+          "method": "POST",
+          "path": "/api/db/modules/{id}/publish",
+          "summary": "Публикация личного черновика"
+        },
+        {
+          "method": "POST",
+          "path": "/api/db/modules/{id}/run",
+          "summary": "Асинхронный запуск DB-модуля"
+        },
+        {
+          "method": "GET",
+          "path": "/api/db/modules/{id}/runs",
+          "summary": "История запусков DB-модуля"
+        },
+        {
+          "method": "GET",
+          "path": "/api/db/modules/{id}/runs/{runId}",
+          "summary": "Детали запуска DB-модуля"
+        },
+        {
+          "method": "POST",
+          "path": "/api/db/modules",
+          "summary": "Создание DB-модуля",
+          "requestFields": ["moduleCode", "title", "description", "tags", "configText", "hiddenFromUi"]
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/db/modules/{id}",
+          "summary": "Удаление DB-модуля"
+        }
+      ]
+    },
+    {
+      "id": "db-sync",
+      "title": "Импорт в DB registry",
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/api/db/sync/state",
+          "summary": "Текущее состояние импорта"
+        },
+        {
+          "method": "POST",
+          "path": "/api/db/sync/one",
+          "summary": "Импорт одного модуля",
+          "requestFields": ["moduleCode"]
+        },
+        {
+          "method": "POST",
+          "path": "/api/db/sync/all",
+          "summary": "Массовый импорт модулей"
+        }
+      ]
+    },
+    {
+      "id": "config-form",
+      "title": "Визуальная форма конфига",
+      "endpoints": [
+        {
+          "method": "POST",
+          "path": "/api/config-form/parse",
+          "summary": "Преобразование YAML в состояние формы",
+          "requestFields": ["configText"]
+        },
+        {
+          "method": "POST",
+          "path": "/api/config-form/update",
+          "summary": "Обновление YAML из состояния формы",
+          "requestFields": ["configText", "formState"]
+        }
+      ]
+    },
+    {
+      "id": "runs",
+      "title": "Запуски и состояние UI",
+      "endpoints": [
+        {
+          "method": "POST",
+          "path": "/api/runs",
+          "summary": "Запуск файлового модуля",
+          "requestFields": ["moduleId", "configText", "sqlFiles"]
+        },
+        {
+          "method": "GET",
+          "path": "/api/state",
+          "summary": "Текущее состояние UI"
+        }
+      ]
+    },
+    {
+      "id": "credentials",
+      "title": "credential.properties",
+      "endpoints": [
+        {
+          "method": "GET",
+          "path": "/api/credentials",
+          "summary": "Статус credentials"
+        },
+        {
+          "method": "POST",
+          "path": "/api/credentials/upload",
+          "summary": "Загрузка credential.properties",
+          "contentType": "multipart/form-data"
+        }
+      ]
+    },
+    {
+      "id": "sql-console",
+      "title": "SQL-консоль",
+      "endpoints": [
+        { "method": "GET", "path": "/api/sql-console/info", "summary": "Конфигурация SQL-консоли" },
+        { "method": "GET", "path": "/api/sql-console/state", "summary": "Сохраненное состояние SQL-консоли" },
+        { "method": "POST", "path": "/api/sql-console/state", "summary": "Сохранение состояния SQL-консоли", "requestFields": ["draftSql", "recentQueries", "selectedSourceNames", "pageSize"] },
+        { "method": "POST", "path": "/api/sql-console/settings", "summary": "Обновление настроек SQL-консоли", "requestFields": ["maxRowsPerShard", "queryTimeoutSec"] },
+        { "method": "POST", "path": "/api/sql-console/connections/check", "summary": "Проверка подключений SQL-консоли" },
+        { "method": "POST", "path": "/api/sql-console/query", "summary": "Синхронный SQL-запрос", "requestFields": ["sql", "selectedSourceNames"] },
+        { "method": "POST", "path": "/api/sql-console/query/start", "summary": "Асинхронный SQL-запрос", "requestFields": ["sql", "selectedSourceNames"] },
+        { "method": "GET", "path": "/api/sql-console/query/{id}", "summary": "Статус асинхронного SQL-запроса" },
+        { "method": "POST", "path": "/api/sql-console/query/{id}/cancel", "summary": "Отмена асинхронного SQL-запроса" },
+        { "method": "POST", "path": "/api/sql-console/export/source-csv", "summary": "Экспорт результата одного shard в CSV" },
+        { "method": "POST", "path": "/api/sql-console/export/all-zip", "summary": "Экспорт результатов всех shard-ов в ZIP" }
+      ]
+    }
+  ]
+}

@@ -48,7 +48,7 @@
 
   function translateLaunchSource(sourceKind) {
     switch (String(sourceKind || '').toUpperCase()) {
-      case 'WORKING_COPY': return 'Рабочая копия';
+      case 'WORKING_COPY': return 'Личный черновик';
       case 'CURRENT_REVISION': return 'Текущая ревизия';
       default: return sourceKind || '-';
     }
@@ -59,7 +59,7 @@
       case 'PREPARE': return 'Подготовка';
       case 'SOURCE': return 'Источники';
       case 'MERGE': return 'Объединение';
-      case 'TARGET': return 'Загрузка в target';
+      case 'TARGET': return 'Загрузка в целевую таблицу';
       case 'RUN': return 'Завершение';
       default: return stage || '-';
     }
@@ -71,6 +71,15 @@
       case 'DELETED': return 'Удален';
       case 'MISSING': return 'Не найден';
       default: return status || '-';
+    }
+  }
+
+  function translateArtifactKind(kind) {
+    switch (String(kind || '').toUpperCase()) {
+      case 'SOURCE_OUTPUT': return 'CSV источника';
+      case 'MERGED_OUTPUT': return 'Итоговый merged.csv';
+      case 'SUMMARY_JSON': return 'Файл summary.json';
+      default: return kind || '-';
     }
   }
 
@@ -129,6 +138,7 @@
     translateLaunchSource,
     translateStage,
     translateArtifactStatus,
+    translateArtifactKind,
     statusTone,
     formatDateTime,
     formatNumber,

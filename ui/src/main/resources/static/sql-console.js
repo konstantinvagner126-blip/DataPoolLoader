@@ -356,7 +356,7 @@
         ? `sql-source-checkbox-${String(connectionState.status || "UNKNOWN").toLowerCase()}`
         : "sql-source-checkbox-unknown";
       const stateLabel = connectionState
-        ? (connectionState.status === "SUCCESS" ? "Подключение OK" : "Ошибка подключения")
+        ? (connectionState.status === "SUCCESS" ? "Подключение доступно" : "Ошибка подключения")
         : "Статус не проверен";
       const stateMessage = connectionState
         ? (connectionState.errorMessage || connectionState.message || stateLabel)

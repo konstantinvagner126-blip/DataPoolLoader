@@ -27,6 +27,7 @@
     const filtersId = options.filtersId || 'runHistoryFilters';
     const historyId = options.historyId || 'runHistory';
     const summaryId = options.summaryId || 'runSummary';
+    const controlsId = options.controlsId || null;
     const historyTitle = options.historyTitle || 'История запусков';
     const currentTitle = options.currentTitle || 'Текущий запуск';
     const emptyText = options.emptyText || 'Запусков пока нет.';
@@ -36,7 +37,10 @@
           <div class="panel h-100">
             <div class="d-flex align-items-center justify-content-between gap-3 mb-3">
               <div class="panel-title mb-0">${historyTitle}</div>
-              <div id="${filtersId}" class="run-history-filters"></div>
+              <div class="run-history-toolbar">
+                ${controlsId ? `<div id="${controlsId}" class="run-history-controls"></div>` : ''}
+                <div id="${filtersId}" class="run-history-filters"></div>
+              </div>
             </div>
             <div id="${historyId}" class="run-history-list">
               <div class="text-secondary small">${emptyText}</div>

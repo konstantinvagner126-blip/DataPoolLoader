@@ -3,22 +3,23 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Load Testing Data Platform Help</title>
+  <title>DataPool Loader UI — справка</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link href="/static/styles.css?v=20260328b" rel="stylesheet">
+  <link href="/static/styles.css?v=20260417m" rel="stylesheet">
 </head>
 <body>
   <div class="container-fluid py-4">
     <div class="hero-card hero-card-compact mb-4">
       <div>
-        <div class="eyebrow">Help Center</div>
+        <div class="eyebrow">Центр справки</div>
         <h1 class="display-6 mb-1">Справка</h1>
-        <p class="text-secondary mb-0">Пошаговая инструкция для двух основных инструментов платформы: модуля загрузки данных и SQL-консоли.</p>
+        <p class="text-secondary mb-0">Пошаговая инструкция по файловому и DB-режиму модулей, а также по SQL-консоли.</p>
       </div>
       <div class="hero-actions">
         <a class="btn btn-outline-secondary" href="/">На главную</a>
         <a class="btn btn-outline-primary" href="/modules">К модулям</a>
         <a class="btn btn-outline-dark" href="/sql-console">К SQL-консоли</a>
+        <a class="btn btn-outline-success" href="/help/api">API UI</a>
       </div>
     </div>
 
@@ -31,7 +32,7 @@
               <div class="help-start-index">1</div>
               <div>
                 <div class="help-start-title">Проверь доступ к модулям</div>
-                <div class="help-start-text">Для packaged UI должен быть настроен <code>ui.appsRoot</code> в <code>ui-application.yml</code>. Без этого список модулей будет пустым.</div>
+                <div class="help-start-text">Для собранного UI должен быть настроен <code>ui.appsRoot</code> в <code>ui-application.yml</code>. Без этого список модулей будет пустым.</div>
               </div>
             </div>
             <div class="help-start-step">
@@ -45,14 +46,14 @@
               <div class="help-start-index">3</div>
               <div>
                 <div class="help-start-title">Выбери режим работы</div>
-                <div class="help-start-text">Открой <strong>модуль загрузки данных</strong>, если нужен batch-сценарий, или <strong>SQL-консоль</strong>, если нужно вручную проверить источники.</div>
+                <div class="help-start-text">Открой <strong>Файловый режим</strong>, если работаешь с каталогом <code>apps</code>, или <strong>DB режим</strong>, если модули уже импортированы в базу данных.</div>
               </div>
             </div>
             <div class="help-start-step">
               <div class="help-start-index">4</div>
               <div>
                 <div class="help-start-title">Запусти сценарий и проверь результат</div>
-                <div class="help-start-text">После запуска смотри историю, summary, статусы источников и при необходимости корректируй конфиг прямо из UI.</div>
+                <div class="help-start-text">После запуска смотри историю, итог запуска, статусы источников и при необходимости корректируй конфиг прямо из UI.</div>
               </div>
             </div>
           </div>
@@ -75,10 +76,23 @@
               <div class="help-mini-text">Источник значений для placeholder-ов в <code>jdbcUrl</code>, <code>username</code> и <code>password</code>.</div>
             </div>
             <div class="help-mini-card">
-              <div class="help-mini-title">Summary</div>
-              <div class="help-mini-text">Итог запуска: merge, target, успешные и проблемные источники.</div>
+              <div class="help-mini-title">Итог запуска</div>
+              <div class="help-mini-text">Режим объединения, загрузка в target, успешные и проблемные источники.</div>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel mb-4">
+      <div class="help-api-banner">
+        <div>
+          <div class="panel-title text-primary mb-2">API UI</div>
+          <div class="text-secondary">Для серверной части UI теперь есть полноценный Swagger UI: endpoint-ы, параметры, примеры запросов и ответов, типовые ошибки и отдельная OpenAPI-спека.</div>
+        </div>
+        <div class="hero-actions">
+          <a class="btn btn-outline-success" href="/help/api">Открыть Swagger UI</a>
+          <a class="btn btn-outline-secondary" href="/static/openapi/ui-api-openapi.yaml">OpenAPI YAML</a>
         </div>
       </div>
     </div>
@@ -97,18 +111,41 @@
         <div class="help-doc-highlight-grid">
           <div class="help-doc-highlight">
             <div class="help-doc-highlight-title">Основной сценарий</div>
-            <div class="help-doc-highlight-value">Export → Merge → Import</div>
+            <div class="help-doc-highlight-value">Выгрузка → Объединение → Загрузка</div>
             <div class="help-doc-highlight-text">Сначала данные выгружаются по каждому source, затем объединяются в <code>merged.csv</code> и при необходимости загружаются в target.</div>
           </div>
           <div class="help-doc-highlight">
             <div class="help-doc-highlight-title">Где настраивается</div>
             <div class="help-doc-highlight-value">application.yml</div>
-            <div class="help-doc-highlight-text">У каждого app-модуля есть свой <code>src/main/resources/application.yml</code> и свой набор SQL-файлов.</div>
+            <div class="help-doc-highlight-text">У каждого файлового модуля есть свой <code>src/main/resources/application.yml</code> и свой набор SQL-файлов.</div>
           </div>
           <div class="help-doc-highlight">
             <div class="help-doc-highlight-title">Как запускать</div>
             <div class="help-doc-highlight-value">UI / IDEA / Gradle</div>
-            <div class="help-doc-highlight-text">Модуль можно запускать прямо из UI или напрямую как обычный app-модуль.</div>
+            <div class="help-doc-highlight-text">Модуль можно запускать прямо из UI или напрямую как обычный модуль проекта.</div>
+          </div>
+        </div>
+
+        <div class="row g-4 mt-1">
+          <div class="col-12 col-xl-6">
+            <div class="help-detail-card h-100">
+              <div class="help-detail-title">Файловый режим</div>
+              <div class="help-detail-list">
+                <div><strong>Где хранятся модули:</strong> в каталоге <code>apps</code>.</div>
+                <div><strong>Когда использовать:</strong> модуль редактируется как набор файлов и может запускаться напрямую из проекта.</div>
+                <div><strong>Что важно:</strong> должен быть корректно настроен <code>ui.appsRoot</code>.</div>
+              </div>
+            </div>
+          </div>
+          <div class="col-12 col-xl-6">
+            <div class="help-detail-card h-100">
+              <div class="help-detail-title">DB режим</div>
+              <div class="help-detail-list">
+                <div><strong>Где хранятся модули:</strong> в базе данных.</div>
+                <div><strong>Когда использовать:</strong> нужен личный черновик, публикация изменений, история запусков и совместная работа нескольких пользователей.</div>
+                <div><strong>Что важно:</strong> сначала импортируй модуль из файлов или создай его прямо в UI.</div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -132,8 +169,72 @@
                 <li>Проверь <code>Настройки модуля</code> или открой <code>application.yml</code>.</li>
                 <li>При необходимости поправь SQL-файлы.</li>
                 <li>Убедись, что найден <code>credential.properties</code>, если есть <code>${...}</code>.</li>
-                <li>Нажми <code>Запустить</code> и смотри историю, статусы и summary.</li>
+                <li>Нажми <code>Запустить</code> и смотри историю, статусы и итог запуска.</li>
               </ol>
+            </div>
+          </div>
+        </div>
+
+        <div class="help-detail-card mt-3">
+          <div class="help-detail-title">Как работать в DB режиме</div>
+          <ol class="help-steps">
+            <li>Переключи UI в режим <strong>База данных</strong> на главной странице.</li>
+            <li>Открой страницу модулей из базы данных и выбери модуль.</li>
+            <li>Сохрани изменения в личный черновик.</li>
+            <li>При необходимости опубликуй черновик как новую ревизию.</li>
+            <li>Запускай модуль и смотри историю запусков, события, результаты по источникам и артефакты.</li>
+          </ol>
+        </div>
+
+        <div class="row g-4 mt-1">
+          <div class="col-12 col-xl-6">
+            <div class="help-detail-card h-100">
+              <div class="help-detail-title">Как импортировать модуль из файлов в базу данных</div>
+              <ol class="help-steps">
+                <li>Перейди на страницу <strong>Импорт из файлов</strong> из DB-режима.</li>
+                <li>Запусти массовый импорт всех модулей или импорт конкретного модуля.</li>
+                <li>UI прочитает <code>application.yml</code>, SQL-ресурсы и UI-метаданные файлового модуля.</li>
+                <li>Если код модуля уже есть в registry, импорт сравнит содержимое и либо обновит DB-модуль, либо пропустит его без изменений.</li>
+                <li>После успешного импорта модуль появится на странице <strong>Модули из базы данных</strong> и будет готов к работе через личный черновик и публикацию.</li>
+              </ol>
+              <div class="config-form-note mt-3 mb-0">
+                Во время полного импорта DB-редактор и часть операций временно блокируются, чтобы не смешивать массовое обновление с ручными изменениями.
+              </div>
+            </div>
+          </div>
+          <div class="col-12 col-xl-6">
+            <div class="help-detail-card h-100">
+              <div class="help-detail-title">Администрирование DB-модуля</div>
+              <div class="help-detail-list">
+                <div><strong>Новый модуль:</strong> создает пустой DB-модуль сразу в registry, без файлового каталога.</div>
+                <div><strong>Сохранить черновик:</strong> сохраняет твои изменения как личную рабочую версию без публикации для других пользователей.</div>
+                <div><strong>Опубликовать:</strong> делает личный черновик новой общей ревизией модуля.</div>
+                <div><strong>Сбросить черновик:</strong> удаляет личную рабочую версию и возвращает редактор к опубликованной ревизии.</div>
+                <div><strong>Удалить модуль:</strong> удаляет DB-модуль из registry, если он больше не нужен.</div>
+                <div><strong>Скрыть из UI:</strong> модуль можно оставить в registry, но убрать из обычного каталога, если он служебный или подготовительный.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="help-detail-card mt-3">
+          <div class="help-detail-title">Что блокируется в DB режиме</div>
+          <div class="help-warning-grid">
+            <div class="help-warning-card">
+              <div class="help-warning-title">Массовый импорт</div>
+              <div class="help-warning-text">Пока идет массовый импорт модулей, DB-редактор работает в ограниченном режиме: нельзя сохранять, публиковать и удалять модули.</div>
+            </div>
+            <div class="help-warning-card">
+              <div class="help-warning-title">Импорт одного модуля</div>
+              <div class="help-warning-text">Если импортируется один конкретный модуль, блокировка применяется только к нему. Остальные DB-модули остаются доступны.</div>
+            </div>
+            <div class="help-warning-card">
+              <div class="help-warning-title">Личный черновик</div>
+              <div class="help-warning-text">Публиковать или сбрасывать черновик можно только для выбранного модуля и только когда над ним не идет конфликтующая операция.</div>
+            </div>
+            <div class="help-warning-card">
+              <div class="help-warning-title">Запуски</div>
+              <div class="help-warning-text">История и результаты доступны всегда, но сам запуск модуля зависит от режима работы UI и от доступности PostgreSQL.</div>
             </div>
           </div>
         </div>
@@ -147,7 +248,7 @@
                 <div><strong>SQL:</strong> общий SQL через <code>commonSql</code> / <code>commonSqlFile</code> или отдельный SQL на уровне источника через <code>sources[].sql</code> / <code>sources[].sqlFile</code>.</div>
                 <div><strong>Источники:</strong> <code>sources[].name</code>, <code>jdbcUrl</code>, <code>username</code>, <code>password</code>.</div>
                 <div><strong>Квоты:</strong> <code>quotas</code> используются только для <code>mergeMode=quota</code>.</div>
-                <div><strong>Target:</strong> <code>enabled</code>, <code>jdbcUrl</code>, <code>username</code>, <code>password</code>, <code>table</code>, <code>truncateBeforeLoad</code>.</div>
+                <div><strong>Целевая загрузка:</strong> <code>enabled</code>, <code>jdbcUrl</code>, <code>username</code>, <code>password</code>, <code>table</code>, <code>truncateBeforeLoad</code>.</div>
               </div>
             </div>
           </div>
@@ -208,7 +309,7 @@
                 <li>Одновременно заданы и inline SQL, и SQL-файл для одного уровня.</li>
                 <li>Неверно указан путь <code>classpath:sql/...</code>.</li>
                 <li>Пустой или несуществующий <code>target.table</code> при включенном импорте.</li>
-                <li>Некорректный <code>ui.appsRoot</code>, если запуск идет через packaged UI.</li>
+                <li>Некорректный <code>ui.appsRoot</code>, если запуск идет через собранный UI.</li>
               </ul>
             </div>
           </div>
@@ -229,16 +330,16 @@
           <div class="help-doc-highlight">
             <div class="help-doc-highlight-title">Источники</div>
             <div class="help-doc-highlight-value">ui.sqlConsole.sources</div>
-            <div class="help-doc-highlight-text">SQL-консоль работает не через app-модули, а через свой список источников из UI-конфига.</div>
+            <div class="help-doc-highlight-text">SQL-консоль работает не через файловые модули, а через свой список источников из UI-конфига.</div>
           </div>
           <div class="help-doc-highlight">
             <div class="help-doc-highlight-title">Режим</div>
-            <div class="help-doc-highlight-value">Single statement</div>
-            <div class="help-doc-highlight-text">Сейчас выполняется один SQL statement за запуск. Для <code>SELECT</code> данные показываются по каждому source отдельно.</div>
+            <div class="help-doc-highlight-value">Одна SQL-команда</div>
+            <div class="help-doc-highlight-text">Сейчас за один запуск выполняется одна SQL-команда. Для <code>SELECT</code> данные показываются по каждому источнику отдельно.</div>
           </div>
           <div class="help-doc-highlight">
             <div class="help-doc-highlight-title">Управление</div>
-            <div class="help-doc-highlight-value">Async + Cancel</div>
+            <div class="help-doc-highlight-value">Фоновое выполнение и отмена</div>
             <div class="help-doc-highlight-text">Запрос выполняется асинхронно, можно следить за статусом и отменять долгие операции.</div>
           </div>
         </div>
@@ -262,7 +363,7 @@
                 <li>Открой SQL-консоль.</li>
                 <li>Убедись, что настроены <code>ui.sqlConsole.sources</code>.</li>
                 <li>Проверь <code>credential.properties</code>, если в источниках есть placeholders.</li>
-                <li>Отметь нужные sources чекбоксами.</li>
+                <li>Отметь нужные источники чекбоксами.</li>
                 <li>Введи SQL и нажми <code>Выполнить</code>.</li>
                 <li>При долгом выполнении используй кнопку <code>Отменить</code>.</li>
               </ol>
@@ -294,8 +395,8 @@
             <div class="help-detail-card h-100">
               <div class="help-detail-title">Как выглядит результат</div>
               <div class="help-detail-list">
-                <div><strong>Для SELECT:</strong> отдельные результаты по каждому source, без смешивания строк между ними.</div>
-                <div><strong>Для DDL / DML:</strong> статусы выполнения по каждому source, включая ошибки и <code>affected rows</code>, если они есть.</div>
+                <div><strong>Для SELECT:</strong> отдельные результаты по каждому источнику, без смешивания строк между ними.</div>
+                <div><strong>Для DDL / DML:</strong> статусы выполнения по каждому источнику, включая ошибки и <code>affected rows</code>, если они есть.</div>
                 <div><strong>Ограничение:</strong> количество строк режется по <code>maxRowsPerShard</code>.</div>
                 <div><strong>Timeout:</strong> используется <code>ui.sqlConsole.queryTimeoutSec</code>.</div>
               </div>
@@ -344,7 +445,7 @@ TARGET_DB_PASSWORD=target_secret</code></pre>
           <div class="help-warning-grid">
             <div class="help-warning-card">
               <div class="help-warning-title">Пустой список модулей</div>
-              <div class="help-warning-text">Проверь <code>ui.appsRoot</code> в <code>ui-application.yml</code>. Для packaged UI нужен абсолютный путь к каталогу <code>apps</code>.</div>
+              <div class="help-warning-text">Проверь <code>ui.appsRoot</code> в <code>ui-application.yml</code>. Для собранного UI нужен абсолютный путь к каталогу <code>apps</code>.</div>
             </div>
             <div class="help-warning-card">
               <div class="help-warning-title">Placeholder не найден</div>

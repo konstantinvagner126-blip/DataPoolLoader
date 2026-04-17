@@ -8,10 +8,10 @@
 
     async function loadRuntimeContext() {
       try {
-        state.runtimeContext = await fetchJson('/api/ui/runtime-context', {}, 'Не удалось загрузить runtime context.');
+        state.runtimeContext = await fetchJson('/api/ui/runtime-context', {}, 'Не удалось загрузить состояние режима интерфейса.');
       } catch (e) {
         console.error(e);
-        renderer.showDbContextAlert('Не удалось определить состояние DB-режима.');
+        renderer.showDbContextAlert('Не удалось определить состояние режима базы данных.');
       }
     }
 
@@ -33,19 +33,20 @@
 
     async function loadDbModuleCatalog() {
       if (!modules.canWorkWithDbModules(ctx)) {
-        renderer.renderUnavailableCatalogState('Каталог DB-модулей временно недоступен.');
+        renderer.renderUnavailableCatalogState('Каталог модулей из базы данных временно недоступен.');
         return;
       }
 
       try {
-        const payload = await fetchJson('/api/db/modules/catalog', {}, 'Не удалось загрузить каталог DB-модулей.');
+        const catalogUrl = state.includeHiddenCatalog ? '/api/db/modules/catalog?includeHidden=true' : '/api/db/modules/catalog';
+        const payload = await fetchJson(catalogUrl, {}, 'Не удалось загрузить каталог модулей из базы данных.');
         const modulesList = Array.isArray(payload.modules) ? payload.modules : [];
 
         if (modulesList.length === 0) {
           renderer.resetSelectedModuleState();
           ctx.refs.dbModuleList.innerHTML = `
             <div class="list-group-item text-secondary">
-              DB-модули не найдены. Импортируйте файловые модули или создайте новый модуль.
+              Модули в базе данных не найдены. Импортируй файловые модули или создай новый модуль.
             </div>
           `;
           return;
@@ -57,6 +58,10 @@
         if (selectedModuleExists) {
           renderer.highlightSelectedModule();
           renderer.updateSaveDiscardButtons();
+          if (state.currentModule?.module?.id !== state.selectedModuleId) {
+            await loadModule(state.selectedModuleId);
+            await loadModuleRuns(state.selectedModuleId);
+          }
           return;
         }
 
@@ -64,7 +69,7 @@
       } catch (e) {
         console.error(e);
         ctx.refs.dbCatalogStatus.className = 'module-catalog-status mt-3 mb-3 text-danger small';
-        ctx.refs.dbCatalogStatus.textContent = e.message || 'Не удалось загрузить каталог DB-модулей.';
+        ctx.refs.dbCatalogStatus.textContent = e.message || 'Не удалось загрузить каталог модулей из базы данных.';
       }
     }
 
@@ -83,7 +88,7 @@
 
     async function loadModule(moduleId) {
       if (!modules.canWorkWithDbModules(ctx)) return;
-      state.currentModule = await fetchJson(`/api/db/modules/${moduleId}`, {}, 'Не удалось загрузить DB-модуль.');
+      state.currentModule = await fetchJson(`/api/db/modules/${moduleId}`, {}, 'Не удалось загрузить модуль из базы данных.');
       ctx.formController?.restoreExpansionStateForModule(state.currentModule.module.id);
       state.sqlContents = {};
       state.currentModule.module.sqlFiles.forEach(file => {
@@ -109,7 +114,7 @@
       }
 
       try {
-        const payload = await fetchJson(`/api/db/modules/${moduleId}/runs`, {}, 'Не удалось загрузить историю DB-запусков.');
+        const payload = await fetchJson(`/api/db/modules/${moduleId}/runs`, {}, 'Не удалось загрузить историю запусков модуля.');
         state.currentRuns = Array.isArray(payload.runs) ? payload.runs : [];
       } catch (e) {
         console.error(e);
@@ -144,7 +149,7 @@
         state.selectedRunDetails = await fetchJson(
           `/api/db/modules/${moduleId}/runs/${runId}`,
           {},
-          'Не удалось загрузить детали DB-запуска.',
+          'Не удалось загрузить детали запуска.',
         );
       } catch (e) {
         console.error(e);
@@ -159,14 +164,14 @@
     async function runSelectedModule() {
       if (!state.selectedModuleId) return;
       if (modules.hasUnsavedChanges(ctx)) {
-        alert('Сначала сохрани изменения в рабочую копию или отмени их, затем запускай модуль.');
+        alert('Сначала сохрани изменения в личный черновик или отмени их, затем запускай модуль.');
         return;
       }
       try {
         const result = await postJson(
           `/api/db/modules/${state.selectedModuleId}/run`,
           {},
-          'Не удалось запустить DB-модуль.',
+          'Не удалось запустить модуль из базы данных.',
         );
         alert(result.message);
         await loadModuleRuns(state.selectedModuleId);
@@ -186,18 +191,18 @@
           configText: editors.configEditor.getValue(),
           sqlFiles: state.sqlContents,
         },
-        'Не удалось сохранить working copy.',
+        'Не удалось сохранить черновик.',
       );
       await loadModule(state.selectedModuleId);
     }
 
     async function discardWorkingCopy() {
       if (!state.selectedModuleId) return;
-      if (!confirm('Удалить личную working copy? Это действие нельзя отменить.')) return;
+      if (!confirm('Сбросить личный черновик? Несохраненные изменения будут потеряны.')) return;
       await postJson(
         `/api/db/modules/${state.selectedModuleId}/discard-working-copy`,
         {},
-        'Не удалось удалить working copy.',
+        'Не удалось сбросить черновик.',
       );
       await loadModule(state.selectedModuleId);
     }
@@ -205,15 +210,15 @@
     async function publishWorkingCopy() {
       if (!state.selectedModuleId) return;
       if (modules.hasUnsavedChanges(ctx)) {
-        alert('Сначала сохрани текущие изменения в рабочую копию или отмени их.');
+        alert('Сначала сохрани текущие изменения в личный черновик или отмени их.');
         return;
       }
-      if (!confirm('Опубликовать рабочую копию как новую ревизию? Рабочая копия будет удалена.')) return;
+      if (!confirm('Опубликовать черновик как новую ревизию? После публикации личный черновик будет удален.')) return;
       try {
         const result = await postJson(
           `/api/db/modules/${state.selectedModuleId}/publish`,
           {},
-          'Не удалось опубликовать working copy.',
+          'Не удалось опубликовать черновик.',
         );
         alert(result.message);
         await loadModule(state.selectedModuleId);
@@ -224,28 +229,21 @@
     }
 
     async function createModule() {
-      const moduleCode = prompt('Введите код модуля (уникальный идентификатор):');
-      if (!moduleCode || !moduleCode.trim()) return;
+      global.location.assign('/db-modules/new');
+    }
 
-      const title = prompt('Введите название модуля:', moduleCode) || moduleCode;
-
-      try {
-        const result = await postJson(
-          '/api/db/modules',
-          {
-            moduleCode: moduleCode.trim(),
-            title,
-            description: '',
-            tags: [],
-            configText: `app:\n  title: ${title}\n  sources: []\n`,
-          },
-          'Не удалось создать модуль.',
-        );
-        alert(result.message);
-        await loadDbModuleCatalog();
-      } catch (e) {
-        console.error(e);
+    function openRunHistory() {
+      if (!state.selectedModuleId) {
+        return;
       }
+      const query = new URLSearchParams({
+        storage: 'database',
+        module: state.selectedModuleId,
+      });
+      if (state.includeHiddenCatalog) {
+        query.set('includeHidden', 'true');
+      }
+      global.location.assign(`/module-runs?${query.toString()}`);
     }
 
     async function deleteSelectedModule() {
@@ -281,6 +279,7 @@
       discardWorkingCopy,
       publishWorkingCopy,
       createModule,
+      openRunHistory,
       deleteSelectedModule,
     };
   }

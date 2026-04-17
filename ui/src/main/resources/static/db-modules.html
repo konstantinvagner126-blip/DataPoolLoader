@@ -3,17 +3,17 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>DataPool Loader UI — DB-модули</title>
+  <title>DataPool Loader UI — модули из базы данных</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link href="/static/styles.css?v=20260417a" rel="stylesheet">
+  <link href="/static/styles.css?v=20260417r" rel="stylesheet">
 </head>
 <body>
   <div class="container-fluid py-4">
     <div class="hero-card mb-4">
       <div>
         <div class="eyebrow">Режим базы данных</div>
-        <h1 class="display-6 mb-1">Управление DB-модулями</h1>
-        <p class="text-secondary mb-0">Просмотр, редактирование и запуск модулей из PostgreSQL. Работа с working copy и публикация изменений.</p>
+        <h1 class="display-6 mb-1">Модули из базы данных</h1>
+        <p class="text-secondary mb-0">Просмотр, редактирование и запуск модулей из PostgreSQL. Личный черновик, публикация изменений и история запусков.</p>
       </div>
       <div class="hero-art" aria-hidden="true">
         <div class="platform-stage">
@@ -34,8 +34,8 @@
     </div>
 
     <div id="dbContextAlert" class="alert alert-warning d-none mb-4">
-      <div class="fw-semibold mb-1" id="dbContextAlertTitle">DB-режим недоступен</div>
-      <div id="dbContextAlertText">Для работы с DB-модулями нужно переключить режим на DATABASE и убедиться, что PostgreSQL доступен.</div>
+      <div class="fw-semibold mb-1" id="dbContextAlertTitle">Режим базы данных недоступен</div>
+      <div id="dbContextAlertText">Для работы с модулями из базы данных нужно переключить режим на «База данных» и убедиться, что PostgreSQL доступен.</div>
     </div>
 
     <div class="row g-4">
@@ -44,7 +44,7 @@
           <div class="mb-3">
             <a class="btn btn-outline-dark w-100" href="/">На главную</a>
           </div>
-          <div class="panel-title">DB-модули</div>
+          <div class="panel-title">Модули из базы данных</div>
           <div id="dbCatalogStatus" class="module-catalog-status mt-3 mb-3 text-secondary small"></div>
           <div id="dbModuleList" class="list-group module-list"></div>
         </div>
@@ -65,19 +65,33 @@
               </div>
               <div id="moduleSourceKind" class="small mt-1 text-secondary"></div>
             </div>
-            <div class="d-flex flex-wrap gap-2">
-              <button id="reloadButton" class="btn btn-outline-secondary">Отменить изменения</button>
-              <button id="runModuleButton" class="btn btn-success" disabled>Запустить</button>
-              <button id="saveWorkingCopyButton" class="btn btn-outline-primary" disabled>Сохранить рабочую копию</button>
-              <button id="discardWorkingCopyButton" class="btn btn-outline-danger" disabled>Удалить рабочую копию</button>
-              <button id="publishButton" class="btn btn-success" disabled>Опубликовать</button>
+            <div class="module-editor-toolbar">
+              <div class="module-editor-toolbar-row">
+                <div class="module-editor-toolbar-group module-editor-toolbar-group-primary">
+                  <div class="module-editor-toolbar-group-label">Выполнение</div>
+                  <button id="runModuleButton" class="btn btn-success" disabled>Запустить</button>
+                  <button id="historyButton" class="btn btn-outline-secondary" disabled>История и результаты</button>
+                </div>
+                <div class="module-editor-toolbar-group module-editor-toolbar-group-draft">
+                  <div class="module-editor-toolbar-group-label">Личный черновик</div>
+                  <button id="saveWorkingCopyButton" class="btn btn-outline-primary" disabled>Сохранить черновик</button>
+                  <button id="publishButton" class="btn btn-success" disabled>Опубликовать</button>
+                  <button id="discardWorkingCopyButton" class="btn btn-outline-danger" disabled>Сбросить черновик</button>
+                </div>
+                <div class="module-editor-toolbar-group module-editor-toolbar-group-secondary">
+                  <div class="module-editor-toolbar-group-label">Редактор</div>
+                  <button id="reloadButton" class="btn btn-outline-secondary">Отменить изменения</button>
+                </div>
+              </div>
+              <div class="module-editor-toolbar-row">
+                <div class="module-editor-toolbar-group module-editor-toolbar-group-admin">
+                  <div class="module-editor-toolbar-group-label">Администрирование</div>
+                  <button id="createModuleButton" class="btn btn-outline-primary">Новый модуль</button>
+                  <button id="deleteModuleButton" class="btn btn-outline-danger" disabled>Удалить модуль</button>
+                  <a href="/db-sync" class="btn btn-outline-secondary">Импорт из файлов</a>
+                </div>
+              </div>
             </div>
-          </div>
-
-          <div class="d-flex flex-wrap gap-2 mb-3">
-            <button id="createModuleButton" class="btn btn-outline-primary btn-sm">+ Новый модуль</button>
-            <button id="deleteModuleButton" class="btn btn-outline-danger btn-sm" disabled>Удалить модуль</button>
-            <a href="/db-sync" class="btn btn-outline-secondary btn-sm">Импорт из файлов</a>
           </div>
 
           <div id="moduleValidationAlert" class="alert d-none mb-3"></div>
@@ -101,7 +115,7 @@
             <div class="tab-pane fade show active" id="configFormTab">
               <div id="configFormWarning" class="alert alert-warning d-none mb-3"></div>
               <div class="config-form-note text-secondary small mb-3">
-                В этой вкладке визуально редактируется конфиг DB-модуля. Изменения синхронизируются с <code>application.yml</code> в реальном времени.
+                В этой вкладке визуально редактируется конфиг модуля из базы данных. Изменения синхронизируются с <code>application.yml</code> в реальном времени.
               </div>
               <div id="configForm" class="config-form-shell"></div>
             </div>
@@ -143,9 +157,6 @@
         <div id="dbLifecyclePanelHost"></div>
         <div id="dbExecutionLogPanelHost"></div>
         <div id="dbHistoryCurrentPanelHost"></div>
-        <div id="dbSummaryPanelHost"></div>
-        <div id="dbSourceResultsPanelHost"></div>
-        <div id="dbArtifactsPanelHost"></div>
       </div>
     </div>
 
@@ -156,23 +167,24 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
   <script src="/static/vendor/monaco-editor/min/vs/loader.js"></script>
-  <script src="/static/js/common/dom.js?v=20260328n"></script>
+  <script src="/static/js/common/dom.js?v=20260417q"></script>
   <script src="/static/js/common/http.js?v=20260328n"></script>
   <script src="/static/js/common/storage.js?v=20260328n"></script>
   <script src="/static/js/common/monaco.js?v=20260417b"></script>
+  <script src="/static/js/common/run-progress.js?v=20260417r"></script>
   <script src="/static/js/common/blocks/credentials-panel.js?v=20260417g"></script>
   <script src="/static/js/common/blocks/editor-panels.js?v=20260417i"></script>
   <script src="/static/js/common/credentials-ui.js?v=20260417h"></script>
-  <script src="/static/js/common/module-editor-shared.js?v=20260417j"></script>
-  <script src="/static/js/modules/module-form.js?v=20260328n"></script>
+  <script src="/static/js/common/module-editor-shared.js?v=20260417n"></script>
+  <script src="/static/js/modules/module-form.js?v=20260417n"></script>
   <script src="/static/js/db/shared/runtime-state.js?v=20260417c"></script>
-  <script src="/static/js/db/modules/context.js?v=20260417h"></script>
-  <script src="/static/js/db/modules/formatters.js?v=20260417h"></script>
-  <script src="/static/js/db/modules/renderers/runtime.js?v=20260417h"></script>
-  <script src="/static/js/db/modules/renderers/module.js?v=20260417h"></script>
-  <script src="/static/js/db/modules/renderers/runs.js?v=20260417h"></script>
-  <script src="/static/js/db/modules/renderers.js?v=20260417h"></script>
-  <script src="/static/js/db/modules/controller.js?v=20260417h"></script>
-  <script src="/static/js/db/modules/page.js?v=20260417i"></script>
+  <script src="/static/js/db/modules/context.js?v=20260417r"></script>
+  <script src="/static/js/db/modules/formatters.js?v=20260417o"></script>
+  <script src="/static/js/db/modules/renderers/runtime.js?v=20260417q"></script>
+  <script src="/static/js/db/modules/renderers/module.js?v=20260417n"></script>
+  <script src="/static/js/db/modules/renderers/runs.js?v=20260417r"></script>
+  <script src="/static/js/db/modules/renderers.js?v=20260417n"></script>
+  <script src="/static/js/db/modules/controller.js?v=20260417r"></script>
+  <script src="/static/js/db/modules/page.js?v=20260417r"></script>
 </body>
 </html>

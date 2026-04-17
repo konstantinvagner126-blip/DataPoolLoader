@@ -1,0 +1,2716 @@
+openapi: 3.1.0
+info:
+  title: DataPool Loader UI API
+  version: "2026-04-17"
+  description: |
+    Полноценная OpenAPI-спецификация серверной части UI.
+
+    В спецификации описаны HTTP endpoint-ы, которые использует фронтенд UI:
+    файловые модули, DB-модули, импорт в registry, визуальная форма конфига,
+    запуски, credential.properties и SQL-консоль.
+
+    Общий формат ошибки для большинства endpoint-ов:
+
+      { "error": "Текст ошибки" }
+
+servers:
+  - url: /
+    description: Текущий UI server
+
+tags:
+  - name: Runtime
+    description: Runtime-контекст UI и переключение режима работы.
+  - name: Files Modules
+    description: Каталог и редактор файловых модулей.
+  - name: Unified Run History
+    description: Единый экран истории и результатов для режимов Files и Database.
+  - name: DB Modules
+    description: Каталог, редактор, личный черновик и запуск DB-модулей.
+  - name: DB Sync
+    description: Импорт файловых модулей в registry PostgreSQL.
+  - name: Config Form
+    description: Визуальная форма поверх application.yml.
+  - name: Files Runs
+    description: Запуск файловых модулей и текущее состояние UI.
+  - name: Credentials
+    description: Работа с credential.properties.
+  - name: SQL Console
+    description: SQL-консоль и асинхронные запросы по shard-источникам.
+  - name: WebSocket
+    description: Live-обновления файлового режима.
+
+paths:
+  /api/ui/runtime-context:
+    get:
+      tags: [Runtime]
+      summary: Текущий runtime-контекст UI
+      description: |
+        Возвращает requested/effective mode, состояние DB-подключения,
+        данные actor и причину возврата в файловый режим, если она есть.
+      operationId: getRuntimeContext
+      responses:
+        "200":
+          description: Runtime-контекст UI
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UiRuntimeContext"
+              example:
+                requestedMode: database
+                effectiveMode: files
+                fallbackReason: "Режим базы данных недоступен, интерфейс переключен в файловый режим."
+                actor:
+                  resolved: true
+                  actorId: kwdev
+                  actorSource: OS_LOGIN
+                  actorDisplayName: kwdev
+                  requiresManualInput: false
+                  message: "Пользователь ОС определен автоматически."
+                database:
+                  configured: true
+                  available: false
+                  schema: ui_registry
+                  message: "Параметры подключения к базе данных содержат неразрешенные placeholders."
+                  errorMessage: "Не удалось разрешить placeholders для полей: jdbcUrl, username, password."
+
+  /api/ui/runtime-mode:
+    post:
+      tags: [Runtime]
+      summary: Сохранение предпочитаемого режима UI
+      description: Сохраняет пользовательское предпочтение Files/Database и сразу возвращает пересчитанный runtime-контекст.
+      operationId: updateRuntimeMode
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UiRuntimeModeUpdateRequest"
+            examples:
+              files:
+                value:
+                  mode: files
+              database:
+                value:
+                  mode: database
+      responses:
+        "200":
+          description: Новый предпочитаемый режим сохранен
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UiRuntimeModeUpdateResponse"
+              example:
+                message: "Предпочитаемый режим UI сохранен: database."
+                runtimeContext:
+                  requestedMode: database
+                  effectiveMode: database
+                  fallbackReason: null
+                  actor:
+                    resolved: true
+                    actorId: kwdev
+                    actorSource: OS_LOGIN
+                    actorDisplayName: kwdev
+                    requiresManualInput: false
+                    message: "Пользователь ОС определен автоматически."
+                  database:
+                    configured: true
+                    available: true
+                    schema: ui_registry
+                    message: "Подключение к базе данных доступно."
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /api/modules:
+    get:
+      tags: [Files Modules]
+      summary: Упрощенный список файловых модулей
+      operationId: listFileModules
+      responses:
+        "200":
+          description: Список файловых модулей
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ModuleCatalogItemResponse"
+              example:
+                - id: local-manual-test
+                  title: local-manual-test
+                  description: "Локальный модуль для ручной проверки"
+                  tags: ["local", "manual"]
+                  validationStatus: VALID
+                  validationIssues: []
+
+  /api/modules/catalog:
+    get:
+      tags: [Files Modules]
+      summary: Расширенный каталог файловых модулей
+      description: Возвращает каталог модулей вместе со статусом appsRoot и валидацией каждого модуля.
+      operationId: getFileModulesCatalog
+      responses:
+        "200":
+          description: Каталог файловых модулей
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModulesCatalogResponse"
+              example:
+                appsRootStatus:
+                  mode: READY
+                  configuredPath: "/Users/kwdev/DataPoolLoader/apps"
+                  message: "Каталог apps найден и готов к работе."
+                modules:
+                  - id: local-manual-test
+                    title: local-manual-test
+                    description: "Локальный модуль для ручной проверки"
+                    tags: ["local", "manual"]
+                    validationStatus: VALID
+                    validationIssues: []
+
+  /api/modules/{id}:
+    get:
+      tags: [Files Modules]
+      summary: Детали файлового модуля
+      operationId: loadFileModule
+      parameters:
+        - $ref: "#/components/parameters/ModuleIdPath"
+      responses:
+        "200":
+          description: Содержимое application.yml, SQL-ресурсов и метаданные модуля
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModuleEditorSessionResponse"
+              example:
+                storageMode: FILES
+                module:
+                  id: local-manual-test
+                  title: local-manual-test
+                  description: "Локальный модуль для ручной проверки"
+                  tags: ["local", "manual"]
+                  validationStatus: VALID
+                  validationIssues: []
+                  configPath: "/Users/kwdev/DataPoolLoader/apps/local-manual-test/src/main/resources/application.yml"
+                  configText: "app:\n  outputDir: ./output\n  sources:\n    - name: db1\n      jdbcUrl: ${DB1_JDBC_URL}\n"
+                  sqlFiles:
+                    - label: "Источник: db1"
+                      path: "classpath:sql/source1.sql"
+                      content: "select * from test_table"
+                      exists: true
+                  requiresCredentials: false
+                  credentialsStatus:
+                    mode: NONE
+                    displayName: "Файл не задан"
+                    fileAvailable: false
+                    uploaded: false
+                  requiredCredentialKeys: []
+                  missingCredentialKeys: []
+                  credentialsReady: true
+                capabilities:
+                  save: true
+                  saveWorkingCopy: false
+                  discardWorkingCopy: false
+                  publish: false
+                  run: true
+                  createModule: false
+                  deleteModule: false
+                sourceKind: FILES
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /api/modules/{id}/save:
+    post:
+      tags: [Files Modules]
+      summary: Сохранение файлового модуля
+      description: Сохраняет application.yml и все SQL-ресурсы файлового модуля.
+      operationId: saveFileModule
+      parameters:
+        - $ref: "#/components/parameters/ModuleIdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveModuleRequest"
+            example:
+              configText: "app:\n  outputDir: ./output\n  mergeMode: plain\n"
+              sqlFiles:
+                "classpath:sql/source1.sql": "select * from test_table"
+      responses:
+        "200":
+          description: Изменения сохранены
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SaveResultResponse"
+              example:
+                message: "Изменения модуля сохранены."
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /api/module-runs/{storage}/{id}:
+    get:
+      tags: [Unified Run History]
+      summary: Session общего экрана истории и результатов
+      description: Возвращает данные заголовка и capability для экрана `/module-runs`.
+      operationId: getModuleRunSession
+      parameters:
+        - $ref: "#/components/parameters/StoragePath"
+        - $ref: "#/components/parameters/ModuleIdPath"
+      responses:
+        "200":
+          description: Session общего экрана истории
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModuleRunPageSessionResponse"
+              example:
+                storageMode: FILES
+                moduleId: local-manual-test
+                moduleTitle: local-manual-test
+                moduleMeta: "/Users/kwdev/DataPoolLoader/apps/local-manual-test/src/main/resources/application.yml · режим хранения: Файлы"
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /api/module-runs/{storage}/{id}/runs:
+    get:
+      tags: [Unified Run History]
+      summary: История запусков для общего экрана
+      operationId: listModuleRunsUnified
+      parameters:
+        - $ref: "#/components/parameters/StoragePath"
+        - $ref: "#/components/parameters/ModuleIdPath"
+        - $ref: "#/components/parameters/LimitQuery"
+      responses:
+        "200":
+          description: Список запусков
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModuleRunHistoryResponse"
+              example:
+                storageMode: FILES
+                moduleId: local-manual-test
+                activeRunId: null
+                uiSettings:
+                  showTechnicalDiagnostics: false
+                  showRawSummaryJson: false
+                runs:
+                  - runId: "run-20260417-001"
+                    moduleId: local-manual-test
+                    moduleTitle: local-manual-test
+                    status: SUCCESS
+                    startedAt: "2026-04-17T10:15:00Z"
+                    finishedAt: "2026-04-17T10:16:05Z"
+                    mergedRowCount: 1700
+                    targetStatus: SUCCESS
+                    successfulSourceCount: 2
+                    failedSourceCount: 0
+                    skippedSourceCount: 0
+                  - runId: "run-20260417-000"
+                    moduleId: local-manual-test
+                    moduleTitle: local-manual-test
+                    status: FAILED
+                    startedAt: "2026-04-17T09:55:00Z"
+                    finishedAt: "2026-04-17T09:55:20Z"
+                    mergedRowCount: 0
+                    targetStatus: FAILED
+                    failedSourceCount: 1
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /api/module-runs/{storage}/{id}/runs/{runId}:
+    get:
+      tags: [Unified Run History]
+      summary: Детали конкретного запуска для общего экрана
+      operationId: getModuleRunDetailsUnified
+      parameters:
+        - $ref: "#/components/parameters/StoragePath"
+        - $ref: "#/components/parameters/ModuleIdPath"
+        - $ref: "#/components/parameters/RunIdPath"
+      responses:
+        "200":
+          description: Детали запуска
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModuleRunDetailsResponse"
+              example:
+                run:
+                  runId: "run-20260417-001"
+                  moduleId: local-manual-test
+                  moduleTitle: local-manual-test
+                  status: RUNNING
+                  startedAt: "2026-04-17T10:15:00Z"
+                  finishedAt: null
+                  requestedAt: "2026-04-17T10:15:00Z"
+                  outputDir: "/Users/kwdev/DataPoolLoader/apps/local-manual-test/output"
+                  mergedRowCount: 1700
+                  targetStatus: RUNNING
+                summaryJson: "{\n  \"mergeMode\": \"plain\"\n}"
+                sourceResults:
+                  - sourceName: db1
+                    sortOrder: 0
+                    status: SUCCESS
+                    exportedRowCount: 1000
+                    mergedRowCount: 1000
+                  - sourceName: db2
+                    sortOrder: 1
+                    status: RUNNING
+                    exportedRowCount: 700
+                events:
+                  - seqNo: 1
+                    timestamp: "2026-04-17T10:15:00Z"
+                    stage: RUN
+                    eventType: RUN_CREATED
+                    severity: INFO
+                    message: "Запуск начат."
+                  - seqNo: 2
+                    timestamp: "2026-04-17T10:15:07Z"
+                    stage: SOURCE
+                    eventType: SOURCE_FINISHED
+                    severity: SUCCESS
+                    sourceName: db1
+                    message: "Источник db1 завершен."
+                artifacts:
+                  - artifactKind: SUMMARY_JSON
+                    artifactKey: summary
+                    filePath: "/Users/kwdev/DataPoolLoader/apps/local-manual-test/output/summary.json"
+                    storageStatus: PRESENT
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /api/db/sync/state:
+    get:
+      tags: [DB Sync]
+      summary: Текущее состояние импорта в DB registry
+      operationId: getDbSyncState
+      responses:
+        "200":
+          description: Состояние массового и точечного импорта
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModuleSyncState"
+              example:
+                maintenanceMode: false
+                message: "Массовый импорт модулей сейчас не выполняется."
+                activeFullSync: null
+                activeSingleSyncs:
+                  - syncRunId: "sync-run-001"
+                    scope: SINGLE
+                    moduleCode: local-manual-test
+                    startedAt: "2026-04-17T10:00:00Z"
+                    startedByActorId: kwdev
+                    startedByActorSource: OS_LOGIN
+                    startedByActorDisplayName: kwdev
+
+  /api/db/sync/one:
+    post:
+      tags: [DB Sync]
+      summary: Импорт одного файлового модуля в registry
+      operationId: syncOneModule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SyncOneModuleRequest"
+            example:
+              moduleCode: local-manual-test
+      responses:
+        "200":
+          description: Результат импорта одного модуля
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncRunResult"
+              example:
+                syncRunId: "sync-run-001"
+                scope: SINGLE
+                moduleCode: local-manual-test
+                status: SUCCESS
+                startedAt: "2026-04-17T10:00:00Z"
+                finishedAt: "2026-04-17T10:00:03Z"
+                totalProcessed: 1
+                totalCreated: 0
+                totalUpdated: 1
+                totalSkipped: 0
+                totalFailed: 0
+                items:
+                  - moduleCode: local-manual-test
+                    action: UPDATE
+                    status: SUCCESS
+                    detectedHash: "sha256:example"
+                    resultRevisionId: "rev-001"
+                    details:
+                      fingerprintMatch: false
+                      changedFiles:
+                        - "src/main/resources/application.yml"
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /api/db/sync/all:
+    post:
+      tags: [DB Sync]
+      summary: Массовый импорт всех файловых модулей в registry
+      operationId: syncAllModules
+      responses:
+        "200":
+          description: Результат массового импорта
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncRunResult"
+              example:
+                syncRunId: "sync-run-002"
+                scope: FULL
+                status: SUCCESS
+                startedAt: "2026-04-17T11:00:00Z"
+                finishedAt: "2026-04-17T11:00:12Z"
+                totalProcessed: 12
+                totalCreated: 2
+                totalUpdated: 5
+                totalSkipped: 5
+                totalFailed: 0
+                items: []
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /api/db/modules/catalog:
+    get:
+      tags: [DB Modules]
+      summary: Каталог DB-модулей
+      operationId: getDbModulesCatalog
+      parameters:
+        - $ref: "#/components/parameters/IncludeHiddenQuery"
+      responses:
+        "200":
+          description: Каталог DB-модулей
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DatabaseModulesCatalogResponse"
+              example:
+                runtimeContext:
+                  requestedMode: database
+                  effectiveMode: database
+                  fallbackReason: null
+                  actor:
+                    resolved: true
+                    actorId: kwdev
+                    actorSource: OS_LOGIN
+                    actorDisplayName: kwdev
+                    requiresManualInput: false
+                    message: "Пользователь ОС определен автоматически."
+                  database:
+                    configured: true
+                    available: true
+                    schema: ui_registry
+                    message: "Подключение к базе данных доступно."
+                modules:
+                  - id: db-demo
+                    title: "DB demo"
+                    description: "Модуль в registry"
+                    tags: ["registry", "demo"]
+                    validationStatus: VALID
+                    validationIssues: []
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /api/db/modules/{id}:
+    get:
+      tags: [DB Modules]
+      summary: Editor session DB-модуля
+      operationId: getDbModuleSession
+      parameters:
+        - $ref: "#/components/parameters/ModuleIdPath"
+      responses:
+        "200":
+          description: Данные DB-модуля для редактора
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModuleEditorSessionResponse"
+              example:
+                storageMode: DATABASE
+                module:
+                  id: db-demo
+                  title: "DB demo"
+                  description: "Модуль в registry"
+                  tags: ["registry", "demo"]
+                  validationStatus: VALID
+                  validationIssues: []
+                  configPath: "database://db-demo/application.yml"
+                  configText: "app:\n  outputDir: ./output\n  sources: []\n"
+                  sqlFiles:
+                    - label: "Общий SQL"
+                      path: "classpath:sql/common.sql"
+                      content: "select 1"
+                      exists: true
+                  requiresCredentials: false
+                  credentialsStatus:
+                    mode: NONE
+                    displayName: "Файл не задан"
+                    fileAvailable: false
+                    uploaded: false
+                  requiredCredentialKeys: []
+                  missingCredentialKeys: []
+                  credentialsReady: true
+                capabilities:
+                  save: false
+                  saveWorkingCopy: true
+                  discardWorkingCopy: true
+                  publish: true
+                  run: true
+                  createModule: true
+                  deleteModule: true
+                sourceKind: WORKING_COPY
+                currentRevisionId: "rev-001"
+                workingCopyId: "draft-001"
+                workingCopyStatus: DIRTY
+                baseRevisionId: "rev-001"
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+    delete:
+      tags: [DB Modules]
+      summary: Удаление DB-модуля
+      operationId: deleteDbModule
+      parameters:
+        - $ref: "#/components/parameters/ModuleIdPath"
+      responses:
+        "200":
+          description: Модуль удален
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DbModuleDeletedResponse"
+              example:
+                message: "Модуль 'db-demo' удалён из базы данных."
+                moduleCode: db-demo
+                deletedBy: kwdev
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /api/db/modules/{id}/runs:
+    get:
+      tags: [DB Modules]
+      summary: Краткая история запусков DB-модуля
+      operationId: listDbModuleRuns
+      parameters:
+        - $ref: "#/components/parameters/ModuleIdPath"
+      responses:
+        "200":
+          description: История запусков DB-модуля
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DatabaseModuleRunsResponse"
+              example:
+                moduleCode: db-demo
+                runs:
+                  - runId: "run-1"
+                    executionSnapshotId: "snapshot-001"
+                    status: SUCCESS
+                    launchSourceKind: WORKING_COPY
+                    requestedAt: "2026-04-17T10:14:58Z"
+                    startedAt: "2026-04-17T10:15:00Z"
+                    finishedAt: "2026-04-17T10:16:05Z"
+                    moduleCode: db-demo
+                    moduleTitle: "DB demo"
+                    outputDir: "/tmp/db-run"
+                    mergedRowCount: 1700
+                    successfulSourceCount: 2
+                    failedSourceCount: 0
+                    skippedSourceCount: 0
+                    targetStatus: SUCCESS
+                    targetTableName: public.target_pool
+                    targetRowsLoaded: 1700
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /api/db/modules/{id}/runs/{runId}:
+    get:
+      tags: [DB Modules]
+      summary: Детали запуска DB-модуля
+      operationId: getDbModuleRunDetails
+      parameters:
+        - $ref: "#/components/parameters/ModuleIdPath"
+        - $ref: "#/components/parameters/RunIdPath"
+      responses:
+        "200":
+          description: Детали запуска DB-модуля
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DatabaseModuleRunDetailsResponse"
+              example:
+                run:
+                  runId: "run-1"
+                  executionSnapshotId: "snapshot-001"
+                  status: SUCCESS
+                  launchSourceKind: WORKING_COPY
+                  requestedAt: "2026-04-17T10:14:58Z"
+                  startedAt: "2026-04-17T10:15:00Z"
+                  finishedAt: "2026-04-17T10:16:05Z"
+                  moduleCode: db-demo
+                  moduleTitle: "DB demo"
+                  outputDir: "/tmp/db-run"
+                  mergedRowCount: 1700
+                  successfulSourceCount: 2
+                  failedSourceCount: 0
+                  skippedSourceCount: 0
+                  targetStatus: SUCCESS
+                  targetTableName: public.target_pool
+                  targetRowsLoaded: 1700
+                summaryJson: "{\n  \"mergeMode\": \"plain\"\n}"
+                sourceResults:
+                  - runSourceResultId: "source-result-1"
+                    sourceName: db1
+                    sortOrder: 0
+                    status: SUCCESS
+                    exportedRowCount: 1000
+                    mergedRowCount: 1000
+                events:
+                  - runEventId: "event-1"
+                    seqNo: 1
+                    createdAt: "2026-04-17T10:15:00Z"
+                    stage: RUN
+                    eventType: RUN_CREATED
+                    severity: INFO
+                    message: "Запуск DB-модуля начат."
+                artifacts:
+                  - runArtifactId: "artifact-1"
+                    artifactKind: MERGED_OUTPUT
+                    artifactKey: merged
+                    filePath: "/tmp/db-run/merged.csv"
+                    storageStatus: PRESENT
+                    createdAt: "2026-04-17T10:16:05Z"
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /api/db/modules/{id}/save:
+    post:
+      tags: [DB Modules]
+      summary: Сохранение изменений в личный черновик
+      operationId: saveDbModuleDraft
+      parameters:
+        - $ref: "#/components/parameters/ModuleIdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveModuleRequest"
+            example:
+              configText: "app:\n  outputDir: ./output\n  mergeMode: plain\n"
+              sqlFiles:
+                "classpath:sql/common.sql": "select 1"
+      responses:
+        "200":
+          description: Черновик сохранен
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SaveResultResponse"
+              example:
+                message: "Изменения сохранены в личный черновик."
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /api/db/modules/{id}/discard-working-copy:
+    post:
+      tags: [DB Modules]
+      summary: Сброс личного черновика
+      operationId: discardDbModuleDraft
+      parameters:
+        - $ref: "#/components/parameters/ModuleIdPath"
+      responses:
+        "200":
+          description: Черновик удален
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SaveResultResponse"
+              example:
+                message: "Личный черновик удалён."
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /api/db/modules/{id}/publish:
+    post:
+      tags: [DB Modules]
+      summary: Публикация личного черновика
+      operationId: publishDbModuleDraft
+      parameters:
+        - $ref: "#/components/parameters/ModuleIdPath"
+      responses:
+        "200":
+          description: Черновик опубликован как новая ревизия
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DbModulePublishResponse"
+              example:
+                message: "Черновик опубликован как ревизия #12."
+                revisionId: "rev-012"
+                revisionNo: 12
+                moduleCode: db-demo
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /api/db/modules/{id}/run:
+    post:
+      tags: [DB Modules]
+      summary: Асинхронный запуск DB-модуля
+      operationId: startDbModuleRun
+      parameters:
+        - $ref: "#/components/parameters/ModuleIdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DatabaseRunStartRequest"
+            example:
+              launchSourceKind: WORKING_COPY
+      responses:
+        "200":
+          description: DB-запуск принят в работу
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DatabaseRunStartResponse"
+              example:
+                runId: "run-1"
+                moduleCode: db-demo
+                status: RUNNING
+                requestedAt: "2026-04-17T10:14:58Z"
+                launchSourceKind: WORKING_COPY
+                executionSnapshotId: "snapshot-001"
+                message: "Запуск DB-модуля 'db-demo' начат."
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /api/db/modules:
+    post:
+      tags: [DB Modules]
+      summary: Создание DB-модуля
+      operationId: createDbModule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDbModuleRequest"
+            example:
+              moduleCode: customer-pool
+              title: "Пул клиентов"
+              description: "Ночной прогрев тестовых данных"
+              tags: ["nightly", "postgres"]
+              hiddenFromUi: true
+              configText: "app:\n  outputDir: ./output\n  sources: []\n"
+      responses:
+        "200":
+          description: DB-модуль создан
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DbModuleCreatedResponse"
+              example:
+                message: "Модуль 'customer-pool' создан в базе данных."
+                moduleId: "module-123"
+                moduleCode: customer-pool
+                revisionId: "rev-001"
+                workingCopyId: "draft-001"
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /api/config-form/parse:
+    post:
+      tags: [Config Form]
+      summary: Преобразование YAML в состояние формы
+      operationId: parseConfigForm
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfigFormParseRequest"
+            example:
+              configText: "app:\n  outputDir: ./output\n  mergeMode: plain\n"
+      responses:
+        "200":
+          description: Состояние визуальной формы
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConfigFormStateResponse"
+              example:
+                outputDir: ./output
+                fileFormat: csv
+                mergeMode: plain
+                errorMode: continue_on_error
+                parallelism: 5
+                fetchSize: 1000
+                queryTimeoutSec: 60
+                progressLogEveryRows: 10000
+                maxMergedRows: null
+                deleteOutputFilesAfterCompletion: false
+                commonSql: ""
+                commonSqlFile: "classpath:sql/common.sql"
+                sources:
+                  - name: db1
+                    jdbcUrl: "${DB1_JDBC_URL}"
+                    username: "${DB1_USERNAME}"
+                    password: "${DB1_PASSWORD}"
+                    sql: null
+                    sqlFile: "classpath:sql/source1.sql"
+                quotas: []
+                targetEnabled: true
+                targetJdbcUrl: "${TARGET_JDBC_URL}"
+                targetUsername: "${TARGET_USERNAME}"
+                targetPassword: "${TARGET_PASSWORD}"
+                targetTable: public.target_pool
+                targetTruncateBeforeLoad: true
+                warnings: []
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /api/config-form/update:
+    post:
+      tags: [Config Form]
+      summary: Обновление YAML из состояния визуальной формы
+      operationId: updateConfigForm
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfigFormUpdateRequest"
+            example:
+              configText: "app:\n  outputDir: ./output\n"
+              formState:
+                outputDir: ./output
+                fileFormat: csv
+                mergeMode: round_robin
+                errorMode: continue_on_error
+                parallelism: 5
+                fetchSize: 1000
+                queryTimeoutSec: 60
+                progressLogEveryRows: 10000
+                maxMergedRows: null
+                deleteOutputFilesAfterCompletion: false
+                commonSql: ""
+                commonSqlFile: "classpath:sql/common.sql"
+                sources: []
+                quotas: []
+                targetEnabled: true
+                targetJdbcUrl: "${TARGET_JDBC_URL}"
+                targetUsername: "${TARGET_USERNAME}"
+                targetPassword: "${TARGET_PASSWORD}"
+                targetTable: public.target_pool
+                targetTruncateBeforeLoad: true
+                warnings: []
+      responses:
+        "200":
+          description: Синхронизированный YAML и форма
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConfigFormUpdateResponse"
+              example:
+                configText: "app:\n  outputDir: ./output\n  mergeMode: round_robin\n"
+                formState:
+                  outputDir: ./output
+                  fileFormat: csv
+                  mergeMode: round_robin
+                  errorMode: continue_on_error
+                  parallelism: 5
+                  fetchSize: 1000
+                  queryTimeoutSec: 60
+                  progressLogEveryRows: 10000
+                  maxMergedRows: null
+                  deleteOutputFilesAfterCompletion: false
+                  commonSql: ""
+                  commonSqlFile: "classpath:sql/common.sql"
+                  sources: []
+                  quotas: []
+                  targetEnabled: true
+                  targetJdbcUrl: "${TARGET_JDBC_URL}"
+                  targetUsername: "${TARGET_USERNAME}"
+                  targetPassword: "${TARGET_PASSWORD}"
+                  targetTable: public.target_pool
+                  targetTruncateBeforeLoad: true
+                  warnings: []
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /api/runs:
+    post:
+      tags: [Files Runs]
+      summary: Запуск файлового модуля
+      operationId: startFileRun
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StartRunRequest"
+            example:
+              moduleId: local-manual-test
+              configText: "app:\n  outputDir: ./output\n"
+              sqlFiles:
+                "classpath:sql/source1.sql": "select * from test_table"
+      responses:
+        "200":
+          description: Запуск принят в работу
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UiRunSnapshot"
+              example:
+                id: "run-uuid"
+                moduleId: local-manual-test
+                moduleTitle: local-manual-test
+                status: RUNNING
+                startedAt: "2026-04-17T10:15:00Z"
+                finishedAt: null
+                outputDir: "/Users/kwdev/DataPoolLoader/apps/local-manual-test/output"
+                mergedRowCount: 0
+                summaryJson: null
+                errorMessage: null
+                sourceProgress: {}
+                events: []
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /api/state:
+    get:
+      tags: [Files Runs]
+      summary: Текущее состояние UI
+      operationId: getUiState
+      responses:
+        "200":
+          description: Состояние UI файлового режима
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UiStateResponse"
+              example:
+                credentialsStatus:
+                  mode: FILE
+                  displayName: "/Users/kwdev/.gradle/credential.properties"
+                  fileAvailable: true
+                  uploaded: false
+                uiSettings:
+                  showTechnicalDiagnostics: false
+                  showRawSummaryJson: false
+                activeRun: null
+                history: []
+
+  /api/credentials:
+    get:
+      tags: [Credentials]
+      summary: Статус credential.properties
+      operationId: getCredentialsStatus
+      responses:
+        "200":
+          description: Текущий статус credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CredentialsStatusResponse"
+              example:
+                mode: FILE
+                displayName: "/Users/kwdev/.gradle/credential.properties"
+                fileAvailable: true
+                uploaded: false
+
+  /api/credentials/upload:
+    post:
+      tags: [Credentials]
+      summary: Загрузка credential.properties
+      description: Загружает файл и сразу переводит UI на использование uploaded-версии без рестарта.
+      operationId: uploadCredentialsFile
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Файл credential.properties
+      responses:
+        "200":
+          description: Файл загружен и принят в работу
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CredentialsStatusResponse"
+              example:
+                mode: UPLOADED
+                displayName: "credential.properties"
+                fileAvailable: true
+                uploaded: true
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /api/sql-console/info:
+    get:
+      tags: [SQL Console]
+      summary: Конфигурация SQL-консоли
+      operationId: getSqlConsoleInfo
+      responses:
+        "200":
+          description: Конфигурация SQL-консоли
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SqlConsoleInfoResponse"
+              example:
+                configured: true
+                sourceNames: ["db1", "db2", "db3"]
+                maxRowsPerShard: 200
+                queryTimeoutSec: 60
+
+  /api/sql-console/state:
+    get:
+      tags: [SQL Console]
+      summary: Сохраненное состояние SQL-консоли
+      operationId: getSqlConsoleState
+      responses:
+        "200":
+          description: Драфт SQL-консоли
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SqlConsoleStateResponse"
+              example:
+                draftSql: "select 1"
+                recentQueries: ["select 1", "select now()"]
+                selectedSourceNames: ["db1", "db2"]
+                pageSize: 50
+    post:
+      tags: [SQL Console]
+      summary: Сохранение состояния SQL-консоли
+      operationId: saveSqlConsoleState
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SqlConsoleStateUpdateRequest"
+            example:
+              draftSql: "select 1"
+              recentQueries: ["select 1"]
+              selectedSourceNames: ["db1"]
+              pageSize: 100
+      responses:
+        "200":
+          description: Состояние обновлено
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SqlConsoleStateResponse"
+              example:
+                draftSql: "select 1"
+                recentQueries: ["select 1"]
+                selectedSourceNames: ["db1"]
+                pageSize: 100
+
+  /api/sql-console/settings:
+    post:
+      tags: [SQL Console]
+      summary: Обновление настроек SQL-консоли
+      operationId: updateSqlConsoleSettings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SqlConsoleSettingsUpdateRequest"
+            example:
+              maxRowsPerShard: 500
+              queryTimeoutSec: 90
+      responses:
+        "200":
+          description: Новые настройки приняты
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SqlConsoleInfoResponse"
+              example:
+                configured: true
+                sourceNames: ["db1", "db2"]
+                maxRowsPerShard: 500
+                queryTimeoutSec: 90
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /api/sql-console/connections/check:
+    post:
+      tags: [SQL Console]
+      summary: Проверка подключений SQL-консоли
+      operationId: checkSqlConsoleConnections
+      responses:
+        "200":
+          description: Результаты проверки по источникам
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SqlConsoleConnectionCheckResponse"
+              example:
+                configured: true
+                sourceResults:
+                  - sourceName: db1
+                    status: SUCCESS
+                    message: "Подключение успешно."
+                  - sourceName: db2
+                    status: FAILED
+                    message: "Не удалось подключиться."
+                    errorMessage: "Connection refused"
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /api/sql-console/query:
+    post:
+      tags: [SQL Console]
+      summary: Синхронный SQL-запрос
+      operationId: executeSqlConsoleQuery
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SqlConsoleQueryRequest"
+            example:
+              sql: "select * from test_table limit 10"
+              selectedSourceNames: ["db1", "db2"]
+      responses:
+        "200":
+          description: Результат синхронного SQL-запроса
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SqlConsoleQueryResponse"
+              example:
+                sql: "select * from test_table limit 10"
+                statementType: SELECT
+                statementKeyword: SELECT
+                maxRowsPerShard: 200
+                shardResults:
+                  - shardName: db1
+                    status: SUCCESS
+                    rowCount: 2
+                    columns: ["id", "name"]
+                    rows:
+                      - id: "1"
+                        name: "Alice"
+                      - id: "2"
+                        name: "Bob"
+                    truncated: false
+                  - shardName: db2
+                    status: SUCCESS
+                    rowCount: 0
+                    columns: ["id", "name"]
+                    rows: []
+                    truncated: false
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /api/sql-console/query/start:
+    post:
+      tags: [SQL Console]
+      summary: Асинхронный SQL-запрос
+      operationId: startSqlConsoleQuery
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SqlConsoleQueryRequest"
+            example:
+              sql: "select pg_sleep(10)"
+              selectedSourceNames: ["db1"]
+      responses:
+        "200":
+          description: Асинхронный запрос принят в работу
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SqlConsoleStartQueryResponse"
+              example:
+                id: "397c4e99-602b-432d-9b39-37a28c42ba5e"
+                status: RUNNING
+                startedAt: "2026-04-17T10:15:00Z"
+                cancelRequested: false
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /api/sql-console/query/{id}:
+    get:
+      tags: [SQL Console]
+      summary: Состояние асинхронного SQL-запроса
+      operationId: getSqlConsoleQuerySnapshot
+      parameters:
+        - $ref: "#/components/parameters/AsyncQueryIdPath"
+      responses:
+        "200":
+          description: Текущее состояние запроса
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SqlConsoleExecutionResponse"
+              example:
+                id: "397c4e99-602b-432d-9b39-37a28c42ba5e"
+                status: RUNNING
+                startedAt: "2026-04-17T10:15:00Z"
+                finishedAt: null
+                cancelRequested: false
+                result: null
+                errorMessage: null
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /api/sql-console/query/{id}/cancel:
+    post:
+      tags: [SQL Console]
+      summary: Отмена асинхронного SQL-запроса
+      operationId: cancelSqlConsoleQuery
+      parameters:
+        - $ref: "#/components/parameters/AsyncQueryIdPath"
+      responses:
+        "200":
+          description: Запрос помечен на отмену
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SqlConsoleExecutionResponse"
+              example:
+                id: "397c4e99-602b-432d-9b39-37a28c42ba5e"
+                status: RUNNING
+                startedAt: "2026-04-17T10:15:00Z"
+                finishedAt: null
+                cancelRequested: true
+                result: null
+                errorMessage: null
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /api/sql-console/export/source-csv:
+    post:
+      tags: [SQL Console]
+      summary: Экспорт одного shard в CSV
+      operationId: exportSqlConsoleShardCsv
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SqlConsoleExportRequest"
+            example:
+              shardName: db1
+              result:
+                sql: "select * from test_table limit 10"
+                statementType: SELECT
+                statementKeyword: SELECT
+                maxRowsPerShard: 200
+                shardResults:
+                  - shardName: db1
+                    status: SUCCESS
+                    rowCount: 2
+                    columns: ["id", "name"]
+                    rows:
+                      - id: "1"
+                        name: "Alice"
+                      - id: "2"
+                        name: "Bob"
+                    truncated: false
+      responses:
+        "200":
+          description: CSV-файл выбранного shard
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /api/sql-console/export/all-zip:
+    post:
+      tags: [SQL Console]
+      summary: Экспорт всех shard-результатов в ZIP
+      operationId: exportSqlConsoleAllZip
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SqlConsoleExportRequest"
+            example:
+              result:
+                sql: "select * from test_table limit 10"
+                statementType: SELECT
+                statementKeyword: SELECT
+                maxRowsPerShard: 200
+                shardResults:
+                  - shardName: db1
+                    status: SUCCESS
+                    rowCount: 2
+                    columns: ["id", "name"]
+                    rows:
+                      - id: "1"
+                        name: "Alice"
+                      - id: "2"
+                        name: "Bob"
+                    truncated: false
+                  - shardName: db2
+                    status: SUCCESS
+                    rowCount: 0
+                    columns: ["id", "name"]
+                    rows: []
+                    truncated: false
+      responses:
+        "200":
+          description: ZIP-архив со всеми shard-результатами
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+        "400":
+          $ref: "#/components/responses/ErrorResponse"
+
+  /ws:
+    get:
+      tags: [WebSocket]
+      summary: Live-обновления файлового режима
+      description: |
+        WebSocket для live-обновлений состояния файлового режима.
+        После подключения сервер сначала отправляет полный `UiStateResponse`,
+        затем публикует новые состояния по мере изменения активного запуска и истории.
+      operationId: fileModeWebSocket
+      responses:
+        "101":
+          description: WebSocket upgrade выполнен
+
+components:
+  parameters:
+    ModuleIdPath:
+      name: id
+      in: path
+      required: true
+      description: Код или идентификатор модуля.
+      schema:
+        type: string
+      example: local-manual-test
+    StoragePath:
+      name: storage
+      in: path
+      required: true
+      description: Режим хранения модуля для общего экрана истории.
+      schema:
+        type: string
+        enum: [files, database]
+      example: files
+    RunIdPath:
+      name: runId
+      in: path
+      required: true
+      schema:
+        type: string
+      example: run-1
+    AsyncQueryIdPath:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      example: 397c4e99-602b-432d-9b39-37a28c42ba5e
+    IncludeHiddenQuery:
+      name: includeHidden
+      in: query
+      required: false
+      description: Показывать скрытые DB-модули.
+      schema:
+        type: boolean
+      example: true
+    LimitQuery:
+      name: limit
+      in: query
+      required: false
+      description: Глубина истории запусков.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+        default: 20
+      example: 50
+
+  responses:
+    ErrorResponse:
+      description: Ошибка уровня запроса
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error: "Режим базы данных сейчас недоступен."
+
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+
+    FreeformObject:
+      type: object
+      additionalProperties: true
+
+    StringMap:
+      type: object
+      additionalProperties:
+        type: string
+
+    NullableStringMap:
+      type: object
+      additionalProperties:
+        type: [string, "null"]
+
+    LongMap:
+      type: object
+      additionalProperties:
+        type: integer
+        format: int64
+
+    UiRuntimeModeUpdateRequest:
+      type: object
+      required: [mode]
+      properties:
+        mode:
+          type: string
+          enum: [files, database]
+
+    UiRuntimeModeUpdateResponse:
+      type: object
+      required: [message, runtimeContext]
+      properties:
+        message:
+          type: string
+        runtimeContext:
+          $ref: "#/components/schemas/UiRuntimeContext"
+
+    UiRuntimeActorState:
+      type: object
+      required: [resolved, requiresManualInput, message]
+      properties:
+        resolved:
+          type: boolean
+        actorId:
+          type: [string, "null"]
+        actorSource:
+          type: [string, "null"]
+        actorDisplayName:
+          type: [string, "null"]
+        requiresManualInput:
+          type: boolean
+        message:
+          type: string
+
+    UiDatabaseConnectionStatus:
+      type: object
+      required: [configured, available, schema, message]
+      properties:
+        configured:
+          type: boolean
+        available:
+          type: boolean
+        schema:
+          type: string
+        message:
+          type: string
+        errorMessage:
+          type: [string, "null"]
+
+    UiRuntimeContext:
+      type: object
+      required: [requestedMode, effectiveMode, actor, database]
+      properties:
+        requestedMode:
+          type: string
+          enum: [files, database]
+        effectiveMode:
+          type: string
+          enum: [files, database]
+        fallbackReason:
+          type: [string, "null"]
+        actor:
+          $ref: "#/components/schemas/UiRuntimeActorState"
+        database:
+          $ref: "#/components/schemas/UiDatabaseConnectionStatus"
+
+    ModuleValidationIssueResponse:
+      type: object
+      required: [severity, message]
+      properties:
+        severity:
+          type: string
+        message:
+          type: string
+
+    ModuleCatalogItemResponse:
+      type: object
+      required: [id, title, tags, validationStatus, validationIssues]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: [string, "null"]
+        tags:
+          type: array
+          items:
+            type: string
+        validationStatus:
+          type: string
+        validationIssues:
+          type: array
+          items:
+            $ref: "#/components/schemas/ModuleValidationIssueResponse"
+
+    AppsRootStatusResponse:
+      type: object
+      required: [mode, message]
+      properties:
+        mode:
+          type: string
+        configuredPath:
+          type: [string, "null"]
+        message:
+          type: string
+
+    ModulesCatalogResponse:
+      type: object
+      required: [appsRootStatus, modules]
+      properties:
+        appsRootStatus:
+          $ref: "#/components/schemas/AppsRootStatusResponse"
+        modules:
+          type: array
+          items:
+            $ref: "#/components/schemas/ModuleCatalogItemResponse"
+
+    DatabaseModulesCatalogResponse:
+      type: object
+      required: [runtimeContext, modules]
+      properties:
+        runtimeContext:
+          $ref: "#/components/schemas/UiRuntimeContext"
+        modules:
+          type: array
+          items:
+            $ref: "#/components/schemas/ModuleCatalogItemResponse"
+
+    ModuleFileContent:
+      type: object
+      required: [label, path, content, exists]
+      properties:
+        label:
+          type: string
+        path:
+          type: string
+        content:
+          type: string
+        exists:
+          type: boolean
+
+    CredentialsStatusResponse:
+      type: object
+      required: [mode, displayName, fileAvailable, uploaded]
+      properties:
+        mode:
+          type: string
+          enum: [UPLOADED, FILE, NONE]
+        displayName:
+          type: string
+        fileAvailable:
+          type: boolean
+        uploaded:
+          type: boolean
+
+    ModuleDetailsResponse:
+      type: object
+      required:
+        - id
+        - title
+        - tags
+        - validationStatus
+        - validationIssues
+        - configPath
+        - configText
+        - sqlFiles
+        - requiresCredentials
+        - credentialsStatus
+        - requiredCredentialKeys
+        - missingCredentialKeys
+        - credentialsReady
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: [string, "null"]
+        tags:
+          type: array
+          items:
+            type: string
+        validationStatus:
+          type: string
+        validationIssues:
+          type: array
+          items:
+            $ref: "#/components/schemas/ModuleValidationIssueResponse"
+        configPath:
+          type: string
+        configText:
+          type: string
+        sqlFiles:
+          type: array
+          items:
+            $ref: "#/components/schemas/ModuleFileContent"
+        requiresCredentials:
+          type: boolean
+        credentialsStatus:
+          $ref: "#/components/schemas/CredentialsStatusResponse"
+        requiredCredentialKeys:
+          type: array
+          items:
+            type: string
+        missingCredentialKeys:
+          type: array
+          items:
+            type: string
+        credentialsReady:
+          type: boolean
+
+    ModuleLifecycleCapabilities:
+      type: object
+      required: [save, saveWorkingCopy, discardWorkingCopy, publish, run, createModule, deleteModule]
+      properties:
+        save:
+          type: boolean
+        saveWorkingCopy:
+          type: boolean
+        discardWorkingCopy:
+          type: boolean
+        publish:
+          type: boolean
+        run:
+          type: boolean
+        createModule:
+          type: boolean
+        deleteModule:
+          type: boolean
+
+    ModuleEditorSessionResponse:
+      type: object
+      required: [storageMode, module, capabilities]
+      properties:
+        storageMode:
+          type: string
+          enum: [FILES, DATABASE]
+        module:
+          $ref: "#/components/schemas/ModuleDetailsResponse"
+        capabilities:
+          $ref: "#/components/schemas/ModuleLifecycleCapabilities"
+        sourceKind:
+          type: [string, "null"]
+        currentRevisionId:
+          type: [string, "null"]
+        workingCopyId:
+          type: [string, "null"]
+        workingCopyStatus:
+          type: [string, "null"]
+        baseRevisionId:
+          type: [string, "null"]
+
+    DatabaseModuleDetailsResponse:
+      type: object
+      required: [runtimeContext, module, sourceKind, currentRevisionId]
+      properties:
+        runtimeContext:
+          $ref: "#/components/schemas/UiRuntimeContext"
+        module:
+          $ref: "#/components/schemas/ModuleDetailsResponse"
+        sourceKind:
+          type: string
+        currentRevisionId:
+          type: string
+        workingCopyId:
+          type: [string, "null"]
+        workingCopyStatus:
+          type: [string, "null"]
+        baseRevisionId:
+          type: [string, "null"]
+
+    SaveModuleRequest:
+      type: object
+      required: [configText, sqlFiles]
+      properties:
+        configText:
+          type: string
+        sqlFiles:
+          $ref: "#/components/schemas/StringMap"
+
+    SaveResultResponse:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+
+    UiSettingsResponse:
+      type: object
+      required: [showTechnicalDiagnostics, showRawSummaryJson]
+      properties:
+        showTechnicalDiagnostics:
+          type: boolean
+        showRawSummaryJson:
+          type: boolean
+
+    ModuleRunPageSessionResponse:
+      type: object
+      required: [storageMode, moduleId, moduleTitle, moduleMeta]
+      properties:
+        storageMode:
+          type: string
+          enum: [FILES, DATABASE]
+        moduleId:
+          type: string
+        moduleTitle:
+          type: string
+        moduleMeta:
+          type: string
+
+    ModuleRunSummaryResponse:
+      type: object
+      required: [runId, moduleId, moduleTitle, status, startedAt]
+      properties:
+        runId:
+          type: string
+        moduleId:
+          type: string
+        moduleTitle:
+          type: string
+        status:
+          type: string
+        startedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: [string, "null"]
+          format: date-time
+        requestedAt:
+          type: [string, "null"]
+          format: date-time
+        outputDir:
+          type: [string, "null"]
+        mergedRowCount:
+          type: [integer, "null"]
+          format: int64
+        errorMessage:
+          type: [string, "null"]
+        launchSourceKind:
+          type: [string, "null"]
+        executionSnapshotId:
+          type: [string, "null"]
+        successfulSourceCount:
+          type: [integer, "null"]
+        failedSourceCount:
+          type: [integer, "null"]
+        skippedSourceCount:
+          type: [integer, "null"]
+        targetStatus:
+          type: [string, "null"]
+        targetTableName:
+          type: [string, "null"]
+        targetRowsLoaded:
+          type: [integer, "null"]
+          format: int64
+
+    ModuleRunSourceResultResponse:
+      type: object
+      required: [sourceName, sortOrder, status]
+      properties:
+        runSourceResultId:
+          type: [string, "null"]
+        sourceName:
+          type: string
+        sortOrder:
+          type: integer
+        status:
+          type: string
+        startedAt:
+          type: [string, "null"]
+          format: date-time
+        finishedAt:
+          type: [string, "null"]
+          format: date-time
+        exportedRowCount:
+          type: [integer, "null"]
+          format: int64
+        mergedRowCount:
+          type: [integer, "null"]
+          format: int64
+        errorMessage:
+          type: [string, "null"]
+
+    ModuleRunEventResponse:
+      type: object
+      required: [seqNo, eventType, severity, payload]
+      properties:
+        runEventId:
+          type: [string, "null"]
+        seqNo:
+          type: integer
+        timestamp:
+          type: [string, "null"]
+          format: date-time
+        stage:
+          type: [string, "null"]
+        eventType:
+          type: string
+        severity:
+          type: string
+        sourceName:
+          type: [string, "null"]
+        message:
+          type: [string, "null"]
+        payload:
+          $ref: "#/components/schemas/FreeformObject"
+
+    ModuleRunArtifactResponse:
+      type: object
+      required: [artifactKind, artifactKey, filePath, storageStatus]
+      properties:
+        runArtifactId:
+          type: [string, "null"]
+        artifactKind:
+          type: string
+        artifactKey:
+          type: string
+        filePath:
+          type: string
+        storageStatus:
+          type: string
+        fileSizeBytes:
+          type: [integer, "null"]
+          format: int64
+        contentHash:
+          type: [string, "null"]
+        createdAt:
+          type: [string, "null"]
+          format: date-time
+
+    ModuleRunHistoryResponse:
+      type: object
+      required: [storageMode, moduleId, uiSettings, runs]
+      properties:
+        storageMode:
+          type: string
+          enum: [FILES, DATABASE]
+        moduleId:
+          type: string
+        activeRunId:
+          type: [string, "null"]
+        uiSettings:
+          $ref: "#/components/schemas/UiSettingsResponse"
+        runs:
+          type: array
+          items:
+            $ref: "#/components/schemas/ModuleRunSummaryResponse"
+
+    ModuleRunDetailsResponse:
+      type: object
+      required: [run, sourceResults, events, artifacts]
+      properties:
+        run:
+          $ref: "#/components/schemas/ModuleRunSummaryResponse"
+        summaryJson:
+          type: [string, "null"]
+        sourceResults:
+          type: array
+          items:
+            $ref: "#/components/schemas/ModuleRunSourceResultResponse"
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/ModuleRunEventResponse"
+        artifacts:
+          type: array
+          items:
+            $ref: "#/components/schemas/ModuleRunArtifactResponse"
+
+    ConfigFormParseRequest:
+      type: object
+      required: [configText]
+      properties:
+        configText:
+          type: string
+
+    ConfigFormSourceState:
+      type: object
+      required: [name, jdbcUrl, username, password]
+      properties:
+        name:
+          type: string
+        jdbcUrl:
+          type: string
+        username:
+          type: string
+        password:
+          type: string
+        sql:
+          type: [string, "null"]
+        sqlFile:
+          type: [string, "null"]
+
+    ConfigFormQuotaState:
+      type: object
+      required: [source]
+      properties:
+        source:
+          type: string
+        percent:
+          type: [number, "null"]
+
+    ConfigFormStateResponse:
+      type: object
+      required:
+        - outputDir
+        - fileFormat
+        - mergeMode
+        - errorMode
+        - parallelism
+        - fetchSize
+        - progressLogEveryRows
+        - deleteOutputFilesAfterCompletion
+        - commonSql
+        - sources
+        - quotas
+        - targetEnabled
+        - targetJdbcUrl
+        - targetUsername
+        - targetPassword
+        - targetTable
+        - targetTruncateBeforeLoad
+        - warnings
+      properties:
+        outputDir:
+          type: string
+        fileFormat:
+          type: string
+        mergeMode:
+          type: string
+        errorMode:
+          type: string
+        parallelism:
+          type: integer
+        fetchSize:
+          type: integer
+        queryTimeoutSec:
+          type: [integer, "null"]
+        progressLogEveryRows:
+          type: integer
+          format: int64
+        maxMergedRows:
+          type: [integer, "null"]
+          format: int64
+        deleteOutputFilesAfterCompletion:
+          type: boolean
+        commonSql:
+          type: string
+        commonSqlFile:
+          type: [string, "null"]
+        sources:
+          type: array
+          items:
+            $ref: "#/components/schemas/ConfigFormSourceState"
+        quotas:
+          type: array
+          items:
+            $ref: "#/components/schemas/ConfigFormQuotaState"
+        targetEnabled:
+          type: boolean
+        targetJdbcUrl:
+          type: string
+        targetUsername:
+          type: string
+        targetPassword:
+          type: string
+        targetTable:
+          type: string
+        targetTruncateBeforeLoad:
+          type: boolean
+        warnings:
+          type: array
+          items:
+            type: string
+
+    ConfigFormUpdateRequest:
+      type: object
+      required: [configText, formState]
+      properties:
+        configText:
+          type: string
+        formState:
+          $ref: "#/components/schemas/ConfigFormStateResponse"
+
+    ConfigFormUpdateResponse:
+      type: object
+      required: [configText, formState]
+      properties:
+        configText:
+          type: string
+        formState:
+          $ref: "#/components/schemas/ConfigFormStateResponse"
+
+    StartRunRequest:
+      type: object
+      required: [moduleId, configText, sqlFiles]
+      properties:
+        moduleId:
+          type: string
+        configText:
+          type: string
+        sqlFiles:
+          $ref: "#/components/schemas/StringMap"
+
+    UiRunSnapshot:
+      type: object
+      required: [id, moduleId, moduleTitle, status, startedAt, mergedRowCount, sourceProgress, events]
+      properties:
+        id:
+          type: string
+        moduleId:
+          type: string
+        moduleTitle:
+          type: string
+        status:
+          type: string
+          enum: [RUNNING, SUCCESS, FAILED, SKIPPED_SCHEMA_MISMATCH, SKIPPED]
+        startedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: [string, "null"]
+          format: date-time
+        outputDir:
+          type: [string, "null"]
+        mergedRowCount:
+          type: integer
+          format: int64
+        summaryJson:
+          type: [string, "null"]
+        errorMessage:
+          type: [string, "null"]
+        sourceProgress:
+          $ref: "#/components/schemas/LongMap"
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/FreeformObject"
+
+    UiStateResponse:
+      type: object
+      required: [credentialsStatus, uiSettings, history]
+      properties:
+        credentialsStatus:
+          $ref: "#/components/schemas/CredentialsStatusResponse"
+        uiSettings:
+          $ref: "#/components/schemas/UiSettingsResponse"
+        activeRun:
+          oneOf:
+            - $ref: "#/components/schemas/UiRunSnapshot"
+            - type: "null"
+        history:
+          type: array
+          items:
+            $ref: "#/components/schemas/UiRunSnapshot"
+
+    SyncOneModuleRequest:
+      type: object
+      required: [moduleCode]
+      properties:
+        moduleCode:
+          type: string
+
+    ActiveModuleSyncRun:
+      type: object
+      required: [syncRunId, scope, startedAt]
+      properties:
+        syncRunId:
+          type: string
+        scope:
+          type: string
+        startedAt:
+          type: string
+          format: date-time
+        moduleCode:
+          type: [string, "null"]
+        startedByActorId:
+          type: [string, "null"]
+        startedByActorSource:
+          type: [string, "null"]
+        startedByActorDisplayName:
+          type: [string, "null"]
+
+    ModuleSyncState:
+      type: object
+      required: [maintenanceMode, activeSingleSyncs, message]
+      properties:
+        maintenanceMode:
+          type: boolean
+        activeFullSync:
+          oneOf:
+            - $ref: "#/components/schemas/ActiveModuleSyncRun"
+            - type: "null"
+        activeSingleSyncs:
+          type: array
+          items:
+            $ref: "#/components/schemas/ActiveModuleSyncRun"
+        message:
+          type: string
+
+    ModuleSyncTrackedFile:
+      type: object
+      required: [path, exists]
+      properties:
+        path:
+          type: string
+        exists:
+          type: boolean
+        lastModifiedEpochMillis:
+          type: [integer, "null"]
+          format: int64
+        sizeBytes:
+          type: [integer, "null"]
+          format: int64
+
+    ModuleSyncFileFingerprint:
+      type: object
+      required: [trackedFiles]
+      properties:
+        trackedFiles:
+          type: array
+          items:
+            $ref: "#/components/schemas/ModuleSyncTrackedFile"
+
+    SyncItemResult:
+      type: object
+      required: [moduleCode, action, status, detectedHash, details]
+      properties:
+        moduleCode:
+          type: string
+        action:
+          type: string
+        status:
+          type: string
+        detectedHash:
+          type: string
+        resultRevisionId:
+          type: [string, "null"]
+        errorMessage:
+          type: [string, "null"]
+        details:
+          $ref: "#/components/schemas/FreeformObject"
+
+    SyncRunResult:
+      type: object
+      required:
+        - syncRunId
+        - scope
+        - status
+        - startedAt
+        - finishedAt
+        - items
+        - totalProcessed
+        - totalCreated
+        - totalUpdated
+        - totalSkipped
+        - totalFailed
+      properties:
+        syncRunId:
+          type: string
+        scope:
+          type: string
+        moduleCode:
+          type: [string, "null"]
+        status:
+          type: string
+        startedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/SyncItemResult"
+        totalProcessed:
+          type: integer
+        totalCreated:
+          type: integer
+        totalUpdated:
+          type: integer
+        totalSkipped:
+          type: integer
+        totalFailed:
+          type: integer
+        errorMessage:
+          type: [string, "null"]
+
+    DatabaseRunStartRequest:
+      type: object
+      properties:
+        launchSourceKind:
+          type: [string, "null"]
+
+    DatabaseRunStartResponse:
+      type: object
+      required: [runId, moduleCode, status, requestedAt, launchSourceKind, executionSnapshotId, message]
+      properties:
+        runId:
+          type: string
+        moduleCode:
+          type: string
+        status:
+          type: string
+        requestedAt:
+          type: string
+          format: date-time
+        launchSourceKind:
+          type: string
+        executionSnapshotId:
+          type: string
+        message:
+          type: string
+
+    CreateDbModuleRequest:
+      type: object
+      required: [moduleCode, title]
+      properties:
+        moduleCode:
+          type: string
+        title:
+          type: string
+        description:
+          type: [string, "null"]
+        tags:
+          type: array
+          items:
+            type: string
+        configText:
+          type: string
+        hiddenFromUi:
+          type: boolean
+
+    DbModuleCreatedResponse:
+      type: object
+      required: [message, moduleId, moduleCode, revisionId, workingCopyId]
+      properties:
+        message:
+          type: string
+        moduleId:
+          type: string
+        moduleCode:
+          type: string
+        revisionId:
+          type: string
+        workingCopyId:
+          type: string
+
+    DbModuleDeletedResponse:
+      type: object
+      required: [message, moduleCode, deletedBy]
+      properties:
+        message:
+          type: string
+        moduleCode:
+          type: string
+        deletedBy:
+          type: string
+
+    DbModulePublishResponse:
+      type: object
+      required: [message, revisionId, revisionNo, moduleCode]
+      properties:
+        message:
+          type: string
+        revisionId:
+          type: string
+        revisionNo:
+          type: integer
+        moduleCode:
+          type: string
+
+    DatabaseModuleRunSummaryResponse:
+      type: object
+      required:
+        - runId
+        - executionSnapshotId
+        - status
+        - launchSourceKind
+        - requestedAt
+        - moduleCode
+        - moduleTitle
+        - outputDir
+        - successfulSourceCount
+        - failedSourceCount
+        - skippedSourceCount
+        - targetStatus
+      properties:
+        runId:
+          type: string
+        executionSnapshotId:
+          type: string
+        status:
+          type: string
+        launchSourceKind:
+          type: string
+        requestedAt:
+          type: string
+          format: date-time
+        startedAt:
+          type: [string, "null"]
+          format: date-time
+        finishedAt:
+          type: [string, "null"]
+          format: date-time
+        moduleCode:
+          type: string
+        moduleTitle:
+          type: string
+        outputDir:
+          type: string
+        mergedRowCount:
+          type: [integer, "null"]
+          format: int64
+        successfulSourceCount:
+          type: integer
+        failedSourceCount:
+          type: integer
+        skippedSourceCount:
+          type: integer
+        targetStatus:
+          type: string
+        targetTableName:
+          type: [string, "null"]
+        targetRowsLoaded:
+          type: [integer, "null"]
+          format: int64
+        errorMessage:
+          type: [string, "null"]
+
+    DatabaseRunSourceResultResponse:
+      type: object
+      required: [runSourceResultId, sourceName, sortOrder, status]
+      properties:
+        runSourceResultId:
+          type: string
+        sourceName:
+          type: string
+        sortOrder:
+          type: integer
+        status:
+          type: string
+        startedAt:
+          type: [string, "null"]
+          format: date-time
+        finishedAt:
+          type: [string, "null"]
+          format: date-time
+        exportedRowCount:
+          type: [integer, "null"]
+          format: int64
+        mergedRowCount:
+          type: [integer, "null"]
+          format: int64
+        errorMessage:
+          type: [string, "null"]
+
+    DatabaseRunEventResponse:
+      type: object
+      required: [runEventId, seqNo, createdAt, stage, eventType, severity, message, payloadJson]
+      properties:
+        runEventId:
+          type: string
+        seqNo:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        stage:
+          type: string
+        eventType:
+          type: string
+        severity:
+          type: string
+        sourceName:
+          type: [string, "null"]
+        message:
+          type: string
+        payloadJson:
+          $ref: "#/components/schemas/FreeformObject"
+
+    DatabaseRunArtifactResponse:
+      type: object
+      required: [runArtifactId, artifactKind, artifactKey, filePath, storageStatus, createdAt]
+      properties:
+        runArtifactId:
+          type: string
+        artifactKind:
+          type: string
+        artifactKey:
+          type: string
+        filePath:
+          type: string
+        storageStatus:
+          type: string
+        fileSizeBytes:
+          type: [integer, "null"]
+          format: int64
+        contentHash:
+          type: [string, "null"]
+        createdAt:
+          type: string
+          format: date-time
+
+    DatabaseModuleRunsResponse:
+      type: object
+      required: [moduleCode, runs]
+      properties:
+        moduleCode:
+          type: string
+        runs:
+          type: array
+          items:
+            $ref: "#/components/schemas/DatabaseModuleRunSummaryResponse"
+
+    DatabaseModuleRunDetailsResponse:
+      type: object
+      required: [run, summaryJson, sourceResults, events, artifacts]
+      properties:
+        run:
+          $ref: "#/components/schemas/DatabaseModuleRunSummaryResponse"
+        summaryJson:
+          type: string
+        sourceResults:
+          type: array
+          items:
+            $ref: "#/components/schemas/DatabaseRunSourceResultResponse"
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/DatabaseRunEventResponse"
+        artifacts:
+          type: array
+          items:
+            $ref: "#/components/schemas/DatabaseRunArtifactResponse"
+
+    SqlConsoleInfoResponse:
+      type: object
+      required: [configured, sourceNames, maxRowsPerShard]
+      properties:
+        configured:
+          type: boolean
+        sourceNames:
+          type: array
+          items:
+            type: string
+        maxRowsPerShard:
+          type: integer
+        queryTimeoutSec:
+          type: [integer, "null"]
+
+    SqlConsoleSourceConnectionStatusResponse:
+      type: object
+      required: [sourceName, status]
+      properties:
+        sourceName:
+          type: string
+        status:
+          type: string
+        message:
+          type: [string, "null"]
+        errorMessage:
+          type: [string, "null"]
+
+    SqlConsoleConnectionCheckResponse:
+      type: object
+      required: [configured, sourceResults]
+      properties:
+        configured:
+          type: boolean
+        sourceResults:
+          type: array
+          items:
+            $ref: "#/components/schemas/SqlConsoleSourceConnectionStatusResponse"
+
+    SqlConsoleStateResponse:
+      type: object
+      required: [draftSql, recentQueries, selectedSourceNames, pageSize]
+      properties:
+        draftSql:
+          type: string
+        recentQueries:
+          type: array
+          items:
+            type: string
+        selectedSourceNames:
+          type: array
+          items:
+            type: string
+        pageSize:
+          type: integer
+          enum: [25, 50, 100]
+
+    SqlConsoleStateUpdateRequest:
+      type: object
+      required: [draftSql]
+      properties:
+        draftSql:
+          type: string
+        recentQueries:
+          type: array
+          items:
+            type: string
+        selectedSourceNames:
+          type: array
+          items:
+            type: string
+        pageSize:
+          type: integer
+
+    SqlConsoleSettingsUpdateRequest:
+      type: object
+      required: [maxRowsPerShard]
+      properties:
+        maxRowsPerShard:
+          type: integer
+        queryTimeoutSec:
+          type: [integer, "null"]
+
+    SqlConsoleQueryRequest:
+      type: object
+      required: [sql]
+      properties:
+        sql:
+          type: string
+        selectedSourceNames:
+          type: array
+          items:
+            type: string
+
+    SqlConsoleShardResultResponse:
+      type: object
+      required: [shardName, status, rows, rowCount, columns, truncated]
+      properties:
+        shardName:
+          type: string
+        status:
+          type: string
+        rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/NullableStringMap"
+        rowCount:
+          type: integer
+        columns:
+          type: array
+          items:
+            type: string
+        truncated:
+          type: boolean
+        affectedRows:
+          type: [integer, "null"]
+        message:
+          type: [string, "null"]
+        errorMessage:
+          type: [string, "null"]
+
+    SqlConsoleQueryResponse:
+      type: object
+      required: [sql, statementType, statementKeyword, shardResults, maxRowsPerShard]
+      properties:
+        sql:
+          type: string
+        statementType:
+          type: string
+        statementKeyword:
+          type: string
+        shardResults:
+          type: array
+          items:
+            $ref: "#/components/schemas/SqlConsoleShardResultResponse"
+        maxRowsPerShard:
+          type: integer
+
+    SqlConsoleExportRequest:
+      type: object
+      required: [result]
+      properties:
+        result:
+          $ref: "#/components/schemas/SqlConsoleQueryResponse"
+        shardName:
+          type: [string, "null"]
+
+    SqlConsoleStartQueryResponse:
+      type: object
+      required: [id, status, startedAt, cancelRequested]
+      properties:
+        id:
+          type: string
+        status:
+          type: string
+        startedAt:
+          type: string
+          format: date-time
+        cancelRequested:
+          type: boolean
+
+    SqlConsoleExecutionResponse:
+      type: object
+      required: [id, status, startedAt, cancelRequested]
+      properties:
+        id:
+          type: string
+        status:
+          type: string
+        startedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: [string, "null"]
+          format: date-time
+        cancelRequested:
+          type: boolean
+        result:
+          oneOf:
+            - $ref: "#/components/schemas/SqlConsoleQueryResponse"
+            - type: "null"
+        errorMessage:
+          type: [string, "null"]

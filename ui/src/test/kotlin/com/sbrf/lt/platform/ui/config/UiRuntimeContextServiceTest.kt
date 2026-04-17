@@ -19,7 +19,7 @@ class UiRuntimeContextServiceTest {
                         configured = true,
                         available = true,
                         schema = config.schemaName(),
-                        message = "PostgreSQL registry доступен.",
+                        message = "Подключение к базе данных доступно.",
                     )
             },
             schemaMigrator = object : UiDatabaseSchemaMigrator() {
@@ -59,7 +59,7 @@ class UiRuntimeContextServiceTest {
                         configured = true,
                         available = false,
                         schema = config.schemaName(),
-                        message = "PostgreSQL registry недоступен.",
+                        message = "Подключение к базе данных недоступно.",
                         errorMessage = "Connection refused",
                     )
             },
@@ -98,7 +98,7 @@ class UiRuntimeContextServiceTest {
                         configured = true,
                         available = true,
                         schema = config.schemaName(),
-                        message = "PostgreSQL registry доступен.",
+                        message = "Подключение к базе данных доступно.",
                     )
             },
             schemaMigrator = object : UiDatabaseSchemaMigrator() {
@@ -137,7 +137,7 @@ class UiRuntimeContextServiceTest {
                         configured = true,
                         available = true,
                         schema = config.schemaName(),
-                        message = "PostgreSQL registry доступен.",
+                        message = "Подключение к базе данных доступно.",
                     )
             },
             schemaMigrator = object : UiDatabaseSchemaMigrator() {
@@ -177,7 +177,7 @@ class UiRuntimeContextServiceTest {
                         configured = true,
                         available = true,
                         schema = config.schemaName(),
-                        message = "PostgreSQL registry доступен.",
+                        message = "Подключение к базе данных доступно.",
                     )
             },
             schemaMigrator = object : UiDatabaseSchemaMigrator() {

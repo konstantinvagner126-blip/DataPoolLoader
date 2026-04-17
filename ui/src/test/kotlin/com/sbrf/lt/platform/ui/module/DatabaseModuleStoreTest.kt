@@ -278,7 +278,7 @@ class DatabaseModuleStoreTest {
             )
         }
 
-        assertTrue(error.message!!.contains("устарела"))
+        assertTrue(error.message!!.contains("устарел"))
         assertTrue(preparedSql.any { it.contains("module_working_copy") })
         assertTrue(preparedSql.none { it.contains("insert into ui_registry.module_revision") })
     }

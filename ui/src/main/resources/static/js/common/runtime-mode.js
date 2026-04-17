@@ -31,13 +31,13 @@
       const isDb = normalizedMode(runtimeContext?.effectiveMode) === "database";
       const requestedDb = normalizedMode(runtimeContext?.requestedMode) === "database";
       dotEl.className = "db-mode-indicator-dot" + (isDb ? " db-mode-active" : " db-mode-inactive");
-      textEl.textContent = `Режим: ${isDb ? "DATABASE" : "FILES"}`;
+      textEl.textContent = `Режим: ${isDb ? "База данных" : "Файлы"}`;
 
       if (statusEl) {
         const parts = [];
         parts.push(runtimeContext?.database?.available ? "PostgreSQL доступен" : "PostgreSQL недоступен");
         if (requestedDb !== isDb) {
-          parts.push(`запрошен ${requestedDb ? "DATABASE" : "FILES"}`);
+          parts.push(`запрошен режим ${requestedDb ? "«База данных»" : "«Файлы»"}`);
         }
         statusEl.textContent = parts.join(" · ");
       }

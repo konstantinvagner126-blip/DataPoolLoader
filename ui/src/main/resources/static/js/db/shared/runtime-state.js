@@ -26,7 +26,7 @@
       return '';
     }
     const actorName = activeSync.startedByActorDisplayName || activeSync.startedByActorId || 'неизвестным пользователем';
-    const moduleCode = activeSync.moduleCode || 'unknown';
+    const moduleCode = activeSync.moduleCode || 'неизвестный модуль';
     const startedAt = activeSync.startedAt ? new Date(activeSync.startedAt).toLocaleString() : null;
     return `Модуль ${moduleCode} импортируется пользователем ${actorName}${startedAt ? ` с ${startedAt}` : ''}.`;
   }

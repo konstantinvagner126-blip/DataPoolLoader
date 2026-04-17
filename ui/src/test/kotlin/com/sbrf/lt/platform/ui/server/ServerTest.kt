@@ -41,9 +41,11 @@ import com.sbrf.lt.platform.ui.model.ModuleCatalogItemResponse
 import com.sbrf.lt.platform.ui.model.ModuleDetailsResponse
 import com.sbrf.lt.platform.ui.model.ModuleFileContent
 import com.sbrf.lt.platform.ui.model.SqlConsoleQueryRequest
+import com.sbrf.lt.platform.ui.model.StartRunRequest
 import com.sbrf.lt.platform.ui.module.DatabaseEditableModule
 import com.sbrf.lt.platform.ui.module.DatabaseModuleStore
 import com.sbrf.lt.platform.ui.module.ModuleRegistry
+import com.sbrf.lt.platform.ui.module.backend.DatabaseModuleBackend
 import com.sbrf.lt.platform.ui.run.DatabaseModuleExecutionSource
 import com.sbrf.lt.platform.ui.run.DatabaseModuleRunService
 import com.sbrf.lt.platform.ui.run.DatabaseRunStore
@@ -73,6 +75,7 @@ import kotlin.io.path.readText
 import kotlin.io.path.writeText
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -691,12 +694,374 @@ class ServerTest {
         }
 
         val dbModulesResponse = noRedirectClient.get("/db-modules")
+        val dbCreateResponse = noRedirectClient.get("/db-modules/new")
         val dbSyncResponse = noRedirectClient.get("/db-sync")
 
         assertEquals(HttpStatusCode.Found, dbModulesResponse.status)
         assertEquals("/?modeAccessError=db-modules", dbModulesResponse.headers[HttpHeaders.Location])
+        assertEquals(HttpStatusCode.Found, dbCreateResponse.status)
+        assertEquals("/?modeAccessError=db-modules", dbCreateResponse.headers[HttpHeaders.Location])
         assertEquals(HttpStatusCode.Found, dbSyncResponse.status)
         assertEquals("/?modeAccessError=db-sync", dbSyncResponse.headers[HttpHeaders.Location])
+    }
+
+    @Test
+    fun `db create module page is available in database mode`() = testApplication {
+        val uiConfig = UiAppConfig(
+            storageDir = Files.createTempDirectory("ui-db-create-page-state-").toString(),
+            moduleStore = UiModuleStoreConfig(mode = UiModuleStoreMode.DATABASE),
+            sqlConsole = SqlConsoleConfig(),
+        )
+        application {
+            uiModule(
+                uiConfig = uiConfig,
+                runtimeContextService = object : UiRuntimeContextService() {
+                    override fun resolve(uiConfig: UiAppConfig): UiRuntimeContext =
+                        testRuntimeContext(UiModuleStoreMode.DATABASE)
+                },
+            )
+        }
+
+        val response = client.get("/db-modules/new")
+
+        assertEquals(HttpStatusCode.OK, response.status)
+        assertTrue(response.bodyAsText().contains("Новый модуль"))
+        assertTrue(response.bodyAsText().contains("createDbModuleForm"))
+    }
+
+    @Test
+    fun `module runs page is available in files mode`() = testApplication {
+        val uiConfig = UiAppConfig(
+            storageDir = Files.createTempDirectory("ui-runs-page-files-state-").toString(),
+            moduleStore = UiModuleStoreConfig(mode = UiModuleStoreMode.FILES),
+            sqlConsole = SqlConsoleConfig(),
+        )
+        application {
+            uiModule(
+                uiConfig = uiConfig,
+                runtimeContextService = object : UiRuntimeContextService() {
+                    override fun resolve(uiConfig: UiAppConfig): UiRuntimeContext =
+                        testRuntimeContext(UiModuleStoreMode.FILES)
+                },
+            )
+        }
+
+        val response = client.get("/module-runs?storage=files&module=demo-app")
+
+        assertEquals(HttpStatusCode.OK, response.status)
+        assertTrue(response.bodyAsText().contains("История и результаты"))
+        assertTrue(response.bodyAsText().contains("runsPageModuleTitle"))
+    }
+
+    @Test
+    fun `module runs page redirects when storage does not match effective mode`() = testApplication {
+        val noRedirectClient = createClient {
+            followRedirects = false
+        }
+        val uiConfig = UiAppConfig(
+            storageDir = Files.createTempDirectory("ui-runs-page-redirect-state-").toString(),
+            moduleStore = UiModuleStoreConfig(mode = UiModuleStoreMode.FILES),
+            sqlConsole = SqlConsoleConfig(),
+        )
+        application {
+            uiModule(
+                uiConfig = uiConfig,
+                runtimeContextService = object : UiRuntimeContextService() {
+                    override fun resolve(uiConfig: UiAppConfig): UiRuntimeContext =
+                        testRuntimeContext(UiModuleStoreMode.FILES)
+                },
+            )
+        }
+
+        val response = noRedirectClient.get("/module-runs?storage=database&module=db-demo")
+
+        assertEquals(HttpStatusCode.Found, response.status)
+        assertEquals("/?modeAccessError=db-modules", response.headers[HttpHeaders.Location])
+    }
+
+    @Test
+    fun `module runs api returns unified files session history and details`() = testApplication {
+        val root = createProject()
+        val registry = ModuleRegistry(appsRoot = root.resolve("apps"))
+        val uiConfig = UiAppConfig(
+            storageDir = Files.createTempDirectory("ui-runs-api-files-state-").toString(),
+            moduleStore = UiModuleStoreConfig(mode = UiModuleStoreMode.FILES),
+            sqlConsole = SqlConsoleConfig(),
+        )
+        val runManager = RunManager(
+            moduleRegistry = registry,
+            applicationRunner = ApplicationRunner(
+                exporter = PostgresExporter { _, _, _ ->
+                    exportConnection(
+                        columns = listOf("id"),
+                        rows = listOf(listOf(1)),
+                    )
+                },
+            ),
+            uiConfig = uiConfig,
+        )
+        val startedRun = runManager.startRun(
+            StartRunRequest(
+                moduleId = "demo-app",
+                configText = """
+                app:
+                  commonSqlFile: classpath:sql/common.sql
+                  sources:
+                    - name: db2
+                      sqlFile: classpath:sql/db2.sql
+                """.trimIndent(),
+                sqlFiles = mapOf(
+                    "classpath:sql/common.sql" to "select 1",
+                    "classpath:sql/db2.sql" to "select 2",
+                ),
+            ),
+        )
+        repeat(40) {
+            if (runManager.currentState().history.any { it.id == startedRun.id && it.summaryJson != null }) {
+                return@repeat
+            }
+            Thread.sleep(50)
+        }
+
+        application {
+            uiModule(
+                uiConfig = uiConfig,
+                moduleRegistry = registry,
+                runManager = runManager,
+                runtimeContextService = object : UiRuntimeContextService() {
+                    override fun resolve(uiConfig: UiAppConfig): UiRuntimeContext =
+                        testRuntimeContext(UiModuleStoreMode.FILES)
+                },
+            )
+        }
+
+        val sessionResponse = client.get("/api/module-runs/files/demo-app")
+        assertEquals(HttpStatusCode.OK, sessionResponse.status)
+        assertTrue(sessionResponse.bodyAsText().contains("\"storageMode\":\"FILES\""))
+        assertTrue(sessionResponse.bodyAsText().contains("\"moduleTitle\":\"Demo App\""))
+
+        val historyResponse = client.get("/api/module-runs/files/demo-app/runs")
+        assertEquals(HttpStatusCode.OK, historyResponse.status)
+        assertTrue(historyResponse.bodyAsText().contains("\"moduleId\":\"demo-app\""))
+        assertTrue(historyResponse.bodyAsText().contains("\"runId\":\"${startedRun.id}\""))
+
+        val detailsResponse = client.get("/api/module-runs/files/demo-app/runs/${startedRun.id}")
+        assertEquals(HttpStatusCode.OK, detailsResponse.status)
+        assertTrue(detailsResponse.bodyAsText().contains("\"events\":"))
+        assertTrue(detailsResponse.bodyAsText().contains("\"artifacts\":"))
+    }
+
+    @Test
+    fun `module runs api returns unified database session history and details`() = testApplication {
+        val uiConfig = UiAppConfig(
+            storageDir = Files.createTempDirectory("ui-runs-api-db-state-").toString(),
+            moduleStore = UiModuleStoreConfig(mode = UiModuleStoreMode.DATABASE),
+            sqlConsole = SqlConsoleConfig(),
+        )
+        val runtimeContextService = object : UiRuntimeContextService() {
+            override fun resolve(uiConfig: UiAppConfig): UiRuntimeContext =
+                testRuntimeContext(UiModuleStoreMode.DATABASE)
+        }
+        val databaseBackend = DatabaseModuleBackend(
+            object : DatabaseModuleStore(
+                connectionProvider = DatabaseConnectionProvider { error("connection must not be requested") },
+            ) {
+                override fun loadModuleDetails(
+                    moduleCode: String,
+                    actorId: String,
+                    actorSource: String,
+                ) = com.sbrf.lt.platform.ui.module.DatabaseEditableModule(
+                    module = ModuleDetailsResponse(
+                        id = moduleCode,
+                        title = "DB Demo",
+                        configPath = "db:$moduleCode",
+                        configText = "app:\n  sources: []",
+                        sqlFiles = emptyList(),
+                        requiresCredentials = false,
+                        credentialsStatus = com.sbrf.lt.platform.ui.model.CredentialsStatusResponse(
+                            mode = "NOT_FOUND",
+                            displayName = "credential.properties не найден",
+                            fileAvailable = false,
+                            uploaded = false,
+                        ),
+                    ),
+                    sourceKind = "CURRENT_REVISION",
+                    currentRevisionId = "revision-1",
+                )
+            },
+        )
+        val runService = object : DatabaseModuleRunService(
+            databaseModuleStore = DatabaseModuleStore(
+                connectionProvider = DatabaseConnectionProvider { error("connection must not be requested") },
+            ),
+            executionSource = DatabaseModuleExecutionSource(
+                connectionProvider = DatabaseConnectionProvider { error("connection must not be requested") },
+            ),
+            runStore = DatabaseRunStore(
+                connectionProvider = DatabaseConnectionProvider { error("connection must not be requested") },
+            ),
+            credentialsProvider = object : UiCredentialsProvider {
+                override fun materializeCredentialsFile(tempDir: java.nio.file.Path) = null
+                override fun currentProperties(): Map<String, String> = emptyMap()
+                override fun currentCredentialsStatus() = com.sbrf.lt.platform.ui.model.CredentialsStatusResponse(
+                    mode = "NOT_FOUND",
+                    displayName = "credential.properties не найден",
+                    fileAvailable = false,
+                    uploaded = false,
+                )
+            },
+        ) {
+            override fun listRuns(moduleCode: String, limit: Int): com.sbrf.lt.platform.ui.model.DatabaseModuleRunsResponse =
+                com.sbrf.lt.platform.ui.model.DatabaseModuleRunsResponse(
+                    moduleCode = moduleCode,
+                    runs = listOf(
+                        com.sbrf.lt.platform.ui.model.DatabaseModuleRunSummaryResponse(
+                            runId = "run-1",
+                            executionSnapshotId = "snapshot-1",
+                            status = "SUCCESS",
+                            launchSourceKind = "WORKING_COPY",
+                            requestedAt = Instant.parse("2026-04-17T10:00:00Z"),
+                            startedAt = Instant.parse("2026-04-17T10:00:01Z"),
+                            finishedAt = Instant.parse("2026-04-17T10:01:00Z"),
+                            moduleCode = moduleCode,
+                            moduleTitle = "DB Demo",
+                            outputDir = "/tmp/out",
+                            mergedRowCount = 10,
+                            successfulSourceCount = 1,
+                            failedSourceCount = 0,
+                            skippedSourceCount = 0,
+                            targetStatus = "SUCCESS",
+                            targetTableName = "demo_target",
+                            targetRowsLoaded = 10,
+                            errorMessage = null,
+                        ),
+                        com.sbrf.lt.platform.ui.model.DatabaseModuleRunSummaryResponse(
+                            runId = "run-2",
+                            executionSnapshotId = "snapshot-2",
+                            status = "FAILED",
+                            launchSourceKind = "CURRENT_REVISION",
+                            requestedAt = Instant.parse("2026-04-16T10:00:00Z"),
+                            startedAt = Instant.parse("2026-04-16T10:00:01Z"),
+                            finishedAt = Instant.parse("2026-04-16T10:01:00Z"),
+                            moduleCode = moduleCode,
+                            moduleTitle = "DB Demo",
+                            outputDir = "/tmp/out-2",
+                            mergedRowCount = 0,
+                            successfulSourceCount = 0,
+                            failedSourceCount = 1,
+                            skippedSourceCount = 0,
+                            targetStatus = "FAILED",
+                            targetTableName = "demo_target",
+                            targetRowsLoaded = 0,
+                            errorMessage = "boom",
+                        ),
+                    ).take(limit),
+                )
+
+            override fun loadRunDetails(
+                moduleCode: String,
+                runId: String,
+            ): com.sbrf.lt.platform.ui.model.DatabaseModuleRunDetailsResponse =
+                com.sbrf.lt.platform.ui.model.DatabaseModuleRunDetailsResponse(
+                    run = com.sbrf.lt.platform.ui.model.DatabaseModuleRunSummaryResponse(
+                        runId = runId,
+                        executionSnapshotId = "snapshot-1",
+                        status = "SUCCESS",
+                        launchSourceKind = "WORKING_COPY",
+                        requestedAt = Instant.parse("2026-04-17T10:00:00Z"),
+                        startedAt = Instant.parse("2026-04-17T10:00:01Z"),
+                        finishedAt = Instant.parse("2026-04-17T10:01:00Z"),
+                        moduleCode = moduleCode,
+                        moduleTitle = "DB Demo",
+                        outputDir = "/tmp/out",
+                        mergedRowCount = 10,
+                        successfulSourceCount = 1,
+                        failedSourceCount = 0,
+                        skippedSourceCount = 0,
+                        targetStatus = "SUCCESS",
+                        targetTableName = "demo_target",
+                        targetRowsLoaded = 10,
+                        errorMessage = null,
+                    ),
+                    summaryJson = """{"mergedRowCount":10}""",
+                    sourceResults = listOf(
+                        com.sbrf.lt.platform.ui.model.DatabaseRunSourceResultResponse(
+                            runSourceResultId = "source-1",
+                            sourceName = "db1",
+                            sortOrder = 0,
+                            status = "SUCCESS",
+                            startedAt = Instant.parse("2026-04-17T10:00:02Z"),
+                            finishedAt = Instant.parse("2026-04-17T10:00:30Z"),
+                            exportedRowCount = 10,
+                            mergedRowCount = 10,
+                            errorMessage = null,
+                        ),
+                    ),
+                    events = listOf(
+                        com.sbrf.lt.platform.ui.model.DatabaseRunEventResponse(
+                            runEventId = "event-1",
+                            seqNo = 1,
+                            createdAt = Instant.parse("2026-04-17T10:00:01Z"),
+                            stage = "RUN",
+                            eventType = "RUN_FINISHED",
+                            severity = "SUCCESS",
+                            sourceName = null,
+                            message = "DB-запуск завершен.",
+                            payloadJson = mapOf("status" to "SUCCESS"),
+                        ),
+                    ),
+                    artifacts = listOf(
+                        com.sbrf.lt.platform.ui.model.DatabaseRunArtifactResponse(
+                            runArtifactId = "artifact-1",
+                            artifactKind = "SUMMARY_JSON",
+                            artifactKey = "summary",
+                            filePath = "/tmp/out/summary.json",
+                            storageStatus = "PRESENT",
+                            fileSizeBytes = 128,
+                            contentHash = null,
+                            createdAt = Instant.parse("2026-04-17T10:01:00Z"),
+                        ),
+                    ),
+                )
+        }
+        application {
+            uiModule(
+                uiConfig = uiConfig,
+                runtimeContextService = runtimeContextService,
+                databaseModuleRunService = runService,
+                databaseModuleBackend = databaseBackend,
+            )
+        }
+
+        val sessionResponse = client.get("/api/module-runs/database/db-demo")
+        assertEquals(HttpStatusCode.OK, sessionResponse.status)
+        assertTrue(sessionResponse.bodyAsText().contains("\"storageMode\":\"DATABASE\""))
+        assertTrue(sessionResponse.bodyAsText().contains("\"moduleTitle\":\"DB Demo\""))
+
+        val historyResponse = client.get("/api/module-runs/database/db-demo/runs?limit=1")
+        assertEquals(HttpStatusCode.OK, historyResponse.status)
+        assertTrue(historyResponse.bodyAsText().contains("\"activeRunId\":null"))
+        assertTrue(historyResponse.bodyAsText().contains("\"executionSnapshotId\":\"snapshot-1\""))
+        assertFalse(historyResponse.bodyAsText().contains("\"executionSnapshotId\":\"snapshot-2\""))
+
+        val detailsResponse = client.get("/api/module-runs/database/db-demo/runs/run-1")
+        assertEquals(HttpStatusCode.OK, detailsResponse.status)
+        assertTrue(detailsResponse.bodyAsText().contains("\"summaryJson\":\"{\\\"mergedRowCount\\\":10}\""))
+        assertTrue(detailsResponse.bodyAsText().contains("\"sourceName\":\"db1\""))
+        assertTrue(detailsResponse.bodyAsText().contains("\"artifactKind\":\"SUMMARY_JSON\""))
+    }
+
+    @Test
+    fun `api help page is available`() = testApplication {
+        application {
+            uiModule()
+        }
+
+        val response = client.get("/help/api")
+
+        assertEquals(HttpStatusCode.OK, response.status)
+        assertTrue(response.bodyAsText().contains("SwaggerUIBundle"))
+        assertTrue(response.bodyAsText().contains("/static/openapi/ui-api-openapi.yaml"))
     }
 
     @Test
@@ -722,7 +1087,7 @@ class ServerTest {
                                 configured = false,
                                 available = false,
                                 schema = config.schemaName(),
-                                message = "Параметры PostgreSQL registry не настроены.",
+                                message = "Параметры подключения к базе данных не настроены.",
                             )
                         }
                     },
@@ -735,7 +1100,7 @@ class ServerTest {
         assertTrue(runtimeContext.contains("\"requestedMode\":\"database\""))
         assertTrue(runtimeContext.contains("\"effectiveMode\":\"files\""))
         assertTrue(runtimeContext.contains("\"requiresManualInput\":true"))
-        assertTrue(runtimeContext.contains("Параметры PostgreSQL registry не настроены."))
+        assertTrue(runtimeContext.contains("Параметры подключения к базе данных не настроены."))
     }
 
     @Test
@@ -768,9 +1133,9 @@ class ServerTest {
                         available = available,
                         schema = config.schemaName(),
                         message = if (available) {
-                            "PostgreSQL registry доступен."
+                            "Подключение к базе данных доступно."
                         } else {
-                            "PostgreSQL registry недоступен."
+                            "Подключение к базе данных недоступно."
                         },
                         errorMessage = if (available) null else "Не удалось разрешить placeholders.",
                     )
@@ -852,7 +1217,7 @@ class ServerTest {
                         configured = true,
                         available = true,
                         schema = config.schemaName(),
-                        message = "PostgreSQL registry доступен.",
+                        message = "Подключение к базе данных доступно.",
                     )
             },
             schemaMigrator = object : UiDatabaseSchemaMigrator() {
@@ -918,7 +1283,7 @@ class ServerTest {
                         configured = true,
                         available = true,
                         schema = config.schemaName(),
-                        message = "PostgreSQL registry доступен.",
+                        message = "Подключение к базе данных доступно.",
                     )
             },
             schemaMigrator = object : UiDatabaseSchemaMigrator() {
@@ -979,7 +1344,7 @@ class ServerTest {
                         configured = true,
                         available = true,
                         schema = config.schemaName(),
-                        message = "PostgreSQL registry доступен.",
+                        message = "Подключение к базе данных доступно.",
                     )
             },
             schemaMigrator = object : UiDatabaseSchemaMigrator() {
@@ -1061,7 +1426,7 @@ class ServerTest {
                         configured = true,
                         available = true,
                         schema = config.schemaName(),
-                        message = "PostgreSQL registry доступен.",
+                        message = "Подключение к базе данных доступно.",
                     )
             },
             schemaMigrator = object : UiDatabaseSchemaMigrator() {
@@ -1161,7 +1526,7 @@ class ServerTest {
                         configured = true,
                         available = true,
                         schema = config.schemaName(),
-                        message = "PostgreSQL registry доступен.",
+                        message = "Подключение к базе данных доступно.",
                     )
             },
             schemaMigrator = object : UiDatabaseSchemaMigrator() {
@@ -1224,6 +1589,80 @@ class ServerTest {
     }
 
     @Test
+    fun `db module create endpoint forwards full draft including hidden flag`() = testApplication {
+        val uiConfig = UiAppConfig(
+            moduleStore = UiModuleStoreConfig(mode = UiModuleStoreMode.DATABASE),
+            storageDir = Files.createTempDirectory("ui-db-create-endpoint-state-").toString(),
+            sqlConsole = SqlConsoleConfig(),
+        )
+        val runtimeContextService = object : UiRuntimeContextService() {
+            override fun resolve(uiConfig: UiAppConfig): UiRuntimeContext =
+                testRuntimeContext(UiModuleStoreMode.DATABASE)
+        }
+        var capturedModuleCode: String? = null
+        var capturedActorId: String? = null
+        var capturedActorSource: String? = null
+        var capturedDraft: RegistryModuleDraft? = null
+        val databaseModuleStore = object : DatabaseModuleStore(
+            connectionProvider = DatabaseConnectionProvider { error("connection must not be requested") },
+        ) {
+            override fun createModule(
+                moduleCode: String,
+                actorId: String,
+                actorSource: String,
+                actorDisplayName: String?,
+                originKind: String,
+                request: RegistryModuleDraft,
+            ): RegistryModuleCreationResult {
+                capturedModuleCode = moduleCode
+                capturedActorId = actorId
+                capturedActorSource = actorSource
+                capturedDraft = request
+                return RegistryModuleCreationResult(
+                    moduleId = "module-1",
+                    moduleCode = moduleCode,
+                    revisionId = "revision-1",
+                    workingCopyId = "working-copy-1",
+                )
+            }
+        }
+        application {
+            uiModule(
+                uiConfig = uiConfig,
+                runtimeContextService = runtimeContextService,
+                databaseModuleStore = databaseModuleStore,
+            )
+        }
+
+        val response = client.post("/api/db/modules") {
+            contentType(ContentType.Application.Json)
+            setBody(
+                """
+                {
+                  "moduleCode": "customer-pool",
+                  "title": "Пул клиентов",
+                  "description": "Тестовый DB-модуль",
+                  "tags": ["demo", "nightly"],
+                  "configText": "app:\n  outputDir: ./output\n  sources: []\n",
+                  "hiddenFromUi": false
+                }
+                """.trimIndent(),
+            )
+        }
+
+        assertEquals(HttpStatusCode.OK, response.status)
+        assertEquals("customer-pool", capturedModuleCode)
+        assertEquals("kwdev", capturedActorId)
+        assertEquals("OS_LOGIN", capturedActorSource)
+        assertEquals("Пул клиентов", capturedDraft?.title)
+        assertEquals("Тестовый DB-модуль", capturedDraft?.description)
+        assertEquals(listOf("demo", "nightly"), capturedDraft?.tags)
+        assertEquals(false, capturedDraft?.hiddenFromUi)
+        assertTrue(capturedDraft?.configText?.contains("outputDir: ./output") == true)
+        assertTrue(response.bodyAsText().contains("\"moduleCode\":\"customer-pool\""))
+    }
+
+    @Test
     fun `db module save endpoint stores personal working copy for current actor`() = testApplication {
         val uiConfig = UiAppConfig(
             moduleStore = UiModuleStoreConfig(
@@ -1248,7 +1687,7 @@ class ServerTest {
                         configured = true,
                         available = true,
                         schema = config.schemaName(),
-                        message = "PostgreSQL registry доступен.",
+                        message = "Подключение к базе данных доступно.",
                     )
             },
             schemaMigrator = object : UiDatabaseSchemaMigrator() {
@@ -1299,7 +1738,7 @@ class ServerTest {
         }
 
         assertEquals(HttpStatusCode.OK, response.status)
-        assertTrue(response.bodyAsText().contains("working copy"))
+        assertTrue(response.bodyAsText().contains("черновик"))
         assertEquals("db-demo", savedModuleCode)
         assertEquals("kwdev", savedActorId)
         assertEquals("app:\n  mergeMode: plain\n", savedConfigText)
@@ -1330,7 +1769,7 @@ class ServerTest {
                         configured = true,
                         available = true,
                         schema = config.schemaName(),
-                        message = "PostgreSQL registry доступен.",
+                        message = "Подключение к базе данных доступно.",
                     )
             },
             schemaMigrator = object : UiDatabaseSchemaMigrator() {
@@ -1356,7 +1795,7 @@ class ServerTest {
         val response = client.post("/api/db/modules/db-demo/discard-working-copy")
 
         assertEquals(HttpStatusCode.OK, response.status)
-        assertTrue(response.bodyAsText().contains("working copy"))
+        assertTrue(response.bodyAsText().contains("черновик"))
         assertEquals(Triple("db-demo", "kwdev", "OS_LOGIN"), discarded)
     }
 
@@ -1385,7 +1824,7 @@ class ServerTest {
                         configured = true,
                         available = true,
                         schema = config.schemaName(),
-                        message = "PostgreSQL registry доступен.",
+                        message = "Подключение к базе данных доступно.",
                     )
             },
             schemaMigrator = object : UiDatabaseSchemaMigrator() {
@@ -1476,7 +1915,7 @@ class ServerTest {
                         configured = true,
                         available = true,
                         schema = config.schemaName(),
-                        message = "PostgreSQL registry доступен.",
+                        message = "Подключение к базе данных доступно.",
                     )
             },
             schemaMigrator = object : UiDatabaseSchemaMigrator() {

@@ -11,7 +11,7 @@
   const { createCredentialsController } = uiCredentialsNamespace;
   const { createConfigFormController } = moduleEditorNamespace;
   const { createSqlCatalogController, renderModuleMetadata } = moduleEditorSharedNamespace;
-  const { renderExecutionLogPanel, renderHistoryCurrentPanel, renderTechnicalDiagnosticsPanel, renderSummaryPanel } = editorBlocksNamespace;
+  const { renderExecutionLogPanel, renderHistoryCurrentPanel, renderTechnicalDiagnosticsPanel, renderSummaryPanel, renderInfoPanel } = editorBlocksNamespace;
   const { createRunPanelsController } = runPanelsNamespace;
 
   const MODULE_UI_STATE_STORAGE_KEY = "datapool.moduleEditor.uiState";
@@ -22,6 +22,7 @@
     filtersId: "runHistoryFilters",
     historyId: "runHistory",
     summaryId: "runSummary",
+    historyTitle: "Последние запуски",
   });
   renderTechnicalDiagnosticsPanel?.(document.getElementById("technicalDiagnosticsPanelHost"), {
     panelId: "technicalDiagnosticsPanel",
@@ -35,6 +36,13 @@
     rawJsonId: "summaryJson",
     emptyText: "Пока нет данных summary.",
     rawPanelInitiallyHidden: true,
+  });
+  renderInfoPanel?.(document.getElementById("resultsPanelHost"), {
+    panelId: "runResultsPanel",
+    title: "Результаты запуска",
+    contentId: "runResultArtifacts",
+    contentClass: "mt-3 text-secondary small",
+    emptyText: "Пути к результатам запуска появятся после выполнения.",
   });
 
   let configEditor = null;
@@ -70,12 +78,14 @@
   const summaryStructured = document.getElementById("summaryStructured");
   const summaryJson = document.getElementById("summaryJson");
   const summaryRawPanel = document.getElementById("summaryRawPanel");
+  const runResultArtifacts = document.getElementById("runResultArtifacts");
   const technicalDiagnosticsPanel = document.getElementById("technicalDiagnosticsPanel");
   const credentialsStatus = document.getElementById("credentialsStatus");
   const credentialsWarning = document.getElementById("credentialsWarning");
   const credentialsFileInput = document.getElementById("credentialsFileInput");
   const reloadButton = document.getElementById("reloadButton");
   const saveButton = document.getElementById("saveButton");
+  const historyButton = document.getElementById("historyButton");
   const runButton = document.getElementById("runButton");
   const uploadCredentialsButton = document.getElementById("uploadCredentialsButton");
 
@@ -149,7 +159,14 @@
     runHistoryFiltersEl: runHistoryFilters,
     runHistoryEl: runHistory,
     summaryStructuredEl: summaryStructured,
-    summaryJsonEl: summaryJson
+    summaryJsonEl: summaryJson,
+    resultArtifactsEl: runResultArtifacts,
+    resultPanelId: "runResultsPanel",
+    rawSummaryPanelId: "summaryRawPanel",
+    rawSummaryCollapseId: "summaryRawCollapse",
+    compactMode: true,
+    historyLimit: 5,
+    humanTimelineLimit: 12,
   });
 
   reloadButton.addEventListener("click", () => {
@@ -184,6 +201,13 @@
       configText: configEditor.getValue(),
       sqlFiles: sqlContents
     }, "Не удалось запустить модуль.");
+  });
+
+  historyButton.addEventListener("click", () => {
+    if (!selectedModuleId) {
+      return;
+    }
+    window.location.assign(`/module-runs?storage=files&module=${encodeURIComponent(selectedModuleId)}`);
   });
 
   uploadCredentialsButton.addEventListener("click", async () => {
@@ -260,7 +284,7 @@
       console.error(error);
       renderModuleCatalogStatus({
         mode: "ERROR",
-        message: error.message || "Не удалось определить состояние каталога app-модулей."
+        message: error.message || "Не удалось определить состояние каталога файловых модулей."
       });
       renderModuleListEmpty(error.message || "Не удалось загрузить список модулей.");
     }
@@ -269,14 +293,14 @@
   function renderModuleCatalogStatus(status) {
     if (!status) {
       moduleCatalogStatus.className = "module-catalog-status mt-3 mb-3 text-secondary small";
-      moduleCatalogStatus.textContent = "Состояние каталога app-модулей пока недоступно.";
+      moduleCatalogStatus.textContent = "Состояние каталога файловых модулей пока недоступно.";
       return;
     }
 
     const isReady = status.mode === "READY";
     moduleCatalogStatus.className = `module-catalog-status mt-3 mb-3 small ${isReady ? "module-catalog-ready" : "module-catalog-warning"}`;
     moduleCatalogStatus.innerHTML = `
-      <div>${escapeHtml(status.message || "Состояние каталога app-модулей неизвестно.")}</div>
+      <div>${escapeHtml(status.message || "Состояние каталога файловых модулей неизвестно.")}</div>
       ${status.configuredPath ? `<span class="module-catalog-path">${escapeHtml(status.configuredPath)}</span>` : ""}
     `;
   }
@@ -376,8 +400,19 @@
 
   function renderValidationBadge(status) {
     const normalized = String(status || "VALID").toUpperCase();
-    const label = normalized === "VALID" ? "OK" : (normalized === "WARNING" ? "Предупреждение" : "Ошибка");
+    const label = normalized === "VALID" ? "Исправен" : (normalized === "WARNING" ? "Предупреждение" : "Ошибка");
     return `<span class="module-validation-badge module-validation-badge-${normalized.toLowerCase()}">${label}</span>`;
+  }
+
+  function translateValidationSeverity(severity) {
+    switch (String(severity || "INFO").toUpperCase()) {
+      case "ERROR":
+        return "Ошибка";
+      case "WARNING":
+        return "Предупреждение";
+      default:
+        return "Информация";
+    }
   }
 
   function renderModuleValidation(module) {
@@ -399,7 +434,7 @@
       <ul class="module-validation-list mb-0">
         ${issues.map(issue => `
           <li>
-            <span class="module-validation-severity module-validation-severity-${String(issue.severity || "").toLowerCase()}">${escapeHtml(issue.severity || "INFO")}</span>
+            <span class="module-validation-severity module-validation-severity-${String(issue.severity || "").toLowerCase()}">${escapeHtml(translateValidationSeverity(issue.severity))}</span>
             <span>${escapeHtml(issue.message || "")}</span>
           </li>
         `).join("")}
@@ -433,6 +468,7 @@
     const capabilities = currentModule?.capabilities || {};
     saveButton.disabled = !dirty || !selectedModuleId || capabilities.save !== true;
     runButton.disabled = !selectedModuleId || capabilities.run !== true;
+    historyButton.disabled = !selectedModuleId;
 
     if (!selectedModuleId) {
       moduleDraftStatus.innerHTML = `
@@ -460,14 +496,18 @@
   }
 
   function restorePersistedModuleUiState() {
+    const params = new URLSearchParams(window.location.search);
+    const requestedModuleId = params.get("module");
     const parsed = loadJsonStorage(window.localStorage, MODULE_UI_STATE_STORAGE_KEY, null);
-    if (!parsed || typeof parsed !== "object") {
-      return;
+    if (parsed && typeof parsed === "object") {
+      selectedModuleId = typeof parsed.selectedModuleId === "string" && parsed.selectedModuleId
+        ? parsed.selectedModuleId
+        : null;
+      formController.loadSerializedExpansionState(parsed.moduleExpansionState);
     }
-    selectedModuleId = typeof parsed.selectedModuleId === "string" && parsed.selectedModuleId
-      ? parsed.selectedModuleId
-      : null;
-    formController.loadSerializedExpansionState(parsed.moduleExpansionState);
+    if (requestedModuleId) {
+      selectedModuleId = requestedModuleId;
+    }
   }
 
   function persistModuleUiState() {

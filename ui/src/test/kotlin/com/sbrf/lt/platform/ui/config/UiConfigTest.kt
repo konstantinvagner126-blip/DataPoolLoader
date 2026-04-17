@@ -17,10 +17,11 @@ class UiConfigTest {
         val config = UiConfigLoader().load()
 
         assertEquals(8080, config.port)
-        assertEquals(UiModuleStoreMode.FILES, config.moduleStore.mode)
+        assertEquals(UiModuleStoreMode.DATABASE, config.moduleStore.mode)
         assertEquals(UiModuleStorePostgresConfig.DEFAULT_SCHEMA, config.moduleStore.postgres.schemaName())
         assertEquals(1000, config.sqlConsole.fetchSize)
         assertEquals(200, config.sqlConsole.maxRowsPerShard)
+        assertEquals("\${LOCAL_MANUAL_DB_JDBC_URL}", config.moduleStore.postgres.jdbcUrl)
     }
 
     @Test

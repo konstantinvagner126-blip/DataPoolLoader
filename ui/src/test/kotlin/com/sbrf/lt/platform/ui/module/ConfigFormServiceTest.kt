@@ -60,6 +60,66 @@ class ConfigFormServiceTest {
         assertEquals("${'$'}{TARGET_JDBC_URL}", state.targetJdbcUrl)
         assertEquals("public.test_data_pool", state.targetTable)
         assertTrue(state.targetTruncateBeforeLoad)
+        assertTrue(state.warnings.isEmpty())
+    }
+
+    @Test
+    fun `parse keeps form available when enum and numeric fields are invalid`() {
+        val state = service.parse(
+            """
+            app:
+              outputDir: ./output
+              mergeMode: broken_mode
+              parallelism: many
+              fetchSize: 1000
+              progressLogEveryRows: invalid
+              sources:
+                - name: db1
+                  jdbcUrl: jdbc:test
+                  username: user
+                  password: pwd
+              target:
+                enabled: yep
+                table: public.pool
+            """.trimIndent(),
+        )
+
+        assertEquals("plain", state.mergeMode)
+        assertEquals(5, state.parallelism)
+        assertEquals(10_000, state.progressLogEveryRows)
+        assertTrue(state.targetEnabled)
+        assertTrue(state.warnings.any { it.contains("mergeMode") })
+        assertTrue(state.warnings.any { it.contains("parallelism") })
+        assertTrue(state.warnings.any { it.contains("progressLogEveryRows") })
+        assertTrue(state.warnings.any { it.contains("app.target.enabled") })
+    }
+
+    @Test
+    fun `parse keeps supported sections even when yaml structure is partially unsupported`() {
+        val state = service.parse(
+            """
+            app:
+              outputDir: ./custom-output
+              sources: invalid
+              quotas:
+                - source: db1
+                  percent: fifty
+              target:
+                jdbcUrl: jdbc:target
+                username: loader
+                password: secret
+                table: public.pool
+            """.trimIndent(),
+        )
+
+        assertEquals("./custom-output", state.outputDir)
+        assertTrue(state.sources.isEmpty())
+        assertEquals(1, state.quotas.size)
+        assertEquals("db1", state.quotas.first().source)
+        assertEquals(null, state.quotas.first().percent)
+        assertEquals("jdbc:target", state.targetJdbcUrl)
+        assertTrue(state.warnings.any { it.contains("app.sources") })
+        assertTrue(state.warnings.any { it.contains("app.quotas[0].percent") })
     }
 
     @Test

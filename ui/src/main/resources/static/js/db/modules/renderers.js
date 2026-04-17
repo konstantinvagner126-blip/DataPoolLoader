@@ -27,14 +27,14 @@
       `;
       refs.moduleDraftStatus.className = 'module-draft-status small mt-1 text-secondary';
       refs.moduleSourceKind.innerHTML = '';
-      refs.workingCopyDetails.textContent = 'Рабочая копия пока не загружена.';
+      refs.workingCopyDetails.textContent = 'Личный черновик пока не загружен.';
       refs.moduleMetadata.innerHTML = '<div class="text-secondary small">Модуль не выбран.</div>';
       refs.moduleValidationAlert.classList.add('d-none');
       refs.moduleValidationAlert.textContent = '';
       refs.sqlCatalogList.innerHTML = '';
       refs.sqlResourceTitle.textContent = 'SQL-ресурс не выбран';
       refs.sqlResourceMeta.innerHTML = '<span class="text-secondary">Создай новый SQL или выбери существующий ресурс.</span>';
-      refs.sqlResourceUsage.innerHTML = '<span class="text-secondary">Usage пока недоступен.</span>';
+      refs.sqlResourceUsage.innerHTML = '<span class="text-secondary">Сведения об использовании пока недоступны.</span>';
       refs.dbRunsList.innerHTML = '<div class="text-secondary small">Запусков пока нет.</div>';
       runRenderer.renderSelectedRunDetails();
       if (editors.configEditor) {

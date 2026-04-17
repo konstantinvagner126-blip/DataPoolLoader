@@ -43,6 +43,9 @@ import com.sbrf.lt.platform.ui.run.DatabaseModuleRunService
 import com.sbrf.lt.platform.ui.run.DatabaseRunStore
 import com.sbrf.lt.platform.ui.run.RunManager
 import com.sbrf.lt.platform.ui.run.UiCredentialsService
+import com.sbrf.lt.platform.ui.run.history.DatabaseModuleRunHistoryService
+import com.sbrf.lt.platform.ui.run.history.FilesModuleRunHistoryService
+import com.sbrf.lt.platform.ui.run.history.ModuleRunHistoryService
 import com.sbrf.lt.datapool.db.registry.DriverManagerDatabaseConnectionProvider
 import com.sbrf.lt.datapool.module.sync.ModuleSyncService
 import com.sbrf.lt.datapool.module.sync.ModuleSyncState
@@ -202,6 +205,8 @@ fun Application.uiModule(
     uiConfigPersistenceService: UiConfigPersistenceService = UiConfigPersistenceService(),
     moduleSyncService: ModuleSyncService? = null,
     databaseModuleRunService: DatabaseModuleRunService? = null,
+    filesModuleRunHistoryService: ModuleRunHistoryService = FilesModuleRunHistoryService(moduleRegistry, runManager),
+    databaseModuleRunHistoryService: ModuleRunHistoryService? = null,
 ) {
     val mapper = ObjectMapper()
         .registerModule(JavaTimeModule())
@@ -266,6 +271,13 @@ fun Application.uiModule(
             )
         }
 
+    fun currentDatabaseModuleRunHistoryService(): ModuleRunHistoryService? =
+        databaseModuleRunHistoryService ?: run {
+            val backend = currentDatabaseModuleBackend() ?: return@run null
+            val runService = currentDatabaseModuleRunService() ?: return@run null
+            DatabaseModuleRunHistoryService(backend, runService)
+        }
+
     fun readSyncStateSafely(): ModuleSyncState =
         runCatching {
             val runtimeContext = currentRuntimeContext()
@@ -303,6 +315,63 @@ fun Application.uiModule(
         }
     }
 
+    fun databaseModeUnavailableMessage(runtimeContext: UiRuntimeContext): String =
+        buildString {
+            append("Режим базы данных сейчас недоступен.")
+            runtimeContext.fallbackReason?.takeIf { it.isNotBlank() }?.let { reason ->
+                append(" Причина: ")
+                append(reason)
+            }
+        }
+
+    fun requireDatabaseMode(runtimeContext: UiRuntimeContext) {
+        require(runtimeContext.effectiveMode == UiModuleStoreMode.DATABASE) {
+            databaseModeUnavailableMessage(runtimeContext)
+        }
+    }
+
+    fun requireDatabaseActorId(runtimeContext: UiRuntimeContext): String =
+        requireNotNull(runtimeContext.actor.actorId) {
+            "Не удалось определить пользователя для режима базы данных."
+        }
+
+    fun requireDatabaseActorSource(runtimeContext: UiRuntimeContext): String =
+        requireNotNull(runtimeContext.actor.actorSource) {
+            "Не удалось определить источник пользователя для режима базы данных."
+        }
+
+    fun requireDatabaseActor(runtimeContext: UiRuntimeContext): ModuleActor =
+        ModuleActor(
+            actorId = requireDatabaseActorId(runtimeContext),
+            actorSource = requireDatabaseActorSource(runtimeContext),
+            actorDisplayName = runtimeContext.actor.actorDisplayName,
+        )
+
+    fun includeHiddenQueryParam(rawValue: String?): Boolean =
+        rawValue == "1" || rawValue.equals("true", ignoreCase = true)
+
+    fun requireRunHistoryService(
+        storageMode: String,
+        runtimeContext: UiRuntimeContext,
+    ): Pair<ModuleRunHistoryService, ModuleActor?> =
+        when (storageMode.lowercase()) {
+            "files" -> {
+                require(runtimeContext.effectiveMode == UiModuleStoreMode.FILES) {
+                    "Страница файловых модулей доступна только в режиме Файлы."
+                }
+                filesModuleRunHistoryService to null
+            }
+            "database" -> {
+                requireDatabaseMaintenanceIsInactive()
+                requireDatabaseMode(runtimeContext)
+                val service = requireNotNull(currentDatabaseModuleRunHistoryService()) {
+                    "Сервис истории запусков для режима базы данных не настроен."
+                }
+                service to requireDatabaseActor(runtimeContext)
+            }
+            else -> error("Неизвестный режим хранения '$storageMode'.")
+        }
+
     routing {
         get("/") {
             val content = loadStaticText("static/home.html")
@@ -329,6 +398,38 @@ fun Application.uiModule(
                 ContentType.Text.Html,
             )
         }
+        get("/help/api") {
+            val content = loadStaticText("static/help-api.html")
+            call.respondText(
+                content,
+                ContentType.Text.Html,
+            )
+        }
+        get("/module-runs") {
+            when (call.request.queryParameters["storage"]?.lowercase()) {
+                "files" -> {
+                    if (currentRuntimeContext().effectiveMode != UiModuleStoreMode.FILES) {
+                        call.respondRedirect("/?modeAccessError=modules", permanent = false)
+                        return@get
+                    }
+                }
+                "database" -> {
+                    if (currentRuntimeContext().effectiveMode != UiModuleStoreMode.DATABASE) {
+                        call.respondRedirect("/?modeAccessError=db-modules", permanent = false)
+                        return@get
+                    }
+                }
+                else -> {
+                    call.respondRedirect("/", permanent = false)
+                    return@get
+                }
+            }
+            val content = loadStaticText("static/module-runs.html")
+            call.respondText(
+                content,
+                ContentType.Text.Html,
+            )
+        }
         get("/sql-console") {
             val content = loadStaticText("static/sql-console.html")
             call.respondText(
@@ -342,6 +443,17 @@ fun Application.uiModule(
                 return@get
             }
             val content = loadStaticText("static/db-modules.html")
+            call.respondText(
+                content,
+                ContentType.Text.Html,
+            )
+        }
+        get("/db-modules/new") {
+            if (currentRuntimeContext().effectiveMode != UiModuleStoreMode.DATABASE) {
+                call.respondRedirect("/?modeAccessError=db-modules", permanent = false)
+                return@get
+            }
+            val content = loadStaticText("static/db-module-create.html")
             call.respondText(
                 content,
                 ContentType.Text.Html,
@@ -368,6 +480,35 @@ fun Application.uiModule(
             call.respond(currentRuntimeContext())
         }
 
+        get("/api/module-runs/{storage}/{id}") {
+            val runtimeContext = currentRuntimeContext()
+            val storageMode = requireNotNull(call.parameters["storage"])
+            val moduleId = requireNotNull(call.parameters["id"])
+            val (service, actor) = requireRunHistoryService(storageMode, runtimeContext)
+            call.respond(service.loadSession(moduleId, actor))
+        }
+
+        get("/api/module-runs/{storage}/{id}/runs") {
+            val runtimeContext = currentRuntimeContext()
+            val storageMode = requireNotNull(call.parameters["storage"])
+            val moduleId = requireNotNull(call.parameters["id"])
+            val limit = call.request.queryParameters["limit"]
+                ?.toIntOrNull()
+                ?.coerceIn(1, 200)
+                ?: 20
+            val (service, actor) = requireRunHistoryService(storageMode, runtimeContext)
+            call.respond(service.listRuns(moduleId, actor, limit))
+        }
+
+        get("/api/module-runs/{storage}/{id}/runs/{runId}") {
+            val runtimeContext = currentRuntimeContext()
+            val storageMode = requireNotNull(call.parameters["storage"])
+            val moduleId = requireNotNull(call.parameters["id"])
+            val runId = requireNotNull(call.parameters["runId"])
+            val (service, actor) = requireRunHistoryService(storageMode, runtimeContext)
+            call.respond(service.loadRunDetails(moduleId, runId, actor))
+        }
+
         post("/api/ui/runtime-mode") {
             val request = call.receive<UiRuntimeModeUpdateRequest>()
             val updatedConfig = uiConfigPersistenceService.updateModuleStoreMode(request.mode)
@@ -388,8 +529,9 @@ fun Application.uiModule(
             requireDatabaseMaintenanceIsInactive()
             val runtimeContext = currentRuntimeContext()
             val store = currentDatabaseModuleStore()
+            val includeHidden = includeHiddenQueryParam(call.request.queryParameters["includeHidden"])
             val modules = if (runtimeContext.effectiveMode == UiModuleStoreMode.DATABASE && store != null) {
-                currentDatabaseModuleBackend()?.listModules().orEmpty()
+                currentDatabaseModuleBackend()?.listModules(includeHidden = includeHidden).orEmpty()
             } else {
                 emptyList()
             }
@@ -399,24 +541,14 @@ fun Application.uiModule(
         get("/api/db/modules/{id}") {
             requireDatabaseMaintenanceIsInactive()
             val runtimeContext = currentRuntimeContext()
-            require(runtimeContext.effectiveMode == UiModuleStoreMode.DATABASE) {
-                "DB-режим недоступен: ${runtimeContext.fallbackReason ?: "effective mode is ${runtimeContext.effectiveMode.toConfigValue()}"}"
-            }
+            requireDatabaseMode(runtimeContext)
             val backend = requireNotNull(currentDatabaseModuleBackend()) {
-                "DB module backend не настроен."
+                "Сервис работы с модулями из базы данных не настроен."
             }
             call.respond(
                 backend.loadModule(
                     moduleId = requireNotNull(call.parameters["id"]),
-                    actor = ModuleActor(
-                        actorId = requireNotNull(runtimeContext.actor.actorId) {
-                            "Для DB-режима нужно определить actorId."
-                        },
-                        actorSource = requireNotNull(runtimeContext.actor.actorSource) {
-                            "Для DB-режима нужно определить actorSource."
-                        },
-                        actorDisplayName = runtimeContext.actor.actorDisplayName,
-                    ),
+                    actor = requireDatabaseActor(runtimeContext),
                 ),
             )
         }
@@ -424,11 +556,9 @@ fun Application.uiModule(
         get("/api/db/modules/{id}/runs") {
             requireDatabaseMaintenanceIsInactive()
             val runtimeContext = currentRuntimeContext()
-            require(runtimeContext.effectiveMode == UiModuleStoreMode.DATABASE) {
-                "DB-режим недоступен: ${runtimeContext.fallbackReason ?: "effective mode is ${runtimeContext.effectiveMode.toConfigValue()}"}"
-            }
+            requireDatabaseMode(runtimeContext)
             val runService = requireNotNull(currentDatabaseModuleRunService()) {
-                "DB run service не настроен."
+                "Сервис истории запусков для режима базы данных не настроен."
             }
             call.respond(runService.listRuns(requireNotNull(call.parameters["id"])))
         }
@@ -436,11 +566,9 @@ fun Application.uiModule(
         get("/api/db/modules/{id}/runs/{runId}") {
             requireDatabaseMaintenanceIsInactive()
             val runtimeContext = currentRuntimeContext()
-            require(runtimeContext.effectiveMode == UiModuleStoreMode.DATABASE) {
-                "DB-режим недоступен: ${runtimeContext.fallbackReason ?: "effective mode is ${runtimeContext.effectiveMode.toConfigValue()}"}"
-            }
+            requireDatabaseMode(runtimeContext)
             val runService = requireNotNull(currentDatabaseModuleRunService()) {
-                "DB run service не настроен."
+                "Сервис истории запусков для режима базы данных не настроен."
             }
             call.respond(
                 runService.loadRunDetails(
@@ -453,72 +581,50 @@ fun Application.uiModule(
         post("/api/db/modules/{id}/save") {
             requireDatabaseMaintenanceIsInactive()
             val runtimeContext = currentRuntimeContext()
-            require(runtimeContext.effectiveMode == UiModuleStoreMode.DATABASE) {
-                "DB-режим недоступен: ${runtimeContext.fallbackReason ?: "effective mode is ${runtimeContext.effectiveMode.toConfigValue()}"}"
-            }
+            requireDatabaseMode(runtimeContext)
             val moduleCode = requireNotNull(call.parameters["id"])
             requireDatabaseModuleIsNotSyncing(moduleCode)
             val backend = requireNotNull(currentDatabaseModuleBackend()) {
-                "DB module backend не настроен."
+                "Сервис работы с модулями из базы данных не настроен."
             }
             backend.saveModule(
                 moduleId = moduleCode,
                 request = call.receive<SaveModuleRequest>(),
-                actor = ModuleActor(
-                    actorId = requireNotNull(runtimeContext.actor.actorId) {
-                        "Для DB-режима нужно определить actorId."
-                    },
-                    actorSource = requireNotNull(runtimeContext.actor.actorSource) {
-                        "Для DB-режима нужно определить actorSource."
-                    },
-                    actorDisplayName = runtimeContext.actor.actorDisplayName,
-                ),
+                actor = requireDatabaseActor(runtimeContext),
             )
-            call.respond(SaveResultResponse("Изменения сохранены в личную working copy."))
+            call.respond(SaveResultResponse("Изменения сохранены в личный черновик."))
         }
 
         post("/api/db/modules/{id}/discard-working-copy") {
             requireDatabaseMaintenanceIsInactive()
             val runtimeContext = currentRuntimeContext()
-            require(runtimeContext.effectiveMode == UiModuleStoreMode.DATABASE) {
-                "DB-режим недоступен: ${runtimeContext.fallbackReason ?: "effective mode is ${runtimeContext.effectiveMode.toConfigValue()}"}"
-            }
+            requireDatabaseMode(runtimeContext)
             val moduleCode = requireNotNull(call.parameters["id"])
             requireDatabaseModuleIsNotSyncing(moduleCode)
             val store = requireNotNull(currentDatabaseModuleStore()) {
-                "DB module store не настроен."
+                "Хранилище модулей из базы данных не настроено."
             }
-            val actorId = requireNotNull(runtimeContext.actor.actorId) {
-                "Для DB-режима нужно определить actorId."
-            }
-            val actorSource = requireNotNull(runtimeContext.actor.actorSource) {
-                "Для DB-режима нужно определить actorSource."
-            }
+            val actorId = requireDatabaseActorId(runtimeContext)
+            val actorSource = requireDatabaseActorSource(runtimeContext)
             store.discardWorkingCopy(
                 moduleCode = moduleCode,
                 actorId = actorId,
                 actorSource = actorSource,
             )
-            call.respond(SaveResultResponse("Личная working copy удалена."))
+            call.respond(SaveResultResponse("Личный черновик удалён."))
         }
 
         post("/api/db/modules/{id}/publish") {
             requireDatabaseMaintenanceIsInactive()
             val runtimeContext = currentRuntimeContext()
-            require(runtimeContext.effectiveMode == UiModuleStoreMode.DATABASE) {
-                "DB-режим недоступен: ${runtimeContext.fallbackReason ?: "effective mode is ${runtimeContext.effectiveMode.toConfigValue()}"}"
-            }
+            requireDatabaseMode(runtimeContext)
             val moduleCode = requireNotNull(call.parameters["id"])
             requireDatabaseModuleIsNotSyncing(moduleCode)
             val store = requireNotNull(currentDatabaseModuleStore()) {
-                "DB module store не настроен."
+                "Хранилище модулей из базы данных не настроено."
             }
-            val actorId = requireNotNull(runtimeContext.actor.actorId) {
-                "Для DB-режима нужно определить actorId."
-            }
-            val actorSource = requireNotNull(runtimeContext.actor.actorSource) {
-                "Для DB-режима нужно определить actorSource."
-            }
+            val actorId = requireDatabaseActorId(runtimeContext)
+            val actorSource = requireDatabaseActorSource(runtimeContext)
             val result = store.publishWorkingCopy(
                 moduleCode = moduleCode,
                 actorId = actorId,
@@ -527,7 +633,7 @@ fun Application.uiModule(
             )
             call.respond(
                 mapOf(
-                    "message" to "Рабочая копия опубликована как revision #${result.revisionNo}",
+                    "message" to "Черновик опубликован как ревизия #${result.revisionNo}.",
                     "revisionId" to result.revisionId,
                     "revisionNo" to result.revisionNo,
                     "moduleCode" to result.moduleCode,
@@ -538,20 +644,14 @@ fun Application.uiModule(
         post("/api/db/modules/{id}/run") {
             requireDatabaseMaintenanceIsInactive()
             val runtimeContext = currentRuntimeContext()
-            require(runtimeContext.effectiveMode == UiModuleStoreMode.DATABASE) {
-                "DB-режим недоступен: ${runtimeContext.fallbackReason ?: "effective mode is ${runtimeContext.effectiveMode.toConfigValue()}"}"
-            }
+            requireDatabaseMode(runtimeContext)
             val moduleCode = requireNotNull(call.parameters["id"])
             requireDatabaseModuleIsNotSyncing(moduleCode)
             val runService = requireNotNull(currentDatabaseModuleRunService()) {
-                "DB run service не настроен."
+                "Сервис запуска модулей из базы данных не настроен."
             }
-            val actorId = requireNotNull(runtimeContext.actor.actorId) {
-                "Для DB-режима нужно определить actorId."
-            }
-            val actorSource = requireNotNull(runtimeContext.actor.actorSource) {
-                "Для DB-режима нужно определить actorSource."
-            }
+            val actorId = requireDatabaseActorId(runtimeContext)
+            val actorSource = requireDatabaseActorSource(runtimeContext)
             call.receive<DatabaseRunStartRequest>()
             call.respond(
                 runService.startRun(
@@ -566,18 +666,12 @@ fun Application.uiModule(
         post("/api/db/modules") {
             requireDatabaseMaintenanceIsInactive()
             val runtimeContext = currentRuntimeContext()
-            require(runtimeContext.effectiveMode == UiModuleStoreMode.DATABASE) {
-                "DB-режим недоступен: ${runtimeContext.fallbackReason ?: "effective mode is ${runtimeContext.effectiveMode.toConfigValue()}"}"
-            }
+            requireDatabaseMode(runtimeContext)
             val store = requireNotNull(currentDatabaseModuleStore()) {
-                "DB module store не настроен."
+                "Хранилище модулей из базы данных не настроено."
             }
-            val actorId = requireNotNull(runtimeContext.actor.actorId) {
-                "Для DB-режима нужно определить actorId."
-            }
-            val actorSource = requireNotNull(runtimeContext.actor.actorSource) {
-                "Для DB-режима нужно определить actorSource."
-            }
+            val actorId = requireDatabaseActorId(runtimeContext)
+            val actorSource = requireDatabaseActorSource(runtimeContext)
             val request = call.receive<CreateDbModuleRequest>()
             val result = store.createModule(
                 moduleCode = request.moduleCode,
@@ -589,11 +683,12 @@ fun Application.uiModule(
                     description = request.description,
                     tags = request.tags,
                     configText = request.configText,
+                    hiddenFromUi = request.hiddenFromUi,
                 ),
             )
             call.respond(
                 mapOf(
-                    "message" to "DB-модуль '${result.moduleCode}' создан.",
+                    "message" to "Модуль '${result.moduleCode}' создан в базе данных.",
                     "moduleId" to result.moduleId,
                     "moduleCode" to result.moduleCode,
                     "revisionId" to result.revisionId,
@@ -605,24 +700,20 @@ fun Application.uiModule(
         delete("/api/db/modules/{id}") {
             requireDatabaseMaintenanceIsInactive()
             val runtimeContext = currentRuntimeContext()
-            require(runtimeContext.effectiveMode == UiModuleStoreMode.DATABASE) {
-                "DB-режим недоступен: ${runtimeContext.fallbackReason ?: "effective mode is ${runtimeContext.effectiveMode.toConfigValue()}"}"
-            }
+            requireDatabaseMode(runtimeContext)
             val moduleCode = requireNotNull(call.parameters["id"])
             requireDatabaseModuleIsNotSyncing(moduleCode)
             val store = requireNotNull(currentDatabaseModuleStore()) {
-                "DB module store не настроен."
+                "Хранилище модулей из базы данных не настроено."
             }
-            val actorId = requireNotNull(runtimeContext.actor.actorId) {
-                "Для DB-режима нужно определить actorId."
-            }
+            val actorId = requireDatabaseActorId(runtimeContext)
             val result = store.deleteModule(
                 moduleCode = moduleCode,
                 actorId = actorId,
             )
             call.respond(
                 mapOf(
-                    "message" to "DB-модуль '${result.moduleCode}' удалён.",
+                    "message" to "Модуль '${result.moduleCode}' удалён из базы данных.",
                     "moduleCode" to result.moduleCode,
                     "deletedBy" to result.deletedBy,
                 )
@@ -631,18 +722,14 @@ fun Application.uiModule(
 
         post("/api/db/sync/one") {
             val runtimeContext = currentRuntimeContext()
-            require(runtimeContext.effectiveMode == UiModuleStoreMode.DATABASE) {
-                "DB-режим недоступен: ${runtimeContext.fallbackReason ?: "effective mode is ${runtimeContext.effectiveMode.toConfigValue()}"}"
-            }
+            requireDatabaseMode(runtimeContext)
             val syncService = requireNotNull(currentModuleSyncService()) {
-                "ModuleSyncService не настроен."
+                "Сервис импорта модулей в базу данных не настроен."
             }
             val appsRoot = requireNotNull(currentRuntimeUiConfig().appsRootPath()) {
-                "appsRoot не настроен."
+                "Путь к каталогу apps не настроен."
             }
-            val actorId = requireNotNull(runtimeContext.actor.actorId) {
-                "Для DB-режима нужно определить actorId."
-            }
+            val actorId = requireDatabaseActorId(runtimeContext)
             val request = call.receive<SyncOneModuleRequest>()
             val result = syncService.syncOneFromFiles(
                 moduleCode = request.moduleCode,
@@ -656,18 +743,14 @@ fun Application.uiModule(
 
         post("/api/db/sync/all") {
             val runtimeContext = currentRuntimeContext()
-            require(runtimeContext.effectiveMode == UiModuleStoreMode.DATABASE) {
-                "DB-режим недоступен: ${runtimeContext.fallbackReason ?: "effective mode is ${runtimeContext.effectiveMode.toConfigValue()}"}"
-            }
+            requireDatabaseMode(runtimeContext)
             val syncService = requireNotNull(currentModuleSyncService()) {
-                "ModuleSyncService не настроен."
+                "Сервис импорта модулей в базу данных не настроен."
             }
             val appsRoot = requireNotNull(currentRuntimeUiConfig().appsRootPath()) {
-                "appsRoot не настроен."
+                "Путь к каталогу apps не настроен."
             }
-            val actorId = requireNotNull(runtimeContext.actor.actorId) {
-                "Для DB-режима нужно определить actorId."
-            }
+            val actorId = requireDatabaseActorId(runtimeContext)
             val result = syncService.syncAllFromFiles(
                 appsRoot = appsRoot,
                 actorId = actorId,

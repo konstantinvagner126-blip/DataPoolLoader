@@ -33,6 +33,7 @@
         sqlResourceUsage: document.getElementById('sqlResourceUsage'),
         reloadButton: document.getElementById('reloadButton'),
         runModuleButton: document.getElementById('runModuleButton'),
+        historyButton: document.getElementById('historyButton'),
         saveWorkingCopyButton: document.getElementById('saveWorkingCopyButton'),
         discardWorkingCopyButton: document.getElementById('discardWorkingCopyButton'),
         publishButton: document.getElementById('publishButton'),
@@ -55,6 +56,7 @@
       formController: null,
       state: {
         selectedModuleId: null,
+        includeHiddenCatalog: false,
         currentModule: null,
         currentSqlPath: null,
         sqlContents: {},

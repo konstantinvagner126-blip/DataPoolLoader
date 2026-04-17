@@ -42,8 +42,13 @@
       targetUsername: "",
       targetPassword: "",
       targetTable: "",
-      targetTruncateBeforeLoad: false
+      targetTruncateBeforeLoad: false,
+      warnings: []
     };
+  }
+
+  function cloneFormState(state) {
+    return JSON.parse(JSON.stringify(state || buildDefaultFormState()));
   }
 
   function defaultExpandedConfigCards() {
@@ -89,6 +94,7 @@
     let expandedSourceCards = new Set();
     let expandedQuotaCards = new Set();
     let lastFormState = buildDefaultFormState();
+    let lastSuccessfulFormState = null;
     const moduleExpansionState = new Map();
 
     function notifyStateChange() {
@@ -97,7 +103,9 @@
 
     function initialize() {
       lastFormState = buildDefaultFormState();
+      lastSuccessfulFormState = null;
       renderConfigForm(lastFormState);
+      setFormWarning(null);
     }
 
     function isApplyingFromForm() {
@@ -213,22 +221,45 @@
         if (requestId !== configSyncRequestId) {
           return;
         }
-        lastFormState = formState;
+        lastFormState = cloneFormState(formState);
+        lastSuccessfulFormState = cloneFormState(formState);
         renderConfigForm(formState);
-        setFormWarning(null);
+        showFormWarnings(formState.warnings);
         onDraftStateChange?.();
       } catch (error) {
         if (requestId !== configSyncRequestId) {
           return;
         }
-        renderConfigForm(buildDefaultFormState(), true);
-        setFormWarning(error.message || "Не удалось разобрать application.yml для визуальной формы.");
+        if (lastSuccessfulFormState) {
+          renderConfigForm(lastSuccessfulFormState, { disabled: true, showEmptyState: false });
+          setFormWarning({
+            variant: "warning",
+            title: "Форма переведена в режим просмотра.",
+            lines: [
+              error.message || "Не удалось синхронизировать форму с текущим application.yml.",
+              "Исправь YAML, после чего форма снова станет редактируемой."
+            ]
+          });
+        } else {
+          renderConfigForm(buildDefaultFormState(), { disabled: true, showEmptyState: true });
+          setFormWarning({
+            variant: "danger",
+            title: "Форма временно недоступна.",
+            lines: [
+              error.message || "Не удалось разобрать application.yml для визуальной формы."
+            ]
+          });
+        }
         onDraftStateChange?.();
       }
     }
 
-    function renderConfigForm(state, disabled = false) {
-      lastFormState = JSON.parse(JSON.stringify(state));
+    function renderConfigForm(state, options = {}) {
+      const normalizedOptions = typeof options === "boolean"
+        ? { disabled: options, showEmptyState: options }
+        : { disabled: false, showEmptyState: false, ...options };
+      const { disabled, showEmptyState } = normalizedOptions;
+      lastFormState = cloneFormState(state);
       const currentActiveSection = configForm.querySelector(".config-section-tabs .nav-link.active")?.dataset.configSectionTarget;
       if (currentActiveSection) {
         activeConfigSectionId = currentActiveSection;
@@ -237,7 +268,7 @@
       const storageMode = String(getStorageMode?.() || "FILES").toUpperCase();
       const defaultSqlState = buildDefaultSqlState(state, sqlResources);
 
-      if (disabled) {
+      if (showEmptyState) {
         configForm.innerHTML = `
           <div class="config-form-empty-state">
             <div class="config-form-empty-title">Визуальная форма временно недоступна</div>
@@ -268,7 +299,7 @@
             <button class="nav-link ${activeConfigSectionId === "configSectionQuotas" ? "active" : ""}" data-bs-toggle="pill" data-bs-target="#configSectionQuotas" data-config-section-target="configSectionQuotas" type="button">Квоты</button>
           </li>
           <li class="nav-item" role="presentation">
-            <button class="nav-link ${activeConfigSectionId === "configSectionTarget" ? "active" : ""}" data-bs-toggle="pill" data-bs-target="#configSectionTarget" data-config-section-target="configSectionTarget" type="button">Target</button>
+            <button class="nav-link ${activeConfigSectionId === "configSectionTarget" ? "active" : ""}" data-bs-toggle="pill" data-bs-target="#configSectionTarget" data-config-section-target="configSectionTarget" type="button">Целевая загрузка</button>
           </li>
         </ul>
 
@@ -278,18 +309,18 @@
               <div class="config-form-fields">
                 ${renderTextField("outputDir", "Каталог output", state.outputDir, disabled, "Обычно оставляем относительный путь ./output.")}
                 ${renderSelectField("fileFormat", "Формат файла", state.fileFormat, [["csv", "csv"]], disabled, "Сейчас поддерживается только CSV.")}
-                ${renderSelectField("mergeMode", "Режим merge", state.mergeMode, [
-                  ["plain", "plain"],
-                  ["round_robin", "round_robin"],
-                  ["proportional", "proportional"],
-                  ["quota", "quota"]
-                ], disabled, "Как объединять данные из source БД.")}
-                ${renderSelectField("errorMode", "Режим ошибок", state.errorMode, [["continue_on_error", "continue_on_error"]], disabled, "Сейчас поддерживается продолжение обработки при ошибке источника.")}
-                ${renderNumberField("parallelism", "Параллелизм", state.parallelism, disabled, false, "Сколько source обрабатывать одновременно.")}
-                ${renderNumberField("fetchSize", "Fetch size", state.fetchSize, disabled, false, "Размер JDBC-порции при чтении результата.")}
-                ${renderNumberField("queryTimeoutSec", "Query timeout (сек)", state.queryTimeoutSec, disabled, true, "Если пусто, явный timeout не задается.")}
-                ${renderNumberField("progressLogEveryRows", "Логировать каждые N строк", state.progressLogEveryRows, disabled, false, "Частота progress-логов по source.")}
-                ${renderNumberField("maxMergedRows", "Максимум строк в merged", state.maxMergedRows, disabled, true, "Если пусто, итоговый файл не ограничивается.")}
+                ${renderSelectField("mergeMode", "Режим объединения", state.mergeMode, [
+                  ["plain", "Прямое объединение"],
+                  ["round_robin", "По очереди"],
+                  ["proportional", "Пропорционально"],
+                  ["quota", "По квотам"]
+                ], disabled, "Как объединять данные из источников базы данных.")}
+                ${renderSelectField("errorMode", "Режим ошибок", state.errorMode, [["continue_on_error", "Продолжать при ошибке"]], disabled, "Сейчас поддерживается продолжение обработки при ошибке источника.")}
+                ${renderNumberField("parallelism", "Параллелизм", state.parallelism, disabled, false, "Сколько источников обрабатывать одновременно.")}
+                ${renderNumberField("fetchSize", "Размер JDBC-пакета", state.fetchSize, disabled, false, "Размер порции данных при чтении результата." )}
+                ${renderNumberField("queryTimeoutSec", "Таймаут запроса (сек)", state.queryTimeoutSec, disabled, true, "Если пусто, явный таймаут не задается.")}
+                ${renderNumberField("progressLogEveryRows", "Логировать каждые N строк", state.progressLogEveryRows, disabled, false, "Частота сообщений о прогрессе по источнику.")}
+                ${renderNumberField("maxMergedRows", "Максимум строк в итоговом файле", state.maxMergedRows, disabled, true, "Если пусто, итоговый файл не ограничивается.")}
                 ${renderCheckboxField("deleteOutputFilesAfterCompletion", "Удалять выходные файлы после завершения", state.deleteOutputFilesAfterCompletion, disabled, "Оставить только summary и результат загрузки.")}
               </div>
             `)}
@@ -454,7 +485,7 @@
         return;
       }
 
-      return applyExplicitFormState(readFormState())
+        return applyExplicitFormState(readFormState())
     }
 
     async function applyExplicitFormState(formState) {
@@ -475,13 +506,18 @@
         isApplyingConfigFromForm = true;
         setConfigText(payload.configText);
         isApplyingConfigFromForm = false;
-        lastFormState = payload.formState;
+        lastFormState = cloneFormState(payload.formState);
+        lastSuccessfulFormState = cloneFormState(payload.formState);
         renderConfigForm(payload.formState);
         onDraftStateChange?.();
-        setFormWarning(null);
+        showFormWarnings(payload.formState.warnings);
       } catch (error) {
         isApplyingConfigFromForm = false;
-        setFormWarning(error.message || "Не удалось синхронизировать YAML с формой.");
+        setFormWarning({
+          variant: "danger",
+          title: "Не удалось синхронизировать YAML с формой.",
+          lines: [error.message || "Во время обновления visual form произошла ошибка."]
+        });
       }
     }
 
@@ -615,16 +651,44 @@
       return numeric;
     }
 
-    function setFormWarning(message) {
-      if (!message) {
+    function showFormWarnings(warnings) {
+      const items = Array.isArray(warnings)
+        ? warnings.map(item => String(item || "").trim()).filter(Boolean)
+        : [];
+      if (items.length === 0) {
+        setFormWarning(null);
+        return;
+      }
+      setFormWarning({
+        variant: "warning",
+        title: "Часть полей показана с безопасными значениями.",
+        lines: items
+      });
+    }
+
+    function setFormWarning(payload) {
+      if (!payload) {
+        configFormWarning.classList.remove("alert-warning", "alert-danger", "alert-info");
         configFormWarning.classList.add("d-none");
         configFormWarning.textContent = "";
         return;
       }
+      const normalized = typeof payload === "string"
+        ? { variant: "danger", title: "Форма временно недоступна.", lines: [payload] }
+        : payload;
+      const lines = Array.isArray(normalized.lines)
+        ? normalized.lines.map(line => String(line || "").trim()).filter(Boolean)
+        : [];
+      configFormWarning.classList.remove("d-none", "alert-warning", "alert-danger", "alert-info");
+      configFormWarning.classList.add(`alert-${normalized.variant || "warning"}`);
       configFormWarning.classList.remove("d-none");
       configFormWarning.innerHTML = `
-        <div><strong>Форма временно недоступна.</strong></div>
-        <div class="mt-1">${escapeHtml(message)}</div>
+        ${normalized.title ? `<div><strong>${escapeHtml(normalized.title)}</strong></div>` : ""}
+        ${lines.length === 0 ? "" : `
+          <ul class="mb-0 mt-2">
+            ${lines.map(line => `<li>${escapeHtml(line)}</li>`).join("")}
+          </ul>
+        `}
       `;
     }
 
@@ -970,9 +1034,9 @@
     return `
       ${renderSelectField("defaultSqlMode", "Источник SQL", sqlState.mode, [
         ["NONE", "Не задан"],
-        ["INLINE", "Inline SQL"],
+        ["INLINE", "Встроенный SQL"],
         ["CATALOG", "SQL из каталога"],
-        ...(sqlState.mode === "EXTERNAL" ? [["EXTERNAL", storageMode === "DATABASE" ? "Внешняя ссылка (нештатно)" : "Внешняя ссылка (только YAML)"]] : [])
+        ...(sqlState.mode === "EXTERNAL" ? [["EXTERNAL", storageMode === "DATABASE" ? "Внешняя ссылка (не рекомендуется)" : "Внешняя ссылка (только в YAML)"]] : [])
       ], disabled, "SQL по умолчанию используется для sources без собственного SQL.")}
       ${renderTextHiddenField("defaultSqlExternalRef", sqlState.externalRef || "")}
       ${sqlState.mode === "INLINE" ? renderTextareaField("defaultSqlInlineText", "SQL по умолчанию", sqlState.inlineText, disabled, "Будет применяться ко всем источникам без собственного SQL.", 6) : ""}
@@ -991,12 +1055,12 @@
       </div>
       ${renderIndexedSelectField("source", index, "sqlMode", "Источник SQL", sqlState.mode, [
         ["INHERIT", "Наследовать SQL по умолчанию"],
-        ["INLINE", "Inline SQL"],
+        ["INLINE", "Встроенный SQL"],
         ["CATALOG", "SQL из каталога"],
-        ...(sqlState.mode === "EXTERNAL" ? [["EXTERNAL", storageMode === "DATABASE" ? "Внешняя ссылка (нештатно)" : "Внешняя ссылка (только YAML)"]] : [])
-      ], disabled, "Источник SQL для конкретного source.", false)}
+        ...(sqlState.mode === "EXTERNAL" ? [["EXTERNAL", storageMode === "DATABASE" ? "Внешняя ссылка (не рекомендуется)" : "Внешняя ссылка (только в YAML)"]] : [])
+      ], disabled, "Источник SQL для конкретного источника.", false)}
       ${renderIndexedHiddenField("source", index, "sqlExternalRef", sqlState.externalRef || "")}
-      ${sqlState.mode === "INLINE" ? renderIndexedTextareaField("source", index, "sqlInlineText", "Inline SQL", sqlState.inlineText, disabled, "Если задан, перекрывает SQL по умолчанию.", 5) : ""}
+      ${sqlState.mode === "INLINE" ? renderIndexedTextareaField("source", index, "sqlInlineText", "Встроенный SQL", sqlState.inlineText, disabled, "Если задан, перекрывает SQL по умолчанию.", 5) : ""}
       ${sqlState.mode === "CATALOG" ? renderIndexedSqlCatalogSelectField(index, "sqlCatalogPath", "SQL-ресурс", sqlState.catalogPath, sqlResources, disabled, "Выбирается из вкладки SQL.") : ""}
       ${sqlState.mode === "EXTERNAL" ? renderSqlExternalReference(sqlState.externalRef, storageMode) : ""}
       ${sqlState.mode === "CATALOG" && sqlState.resource?.exists === false ? renderSqlMissingWarning(sqlState.catalogPath) : ""}
@@ -1066,7 +1130,7 @@
         <div class="fw-semibold mb-1">${storageMode === "DATABASE" ? "Нештатная внешняя SQL-ссылка" : "Внешняя SQL-ссылка"}</div>
         <div><code>${escapeHtml(externalRef)}</code></div>
         <div class="config-form-help mt-1">${storageMode === "DATABASE"
-          ? "Для DB-режима visual editor считает нормальным только inline SQL и SQL-ресурсы самого модуля."
+          ? "Для режима базы данных визуальный редактор поддерживает только встроенный SQL и SQL-ресурсы самого модуля."
           : "Эта ссылка сохраняется, но полноценно управляется только через application.yml."}</div>
       </div>
     `;

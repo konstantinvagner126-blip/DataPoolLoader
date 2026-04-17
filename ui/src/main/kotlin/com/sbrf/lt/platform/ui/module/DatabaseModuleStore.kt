@@ -163,10 +163,10 @@ open class DatabaseModuleStore(
             try {
                 val moduleInfo = loadModuleForPublish(connection, normalizedSchema, moduleCode, actorId, actorSource)
                 require(moduleInfo.hasWorkingCopy) {
-                    "Нет working copy для публикации. Сначала сохраните изменения."
+                    "Нет личного черновика для публикации. Сначала сохраните изменения."
                 }
                 require(moduleInfo.baseRevisionId == moduleInfo.currentRevisionId && moduleInfo.workingCopyStatus != "STALE") {
-                    "Working copy устарела относительно текущей revision. Перезагрузите модуль и примените изменения заново."
+                    "Личный черновик устарел относительно текущей ревизии. Перезагрузите модуль и примените изменения заново."
                 }
 
                 val newRevisionId = UUID.randomUUID().toString()

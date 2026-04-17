@@ -11,7 +11,7 @@
       const maintenanceMode = state.syncState?.maintenanceMode === true;
 
       if (!shared.isDatabaseMode(state.runtimeContext)) {
-        showDbContextAlert(state.runtimeContext?.fallbackReason || 'DB-режим не активен.');
+        showDbContextAlert(state.runtimeContext?.fallbackReason || 'Режим базы данных сейчас не активен.');
         setDbControlsDisabled(true);
       } else if (maintenanceMode) {
         const activeSync = state.syncState.activeFullSync;
@@ -44,7 +44,7 @@
       }
     }
 
-    function showDbContextAlert(message, title = 'DB-режим недоступен', kind = 'warning') {
+    function showDbContextAlert(message, title = 'Режим базы данных недоступен', kind = 'warning') {
       refs.dbContextAlert.className = `alert alert-${kind} mb-4`;
       refs.dbContextAlert.classList.remove('d-none');
       refs.dbContextAlertTitle.textContent = title;
@@ -55,6 +55,7 @@
       refs.reloadButton.disabled = disabled;
       refs.createModuleButton.disabled = disabled;
       refs.deleteModuleButton.disabled = disabled || !state.selectedModuleId;
+      refs.historyButton.disabled = disabled || !state.selectedModuleId;
       refs.sqlCreateButton.disabled = disabled;
       refs.sqlRenameButton.disabled = disabled || !state.currentSqlPath;
       refs.sqlDeleteButton.disabled = disabled || !state.currentSqlPath;
@@ -87,18 +88,20 @@
       const activeSingleSyncCount = modules.hasActiveSingleSyncs(ctx) ? shared.activeSingleSyncs(state.syncState).length : 0;
       refs.dbCatalogStatus.className = `module-catalog-status mt-3 mb-3 small ${shared.isDatabaseMode(state.runtimeContext) && !maintenanceMode ? 'module-catalog-ready' : 'module-catalog-warning'}`;
       refs.dbCatalogStatus.innerHTML = `
-        <div>Режим: <strong>${shared.isDatabaseMode(state.runtimeContext) ? 'DATABASE' : 'FILES'}</strong></div>
+        <div>Режим: <strong>${shared.isDatabaseMode(state.runtimeContext) ? 'База данных' : 'Файлы'}</strong></div>
         <div>PostgreSQL: ${state.runtimeContext.database.available ? 'доступен' : 'недоступен'}</div>
         ${state.runtimeContext.actor?.actorId ? `<div>Пользователь: ${escapeHtml(state.runtimeContext.actor.actorId)}</div>` : ''}
+        ${state.includeHiddenCatalog ? '<div class="text-secondary mt-1">Каталог открыт с показом скрытых модулей.</div>' : ''}
         ${maintenanceMode ? '<div class="text-warning-emphasis mt-1">Массовый импорт: выполняется</div>' : ''}
         ${activeSingleSyncCount > 0 ? `<div class="text-info-emphasis mt-1">Точечный импорт: ${activeSingleSyncCount}</div>` : ''}
-        ${state.runtimeContext.fallbackReason ? `<div class="text-danger mt-1">Причина fallback: ${escapeHtml(state.runtimeContext.fallbackReason)}</div>` : ''}
+        ${state.runtimeContext.fallbackReason ? `<div class="text-danger mt-1">Причина возврата в файловый режим: ${escapeHtml(state.runtimeContext.fallbackReason)}</div>` : ''}
       `;
     }
 
     function updateSaveDiscardButtons() {
       if (!modules.canWorkWithDbModules(ctx)) {
         refs.runModuleButton.disabled = true;
+        refs.historyButton.disabled = true;
         refs.saveWorkingCopyButton.disabled = true;
         refs.discardWorkingCopyButton.disabled = true;
         refs.publishButton.disabled = true;
@@ -111,6 +114,7 @@
 
       if (!state.currentModule) {
         refs.runModuleButton.disabled = true;
+        refs.historyButton.disabled = !state.selectedModuleId;
         refs.saveWorkingCopyButton.disabled = true;
         refs.discardWorkingCopyButton.disabled = true;
         refs.publishButton.disabled = true;
@@ -124,8 +128,10 @@
       const hasUnsavedChanges = modules.hasUnsavedChanges(ctx);
       const capabilities = state.currentModule.capabilities || {};
       refs.runModuleButton.disabled = !capabilities.run || modules.hasRunningDbRun(ctx);
+      refs.historyButton.disabled = false;
       if (modules.selectedModuleIsSyncing(ctx)) {
         refs.runModuleButton.disabled = true;
+        refs.historyButton.disabled = true;
         refs.saveWorkingCopyButton.disabled = true;
         refs.discardWorkingCopyButton.disabled = true;
         refs.publishButton.disabled = true;

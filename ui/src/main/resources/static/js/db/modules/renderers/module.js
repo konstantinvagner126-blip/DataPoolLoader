@@ -10,7 +10,14 @@
     const { escapeHtml } = ctx.common;
 
     function translateModuleSourceKind(sourceKind) {
-      return sourceKind === 'WORKING_COPY' ? 'Рабочая копия' : (sourceKind === 'CURRENT_REVISION' ? 'Текущая ревизия' : (sourceKind || '-'));
+      return sourceKind === 'WORKING_COPY' ? 'Личный черновик' : (sourceKind === 'CURRENT_REVISION' ? 'Текущая ревизия' : (sourceKind || '-'));
+    }
+
+    function translateValidationSeverity(severity) {
+      const normalized = String(severity || 'INFO').toUpperCase();
+      if (normalized === 'ERROR') return 'Ошибка';
+      if (normalized === 'WARNING') return 'Предупреждение';
+      return 'Информация';
     }
 
     function renderCatalog(modulesList, onSelectModule) {
@@ -44,7 +51,7 @@
 
       refs.moduleSourceKind.innerHTML = `
         <span class="source-kind-badge ${state.currentModule.sourceKind === 'WORKING_COPY' ? 'source-kind-badge-working-copy' : 'source-kind-badge-revision'}">
-          ${state.currentModule.sourceKind === 'WORKING_COPY' ? 'Рабочая копия' : 'Текущая ревизия'}
+          ${state.currentModule.sourceKind === 'WORKING_COPY' ? 'Личный черновик' : 'Текущая ревизия'}
         </span>
       `;
 
@@ -67,7 +74,7 @@
     function renderModuleListItem(module) {
       const activeSync = modules.activeSingleSyncFor(ctx, module.id);
       const validationBadge = renderValidationBadge(module.validationStatus);
-      const syncBadge = activeSync ? '<span class="badge text-bg-warning">Sync</span>' : '';
+      const syncBadge = activeSync ? '<span class="badge text-bg-warning">Импорт</span>' : '';
       const description = module.description
         ? `<div class="module-list-description">${escapeHtml(module.description)}</div>`
         : '';
@@ -95,7 +102,7 @@
 
     function renderValidationBadge(status) {
       const normalized = String(status || 'VALID').toUpperCase();
-      const label = normalized === 'VALID' ? 'OK' : (normalized === 'WARNING' ? 'Предупреждение' : 'Ошибка');
+      const label = normalized === 'VALID' ? 'Исправен' : (normalized === 'WARNING' ? 'Предупреждение' : 'Ошибка');
       return `<span class="module-validation-badge module-validation-badge-${normalized.toLowerCase()}">${label}</span>`;
     }
 
@@ -118,7 +125,7 @@
         <ul class="module-validation-list mb-0">
           ${issues.map(issue => `
             <li>
-              <span class="module-validation-severity module-validation-severity-${String(issue.severity || '').toLowerCase()}">${escapeHtml(issue.severity || 'INFO')}</span>
+              <span class="module-validation-severity module-validation-severity-${String(issue.severity || '').toLowerCase()}">${escapeHtml(translateValidationSeverity(issue.severity))}</span>
               <span>${escapeHtml(issue.message || '')}</span>
             </li>
           `).join('')}
@@ -133,10 +140,10 @@
           <div><strong>Источник:</strong> ${escapeHtml(translateModuleSourceKind(state.currentModule?.sourceKind))}</div>
           <div><strong>Текущая ревизия:</strong> <code>${escapeHtml(state.currentModule?.currentRevisionId || '-')}</code></div>
           ${hasWorkingCopy ? `
-            <div><strong>ID рабочей копии:</strong> <code>${escapeHtml(state.currentModule.workingCopyId)}</code></div>
-            <div><strong>Статус рабочей копии:</strong> <span class="badge bg-warning">${escapeHtml(state.currentModule.workingCopyStatus)}</span></div>
+            <div><strong>ID черновика:</strong> <code>${escapeHtml(state.currentModule.workingCopyId)}</code></div>
+            <div><strong>Статус черновика:</strong> <span class="badge bg-warning">${escapeHtml(state.currentModule.workingCopyStatus)}</span></div>
             <div><strong>Базовая ревизия:</strong> <code>${escapeHtml(state.currentModule.baseRevisionId)}</code></div>
-          ` : '<div class="text-success mt-1">Личной рабочей копии нет. Сейчас открыта текущая ревизия.</div>'}
+          ` : '<div class="text-success mt-1">Личного черновика нет. Сейчас открыта текущая ревизия.</div>'}
         </div>
       `;
     }
@@ -159,13 +166,13 @@
       } else if (modules.hasUnsavedChanges(ctx)) {
         refs.moduleDraftStatus.innerHTML = `
           <span class="module-draft-dot module-draft-dot-dirty" aria-hidden="true"></span>
-          <span>Есть несохраненные изменения. Сначала сохрани рабочую копию, затем запускай модуль.</span>
+          <span>Есть несохраненные изменения. Сначала сохрани черновик, затем запускай модуль.</span>
         `;
         refs.moduleDraftStatus.className = 'module-draft-status small mt-1 text-primary';
       } else if (state.currentModule.workingCopyId) {
         refs.moduleDraftStatus.innerHTML = `
           <span class="module-draft-dot module-draft-dot-saved" aria-hidden="true"></span>
-          <span>Изменения сохранены в рабочей копии.</span>
+          <span>Изменения сохранены в личном черновике.</span>
         `;
         refs.moduleDraftStatus.className = 'module-draft-status small mt-1 text-secondary';
       } else {

@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DataPool Loader UI — Swagger UI</title>
+  <link href="/static/vendor/swagger-ui/swagger-ui.css" rel="stylesheet">
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #f8fafc;
+    }
+
+    .swagger-shell {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .swagger-topbar {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      padding: 1rem 1.5rem;
+      border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+      background: #0f172a;
+      color: #e2e8f0;
+    }
+
+    .swagger-topbar h1 {
+      margin: 0;
+      font-size: 1.15rem;
+      font-weight: 700;
+    }
+
+    .swagger-topbar p {
+      margin: 0.35rem 0 0;
+      color: #cbd5e1;
+      font-size: 0.92rem;
+      max-width: 48rem;
+    }
+
+    .swagger-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
+
+    .swagger-actions a {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 2.5rem;
+      padding: 0.55rem 0.9rem;
+      border-radius: 12px;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      color: #f8fafc;
+      text-decoration: none;
+      font-weight: 600;
+      background: rgba(15, 23, 42, 0.25);
+    }
+
+    .swagger-actions a:hover {
+      background: rgba(59, 130, 246, 0.2);
+      border-color: rgba(96, 165, 250, 0.55);
+    }
+
+    #swagger-ui {
+      flex: 1 1 auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="swagger-shell">
+    <header class="swagger-topbar">
+      <div>
+        <h1>Swagger UI для серверной части DataPool Loader UI</h1>
+        <p>Интерактивная OpenAPI-спецификация со всеми HTTP endpoint-ами UI, примерами запросов, типовыми ответами и описанием ошибок.</p>
+      </div>
+      <div class="swagger-actions">
+        <a href="/">На главную</a>
+        <a href="/help">Общая справка</a>
+        <a href="/static/openapi/ui-api-openapi.yaml">Открыть YAML-спеку</a>
+      </div>
+    </header>
+    <div id="swagger-ui"></div>
+  </div>
+
+  <script src="/static/vendor/swagger-ui/swagger-ui-bundle.js"></script>
+  <script src="/static/vendor/swagger-ui/swagger-ui-standalone-preset.js"></script>
+  <script>
+    window.addEventListener("load", () => {
+      window.ui = SwaggerUIBundle({
+        url: "/static/openapi/ui-api-openapi.yaml",
+        dom_id: "#swagger-ui",
+        deepLinking: true,
+        presets: [
+          SwaggerUIBundle.presets.apis,
+          SwaggerUIStandalonePreset
+        ],
+        layout: "BaseLayout",
+        defaultModelsExpandDepth: 2,
+        defaultModelExpandDepth: 2,
+        docExpansion: "list",
+        displayRequestDuration: true,
+        filter: true,
+        persistAuthorization: false,
+        tryItOutEnabled: false
+      });
+    });
+  </script>
+</body>
+</html>

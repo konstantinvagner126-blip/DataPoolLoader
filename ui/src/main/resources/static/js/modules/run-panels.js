@@ -1,7 +1,8 @@
 (function initDataPoolRunPanels(global) {
   const common = global.DataPoolCommon || {};
   const namespace = global.DataPoolRunPanels || (global.DataPoolRunPanels = {});
-  const { escapeHtml } = common;
+  const runProgress = global.DataPoolRunProgress || {};
+  const { escapeHtml, scrollToElement, revealCollapse } = common;
 
   function createRunPanelsController({
     runSummaryEl,
@@ -10,7 +11,15 @@
     runHistoryFiltersEl,
     runHistoryEl,
     summaryStructuredEl,
-    summaryJsonEl
+    summaryJsonEl,
+    resultArtifactsEl,
+    resultPanelId,
+    rawSummaryPanelId,
+    rawSummaryCollapseId,
+    compactMode = false,
+    historyLimit = 20,
+    humanTimelineLimit = 40,
+    onRunSelected = null,
   }) {
     let latestUiState = null;
     let selectedHistoryRunId = null;
@@ -25,17 +34,27 @@
       if (!latestRun) {
         runSummaryEl.textContent = "Запусков пока нет.";
         eventLogEl.textContent = "";
-        technicalEventLogEl.textContent = "";
+        if (technicalEventLogEl) {
+          technicalEventLogEl.textContent = "";
+        }
         runHistoryEl.innerHTML = `<div class="text-secondary small">История запусков пока пуста.</div>`;
-        summaryStructuredEl.innerHTML = `<div class="text-secondary">Пока нет данных summary.</div>`;
-        summaryJsonEl.textContent = "Пока нет данных summary.";
+        if (summaryStructuredEl) {
+          summaryStructuredEl.innerHTML = `<div class="text-secondary">Пока нет данных summary.</div>`;
+        }
+        if (summaryJsonEl) {
+          summaryJsonEl.textContent = "Пока нет данных summary.";
+        }
+        if (resultArtifactsEl) {
+          resultArtifactsEl.innerHTML = `<div class="text-secondary small">Пути к результатам запуска появятся после выполнения.</div>`;
+        }
         return;
       }
 
       const sourceStates = buildSourceStates(latestRun);
-      const timeline = buildHumanTimeline(latestRun, sourceStates);
+      const timeline = buildHumanTimeline(latestRun, sourceStates, humanTimelineLimit);
 
       runSummaryEl.innerHTML = renderRunSummary(latestRun, sourceStates);
+      bindRunQuickActions();
       eventLogEl.innerHTML = timeline.length > 0
         ? timeline.map(item => `
             <div class="human-log-entry human-log-entry-${escapeHtml(item.tone || "neutral")}">
@@ -45,13 +64,22 @@
           `).join("")
         : `<div class="text-secondary">Пока нет значимых событий для отображения.</div>`;
 
-      technicalEventLogEl.textContent = (latestRun.events || [])
-        .slice(-200)
-        .map(event => JSON.stringify(event, null, 2))
-        .join("\n\n");
+      if (technicalEventLogEl) {
+        technicalEventLogEl.textContent = (latestRun.events || [])
+          .slice(-200)
+          .map(event => JSON.stringify(event, null, 2))
+          .join("\n\n");
+      }
 
-      renderSummaryStructured(latestRun);
-      summaryJsonEl.textContent = latestRun.summaryJson || "Итоги запуска еще не сформированы.";
+      if (summaryStructuredEl) {
+        renderSummaryStructured(latestRun);
+      }
+      if (summaryJsonEl) {
+        summaryJsonEl.textContent = latestRun.summaryJson || "Итоги запуска еще не сформированы.";
+      }
+      if (resultArtifactsEl) {
+        resultArtifactsEl.innerHTML = renderRunArtifacts(latestRun, sourceStates);
+      }
     }
 
     function resolveSelectedRun(state) {
@@ -94,7 +122,7 @@
         return;
       }
 
-      runHistoryEl.innerHTML = filteredHistory.slice(0, 20).map(run => `
+      runHistoryEl.innerHTML = filteredHistory.slice(0, historyLimit).map(run => `
         <button
           type="button"
           class="run-history-item ${run.id === activeRunId ? "run-history-item-active" : ""}"
@@ -114,6 +142,7 @@
         button.addEventListener("click", () => {
           selectedHistoryRunId = button.dataset.runId;
           historySelectionPinned = true;
+          onRunSelected?.(selectedHistoryRunId);
           renderState(latestUiState);
         });
       });
@@ -161,38 +190,38 @@
 
     function renderRunSummary(run, sourceStates) {
       const overallStatus = translateStatus(run.status);
-      const stageLabel = detectCurrentStage(run);
+      const stageKey = detectCurrentStageKey(run);
+      const stageLabel = stageLabelByKey(stageKey);
       const successCount = Object.values(sourceStates).filter(state => state.status === "SUCCESS").length;
       const failedCount = Object.values(sourceStates).filter(state => state.status === "FAILED" || state.status === "SKIPPED_SCHEMA_MISMATCH").length;
+      const stageStates = runProgress.buildStageStates
+        ? runProgress.buildStageStates(stageKey, run.status)
+        : [];
+      const progressWidget = runProgress.renderRunProgressWidget
+        ? runProgress.renderRunProgressWidget({
+            title: run.moduleTitle,
+            subtitle: compactMode ? `Текущий этап: ${stageLabel}` : stageLabel,
+            statusLabel: overallStatus,
+            statusClass: `status-badge status-${(run.status || "PENDING").toLowerCase()}`,
+            running: run.status === "RUNNING",
+            stages: stageStates,
+            metrics: [
+              { label: "Строк в merged", value: formatNumber(run.mergedRowCount || 0), tone: "important" },
+              { label: "Успешные источники", value: formatNumber(successCount), tone: successCount > 0 ? "success" : "default" },
+              { label: "Ошибочные источники", value: formatNumber(failedCount), tone: failedCount > 0 ? "failed" : "default" },
+            ],
+          })
+        : "";
 
       return `
-        <div class="run-summary-header">
-          <div>
-            <div class="run-summary-title">${escapeHtml(run.moduleTitle)}</div>
-            <div class="run-summary-subtitle">${escapeHtml(stageLabel)}</div>
-          </div>
-          <span class="status-badge status-${(run.status || "PENDING").toLowerCase()}">${overallStatus}</span>
-        </div>
+        ${progressWidget}
 
-        <div class="run-summary-metrics">
-          <div class="run-summary-metric">
-            <div class="run-summary-metric-label">Строк в merged</div>
-            <div class="run-summary-metric-value">${formatNumber(run.mergedRowCount || 0)}</div>
-          </div>
-          <div class="run-summary-metric">
-            <div class="run-summary-metric-label">Успешные sources</div>
-            <div class="run-summary-metric-value">${formatNumber(successCount)}</div>
-          </div>
-          <div class="run-summary-metric">
-            <div class="run-summary-metric-label">Ошибки sources</div>
-            <div class="run-summary-metric-value">${formatNumber(failedCount)}</div>
-          </div>
-        </div>
+        ${renderQuickActions(run)}
 
         <div class="run-summary-list">
           ${renderSummaryKeyValue("Старт", formatDateTime(run.startedAt))}
           ${renderSummaryKeyValue("Завершение", run.finishedAt ? formatDateTime(run.finishedAt) : "еще выполняется")}
-          ${renderSummaryKeyValue("Папка результата", run.outputDir || "-")}
+          ${compactMode ? "" : renderSummaryKeyValue("Папка результата", run.outputDir || "-")}
           ${renderSummaryKeyValue("Ошибка", run.errorMessage || "-")}
         </div>
 
@@ -201,6 +230,56 @@
           ${renderSourceStatusTable(sourceStates)}
         </div>
       `;
+    }
+
+    function renderQuickActions(run) {
+      if (compactMode) {
+        return "";
+      }
+      const actions = [];
+      if (run.outputDir && resultPanelId) {
+        actions.push({
+          label: "К результатам запуска",
+          targetId: resultPanelId,
+        });
+      }
+      if (run.summaryJson && rawSummaryPanelId && rawSummaryCollapseId) {
+        actions.push({
+          label: "Открыть summary.json",
+          targetId: rawSummaryPanelId,
+          collapseId: rawSummaryCollapseId,
+        });
+      }
+      if (actions.length === 0) {
+        return "";
+      }
+
+      return `
+        <div class="run-result-actions">
+          ${actions.map(action => `
+            <button
+              type="button"
+              class="run-result-action-button"
+              data-run-action-target="${escapeHtml(action.targetId)}"
+              ${action.collapseId ? `data-run-action-collapse="${escapeHtml(action.collapseId)}"` : ""}
+            >
+              ${escapeHtml(action.label)}
+            </button>
+          `).join("")}
+        </div>
+      `;
+    }
+
+    function bindRunQuickActions() {
+      runSummaryEl.querySelectorAll("[data-run-action-target]").forEach(button => {
+        button.addEventListener("click", () => {
+          const collapseId = button.dataset.runActionCollapse;
+          if (collapseId) {
+            revealCollapse?.(collapseId);
+          }
+          scrollToElement?.(button.dataset.runActionTarget);
+        });
+      });
     }
 
     function renderSummaryStructured(run) {
@@ -234,11 +313,11 @@
           ${renderSummaryOverviewTable([
             { label: "Старт", value: formatDateTime(summary.startedAt) },
             { label: "Завершение", value: formatDateTime(summary.finishedAt) },
-            { label: "Merge mode", value: summary.mergeMode || "-", tone: "important" },
+            { label: "Режим объединения", value: summary.mergeMode || "-", tone: "important" },
             { label: "Файл merged", value: summary.mergedFile || "-" },
             { label: "Строк в merged", value: formatNumber(summary.mergedRowCount), tone: "important" },
             { label: "Макс. строк merged", value: summary.maxMergedRows == null ? "без ограничения" : formatNumber(summary.maxMergedRows) },
-            { label: "Output", value: run.outputDir || "-" },
+            { label: "Каталог результата", value: run.outputDir || "-" },
             {
               label: "Статус target",
               value: `<span class="status-badge status-${targetStatus}">${translateStatus(targetLoad.status)}</span>`,
@@ -247,8 +326,8 @@
             },
             { label: "Таблица target", value: targetLoad.table || "-", tone: targetLoad.table ? "important" : "default" },
             { label: "Загружено", value: formatNumber(targetLoad.rowCount || 0), tone: "important" },
-            { label: "Успешных sources", value: formatNumber(successfulSources.length), tone: successfulSources.length > 0 ? "success" : "default" },
-            { label: "Ошибочных sources", value: formatNumber(failedSources.length), tone: failedSources.length > 0 ? "failed" : "success" },
+            { label: "Успешных источников", value: formatNumber(successfulSources.length), tone: successfulSources.length > 0 ? "success" : "default" },
+            { label: "Ошибочных источников", value: formatNumber(failedSources.length), tone: failedSources.length > 0 ? "failed" : "success" },
             { label: "Ошибка target", value: targetError, tone: targetError !== "-" ? "failed" : "success" }
           ])}
         </div>
@@ -265,8 +344,77 @@
       `;
     }
 
+    function renderRunArtifacts(run, sourceStates) {
+      const artifacts = collectRunArtifacts(run, sourceStates);
+      if (artifacts.length === 0) {
+        return `<div class="text-secondary small">Пути к результатам запуска пока неизвестны.</div>`;
+      }
+
+      return `
+        <div class="run-artifact-grid">
+          ${artifacts.map(item => `
+            <div class="run-artifact-card">
+              <div class="run-artifact-kind">${escapeHtml(item.kind)}</div>
+              <div class="run-artifact-title">${escapeHtml(item.title)}</div>
+              <div class="run-artifact-note">${escapeHtml(item.note)}</div>
+              <div class="run-artifact-path"><code>${escapeHtml(item.path)}</code></div>
+            </div>
+          `).join("")}
+        </div>
+      `;
+    }
+
+    function collectRunArtifacts(run, sourceStates) {
+      if (!run?.outputDir) {
+        return [];
+      }
+
+      const artifacts = [];
+      const outputDir = run.outputDir;
+      const summary = safeParseJson(run.summaryJson);
+
+      artifacts.push({
+        kind: "Каталог",
+        title: "Каталог результата",
+        note: "В этой папке лежат файлы выбранного запуска.",
+        path: outputDir,
+      });
+
+      const mergedFile = summary?.mergedFile || joinPath(outputDir, "merged.csv");
+      artifacts.push({
+        kind: "Итоговый файл",
+        title: "merged.csv",
+        note: "Основной объединенный результат запуска.",
+        path: mergedFile,
+      });
+
+      if (run.summaryJson) {
+        artifacts.push({
+          kind: "Итоги запуска",
+          title: "summary.json",
+          note: "Файл итогов и сводных метрик. Raw JSON доступен ниже.",
+          path: joinPath(outputDir, "summary.json"),
+        });
+      }
+
+      Object.entries(sourceStates)
+        .filter(([, state]) => state.status === "SUCCESS")
+        .sort((left, right) => left[0].localeCompare(right[0]))
+        .forEach(([sourceName]) => {
+          artifacts.push({
+            kind: "Источник",
+            title: `${sourceName}.csv`,
+            note: `Выгрузка по источнику ${sourceName}.`,
+            path: joinPath(outputDir, `${sourceName}.csv`),
+          });
+        });
+
+      return artifacts;
+    }
+
     return {
-      renderState
+      renderState,
+      selectedRunId: () => selectedHistoryRunId,
     };
   }
 
@@ -294,6 +442,26 @@
         </table>
       </div>
     `;
+  }
+
+  function safeParseJson(value) {
+    if (!value) {
+      return null;
+    }
+    try {
+      return JSON.parse(value);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function joinPath(basePath, fileName) {
+    const base = String(basePath || "").trim();
+    if (!base) {
+      return fileName;
+    }
+    const separator = base.includes("\\") && !base.includes("/") ? "\\" : "/";
+    return `${base.replace(/[\\/]+$/, "")}${separator}${fileName}`;
   }
 
   function renderSummaryOverviewRow(row) {
@@ -417,7 +585,7 @@
     return states;
   }
 
-  function buildHumanTimeline(run, sourceStates) {
+  function buildHumanTimeline(run, sourceStates, limit = 40) {
     const timeline = [];
     (run.events || []).forEach(event => {
       const entry = toHumanEvent(event, sourceStates);
@@ -425,13 +593,13 @@
         timeline.push(entry);
       }
     });
-    return timeline.slice(-40);
+    return timeline.slice(-limit);
   }
 
   function toHumanEvent(event) {
     switch (detectEventKind(event)) {
       case "runStarted":
-        return { timestamp: event.timestamp, message: `Запуск начат. Источников: ${event.sourceNames.length}, режим merge: ${event.mergeMode}.`, tone: "neutral" };
+        return { timestamp: event.timestamp, message: `Запуск начат. Источников: ${event.sourceNames.length}, режим объединения: ${event.mergeMode}.`, tone: "neutral" };
       case "sourceStarted":
         return { timestamp: event.timestamp, message: `Начата выгрузка из источника ${event.sourceName}.`, tone: "neutral" };
       case "sourceProgress":
@@ -496,24 +664,33 @@
     `;
   }
 
-  function detectCurrentStage(run) {
+  function detectCurrentStageKey(run) {
     if (run.status === "SUCCESS") {
-      return "Завершено";
-    }
-    if (run.status === "FAILED") {
-      return "Завершено с ошибкой";
+      return "finish";
     }
     const events = run.events || [];
-    if (events.some(event => detectEventKind(event) === "targetStarted")) {
-      return "Загрузка в target";
+    if (events.some(event => ["targetStarted", "targetFinished"].includes(detectEventKind(event)))) {
+      return "target";
     }
-    if (events.some(event => detectEventKind(event) === "mergeStarted")) {
-      return "Объединение";
+    if (events.some(event => ["mergeStarted", "mergeFinished"].includes(detectEventKind(event)))) {
+      return "merge";
     }
-    if (events.some(event => detectEventKind(event) === "sourceStarted")) {
-      return "Выгрузка из источников";
+    if (events.some(event => ["sourceStarted", "sourceProgress", "sourceFinished", "schemaMismatch"].includes(detectEventKind(event)))) {
+      return "sources";
     }
-    return "Подготовка";
+    return run.status === "FAILED" ? "finish" : "prepare";
+  }
+
+  function stageLabelByKey(stageKey) {
+    const fallback = {
+      prepare: "Подготовка",
+      sources: "Выгрузка из источников",
+      merge: "Объединение",
+      target: "Загрузка в target",
+      finish: "Завершение",
+    };
+    const sharedLabel = runProgress.getStageDefinitions?.().find(stage => stage.key === stageKey)?.label;
+    return sharedLabel || fallback[stageKey] || fallback.prepare;
   }
 
   function detectEventKind(event) {

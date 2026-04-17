@@ -131,6 +131,7 @@ data class ConfigFormStateResponse(
     val targetPassword: String,
     val targetTable: String,
     val targetTruncateBeforeLoad: Boolean,
+    val warnings: List<String> = emptyList(),
 )
 
 data class ConfigFormUpdateRequest(
@@ -186,6 +187,7 @@ data class CreateDbModuleRequest(
     val description: String? = null,
     val tags: List<String> = emptyList(),
     val configText: String = "",
+    val hiddenFromUi: Boolean = true,
 )
 
 data class SyncOneModuleRequest(
