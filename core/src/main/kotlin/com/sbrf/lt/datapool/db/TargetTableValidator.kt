@@ -1,5 +1,6 @@
 package com.sbrf.lt.datapool.db
 
+import com.sbrf.lt.datapool.app.port.TargetSchemaValidator
 import com.sbrf.lt.datapool.model.TargetConfig
 import java.sql.Connection
 import java.sql.DriverManager
@@ -8,8 +9,8 @@ class TargetTableValidator(
     private val connectionProvider: (String, String, String) -> Connection = { jdbcUrl, username, password ->
         DriverManager.getConnection(jdbcUrl, username, password)
     },
-) {
-    fun validate(
+) : TargetSchemaValidator {
+    override fun validate(
         target: TargetConfig,
         resolvedJdbcUrl: String,
         resolvedUsername: String,

@@ -3,9 +3,11 @@ package com.sbrf.lt.datapool
 import com.sbrf.lt.datapool.app.ApplicationRunner
 import com.sbrf.lt.datapool.app.ExecutionEvent
 import com.sbrf.lt.datapool.app.ExecutionListener
+import com.sbrf.lt.datapool.app.RuntimeModuleSnapshot
 import com.sbrf.lt.datapool.app.RunFinishedEvent
 import com.sbrf.lt.datapool.app.RunStartedEvent
 import com.sbrf.lt.datapool.app.SourceSchemaMismatchEvent
+import com.sbrf.lt.datapool.config.ConfigLoader
 import com.sbrf.lt.datapool.db.PostgresExporter
 import com.sbrf.lt.datapool.model.ExecutionStatus
 import kotlin.io.path.exists
@@ -20,6 +22,60 @@ import java.nio.file.Files
 import java.sql.SQLException
 
 class ApplicationRunnerTest {
+
+    @Test
+    fun `runs pipeline from runtime snapshot`() {
+        val root = Files.createTempDirectory("runner-snapshot")
+        val configFile = root.resolve("application.yml")
+        Files.writeString(
+            configFile,
+            """
+            app:
+              outputDir: ${root.resolve("out")}
+              fileFormat: csv
+              mergeMode: plain
+              errorMode: continue_on_error
+              parallelism: 1
+              fetchSize: 100
+              commonSql: select 1
+              target:
+                enabled: false
+              sources:
+                - name: db1
+                  jdbcUrl: jdbc:test:db1
+                  username: user
+                  password: pwd
+            """.trimIndent(),
+        )
+
+        val runner = ApplicationRunner(
+            exporter = PostgresExporter { _, _, _ ->
+                exportConnection(
+                    columns = listOf("id", "name"),
+                    rows = listOf(listOf(1, "A")),
+                )
+            },
+        )
+        val events = mutableListOf<ExecutionEvent>()
+
+        val result = runner.run(
+            snapshot = RuntimeModuleSnapshot(
+                moduleCode = "db-demo",
+                moduleTitle = "DB Demo",
+                configYaml = Files.readString(configFile),
+                sqlFiles = emptyMap(),
+                appConfig = ConfigLoader().load(configFile),
+                launchSourceKind = "DATABASE",
+                executionSnapshotId = "snapshot-1",
+                configLocation = "db:db-demo",
+            ),
+            credentialsPath = null,
+            executionListener = ExecutionListener { events += it },
+        )
+
+        assertEquals(ExecutionStatus.SUCCESS, result.status)
+        assertEquals("db:db-demo", (events.first() as RunStartedEvent).configPath)
+    }
 
     @Test
     fun `runs pipeline and skips schema mismatch source`() {

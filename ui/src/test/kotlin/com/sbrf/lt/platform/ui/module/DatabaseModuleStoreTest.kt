@@ -246,6 +246,43 @@ class DatabaseModuleStoreTest {
     }
 
     @Test
+    fun `rejects publishing stale personal working copy`() {
+        val preparedSql = mutableListOf<String>()
+        val store = DatabaseModuleStore(
+            connectionProvider = DatabaseConnectionProvider {
+                fakeConnection(
+                    rows = listOf(
+                        mapOf(
+                            "module_id" to "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+                            "current_revision_id" to "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+                            "working_copy_id" to "cccccccc-cccc-cccc-cccc-cccccccccccc",
+                            "base_revision_id" to "dddddddd-dddd-dddd-dddd-dddddddddddd",
+                            "working_copy_status" to "STALE",
+                            "working_copy_json" to """{"configText":"app:\n  mergeMode: plain\n","sqlFiles":[]}""",
+                            "working_copy_yaml" to "app:\n  mergeMode: plain\n",
+                            "content_hash" to "hash",
+                        ),
+                    ),
+                    preparedSql = preparedSql,
+                )
+            },
+        )
+
+        val error = assertFailsWith<IllegalArgumentException> {
+            store.publishWorkingCopy(
+                moduleCode = "db-demo",
+                actorId = "kwdev",
+                actorSource = "OS_LOGIN",
+                actorDisplayName = "kwdev",
+            )
+        }
+
+        assertTrue(error.message!!.contains("устарела"))
+        assertTrue(preparedSql.any { it.contains("module_working_copy") })
+        assertTrue(preparedSql.none { it.contains("insert into ui_registry.module_revision") })
+    }
+
+    @Test
     fun `rejects invalid schema name`() {
         val store = DatabaseModuleStore(
             connectionProvider = DatabaseConnectionProvider { error("connection must not be requested") },

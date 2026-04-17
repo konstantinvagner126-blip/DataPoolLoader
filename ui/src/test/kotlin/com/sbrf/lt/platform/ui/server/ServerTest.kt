@@ -17,6 +17,7 @@ import com.sbrf.lt.platform.ui.config.UiAppConfig
 import com.sbrf.lt.platform.ui.config.UiActorIdentity
 import com.sbrf.lt.platform.ui.config.UiActorResolver
 import com.sbrf.lt.platform.ui.config.UiActorSource
+import com.sbrf.lt.platform.ui.config.UiConfigLoader
 import com.sbrf.lt.platform.ui.config.UiDatabaseConnectionChecker
 import com.sbrf.lt.platform.ui.config.UiDatabaseConnectionStatus
 import com.sbrf.lt.platform.ui.config.UiDatabaseSchemaMigrator
@@ -25,6 +26,7 @@ import com.sbrf.lt.platform.ui.config.UiModuleStoreConfig
 import com.sbrf.lt.platform.ui.config.UiModuleStoreMode
 import com.sbrf.lt.platform.ui.config.UiModuleStorePostgresConfig
 import com.sbrf.lt.platform.ui.config.UiRuntimeContextService
+import com.sbrf.lt.platform.ui.config.UiRuntimeConfigResolver
 import com.sbrf.lt.platform.ui.config.schemaName
 import com.sbrf.lt.platform.ui.model.ModuleCatalogItemResponse
 import com.sbrf.lt.platform.ui.model.ModuleDetailsResponse
@@ -34,8 +36,16 @@ import com.sbrf.lt.platform.ui.module.DatabaseConnectionProvider
 import com.sbrf.lt.platform.ui.module.DatabaseEditableModule
 import com.sbrf.lt.platform.ui.module.DatabaseModuleStore
 import com.sbrf.lt.platform.ui.module.ModuleRegistry
+import com.sbrf.lt.platform.ui.run.DatabaseModuleExecutionSource
+import com.sbrf.lt.platform.ui.run.DatabaseModuleRunService
+import com.sbrf.lt.platform.ui.run.DatabaseRunStore
 import com.sbrf.lt.platform.ui.run.RunManager
+import com.sbrf.lt.platform.ui.run.UiCredentialsService
+import com.sbrf.lt.platform.ui.run.UiCredentialsProvider
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleQueryManager
+import com.sbrf.lt.platform.ui.sync.ActiveModuleSyncRun
+import com.sbrf.lt.platform.ui.sync.ModuleSyncState
+import com.sbrf.lt.platform.ui.sync.ModuleSyncService
 import io.ktor.client.request.get
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
@@ -67,6 +77,7 @@ import java.sql.Connection
 import java.sql.PreparedStatement
 import java.sql.ResultSet
 import java.sql.ResultSetMetaData
+import java.time.Instant
 import org.slf4j.helpers.NOPLogger
 
 class ServerTest {
@@ -666,6 +677,161 @@ class ServerTest {
     }
 
     @Test
+    fun `runtime context switches to database after credentials upload`() = testApplication {
+        val uiConfig = UiAppConfig(
+            moduleStore = UiModuleStoreConfig(
+                mode = UiModuleStoreMode.DATABASE,
+                postgres = UiModuleStorePostgresConfig(
+                    jdbcUrl = "\${LOCAL_MANUAL_DB_JDBC_URL}",
+                    username = "\${LOCAL_MANUAL_DB_USERNAME}",
+                    password = "\${LOCAL_MANUAL_DB_PASSWORD}",
+                ),
+            ),
+            storageDir = Files.createTempDirectory("ui-runtime-context-upload-state-").toString(),
+            sqlConsole = SqlConsoleConfig(),
+        )
+        val credentialsService = UiCredentialsService(uiConfigProvider = { uiConfig })
+        val runtimeContextService = UiRuntimeContextService(
+            actorResolver = object : UiActorResolver() {
+                override fun resolveAutomaticActor(): UiActorIdentity =
+                    UiActorIdentity("kwdev", UiActorSource.OS_LOGIN)
+            },
+            connectionChecker = object : UiDatabaseConnectionChecker() {
+                override fun check(config: UiModuleStorePostgresConfig): UiDatabaseConnectionStatus {
+                    val available = config.jdbcUrl == "jdbc:postgresql://127.0.0.1:5432/postgres" &&
+                        config.username == "kwdev" &&
+                        config.password == "dummy"
+                    return UiDatabaseConnectionStatus(
+                        configured = true,
+                        available = available,
+                        schema = config.schemaName(),
+                        message = if (available) {
+                            "PostgreSQL registry доступен."
+                        } else {
+                            "PostgreSQL registry недоступен."
+                        },
+                        errorMessage = if (available) null else "Не удалось разрешить placeholders.",
+                    )
+                }
+            },
+            schemaMigrator = object : UiDatabaseSchemaMigrator() {
+                override fun migrate(config: UiModuleStorePostgresConfig) = Unit
+            },
+        )
+        application {
+            uiModule(
+                uiConfig = uiConfig,
+                credentialsService = credentialsService,
+                runtimeConfigResolver = UiRuntimeConfigResolver(credentialsService),
+                runtimeContextService = runtimeContextService,
+            )
+        }
+
+        val before = client.get("/api/ui/runtime-context").bodyAsText()
+        val upload = client.post("/api/credentials/upload") {
+            setBody(
+                MultiPartFormDataContent(
+                    formData {
+                        append(
+                            "file",
+                            """
+                            LOCAL_MANUAL_DB_JDBC_URL=jdbc:postgresql://127.0.0.1:5432/postgres
+                            LOCAL_MANUAL_DB_USERNAME=kwdev
+                            LOCAL_MANUAL_DB_PASSWORD=dummy
+                            """.trimIndent(),
+                            io.ktor.http.Headers.build {
+                                append(
+                                    HttpHeaders.ContentDisposition,
+                                    ContentDisposition.File
+                                        .withParameter(ContentDisposition.Parameters.Name, "file")
+                                        .withParameter(ContentDisposition.Parameters.FileName, "credential.properties")
+                                        .toString(),
+                                )
+                                append(HttpHeaders.ContentType, ContentType.Text.Plain.toString())
+                            },
+                        )
+                    },
+                ),
+            )
+        }
+        val after = client.get("/api/ui/runtime-context").bodyAsText()
+
+        assertEquals(HttpStatusCode.OK, upload.status)
+        assertTrue(before.contains("\"effectiveMode\":\"files\""))
+        assertTrue(after.contains("\"effectiveMode\":\"database\""))
+        assertTrue(after.contains("\"dbAvailable\":true") || after.contains("\"available\":true"))
+    }
+
+    @Test
+    fun `runtime mode endpoint updates preferred mode and affects subsequent runtime context`() = testApplication {
+        var currentConfig = UiAppConfig(
+            moduleStore = UiModuleStoreConfig(
+                mode = UiModuleStoreMode.FILES,
+                postgres = UiModuleStorePostgresConfig(
+                    jdbcUrl = "jdbc:postgresql://localhost:5432/modules",
+                    username = "registry_user",
+                    password = "registry_pwd",
+                ),
+            ),
+            storageDir = Files.createTempDirectory("ui-runtime-mode-state-").toString(),
+            sqlConsole = SqlConsoleConfig(),
+        )
+        val uiConfigLoader = object : UiConfigLoader() {
+            override fun load(): UiAppConfig = currentConfig
+        }
+        val runtimeContextService = UiRuntimeContextService(
+            actorResolver = object : UiActorResolver() {
+                override fun resolveAutomaticActor(): UiActorIdentity =
+                    UiActorIdentity("kwdev", UiActorSource.OS_LOGIN)
+            },
+            connectionChecker = object : UiDatabaseConnectionChecker() {
+                override fun check(config: UiModuleStorePostgresConfig): UiDatabaseConnectionStatus =
+                    UiDatabaseConnectionStatus(
+                        configured = true,
+                        available = true,
+                        schema = config.schemaName(),
+                        message = "PostgreSQL registry доступен.",
+                    )
+            },
+            schemaMigrator = object : UiDatabaseSchemaMigrator() {
+                override fun migrate(config: UiModuleStorePostgresConfig) = Unit
+            },
+        )
+        val uiConfigPersistenceService = object : UiConfigPersistenceService(uiConfigLoader = uiConfigLoader) {
+            override fun updateModuleStoreMode(mode: UiModuleStoreMode): UiAppConfig {
+                currentConfig = currentConfig.copy(
+                    moduleStore = currentConfig.moduleStore.copy(mode = mode),
+                )
+                return currentConfig
+            }
+        }
+        application {
+            uiModule(
+                uiConfig = currentConfig,
+                uiConfigLoader = uiConfigLoader,
+                runtimeContextService = runtimeContextService,
+                uiConfigPersistenceService = uiConfigPersistenceService,
+            )
+        }
+
+        val before = client.get("/api/ui/runtime-context").bodyAsText()
+        val update = client.post("/api/ui/runtime-mode") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"mode":"database"}""")
+        }
+        val updateBody = update.bodyAsText()
+        val after = client.get("/api/ui/runtime-context").bodyAsText()
+
+        assertTrue(before.contains("\"requestedMode\":\"files\""))
+        assertTrue(before.contains("\"effectiveMode\":\"files\""))
+        assertEquals(HttpStatusCode.OK, update.status)
+        assertTrue(updateBody.contains("\"runtimeContext\":{\"requestedMode\":\"database\""))
+        assertTrue(updateBody.contains("\"effectiveMode\":\"database\""))
+        assertTrue(after.contains("\"requestedMode\":\"database\""))
+        assertTrue(after.contains("\"effectiveMode\":\"database\""))
+    }
+
+    @Test
     fun `db catalog endpoint returns modules when effective mode is database`() = testApplication {
         val uiConfig = UiAppConfig(
             moduleStore = UiModuleStoreConfig(
@@ -724,6 +890,168 @@ class ServerTest {
         assertTrue(catalog.contains("\"effectiveMode\":\"database\""))
         assertTrue(catalog.contains("\"id\":\"db-demo\""))
         assertTrue(catalog.contains("\"tags\":[\"database\"]"))
+    }
+
+    @Test
+    fun `db endpoints expose sync state and block catalog during maintenance mode`() = testApplication {
+        val uiConfig = UiAppConfig(
+            moduleStore = UiModuleStoreConfig(
+                mode = UiModuleStoreMode.DATABASE,
+                postgres = UiModuleStorePostgresConfig(
+                    jdbcUrl = "jdbc:postgresql://localhost:5432/modules",
+                    username = "registry_user",
+                    password = "registry_pwd",
+                ),
+            ),
+            storageDir = Files.createTempDirectory("ui-db-maintenance-state-").toString(),
+            sqlConsole = SqlConsoleConfig(),
+        )
+        val runtimeContextService = UiRuntimeContextService(
+            actorResolver = object : UiActorResolver() {
+                override fun resolveAutomaticActor(): UiActorIdentity =
+                    UiActorIdentity("kwdev", UiActorSource.OS_LOGIN)
+            },
+            connectionChecker = object : UiDatabaseConnectionChecker() {
+                override fun check(config: UiModuleStorePostgresConfig): UiDatabaseConnectionStatus =
+                    UiDatabaseConnectionStatus(
+                        configured = true,
+                        available = true,
+                        schema = config.schemaName(),
+                        message = "PostgreSQL registry доступен.",
+                    )
+            },
+            schemaMigrator = object : UiDatabaseSchemaMigrator() {
+                override fun migrate(config: UiModuleStorePostgresConfig) = Unit
+            },
+        )
+        val moduleSyncService = object : ModuleSyncService(
+            connectionProvider = DatabaseConnectionProvider { error("connection must not be requested") },
+        ) {
+            override fun currentSyncState(): ModuleSyncState = ModuleSyncState(
+                maintenanceMode = true,
+                activeFullSync = ActiveModuleSyncRun(
+                    syncRunId = "dddddddd-dddd-dddd-dddd-dddddddddddd",
+                    scope = "ALL",
+                    startedAt = Instant.parse("2026-04-16T10:15:30Z"),
+                    startedByActorId = "kwdev",
+                    startedByActorSource = "OS_LOGIN",
+                    startedByActorDisplayName = "kwdev",
+                ),
+            )
+        }
+        val databaseModuleStore = object : DatabaseModuleStore(
+            connectionProvider = DatabaseConnectionProvider { error("connection must not be requested") },
+        ) {
+            override fun listModules(includeHidden: Boolean): List<ModuleCatalogItemResponse> =
+                error("catalog must be blocked during maintenance mode")
+        }
+        application {
+            uiModule(
+                uiConfig = uiConfig,
+                runtimeContextService = runtimeContextService,
+                databaseModuleStore = databaseModuleStore,
+                moduleSyncService = moduleSyncService,
+            )
+        }
+
+        val syncStateResponse = client.get("/api/db/sync/state")
+        val catalogResponse = client.get("/api/db/modules/catalog")
+
+        assertEquals(HttpStatusCode.OK, syncStateResponse.status)
+        assertTrue(syncStateResponse.bodyAsText().contains("\"maintenanceMode\":true"))
+        assertTrue(syncStateResponse.bodyAsText().contains("\"scope\":\"ALL\""))
+        assertEquals(HttpStatusCode.BadRequest, catalogResponse.status)
+        assertTrue(catalogResponse.bodyAsText().contains("идет массовый импорт модулей в БД"))
+    }
+
+    @Test
+    fun `db endpoints expose active single sync state and block save for busy module`() = testApplication {
+        val uiConfig = UiAppConfig(
+            moduleStore = UiModuleStoreConfig(
+                mode = UiModuleStoreMode.DATABASE,
+                postgres = UiModuleStorePostgresConfig(
+                    jdbcUrl = "jdbc:postgresql://localhost:5432/modules",
+                    username = "registry_user",
+                    password = "registry_pwd",
+                ),
+            ),
+            storageDir = Files.createTempDirectory("ui-db-single-sync-state-").toString(),
+            sqlConsole = SqlConsoleConfig(),
+        )
+        val runtimeContextService = UiRuntimeContextService(
+            actorResolver = object : UiActorResolver() {
+                override fun resolveAutomaticActor(): UiActorIdentity =
+                    UiActorIdentity("kwdev", UiActorSource.OS_LOGIN)
+            },
+            connectionChecker = object : UiDatabaseConnectionChecker() {
+                override fun check(config: UiModuleStorePostgresConfig): UiDatabaseConnectionStatus =
+                    UiDatabaseConnectionStatus(
+                        configured = true,
+                        available = true,
+                        schema = config.schemaName(),
+                        message = "PostgreSQL registry доступен.",
+                    )
+            },
+            schemaMigrator = object : UiDatabaseSchemaMigrator() {
+                override fun migrate(config: UiModuleStorePostgresConfig) = Unit
+            },
+        )
+        val moduleSyncService = object : ModuleSyncService(
+            connectionProvider = DatabaseConnectionProvider { error("connection must not be requested") },
+        ) {
+            override fun currentSyncState(): ModuleSyncState = ModuleSyncState(
+                activeSingleSyncs = listOf(
+                    ActiveModuleSyncRun(
+                        syncRunId = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
+                        scope = "ONE",
+                        startedAt = Instant.parse("2026-04-16T11:00:00Z"),
+                        moduleCode = "db-demo",
+                        startedByActorId = "other-user",
+                        startedByActorSource = "OS_LOGIN",
+                        startedByActorDisplayName = "other-user",
+                    ),
+                ),
+            )
+        }
+        val databaseModuleStore = object : DatabaseModuleStore(
+            connectionProvider = DatabaseConnectionProvider { error("connection must not be requested") },
+        ) {
+            override fun saveWorkingCopy(
+                moduleCode: String,
+                actorId: String,
+                actorSource: String,
+                actorDisplayName: String?,
+                request: com.sbrf.lt.platform.ui.model.SaveModuleRequest,
+            ) {
+                error("save must be blocked while module sync is active")
+            }
+        }
+        application {
+            uiModule(
+                uiConfig = uiConfig,
+                runtimeContextService = runtimeContextService,
+                databaseModuleStore = databaseModuleStore,
+                moduleSyncService = moduleSyncService,
+            )
+        }
+
+        val syncStateResponse = client.get("/api/db/sync/state")
+        val saveResponse = client.post("/api/db/modules/db-demo/save") {
+            contentType(ContentType.Application.Json)
+            setBody(
+                """
+                {
+                  "configText": "app:\n  mergeMode: plain\n",
+                  "sqlFiles": {}
+                }
+                """.trimIndent()
+            )
+        }
+
+        assertEquals(HttpStatusCode.OK, syncStateResponse.status)
+        assertTrue(syncStateResponse.bodyAsText().contains("\"moduleCode\":\"db-demo\""))
+        assertEquals(HttpStatusCode.BadRequest, saveResponse.status)
+        assertTrue(saveResponse.bodyAsText().contains("Импорт модуля 'db-demo' уже выполняется"))
     }
 
     @Test
@@ -948,6 +1276,194 @@ class ServerTest {
         assertEquals(HttpStatusCode.OK, response.status)
         assertTrue(response.bodyAsText().contains("working copy"))
         assertEquals(Triple("db-demo", "kwdev", "OS_LOGIN"), discarded)
+    }
+
+    @Test
+    fun `db module run endpoint starts database run for current actor`() = testApplication {
+        val uiConfig = UiAppConfig(
+            moduleStore = UiModuleStoreConfig(
+                mode = UiModuleStoreMode.DATABASE,
+                postgres = UiModuleStorePostgresConfig(
+                    jdbcUrl = "jdbc:postgresql://localhost:5432/modules",
+                    username = "registry_user",
+                    password = "registry_pwd",
+                ),
+            ),
+            storageDir = Files.createTempDirectory("ui-db-run-state-").toString(),
+            sqlConsole = SqlConsoleConfig(),
+        )
+        val runtimeContextService = UiRuntimeContextService(
+            actorResolver = object : UiActorResolver() {
+                override fun resolveAutomaticActor(): UiActorIdentity =
+                    UiActorIdentity("kwdev", UiActorSource.OS_LOGIN)
+            },
+            connectionChecker = object : UiDatabaseConnectionChecker() {
+                override fun check(config: UiModuleStorePostgresConfig): UiDatabaseConnectionStatus =
+                    UiDatabaseConnectionStatus(
+                        configured = true,
+                        available = true,
+                        schema = config.schemaName(),
+                        message = "PostgreSQL registry доступен.",
+                    )
+            },
+            schemaMigrator = object : UiDatabaseSchemaMigrator() {
+                override fun migrate(config: UiModuleStorePostgresConfig) = Unit
+            },
+        )
+        var startedBy: Triple<String, String, String>? = null
+        val runService = object : DatabaseModuleRunService(
+            databaseModuleStore = DatabaseModuleStore(
+                connectionProvider = DatabaseConnectionProvider { error("connection must not be requested") },
+            ),
+            executionSource = DatabaseModuleExecutionSource(
+                connectionProvider = DatabaseConnectionProvider { error("connection must not be requested") },
+            ),
+            runStore = DatabaseRunStore(
+                connectionProvider = DatabaseConnectionProvider { error("connection must not be requested") },
+            ),
+            credentialsProvider = object : UiCredentialsProvider {
+                override fun currentCredentialsStatus() =
+                    com.sbrf.lt.platform.ui.model.CredentialsStatusResponse(
+                        mode = "NONE",
+                        displayName = "Файл не задан",
+                        fileAvailable = false,
+                        uploaded = false,
+                    )
+
+                override fun materializeCredentialsFile(tempDir: java.nio.file.Path) = null
+            },
+        ) {
+            override fun startRun(
+                moduleCode: String,
+                actorId: String,
+                actorSource: String,
+                actorDisplayName: String?,
+            ): com.sbrf.lt.platform.ui.model.DatabaseRunStartResponse {
+                startedBy = Triple(moduleCode, actorId, actorSource)
+                return com.sbrf.lt.platform.ui.model.DatabaseRunStartResponse(
+                    runId = "run-1",
+                    moduleCode = moduleCode,
+                    status = "RUNNING",
+                    requestedAt = Instant.parse("2026-04-17T10:00:00Z"),
+                    launchSourceKind = "CURRENT_REVISION",
+                    executionSnapshotId = "snapshot-1",
+                    message = "DB-модуль '$moduleCode' поставлен в выполнение.",
+                )
+            }
+        }
+        application {
+            uiModule(
+                uiConfig = uiConfig,
+                runtimeContextService = runtimeContextService,
+                databaseModuleRunService = runService,
+            )
+        }
+
+        val response = client.post("/api/db/modules/db-demo/run") {
+            contentType(ContentType.Application.Json)
+            setBody("""{}""")
+        }
+
+        assertEquals(HttpStatusCode.OK, response.status)
+        assertTrue(response.bodyAsText().contains("\"runId\":\"run-1\""))
+        assertEquals(Triple("db-demo", "kwdev", "OS_LOGIN"), startedBy)
+    }
+
+    @Test
+    fun `db module runs endpoint returns stored run summaries`() = testApplication {
+        val uiConfig = UiAppConfig(
+            moduleStore = UiModuleStoreConfig(
+                mode = UiModuleStoreMode.DATABASE,
+                postgres = UiModuleStorePostgresConfig(
+                    jdbcUrl = "jdbc:postgresql://localhost:5432/modules",
+                    username = "registry_user",
+                    password = "registry_pwd",
+                ),
+            ),
+            storageDir = Files.createTempDirectory("ui-db-runs-state-").toString(),
+            sqlConsole = SqlConsoleConfig(),
+        )
+        val runtimeContextService = UiRuntimeContextService(
+            actorResolver = object : UiActorResolver() {
+                override fun resolveAutomaticActor(): UiActorIdentity =
+                    UiActorIdentity("kwdev", UiActorSource.OS_LOGIN)
+            },
+            connectionChecker = object : UiDatabaseConnectionChecker() {
+                override fun check(config: UiModuleStorePostgresConfig): UiDatabaseConnectionStatus =
+                    UiDatabaseConnectionStatus(
+                        configured = true,
+                        available = true,
+                        schema = config.schemaName(),
+                        message = "PostgreSQL registry доступен.",
+                    )
+            },
+            schemaMigrator = object : UiDatabaseSchemaMigrator() {
+                override fun migrate(config: UiModuleStorePostgresConfig) = Unit
+            },
+        )
+        val runService = object : DatabaseModuleRunService(
+            databaseModuleStore = DatabaseModuleStore(
+                connectionProvider = DatabaseConnectionProvider { error("connection must not be requested") },
+            ),
+            executionSource = DatabaseModuleExecutionSource(
+                connectionProvider = DatabaseConnectionProvider { error("connection must not be requested") },
+            ),
+            runStore = DatabaseRunStore(
+                connectionProvider = DatabaseConnectionProvider { error("connection must not be requested") },
+            ),
+            credentialsProvider = object : UiCredentialsProvider {
+                override fun currentCredentialsStatus() =
+                    com.sbrf.lt.platform.ui.model.CredentialsStatusResponse(
+                        mode = "NONE",
+                        displayName = "Файл не задан",
+                        fileAvailable = false,
+                        uploaded = false,
+                    )
+
+                override fun materializeCredentialsFile(tempDir: java.nio.file.Path) = null
+            },
+        ) {
+            override fun listRuns(moduleCode: String, limit: Int): com.sbrf.lt.platform.ui.model.DatabaseModuleRunsResponse =
+                com.sbrf.lt.platform.ui.model.DatabaseModuleRunsResponse(
+                    moduleCode = moduleCode,
+                    runs = listOf(
+                        com.sbrf.lt.platform.ui.model.DatabaseModuleRunSummaryResponse(
+                            runId = "run-1",
+                            executionSnapshotId = "snapshot-1",
+                            status = "SUCCESS",
+                            launchSourceKind = "WORKING_COPY",
+                            requestedAt = Instant.parse("2026-04-17T10:00:00Z"),
+                            startedAt = Instant.parse("2026-04-17T10:00:01Z"),
+                            finishedAt = Instant.parse("2026-04-17T10:01:00Z"),
+                            moduleCode = moduleCode,
+                            moduleTitle = "DB Demo",
+                            outputDir = "/tmp/out",
+                            mergedRowCount = 10,
+                            successfulSourceCount = 1,
+                            failedSourceCount = 0,
+                            skippedSourceCount = 0,
+                            targetStatus = "SUCCESS",
+                            targetTableName = "demo_target",
+                            targetRowsLoaded = 10,
+                            errorMessage = null,
+                        ),
+                    ),
+                )
+        }
+        application {
+            uiModule(
+                uiConfig = uiConfig,
+                runtimeContextService = runtimeContextService,
+                databaseModuleRunService = runService,
+            )
+        }
+
+        val response = client.get("/api/db/modules/db-demo/runs")
+
+        assertEquals(HttpStatusCode.OK, response.status)
+        assertTrue(response.bodyAsText().contains("\"moduleCode\":\"db-demo\""))
+        assertTrue(response.bodyAsText().contains("\"runId\":\"run-1\""))
+        assertTrue(response.bodyAsText().contains("\"launchSourceKind\":\"WORKING_COPY\""))
     }
 
     @Test

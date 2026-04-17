@@ -82,6 +82,9 @@ data class ModuleDetailsResponse(
     val sqlFiles: List<ModuleFileContent>,
     val requiresCredentials: Boolean,
     val credentialsStatus: CredentialsStatusResponse,
+    val requiredCredentialKeys: List<String> = emptyList(),
+    val missingCredentialKeys: List<String> = emptyList(),
+    val credentialsReady: Boolean = true,
 )
 
 data class SaveModuleRequest(

@@ -1,5 +1,6 @@
 package com.sbrf.lt.datapool.merge
 
+import com.sbrf.lt.datapool.app.port.ResultMerger
 import com.sbrf.lt.datapool.export.CsvSupport
 import com.sbrf.lt.datapool.model.AppConfig
 import com.sbrf.lt.datapool.model.MergeResult
@@ -11,10 +12,10 @@ import java.io.BufferedReader
 import java.nio.file.Files
 import java.nio.file.Path
 
-class MergeService {
+class MergeService : ResultMerger {
     private val maxOpenReaders = 64
 
-    fun merge(
+    override fun merge(
         successfulSources: List<SourceExecutionResult>,
         appConfig: AppConfig,
         outputFile: Path,

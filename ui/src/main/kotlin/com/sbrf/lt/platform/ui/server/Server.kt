@@ -7,6 +7,7 @@ import com.sbrf.lt.datapool.sqlconsole.SqlConsoleService
 import com.sbrf.lt.platform.ui.config.UiAppConfig
 import com.sbrf.lt.platform.ui.config.UiConfigLoader
 import com.sbrf.lt.platform.ui.config.UiConfigPersistenceService
+import com.sbrf.lt.platform.ui.config.UiRuntimeConfigResolver
 import com.sbrf.lt.platform.ui.config.UiRuntimeContext
 import com.sbrf.lt.platform.ui.config.UiRuntimeContextService
 import com.sbrf.lt.platform.ui.config.appsRootPath
@@ -17,21 +18,29 @@ import com.sbrf.lt.platform.ui.model.ConfigFormParseRequest
 import com.sbrf.lt.platform.ui.model.ConfigFormUpdateRequest
 import com.sbrf.lt.platform.ui.model.DatabaseModuleDetailsResponse
 import com.sbrf.lt.platform.ui.model.DatabaseModulesCatalogResponse
+import com.sbrf.lt.platform.ui.model.DatabaseRunStartRequest
 import com.sbrf.lt.platform.ui.model.ModulesCatalogResponse
 import com.sbrf.lt.platform.ui.model.SaveModuleRequest
 import com.sbrf.lt.platform.ui.model.SaveResultResponse
+import com.sbrf.lt.platform.ui.model.UiRuntimeModeUpdateRequest
+import com.sbrf.lt.platform.ui.model.UiRuntimeModeUpdateResponse
 import com.sbrf.lt.platform.ui.model.SqlConsoleExportRequest
 import com.sbrf.lt.platform.ui.model.SqlConsoleSettingsUpdateRequest
 import com.sbrf.lt.platform.ui.model.SqlConsoleQueryRequest
 import com.sbrf.lt.platform.ui.model.StartRunRequest
 import com.sbrf.lt.platform.ui.model.CreateDbModuleRequest
+import com.sbrf.lt.platform.ui.model.SyncOneModuleRequest
 import com.sbrf.lt.platform.ui.model.toCatalogItemResponse
 import com.sbrf.lt.platform.ui.model.toResponse
 import com.sbrf.lt.platform.ui.model.toStartResponse
 import com.sbrf.lt.platform.ui.module.ConfigFormService
 import com.sbrf.lt.platform.ui.module.DatabaseModuleStore
 import com.sbrf.lt.platform.ui.module.ModuleRegistry
+import com.sbrf.lt.platform.ui.run.DatabaseModuleExecutionSource
+import com.sbrf.lt.platform.ui.run.DatabaseModuleRunService
+import com.sbrf.lt.platform.ui.run.DatabaseRunStore
 import com.sbrf.lt.platform.ui.run.RunManager
+import com.sbrf.lt.platform.ui.run.UiCredentialsService
 import com.sbrf.lt.platform.ui.sync.ModuleSyncService
 import com.sbrf.lt.platform.ui.sync.SyncRunResult
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleExportService
@@ -95,8 +104,15 @@ internal fun loadStaticText(
 internal fun uiStartupModule(
     uiConfig: UiAppConfig,
     logger: Logger,
-    runtimeContext: UiRuntimeContext = UiRuntimeContextService().resolve(uiConfig),
-    moduleInstaller: Application.() -> Unit = { uiModule(uiConfig = uiConfig, runtimeContext = runtimeContext) },
+    runtimeConfigResolver: UiRuntimeConfigResolver = UiRuntimeConfigResolver(),
+    runtimeContext: UiRuntimeContext = UiRuntimeContextService().resolve(runtimeConfigResolver.resolve(uiConfig)),
+    moduleInstaller: Application.() -> Unit = {
+        uiModule(
+            uiConfig = uiConfig,
+            uiConfigLoader = UiConfigLoader(),
+            runtimeContext = runtimeContext,
+        )
+    },
 ): Application.() -> Unit = {
     environment.monitor.subscribe(ApplicationStarted) {
         logger.info("UI успешно запущен. Переходи по ссылке для открытия страницы с интерфейсом: http://localhost:${uiConfig.port}")
@@ -109,11 +125,12 @@ fun startUiServer(
     logger: Logger = LoggerFactory.getLogger("com.sbrf.lt.platform.ui.Startup"),
     starter: UiServerStarter = defaultUiServerStarter(),
     runtimeContextService: UiRuntimeContextService = UiRuntimeContextService(),
+    runtimeConfigResolver: UiRuntimeConfigResolver = UiRuntimeConfigResolver(),
 ) {
     val port = uiConfig.port
     val appsRoot = uiConfig.appsRootPath()
     val storageDir = uiConfig.storageDirPath()
-    val runtimeContext = runtimeContextService.resolve(uiConfig)
+    val runtimeContext = runtimeContextService.resolve(runtimeConfigResolver.resolve(uiConfig))
     if (appsRoot != null) {
         logger.info("Apps root определен: {}", appsRoot)
     } else {
@@ -130,27 +147,32 @@ fun startUiServer(
     runtimeContext.fallbackReason?.let { reason ->
         logger.warn("Режим UI переведен в FILES: {}", reason)
     }
-    starter.start(port, uiStartupModule(uiConfig, logger, runtimeContext))
+    starter.start(port, uiStartupModule(uiConfig, logger, runtimeConfigResolver, runtimeContext))
 }
 
 fun Application.uiModule(
     uiConfig: UiAppConfig = UiConfigLoader().load(),
+    uiConfigLoader: UiConfigLoader = object : UiConfigLoader() {
+        override fun load(): UiAppConfig = uiConfig
+    },
+    credentialsService: UiCredentialsService = UiCredentialsService(
+        uiConfigProvider = { runCatching { uiConfigLoader.load() }.getOrDefault(uiConfig) },
+    ),
+    runtimeConfigResolver: UiRuntimeConfigResolver = UiRuntimeConfigResolver(credentialsService),
     runtimeContextService: UiRuntimeContextService = UiRuntimeContextService(),
-    runtimeContext: UiRuntimeContext = runtimeContextService.resolve(uiConfig),
+    runtimeUiConfig: UiAppConfig = runtimeConfigResolver.resolve(uiConfig),
+    runtimeContext: UiRuntimeContext = runtimeContextService.resolve(runtimeUiConfig),
     moduleRegistry: ModuleRegistry = ModuleRegistry(appsRoot = uiConfig.appsRootPath()),
-    databaseModuleStore: DatabaseModuleStore? = uiConfig.moduleStore.postgres
-        .takeIf { it.isConfigured() }
-        ?.let { DatabaseModuleStore.fromConfig(it) },
-    runManager: RunManager = RunManager(moduleRegistry = moduleRegistry, uiConfig = uiConfig),
+    databaseModuleStore: DatabaseModuleStore? = null,
+    runManager: RunManager = RunManager(moduleRegistry = moduleRegistry, uiConfig = uiConfig, credentialsService = credentialsService),
     configFormService: ConfigFormService = ConfigFormService(),
-    sqlConsoleService: SqlConsoleService = SqlConsoleService(uiConfig.sqlConsole),
+    sqlConsoleService: SqlConsoleService = SqlConsoleService(runtimeUiConfig.sqlConsole),
     sqlConsoleQueryManager: SqlConsoleQueryManager = SqlConsoleQueryManager(sqlConsoleService),
     sqlConsoleExportService: SqlConsoleExportService = SqlConsoleExportService(),
     sqlConsoleStateService: SqlConsoleStateService = SqlConsoleStateService(SqlConsoleStateStore(uiConfig.storageDirPath())),
     uiConfigPersistenceService: UiConfigPersistenceService = UiConfigPersistenceService(),
-    moduleSyncService: ModuleSyncService? = uiConfig.moduleStore.postgres
-        .takeIf { it.isConfigured() }
-        ?.let { ModuleSyncService.fromConfig(it) },
+    moduleSyncService: ModuleSyncService? = null,
+    databaseModuleRunService: DatabaseModuleRunService? = null,
 ) {
     val mapper = ObjectMapper()
         .registerModule(JavaTimeModule())
@@ -169,6 +191,72 @@ fun Application.uiModule(
     install(StatusPages) {
         exception<Throwable> { call, cause ->
             call.respond(HttpStatusCode.BadRequest, mapOf("error" to (cause.message ?: "Неизвестная ошибка")))
+        }
+    }
+
+    fun currentUiConfig(): UiAppConfig =
+        runCatching { uiConfigLoader.load() }.getOrDefault(uiConfig)
+
+    fun currentRuntimeUiConfig(): UiAppConfig =
+        runCatching { runtimeConfigResolver.resolve(currentUiConfig()) }.getOrDefault(runtimeUiConfig)
+
+    fun currentRuntimeContext(): UiRuntimeContext =
+        runCatching { runtimeContextService.resolve(currentRuntimeUiConfig()) }.getOrDefault(runtimeContext)
+
+    fun currentDatabasePostgresConfig() =
+        currentRuntimeUiConfig().moduleStore.postgres.takeIf { it.isConfigured() }
+
+    fun currentDatabaseModuleStore(): DatabaseModuleStore? =
+        databaseModuleStore ?: currentDatabasePostgresConfig()?.let { DatabaseModuleStore.fromConfig(it) }
+
+    fun currentModuleSyncService(): ModuleSyncService? =
+        moduleSyncService ?: currentDatabasePostgresConfig()?.let { ModuleSyncService.fromConfig(it) }
+
+    fun currentDatabaseModuleRunService(): DatabaseModuleRunService? =
+        databaseModuleRunService ?: currentDatabasePostgresConfig()?.let { postgres ->
+            val store = currentDatabaseModuleStore() ?: DatabaseModuleStore.fromConfig(postgres)
+            DatabaseModuleRunService(
+                databaseModuleStore = store,
+                executionSource = DatabaseModuleExecutionSource.fromConfig(postgres),
+                runStore = DatabaseRunStore.fromConfig(postgres),
+                credentialsProvider = credentialsService,
+            )
+        }
+
+    fun readSyncStateSafely(): com.sbrf.lt.platform.ui.sync.ModuleSyncState =
+        runCatching {
+            val runtimeContext = currentRuntimeContext()
+            val syncService = currentModuleSyncService()
+            if (runtimeContext.effectiveMode == UiModuleStoreMode.DATABASE && syncService != null) {
+                syncService.currentSyncState()
+            } else {
+                com.sbrf.lt.platform.ui.sync.ModuleSyncState()
+            }
+        }.getOrElse {
+            com.sbrf.lt.platform.ui.sync.ModuleSyncState()
+        }
+
+    fun requireDatabaseMaintenanceIsInactive() {
+        if (readSyncStateSafely().maintenanceMode) {
+            error("Работа с DB-модулями временно недоступна: идет массовый импорт модулей в БД.")
+        }
+    }
+
+    fun requireDatabaseModuleIsNotSyncing(moduleCode: String) {
+        val activeSync = readSyncStateSafely().activeSingleSync(moduleCode)
+        if (activeSync != null) {
+            val startedBy = activeSync.startedByActorDisplayName ?: activeSync.startedByActorId
+            val startedAt = activeSync.startedAt
+            error(
+                buildString {
+                    append("Импорт модуля '$moduleCode' уже выполняется")
+                    if (!startedBy.isNullOrBlank()) {
+                        append(" пользователем $startedBy")
+                    }
+                    append(".")
+                    append(" Начало: $startedAt.")
+                },
+            )
         }
     }
 
@@ -222,12 +310,31 @@ fun Application.uiModule(
         }
 
         get("/api/ui/runtime-context") {
-            call.respond(runtimeContext)
+            call.respond(currentRuntimeContext())
+        }
+
+        post("/api/ui/runtime-mode") {
+            val request = call.receive<UiRuntimeModeUpdateRequest>()
+            val updatedConfig = uiConfigPersistenceService.updateModuleStoreMode(request.mode)
+            val updatedRuntimeContext = runtimeContextService.resolve(runtimeConfigResolver.resolve(updatedConfig))
+            call.respond(
+                UiRuntimeModeUpdateResponse(
+                    message = "Предпочитаемый режим UI сохранен: ${request.mode.toConfigValue()}.",
+                    runtimeContext = updatedRuntimeContext,
+                ),
+            )
+        }
+
+        get("/api/db/sync/state") {
+            call.respond(readSyncStateSafely())
         }
 
         get("/api/db/modules/catalog") {
-            val modules = if (runtimeContext.effectiveMode == UiModuleStoreMode.DATABASE && databaseModuleStore != null) {
-                databaseModuleStore.listModules()
+            requireDatabaseMaintenanceIsInactive()
+            val runtimeContext = currentRuntimeContext()
+            val store = currentDatabaseModuleStore()
+            val modules = if (runtimeContext.effectiveMode == UiModuleStoreMode.DATABASE && store != null) {
+                store.listModules()
             } else {
                 emptyList()
             }
@@ -235,10 +342,12 @@ fun Application.uiModule(
         }
 
         get("/api/db/modules/{id}") {
+            requireDatabaseMaintenanceIsInactive()
+            val runtimeContext = currentRuntimeContext()
             require(runtimeContext.effectiveMode == UiModuleStoreMode.DATABASE) {
                 "DB-режим недоступен: ${runtimeContext.fallbackReason ?: "effective mode is ${runtimeContext.effectiveMode.toConfigValue()}"}"
             }
-            val store = requireNotNull(databaseModuleStore) {
+            val store = requireNotNull(currentDatabaseModuleStore()) {
                 "DB module store не настроен."
             }
             val actorId = requireNotNull(runtimeContext.actor.actorId) {
@@ -265,11 +374,27 @@ fun Application.uiModule(
             )
         }
 
-        post("/api/db/modules/{id}/save") {
+        get("/api/db/modules/{id}/runs") {
+            requireDatabaseMaintenanceIsInactive()
+            val runtimeContext = currentRuntimeContext()
             require(runtimeContext.effectiveMode == UiModuleStoreMode.DATABASE) {
                 "DB-режим недоступен: ${runtimeContext.fallbackReason ?: "effective mode is ${runtimeContext.effectiveMode.toConfigValue()}"}"
             }
-            val store = requireNotNull(databaseModuleStore) {
+            val runService = requireNotNull(currentDatabaseModuleRunService()) {
+                "DB run service не настроен."
+            }
+            call.respond(runService.listRuns(requireNotNull(call.parameters["id"])))
+        }
+
+        post("/api/db/modules/{id}/save") {
+            requireDatabaseMaintenanceIsInactive()
+            val runtimeContext = currentRuntimeContext()
+            require(runtimeContext.effectiveMode == UiModuleStoreMode.DATABASE) {
+                "DB-режим недоступен: ${runtimeContext.fallbackReason ?: "effective mode is ${runtimeContext.effectiveMode.toConfigValue()}"}"
+            }
+            val moduleCode = requireNotNull(call.parameters["id"])
+            requireDatabaseModuleIsNotSyncing(moduleCode)
+            val store = requireNotNull(currentDatabaseModuleStore()) {
                 "DB module store не настроен."
             }
             val actorId = requireNotNull(runtimeContext.actor.actorId) {
@@ -279,7 +404,7 @@ fun Application.uiModule(
                 "Для DB-режима нужно определить actorSource."
             }
             store.saveWorkingCopy(
-                moduleCode = requireNotNull(call.parameters["id"]),
+                moduleCode = moduleCode,
                 actorId = actorId,
                 actorSource = actorSource,
                 actorDisplayName = runtimeContext.actor.actorDisplayName,
@@ -289,10 +414,14 @@ fun Application.uiModule(
         }
 
         post("/api/db/modules/{id}/discard-working-copy") {
+            requireDatabaseMaintenanceIsInactive()
+            val runtimeContext = currentRuntimeContext()
             require(runtimeContext.effectiveMode == UiModuleStoreMode.DATABASE) {
                 "DB-режим недоступен: ${runtimeContext.fallbackReason ?: "effective mode is ${runtimeContext.effectiveMode.toConfigValue()}"}"
             }
-            val store = requireNotNull(databaseModuleStore) {
+            val moduleCode = requireNotNull(call.parameters["id"])
+            requireDatabaseModuleIsNotSyncing(moduleCode)
+            val store = requireNotNull(currentDatabaseModuleStore()) {
                 "DB module store не настроен."
             }
             val actorId = requireNotNull(runtimeContext.actor.actorId) {
@@ -302,7 +431,7 @@ fun Application.uiModule(
                 "Для DB-режима нужно определить actorSource."
             }
             store.discardWorkingCopy(
-                moduleCode = requireNotNull(call.parameters["id"]),
+                moduleCode = moduleCode,
                 actorId = actorId,
                 actorSource = actorSource,
             )
@@ -310,10 +439,14 @@ fun Application.uiModule(
         }
 
         post("/api/db/modules/{id}/publish") {
+            requireDatabaseMaintenanceIsInactive()
+            val runtimeContext = currentRuntimeContext()
             require(runtimeContext.effectiveMode == UiModuleStoreMode.DATABASE) {
                 "DB-режим недоступен: ${runtimeContext.fallbackReason ?: "effective mode is ${runtimeContext.effectiveMode.toConfigValue()}"}"
             }
-            val store = requireNotNull(databaseModuleStore) {
+            val moduleCode = requireNotNull(call.parameters["id"])
+            requireDatabaseModuleIsNotSyncing(moduleCode)
+            val store = requireNotNull(currentDatabaseModuleStore()) {
                 "DB module store не настроен."
             }
             val actorId = requireNotNull(runtimeContext.actor.actorId) {
@@ -323,7 +456,7 @@ fun Application.uiModule(
                 "Для DB-режима нужно определить actorSource."
             }
             val result = store.publishWorkingCopy(
-                moduleCode = requireNotNull(call.parameters["id"]),
+                moduleCode = moduleCode,
                 actorId = actorId,
                 actorSource = actorSource,
                 actorDisplayName = runtimeContext.actor.actorDisplayName,
@@ -338,11 +471,41 @@ fun Application.uiModule(
             )
         }
 
-        post("/api/db/modules") {
+        post("/api/db/modules/{id}/run") {
+            requireDatabaseMaintenanceIsInactive()
+            val runtimeContext = currentRuntimeContext()
             require(runtimeContext.effectiveMode == UiModuleStoreMode.DATABASE) {
                 "DB-режим недоступен: ${runtimeContext.fallbackReason ?: "effective mode is ${runtimeContext.effectiveMode.toConfigValue()}"}"
             }
-            val store = requireNotNull(databaseModuleStore) {
+            val moduleCode = requireNotNull(call.parameters["id"])
+            requireDatabaseModuleIsNotSyncing(moduleCode)
+            val runService = requireNotNull(currentDatabaseModuleRunService()) {
+                "DB run service не настроен."
+            }
+            val actorId = requireNotNull(runtimeContext.actor.actorId) {
+                "Для DB-режима нужно определить actorId."
+            }
+            val actorSource = requireNotNull(runtimeContext.actor.actorSource) {
+                "Для DB-режима нужно определить actorSource."
+            }
+            call.receive<DatabaseRunStartRequest>()
+            call.respond(
+                runService.startRun(
+                    moduleCode = moduleCode,
+                    actorId = actorId,
+                    actorSource = actorSource,
+                    actorDisplayName = runtimeContext.actor.actorDisplayName,
+                )
+            )
+        }
+
+        post("/api/db/modules") {
+            requireDatabaseMaintenanceIsInactive()
+            val runtimeContext = currentRuntimeContext()
+            require(runtimeContext.effectiveMode == UiModuleStoreMode.DATABASE) {
+                "DB-режим недоступен: ${runtimeContext.fallbackReason ?: "effective mode is ${runtimeContext.effectiveMode.toConfigValue()}"}"
+            }
+            val store = requireNotNull(currentDatabaseModuleStore()) {
                 "DB module store не настроен."
             }
             val actorId = requireNotNull(runtimeContext.actor.actorId) {
@@ -376,17 +539,21 @@ fun Application.uiModule(
         }
 
         delete("/api/db/modules/{id}") {
+            requireDatabaseMaintenanceIsInactive()
+            val runtimeContext = currentRuntimeContext()
             require(runtimeContext.effectiveMode == UiModuleStoreMode.DATABASE) {
                 "DB-режим недоступен: ${runtimeContext.fallbackReason ?: "effective mode is ${runtimeContext.effectiveMode.toConfigValue()}"}"
             }
-            val store = requireNotNull(databaseModuleStore) {
+            val moduleCode = requireNotNull(call.parameters["id"])
+            requireDatabaseModuleIsNotSyncing(moduleCode)
+            val store = requireNotNull(currentDatabaseModuleStore()) {
                 "DB module store не настроен."
             }
             val actorId = requireNotNull(runtimeContext.actor.actorId) {
                 "Для DB-режима нужно определить actorId."
             }
             val result = store.deleteModule(
-                moduleCode = requireNotNull(call.parameters["id"]),
+                moduleCode = moduleCode,
                 actorId = actorId,
             )
             call.respond(
@@ -399,13 +566,14 @@ fun Application.uiModule(
         }
 
         post("/api/db/sync/one") {
+            val runtimeContext = currentRuntimeContext()
             require(runtimeContext.effectiveMode == UiModuleStoreMode.DATABASE) {
                 "DB-режим недоступен: ${runtimeContext.fallbackReason ?: "effective mode is ${runtimeContext.effectiveMode.toConfigValue()}"}"
             }
-            val syncService = requireNotNull(moduleSyncService) {
+            val syncService = requireNotNull(currentModuleSyncService()) {
                 "ModuleSyncService не настроен."
             }
-            val appsRoot = requireNotNull(uiConfig.appsRootPath()) {
+            val appsRoot = requireNotNull(currentRuntimeUiConfig().appsRootPath()) {
                 "appsRoot не настроен."
             }
             val actorId = requireNotNull(runtimeContext.actor.actorId) {
@@ -423,13 +591,14 @@ fun Application.uiModule(
         }
 
         post("/api/db/sync/all") {
+            val runtimeContext = currentRuntimeContext()
             require(runtimeContext.effectiveMode == UiModuleStoreMode.DATABASE) {
                 "DB-режим недоступен: ${runtimeContext.fallbackReason ?: "effective mode is ${runtimeContext.effectiveMode.toConfigValue()}"}"
             }
-            val syncService = requireNotNull(moduleSyncService) {
+            val syncService = requireNotNull(currentModuleSyncService()) {
                 "ModuleSyncService не настроен."
             }
-            val appsRoot = requireNotNull(uiConfig.appsRootPath()) {
+            val appsRoot = requireNotNull(currentRuntimeUiConfig().appsRootPath()) {
                 "appsRoot не настроен."
             }
             val actorId = requireNotNull(runtimeContext.actor.actorId) {

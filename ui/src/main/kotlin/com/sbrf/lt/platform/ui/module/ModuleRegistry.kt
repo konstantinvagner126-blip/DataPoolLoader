@@ -115,6 +115,9 @@ class ModuleRegistry(
                 fileAvailable = false,
                 uploaded = false,
             ),
+            requiredCredentialKeys = emptyList(),
+            missingCredentialKeys = emptyList(),
+            credentialsReady = true,
         )
     }
 
@@ -296,16 +299,4 @@ class ModuleRegistry(
         }
     }
 
-    private data class SqlFileEntry(
-        val label: String,
-        val path: String,
-    )
-
-    private data class ModuleMetadataResult(
-        val title: String? = null,
-        val description: String? = null,
-        val tags: List<String> = emptyList(),
-        val hiddenFromUi: Boolean = false,
-        val issue: ModuleValidationIssueResponse? = null,
-    )
 }

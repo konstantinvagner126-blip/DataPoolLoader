@@ -3,6 +3,7 @@ package com.sbrf.lt.datapool.db
 import com.sbrf.lt.datapool.app.SourceExportFinishedEvent
 import com.sbrf.lt.datapool.app.SourceExportProgressEvent
 import com.sbrf.lt.datapool.app.SourceExportStartedEvent
+import com.sbrf.lt.datapool.app.port.SourceExporter
 import com.sbrf.lt.datapool.export.CsvSupport
 import com.sbrf.lt.datapool.model.ExecutionStatus
 import com.sbrf.lt.datapool.model.ExportTask
@@ -20,10 +21,10 @@ class PostgresExporter(
     private val connectionProvider: (String, String, String) -> Connection = { jdbcUrl, username, password ->
         DriverManager.getConnection(jdbcUrl, username, password)
     },
-) {
+) : SourceExporter {
     private val logger = LoggerFactory.getLogger(javaClass)
 
-    fun export(task: ExportTask): SourceExecutionResult {
+    override fun export(task: ExportTask): SourceExecutionResult {
         val startedAt = Instant.now()
         logger.info("Запуск выгрузки для источника {}", task.source.name)
         task.executionListener.onEvent(

@@ -4,12 +4,9 @@ import com.sbrf.lt.datapool.app.ApplicationRunResult
 import com.sbrf.lt.datapool.app.ApplicationRunner
 import com.sbrf.lt.datapool.app.ExecutionEvent
 import com.sbrf.lt.datapool.app.ExecutionListener
-import com.sbrf.lt.datapool.config.ConfigLoader
 import com.sbrf.lt.datapool.model.ExecutionStatus
-import com.fasterxml.jackson.databind.node.ObjectNode
 import com.sbrf.lt.platform.ui.config.UiAppConfig
 import com.sbrf.lt.platform.ui.config.UiConfigLoader
-import com.sbrf.lt.platform.ui.config.defaultCredentialsPath
 import com.sbrf.lt.platform.ui.config.storageDirPath
 import com.sbrf.lt.platform.ui.model.CredentialsStatusResponse
 import com.sbrf.lt.platform.ui.model.ModuleDescriptor
@@ -21,28 +18,25 @@ import com.sbrf.lt.platform.ui.model.UiStateResponse
 import com.sbrf.lt.platform.ui.module.ModuleRegistry
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
-import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Instant
 import java.util.UUID
 import java.util.concurrent.Executors
-import kotlin.io.path.createDirectories
 import kotlin.io.path.readText
-import kotlin.io.path.writeText
 
 class RunManager(
     private val moduleRegistry: ModuleRegistry = ModuleRegistry(),
     private val applicationRunner: ApplicationRunner = ApplicationRunner(),
     private val uiConfig: UiAppConfig = UiConfigLoader().load(),
     private val stateStore: RunStateStore = RunStateStore(uiConfig.storageDirPath()),
-) {
-    private val logger = LoggerFactory.getLogger(javaClass)
+    private val credentialsService: UiCredentialsService = UiCredentialsService(uiConfigProvider = { uiConfig }),
+    private val moduleExecutionSource: ModuleExecutionSource = FilesModuleExecutionSource(moduleRegistry),
+) : UiCredentialsProvider {
     private val executor = Executors.newSingleThreadExecutor()
     private val snapshots = mutableListOf<MutableRunSnapshot>()
     private val updatesFlow = MutableSharedFlow<UiStateResponse>(replay = 1, extraBufferCapacity = 32)
-    private val configLoader = ConfigLoader()
-    private var uploadedCredentials: UploadedCredentials? = null
+    private val mapper = com.sbrf.lt.datapool.config.ConfigLoader().objectMapper()
 
     init {
         restorePersistedState()
@@ -67,41 +61,13 @@ class RunManager(
 
     @Synchronized
     fun uploadCredentials(fileName: String, content: String): CredentialsStatusResponse {
-        require(content.isNotBlank()) { "Файл credential.properties пуст." }
-        uploadedCredentials = UploadedCredentials(fileName = fileName, content = content)
+        credentialsService.uploadCredentials(fileName, content)
         publishState()
         return currentCredentialsStatus()
     }
 
     @Synchronized
-    fun currentCredentialsStatus(): CredentialsStatusResponse {
-        val uploaded = uploadedCredentials
-        if (uploaded != null) {
-            return CredentialsStatusResponse(
-                mode = "UPLOADED",
-                displayName = uploaded.fileName,
-                fileAvailable = true,
-                uploaded = true,
-            )
-        }
-
-        val fallback = uiConfig.defaultCredentialsPath()
-        return if (fallback != null) {
-            CredentialsStatusResponse(
-                mode = "FILE",
-                displayName = fallback.toString(),
-                fileAvailable = Files.exists(fallback),
-                uploaded = false,
-            )
-        } else {
-            CredentialsStatusResponse(
-                mode = "NONE",
-                displayName = "Файл не задан",
-                fileAvailable = false,
-                uploaded = false,
-            )
-        }
-    }
+    override fun currentCredentialsStatus(): CredentialsStatusResponse = credentialsService.currentCredentialsStatus()
 
     @Synchronized
     fun startRun(request: StartRunRequest): UiRunSnapshot {
@@ -142,11 +108,11 @@ class RunManager(
     ): ApplicationRunResult {
         snapshot.status = ExecutionStatus.RUNNING
         publishState()
-        val tempDir = Files.createTempDirectory("datapool-ui-${module.id}-")
-        val tempConfig = prepareWorkingCopy(module, request, tempDir)
+        val runtimeSnapshot = moduleExecutionSource.prepareExecution(module, request)
+        val tempDir = Files.createTempDirectory("datapool-ui-run-${module.id}-")
         val credentialsPath = materializeCredentialsFile(tempDir)
         return applicationRunner.run(
-            configPath = tempConfig,
+            snapshot = runtimeSnapshot,
             credentialsPath = credentialsPath,
             executionListener = ExecutionListener { event ->
                 handleEvent(snapshot, event)
@@ -157,90 +123,39 @@ class RunManager(
     @Synchronized
     fun loadModuleDetails(moduleId: String): ModuleDetailsResponse {
         val details = moduleRegistry.loadModuleDetails(moduleId)
+        val requirement = analyzeCredentialRequirements(details.configText, currentProperties())
         return details.copy(
-            requiresCredentials = usesCredentialPlaceholders(details.configText),
+            requiresCredentials = requirement.requiresCredentials,
             credentialsStatus = currentCredentialsStatus(),
+            requiredCredentialKeys = requirement.requiredKeys,
+            missingCredentialKeys = requirement.missingKeys,
+            credentialsReady = !requirement.requiresCredentials || requirement.ready,
         )
     }
 
     private fun validateCredentialsBeforeRun(configText: String) {
-        if (!usesCredentialPlaceholders(configText)) {
+        val requirement = analyzeCredentialRequirements(configText, currentProperties())
+        if (!requirement.requiresCredentials) {
             return
         }
         val status = currentCredentialsStatus()
-        require(status.fileAvailable) {
-            "Для выбранного модуля требуется credential.properties: в конфиге найдены placeholders \${...}, но файл с credentials не загружен и не найден."
+        require(requirement.ready) {
+            buildMissingCredentialValuesMessage(
+                subjectLabel = "модуля",
+                missingKeys = requirement.missingKeys,
+                credentialsStatus = status,
+            )
         }
     }
 
-    internal fun materializeCredentialsFile(tempDir: Path): Path? {
-        val uploaded = synchronized(this) { uploadedCredentials }
-        if (uploaded != null) {
-            val path = tempDir.resolve("credential.properties")
-            path.writeText(uploaded.content)
-            logger.info("Для запуска используется credential.properties, загруженный через UI: {}", uploaded.fileName)
-            return path
-        }
-        val fallback = uiConfig.defaultCredentialsPath()
-        val resolved = fallback?.takeIf { Files.exists(it) }
-        if (resolved != null) {
-            logger.info("Для запуска используется fallback credential.properties: {}", resolved)
-        } else {
-            logger.info("credential.properties для запуска не найден, будет использован только inline/env/system resolution")
-        }
-        return resolved
+    override fun materializeCredentialsFile(tempDir: Path): Path? {
+        return credentialsService.materializeCredentialsFile(tempDir)
     }
+
+    override fun currentProperties(): Map<String, String> = credentialsService.currentProperties()
 
     private fun usesCredentialPlaceholders(configText: String): Boolean =
-        Regex("""\$\{[^}]+}""").containsMatchIn(configText)
-
-    private fun prepareWorkingCopy(
-        module: ModuleDescriptor,
-        request: StartRunRequest,
-        tempDir: Path,
-    ): Path {
-        val root = configLoader.objectMapper().readTree(request.configText) as ObjectNode
-        val appNode = root.path("app") as ObjectNode
-
-        appNode.path("commonSqlFile").takeIf { it.isTextual }.also { node ->
-            if (node != null) {
-                rewriteSqlReference(module, tempDir, request, node.asText(), appNode, "commonSqlFile")
-            }
-        }
-
-        appNode.path("sources").takeIf { it.isArray }?.forEach { sourceNode ->
-            sourceNode.path("sqlFile").takeIf { it.isTextual }?.also { node ->
-                rewriteSqlReference(module, tempDir, request, node.asText(), sourceNode as ObjectNode, "sqlFile")
-            }
-        }
-
-        val configPath = tempDir.resolve("application.yml")
-        configPath.writeText(configLoader.objectMapper().writerWithDefaultPrettyPrinter().writeValueAsString(root))
-        return configPath
-    }
-
-    private fun rewriteSqlReference(
-        module: ModuleDescriptor,
-        tempDir: Path,
-        request: StartRunRequest,
-        originalRef: String,
-        objectNode: ObjectNode,
-        fieldName: String,
-    ) {
-        val content = request.sqlFiles[originalRef]
-            ?: moduleRegistry.resolveSqlPath(module, originalRef)?.takeIf { Files.exists(it) }?.readText()
-            ?: return
-
-        val relativePath = when {
-            originalRef.startsWith("classpath:") -> originalRef.removePrefix("classpath:").removePrefix("/")
-            else -> originalRef.removePrefix("./")
-        }
-        val target = tempDir.resolve(relativePath).normalize()
-        target.parent?.createDirectories()
-        target.writeText(content)
-
-        objectNode.put(fieldName, relativePath)
-    }
+        containsCredentialPlaceholders(configText)
 
     @Synchronized
     private fun handleEvent(snapshot: MutableRunSnapshot, event: ExecutionEvent) {
@@ -288,12 +203,6 @@ class RunManager(
     @Synchronized
     private fun restorePersistedState() {
         val persisted = stateStore.load()
-        uploadedCredentials = persisted.uploadedCredentials?.let {
-            UploadedCredentials(
-                fileName = it.fileName,
-                content = it.content,
-            )
-        }
         snapshots.clear()
         snapshots.addAll(
             persisted.history.map { snapshot ->
@@ -319,12 +228,6 @@ class RunManager(
     private fun persistState() {
         stateStore.save(
             PersistedRunState(
-                uploadedCredentials = uploadedCredentials?.let {
-                    PersistedUploadedCredentials(
-                        fileName = it.fileName,
-                        content = it.content,
-                    )
-                },
                 history = snapshots
                     .sortedByDescending { it.startedAt }
                     .map { it.toUi() },
@@ -332,43 +235,8 @@ class RunManager(
         )
     }
 
-    private data class MutableRunSnapshot(
-        val id: String,
-        val moduleId: String,
-        val moduleTitle: String,
-        var status: ExecutionStatus,
-        val startedAt: Instant,
-        var finishedAt: Instant? = null,
-        var outputDir: String? = null,
-        var mergedRowCount: Long = 0,
-        var summaryJson: String? = null,
-        var errorMessage: String? = null,
-        val sourceProgress: MutableMap<String, Long> = linkedMapOf(),
-        val events: MutableList<Map<String, Any?>> = mutableListOf(),
-    ) {
-        fun toUi(): UiRunSnapshot = UiRunSnapshot(
-            id = id,
-            moduleId = moduleId,
-            moduleTitle = moduleTitle,
-            status = status,
-            startedAt = startedAt,
-            finishedAt = finishedAt,
-            outputDir = outputDir,
-            mergedRowCount = mergedRowCount,
-            summaryJson = summaryJson,
-            errorMessage = errorMessage,
-            sourceProgress = sourceProgress.toMap(),
-            events = events.toList(),
-        )
-    }
-
-    private data class UploadedCredentials(
-        val fileName: String,
-        val content: String,
-    )
-
     private fun ExecutionEvent.toUiEventMap(): Map<String, Any?> {
-        val result = configLoader.objectMapper().convertValue(this, MutableMap::class.java)
+        val result = mapper.convertValue(this, MutableMap::class.java)
             .mapKeys { it.key.toString() }
             .toMutableMap()
         result["type"] = javaClass.simpleName

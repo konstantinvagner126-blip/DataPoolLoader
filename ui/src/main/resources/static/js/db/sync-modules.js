@@ -1,10 +1,15 @@
 (function initDbSyncPage() {
   const { fetchJson, postJson, escapeHtml } = window.DataPoolCommon || {};
+  const { createRuntimeModeController } = window.DataPoolRuntimeMode || {};
 
   const dbModeIndicator = document.getElementById('dbModeIndicator');
   const dbModeDot = document.getElementById('dbModeDot');
   const dbModeText = document.getElementById('dbModeText');
+  const dbModeStatus = document.getElementById('dbModeStatus');
+  const dbModeToggle = document.getElementById('dbModeToggle');
   const dbContextAlert = document.getElementById('dbContextAlert');
+  const dbContextAlertTitle = document.getElementById('dbContextAlertTitle');
+  const dbContextAlertText = document.getElementById('dbContextAlertText');
   const syncAllButton = document.getElementById('syncAllButton');
   const syncOneButton = document.getElementById('syncOneButton');
   const syncOneModuleInput = document.getElementById('syncOneModuleInput');
@@ -15,6 +20,15 @@
   const syncResultItems = document.getElementById('syncResultItems');
 
   let runtimeContext = null;
+  let syncState = null;
+  const runtimeModeController = createRuntimeModeController ? createRuntimeModeController({
+    indicatorEl: dbModeIndicator,
+    dotEl: dbModeDot,
+    textEl: dbModeText,
+    statusEl: dbModeStatus,
+    toggleEl: dbModeToggle,
+    onContextChanged: handleRuntimeContextChanged,
+  }) : null;
 
   syncAllButton.addEventListener('click', async () => {
     if (!confirm('Синхронизировать все файловые модули в PostgreSQL?')) return;
@@ -43,30 +57,122 @@
     }
   });
 
+  syncOneModuleCode.addEventListener('input', () => {
+    renderRuntimeContext();
+  });
+
   async function loadRuntimeContext() {
     try {
-      runtimeContext = await fetchJson('/api/ui/runtime-context', {}, 'Не удалось загрузить runtime context.');
-      renderRuntimeContext();
+      if (runtimeModeController) {
+        runtimeContext = await runtimeModeController.loadContext();
+      } else {
+        runtimeContext = await fetchJson('/api/ui/runtime-context', {}, 'Не удалось загрузить runtime context.');
+      }
     } catch (e) {
       console.error(e);
     }
   }
 
+  async function loadSyncState() {
+    try {
+      syncState = await fetchJson('/api/db/sync/state', {}, 'Не удалось загрузить состояние импорта.');
+    } catch (e) {
+      console.error(e);
+      syncState = null;
+    }
+  }
+
   function renderRuntimeContext() {
-    dbModeIndicator.classList.remove('d-none');
-    const isDb = runtimeContext.effectiveMode === 'DATABASE';
-    dbModeDot.className = 'db-mode-indicator-dot' + (isDb ? ' db-mode-active' : ' db-mode-inactive');
-    dbModeText.textContent = `Режим: ${isDb ? 'DATABASE' : 'FILES'}`;
+    const isDb = runtimeContext?.effectiveMode === 'DATABASE';
+    const maintenanceMode = syncState?.maintenanceMode === true;
+    const activeSingleSyncs = Array.isArray(syncState?.activeSingleSyncs) ? syncState.activeSingleSyncs : [];
 
     if (!isDb) {
-      dbContextAlert.classList.remove('d-none');
-      syncAllButton.disabled = true;
-      syncOneButton.disabled = true;
+      showAlert('DB-режим недоступен', runtimeContext?.fallbackReason || 'Для импорта нужен активный DB-режим.');
+      setSyncActionsState({ canSyncAll: false, canSyncOne: false, canConfirmSyncOne: false });
+      return;
+    }
+
+    if (maintenanceMode) {
+      const activeSync = syncState.activeFullSync;
+      const actorName = activeSync?.startedByActorDisplayName || activeSync?.startedByActorId;
+      const startedAt = activeSync?.startedAt
+        ? new Date(activeSync.startedAt).toLocaleString()
+        : null;
+      showAlert(
+        'Идет массовый импорт модулей',
+        [
+          syncState.message,
+          actorName ? `Инициатор: ${actorName}.` : null,
+          startedAt ? `Запуск: ${startedAt}.` : null,
+        ].filter(Boolean).join(' ')
+      );
+      setSyncActionsState({ canSyncAll: false, canSyncOne: false, canConfirmSyncOne: false });
+    } else if (activeSingleSyncs.length > 0) {
+      showAlert(
+        'Идут точечные импорты модулей',
+        activeSingleSyncs.map(describeActiveSingleSync).join(' '),
+        'info',
+      );
+      setSyncActionsState({
+        canSyncAll: false,
+        canSyncOne: true,
+        canConfirmSyncOne: !isSelectedModuleSyncing(),
+      });
     } else {
       dbContextAlert.classList.add('d-none');
-      syncAllButton.disabled = false;
-      syncOneButton.disabled = false;
+      setSyncActionsState({ canSyncAll: true, canSyncOne: true, canConfirmSyncOne: true });
     }
+  }
+
+  function showAlert(title, message, kind = 'warning') {
+    dbContextAlert.className = `alert alert-${kind} mb-4`;
+    dbContextAlert.classList.remove('d-none');
+    dbContextAlertTitle.textContent = title;
+    dbContextAlertText.textContent = message;
+  }
+
+  function setSyncActionsState({ canSyncAll, canSyncOne, canConfirmSyncOne }) {
+    syncAllButton.disabled = !canSyncAll;
+    syncOneButton.disabled = !canSyncOne;
+    syncOneConfirmButton.disabled = !canConfirmSyncOne;
+    if (!canSyncOne) {
+      syncOneModuleInput.classList.add('d-none');
+    }
+  }
+
+  function isSelectedModuleSyncing() {
+    const moduleCode = syncOneModuleCode.value?.trim();
+    if (!moduleCode) {
+      return false;
+    }
+    return activeSingleSyncFor(moduleCode) != null;
+  }
+
+  function activeSingleSyncFor(moduleCode) {
+    const activeSingleSyncs = Array.isArray(syncState?.activeSingleSyncs) ? syncState.activeSingleSyncs : [];
+    return activeSingleSyncs.find(item => item.moduleCode === moduleCode) || null;
+  }
+
+  function describeActiveSingleSync(activeSync) {
+    const actorName = activeSync?.startedByActorDisplayName || activeSync?.startedByActorId || 'неизвестным пользователем';
+    const moduleCode = activeSync?.moduleCode || 'unknown';
+    const startedAt = activeSync?.startedAt
+      ? new Date(activeSync.startedAt).toLocaleString()
+      : null;
+    return `Модуль ${moduleCode} импортируется пользователем ${actorName}${startedAt ? ` с ${startedAt}.` : '.'}`;
+  }
+
+  async function handleRuntimeContextChanged(context) {
+    runtimeContext = context;
+    await loadSyncState();
+    renderRuntimeContext();
+  }
+
+  async function refreshPageState() {
+    await loadRuntimeContext();
+    await loadSyncState();
+    renderRuntimeContext();
   }
 
   async function syncAll() {
@@ -79,17 +185,32 @@
     } catch (e) {
       alert('Ошибка синхронизации: ' + (e.message || e));
     } finally {
-      syncAllButton.disabled = false;
       syncAllButton.innerHTML = `
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-down-up" viewBox="0 0 16 16">
           <path fill-rule="evenodd" d="M11.5 15a.5.5 0 0 0 .5-.5V2.707l3.146 3.147a.5.5 0 0 0 .708-.708l-4-4a.5.5 0 0 0-.708 0l-4 4a.5.5 0 1 0 .708.708L11 2.707V14.5a.5.5 0 0 0 .5.5zm-7-14a.5.5 0 0 1 .5.5v11.793l3.146-3.147a.5.5 0 0 1 .708.708l-4 4a.5.5 0 0 1-.708 0l-4-4a.5.5 0 0 1 .708-.708L4 13.293V1.5a.5.5 0 0 1 .5-.5z"/>
         </svg>
         Синхронизировать все модули
       `;
+      await refreshPageState();
     }
   }
 
   async function syncOne(moduleCode) {
+    const activeSync = activeSingleSyncFor(moduleCode);
+    if (activeSync) {
+      showAlert(
+        'Импорт уже выполняется',
+        describeActiveSingleSync(activeSync),
+        'info',
+      );
+      setSyncActionsState({
+        canSyncAll: false,
+        canSyncOne: true,
+        canConfirmSyncOne: false,
+      });
+      return;
+    }
+
     syncOneConfirmButton.disabled = true;
     syncOneConfirmButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Синхронизация...';
 
@@ -99,8 +220,8 @@
     } catch (e) {
       alert('Ошибка синхронизации: ' + (e.message || e));
     } finally {
-      syncOneConfirmButton.disabled = false;
       syncOneConfirmButton.textContent = 'Синхронизировать';
+      await refreshPageState();
     }
   }
 
@@ -135,11 +256,36 @@
               ${item.errorMessage ? `<span class="text-danger small">${escapeHtml(item.errorMessage)}</span>` : ''}
               ${item.resultRevisionId ? `<span class="small text-secondary">revision: ${escapeHtml(item.resultRevisionId)}</span>` : ''}
             </div>
+            ${renderItemDetails(item.details)}
           </div>
         </div>
       `;
     }).join('');
   }
 
-  loadRuntimeContext();
+  function renderItemDetails(details) {
+    if (!details || typeof details !== 'object') {
+      return '';
+    }
+    const actorName = details.activeSyncStartedByActorDisplayName || details.activeSyncStartedByActorId;
+    const activeModuleCode = details.activeSyncModuleCode;
+    const startedAt = details.activeSyncStartedAt
+      ? new Date(details.activeSyncStartedAt).toLocaleString()
+      : null;
+    if (!actorName && !activeModuleCode && !startedAt) {
+      return '';
+    }
+    return `
+      <div class="small text-secondary mt-2">
+        ${activeModuleCode ? `Активный импорт: <code>${escapeHtml(activeModuleCode)}</code>. ` : ''}
+        ${actorName ? `Пользователь: ${escapeHtml(actorName)}. ` : ''}
+        ${startedAt ? `Запуск: ${escapeHtml(startedAt)}.` : ''}
+      </div>
+    `;
+  }
+
+  refreshPageState();
+  setInterval(() => {
+    refreshPageState().catch(console.error);
+  }, 5000);
 })();

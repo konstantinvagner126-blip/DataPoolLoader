@@ -38,7 +38,13 @@
       <div class="db-mode-indicator-inner">
         <span class="db-mode-indicator-dot" id="dbModeDot"></span>
         <span id="dbModeText">Режим: FILES</span>
-        <button type="button" class="btn btn-sm btn-link db-mode-toggle-btn" id="dbModeToggle">Переключить</button>
+        <span id="dbModeStatus" class="db-mode-status"></span>
+        <label class="runtime-mode-switch" aria-label="Переключатель режима UI">
+          <span class="runtime-mode-switch-label">FILES</span>
+          <input type="checkbox" id="dbModeToggle">
+          <span class="runtime-mode-switch-track"></span>
+          <span class="runtime-mode-switch-label">DB</span>
+        </label>
       </div>
     </div>
 
@@ -79,53 +85,41 @@
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
   <script src="/static/js/common/http.js?v=20260328n"></script>
+  <script src="/static/js/common/runtime-mode.js?v=20260417a"></script>
   <script>
     (function initDbModeIndicator() {
       const indicator = document.getElementById('dbModeIndicator');
       const dot = document.getElementById('dbModeDot');
       const text = document.getElementById('dbModeText');
-      const toggleBtn = document.getElementById('dbModeToggle');
+      const status = document.getElementById('dbModeStatus');
+      const toggle = document.getElementById('dbModeToggle');
       const dbModulesCard = document.getElementById('dbModulesCard');
+      const runtimeMode = window.DataPoolRuntimeMode || {};
+      const controller = runtimeMode.createRuntimeModeController({
+        indicatorEl: indicator,
+        dotEl: dot,
+        textEl: text,
+        statusEl: status,
+        toggleEl: toggle,
+        onContextChanged: renderHomeState,
+      });
 
-      async function loadRuntimeContext() {
-        try {
-          const ctx = await fetch('/api/ui/runtime-context').then(r => r.json());
-          indicator.classList.remove('d-none');
-          
-          const isDb = ctx.effectiveMode === 'DATABASE';
-          dot.className = 'db-mode-indicator-dot' + (isDb ? ' db-mode-active' : ' db-mode-inactive');
-          text.textContent = `Режим: ${isDb ? 'DATABASE' : 'FILES'}`;
-          
-          if (ctx.fallbackReason) {
-            text.textContent += ` (fallback: ${ctx.fallbackReason})`;
-          }
-          
-          if (ctx.database.available) {
-            toggleBtn.textContent = isDb ? 'Переключить на FILES' : 'Переключить на DB';
-            toggleBtn.disabled = false;
-          } else {
-            toggleBtn.textContent = 'DB недоступен';
-            toggleBtn.disabled = true;
-          }
-          
-          if (dbModulesCard && !isDb) {
-            dbModulesCard.style.opacity = '0.5';
-            dbModulesCard.title = 'DB-модули доступны только в режиме DATABASE';
-          }
-        } catch (e) {
-          console.error('Failed to load runtime context:', e);
+      function renderHomeState(ctx) {
+        const isDb = ctx.effectiveMode === 'DATABASE';
+        if (dbModulesCard && !isDb) {
+          dbModulesCard.style.opacity = '0.5';
+          dbModulesCard.title = ctx.fallbackReason || 'DB-модули доступны только в режиме DATABASE';
+          return;
+        }
+        if (dbModulesCard) {
+          dbModulesCard.style.opacity = '1';
+          dbModulesCard.title = '';
         }
       }
 
-      toggleBtn?.addEventListener('click', () => {
-        const isDb = text.textContent.includes('DATABASE');
-        const instruction = isDb 
-          ? 'Для переключения на FILES: измените ui.moduleStore.mode на "files" в application.yml и перезапустите UI.'
-          : 'Для переключения на DB: измените ui.moduleStore.mode на "database" и настройте PostgreSQL connection в application.yml, затем перезапустите UI.';
-        alert(instruction);
+      controller.loadContext().catch(e => {
+        console.error('Failed to load runtime context:', e);
       });
-
-      loadRuntimeContext();
     })();
   </script>
 </body>

@@ -4,12 +4,11 @@ ui:
   appsRoot: "/Users/kwdev/DataPoolLoader/apps"
   storageDir: "/Users/kwdev/.datapool-loader/ui/storage"
   moduleStore:
-    mode: files
+    mode: database
     postgres:
-      jdbcUrl: null
-      username: null
-      password: null
-      schema: ui_registry
+      jdbcUrl: "${LOCAL_MANUAL_DB_JDBC_URL}"
+      username: "${LOCAL_MANUAL_DB_USERNAME}"
+      password: "${LOCAL_MANUAL_DB_PASSWORD}"
   showTechnicalDiagnostics: false
   showRawSummaryJson: false
   defaultCredentialsFile: null

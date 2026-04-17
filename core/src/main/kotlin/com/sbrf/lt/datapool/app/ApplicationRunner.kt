@@ -4,6 +4,10 @@ import com.sbrf.lt.datapool.config.ConfigLoader
 import com.sbrf.lt.datapool.config.CredentialsFileLocator
 import com.sbrf.lt.datapool.config.ProjectRootLocator
 import com.sbrf.lt.datapool.config.ValueResolver
+import com.sbrf.lt.datapool.app.port.ResultMerger
+import com.sbrf.lt.datapool.app.port.SourceExporter
+import com.sbrf.lt.datapool.app.port.TargetImporter
+import com.sbrf.lt.datapool.app.port.TargetSchemaValidator
 import com.sbrf.lt.datapool.db.PostgresExporter
 import com.sbrf.lt.datapool.db.PostgresImporter
 import com.sbrf.lt.datapool.db.TargetTableValidator
@@ -32,10 +36,10 @@ import java.util.concurrent.Future
 
 class ApplicationRunner(
     private val configLoader: ConfigLoader = ConfigLoader(),
-    private val exporter: PostgresExporter = PostgresExporter(),
-    private val mergeService: MergeService = MergeService(),
-    private val targetTableValidator: TargetTableValidator = TargetTableValidator(),
-    private val importer: PostgresImporter = PostgresImporter(),
+    private val exporter: SourceExporter = PostgresExporter(),
+    private val mergeService: ResultMerger = MergeService(),
+    private val targetTableValidator: TargetSchemaValidator = TargetTableValidator(),
+    private val importer: TargetImporter = PostgresImporter(),
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
     private val summaryMapper = ObjectMapper()
@@ -47,8 +51,30 @@ class ApplicationRunner(
         credentialsPath: Path? = defaultCredentialsPath(),
         executionListener: ExecutionListener = NoOpExecutionListener,
     ): ApplicationRunResult {
-        BannerPrinter.printBanner()
         val appConfig = configLoader.load(configPath)
+        val configYaml = Files.newBufferedReader(configPath).use { it.readText() }
+        return run(
+            snapshot = RuntimeModuleSnapshot(
+                moduleCode = null,
+                moduleTitle = null,
+                configYaml = configYaml,
+                sqlFiles = emptyMap(),
+                appConfig = appConfig,
+                launchSourceKind = "FILES",
+                configLocation = configPath.toString(),
+            ),
+            credentialsPath = credentialsPath,
+            executionListener = executionListener,
+        )
+    }
+
+    fun run(
+        snapshot: RuntimeModuleSnapshot,
+        credentialsPath: Path? = defaultCredentialsPath(),
+        executionListener: ExecutionListener = NoOpExecutionListener,
+    ): ApplicationRunResult {
+        BannerPrinter.printBanner()
+        val appConfig = snapshot.appConfig
         val valueResolver = ValueResolver.fromFile(credentialsPath)
         val runStartedAt = Instant.now()
         val outputDir = createOutputDir(appConfig.outputDir, runStartedAt)
@@ -57,7 +83,7 @@ class ApplicationRunner(
         executionListener.onEvent(
             RunStartedEvent(
                 timestamp = runStartedAt,
-                configPath = configPath.toString(),
+                configPath = snapshot.configLocation,
                 outputDir = outputDir.toString(),
                 sourceNames = appConfig.sources.map { it.name },
                 mergeMode = appConfig.mergeMode,

@@ -79,4 +79,34 @@ class UiConfigPersistenceServiceTest {
         assertEquals(null, updated.sqlConsole.queryTimeoutSec)
         assertTrue(configFile.readText().contains("maxRowsPerShard: 320"))
     }
+
+    @Test
+    fun `updates module store mode in managed external config`() {
+        val configDir = Files.createTempDirectory("ui-persist-mode")
+        val configFile = configDir.resolve("ui-application.yml").apply {
+            writeText(
+                """
+                ui:
+                  port: 8080
+                  moduleStore:
+                    mode: files
+                  sqlConsole:
+                    maxRowsPerShard: 200
+                """.trimIndent(),
+            )
+        }
+
+        val service = object : UiConfigPersistenceService(
+            uiConfigLoader = object : UiConfigLoader() {
+                override fun resolveExternalConfigPath() = null
+            },
+        ) {
+            override fun resolveManagedExternalConfigPath() = configFile
+        }
+
+        val updated = service.updateModuleStoreMode(UiModuleStoreMode.DATABASE)
+
+        assertEquals(UiModuleStoreMode.DATABASE, updated.moduleStore.mode)
+        assertTrue(configFile.readText().lowercase().contains("database"))
+    }
 }

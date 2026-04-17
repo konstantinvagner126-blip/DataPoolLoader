@@ -275,6 +275,9 @@ class RunManagerTest {
         assertTrue(details.requiresCredentials)
         assertEquals("FILE", details.credentialsStatus.mode)
         assertTrue(details.credentialsStatus.fileAvailable)
+        assertFalse(details.credentialsReady)
+        assertEquals(listOf("DB1_JDBC_URL", "DB1_USERNAME", "DB1_PASSWORD"), details.requiredCredentialKeys)
+        assertEquals(listOf("DB1_JDBC_URL", "DB1_PASSWORD"), details.missingCredentialKeys)
     }
 
     @Test
@@ -357,6 +360,7 @@ class RunManagerTest {
             }
 
             assertTrue(error.message!!.contains("credential.properties"))
+            assertTrue(error.message!!.contains("DB1_JDBC_URL"))
         } finally {
             if (previous != null) {
                 System.setProperty("credentials.file", previous)
@@ -364,6 +368,53 @@ class RunManagerTest {
                 System.clearProperty("credentials.file")
             }
         }
+    }
+
+    @Test
+    fun `rejects run when credentials file exists but required keys are missing`() {
+        val projectRoot = createProject(
+            configText = """
+                app:
+                  outputDir: ./output
+                  mergeMode: plain
+                  errorMode: continue_on_error
+                  parallelism: 1
+                  fetchSize: 100
+                  commonSql: select 1
+                  target:
+                    enabled: false
+                  sources:
+                    - name: db1
+                      jdbcUrl: ${'$'}{DB1_JDBC_URL}
+                      username: ${'$'}{DB1_USERNAME}
+                      password: ${'$'}{DB1_PASSWORD}
+            """.trimIndent(),
+        )
+        val fallbackFile = createTempDirectory("datapool-ui-fallback-")
+            .resolve("credential.properties")
+            .apply { writeText("DB1_USERNAME=fallback") }
+        val registry = ModuleRegistry(appsRoot = projectRoot.resolve("apps"))
+        val runManager = RunManager(
+            moduleRegistry = registry,
+            uiConfig = UiAppConfig(
+                defaultCredentialsFile = fallbackFile.toString(),
+                storageDir = createTempDirectory("datapool-ui-storage-").toString(),
+            ),
+        )
+
+        val error = assertFailsWith<IllegalArgumentException> {
+            runManager.startRun(
+                StartRunRequest(
+                    moduleId = "demo-app",
+                    configText = registry.loadModuleDetails("demo-app").configText,
+                    sqlFiles = emptyMap(),
+                ),
+            )
+        }
+
+        assertTrue(error.message!!.contains("DB1_JDBC_URL"))
+        assertTrue(error.message!!.contains("DB1_PASSWORD"))
+        assertTrue(error.message!!.contains("credential.properties"))
     }
 
     @Test

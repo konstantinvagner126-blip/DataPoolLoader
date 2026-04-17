@@ -3,7 +3,6 @@ package com.sbrf.lt.platform.ui.sync
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.sbrf.lt.datapool.config.ConfigLoader
-import com.sbrf.lt.datapool.model.RootConfig
 import com.sbrf.lt.platform.ui.config.UiModuleStorePostgresConfig
 import com.sbrf.lt.platform.ui.config.schemaName
 import com.sbrf.lt.platform.ui.module.DatabaseConnectionProvider
@@ -12,41 +11,12 @@ import com.sbrf.lt.platform.ui.module.DriverManagerDatabaseConnectionProvider
 import com.sbrf.lt.platform.ui.module.CreateModuleRequest
 import com.sbrf.lt.platform.ui.module.CreateModuleResult
 import java.nio.file.Path
+import java.nio.file.Files
 import java.security.MessageDigest
 import java.sql.Connection
+import java.sql.Timestamp
 import java.time.Instant
 import java.util.UUID
-
-data class ModuleSyncConfig(
-    val appsRoot: Path,
-    val includeHidden: Boolean = false,
-)
-
-data class SyncRunResult(
-    val syncRunId: String,
-    val scope: String,
-    val moduleCode: String? = null,
-    val status: String,
-    val startedAt: Instant,
-    val finishedAt: Instant,
-    val items: List<SyncItemResult>,
-    val totalProcessed: Int,
-    val totalCreated: Int,
-    val totalUpdated: Int,
-    val totalSkipped: Int,
-    val totalFailed: Int,
-    val errorMessage: String? = null,
-)
-
-data class SyncItemResult(
-    val moduleCode: String,
-    val action: String,
-    val status: String,
-    val detectedHash: String,
-    val resultRevisionId: String? = null,
-    val errorMessage: String? = null,
-    val details: Map<String, Any?> = emptyMap(),
-)
 
 open class ModuleSyncService(
     private val connectionProvider: DatabaseConnectionProvider,
@@ -60,6 +30,41 @@ open class ModuleSyncService(
                 schema = config.schemaName(),
             )
     }
+
+    open fun currentSyncState(): ModuleSyncState {
+        val normalizedSchema = normalizeSchemaName(schema)
+        connectionProvider.getConnection().use { connection ->
+            val maintenanceLockKey = advisoryLockKey("module-sync:maintenance")
+            val maintenanceMode = !tryAcquireExclusiveAdvisoryLock(connection, maintenanceLockKey)
+            val runningFullSyncs = loadRunningFullSyncs(connection, normalizedSchema)
+            val staleFullSyncIds = mutableListOf<String>()
+            val activeFullSync = if (maintenanceMode) {
+                runningFullSyncs.firstOrNull()
+            } else {
+                runningFullSyncs.onEach { staleFullSyncIds += it.syncRunId }
+                releaseExclusiveAdvisoryLock(connection, maintenanceLockKey)
+                null
+            }
+            val activeSingleSyncs = filterActiveSingleSyncs(
+                connection = connection,
+                normalizedSchema = normalizedSchema,
+                runningSingleSyncs = loadRunningSingleSyncs(connection, normalizedSchema),
+            )
+            if (staleFullSyncIds.isNotEmpty()) {
+                markSyncRunsAsFailed(connection, normalizedSchema, staleFullSyncIds)
+            }
+            if (!maintenanceMode) {
+                return ModuleSyncState(activeSingleSyncs = activeSingleSyncs)
+            }
+
+            return ModuleSyncState(
+                maintenanceMode = true,
+                activeFullSync = activeFullSync,
+                activeSingleSyncs = activeSingleSyncs,
+            )
+        }
+    }
+
     open fun syncOneFromFiles(
         moduleCode: String,
         appsRoot: Path,
@@ -71,24 +76,63 @@ open class ModuleSyncService(
         val startedAt = Instant.now()
         val normalizedSchema = normalizeSchemaName(schema)
 
-        val syncItem = try {
-            syncSingleModule(
-                connection = null,
-                normalizedSchema = normalizedSchema,
-                moduleCode = moduleCode,
-                appsRoot = appsRoot,
-                actorId = actorId,
-                actorSource = actorSource,
-                actorDisplayName = actorDisplayName,
-            )
-        } catch (e: Exception) {
-            SyncItemResult(
-                moduleCode = moduleCode,
-                action = "FAILED",
-                status = "FAILED",
-                detectedHash = "",
-                errorMessage = e.message,
-            )
+        val syncItem = connectionProvider.getConnection().use { lockConnection ->
+            val globalLockKey = advisoryLockKey("module-sync:global")
+            if (!tryAcquireSharedAdvisoryLock(lockConnection, globalLockKey)) {
+                val activeFullSync = loadRunningFullSync(lockConnection, normalizedSchema)
+                return syncOneLockRejected(
+                    syncRunId = syncRunId,
+                    moduleCode = moduleCode,
+                    startedAt = startedAt,
+                    message = "Работа пока невозможна: идет массовый импорт модулей в БД.",
+                    activeSync = activeFullSync,
+                )
+            }
+
+            val moduleLockKey = advisoryLockKey("module-sync:module:$moduleCode")
+            try {
+                if (!tryAcquireExclusiveAdvisoryLock(lockConnection, moduleLockKey)) {
+                    val activeSingleSync = loadRunningSingleSync(lockConnection, normalizedSchema, moduleCode)
+                    return syncOneLockRejected(
+                        syncRunId = syncRunId,
+                        moduleCode = moduleCode,
+                        startedAt = startedAt,
+                        message = "Работа пока невозможна: модуль '$moduleCode' уже импортируется другим пользователем.",
+                        activeSync = activeSingleSync,
+                    )
+                }
+
+                try {
+                    insertRunningSyncRun(
+                        normalizedSchema = normalizedSchema,
+                        syncRunId = syncRunId,
+                        scope = "ONE",
+                        moduleCode = moduleCode,
+                        startedAt = startedAt,
+                        actorId = actorId,
+                        actorSource = actorSource,
+                        actorDisplayName = actorDisplayName,
+                    )
+                    syncSingleModule(
+                        connection = null,
+                        normalizedSchema = normalizedSchema,
+                        moduleCode = moduleCode,
+                        appsRoot = appsRoot,
+                        actorId = actorId,
+                        actorSource = actorSource,
+                        actorDisplayName = actorDisplayName,
+                    )
+                } catch (e: Exception) {
+                    failedSyncItem(
+                        moduleCode = moduleCode,
+                        exception = e,
+                    )
+                } finally {
+                    releaseExclusiveAdvisoryLock(lockConnection, moduleLockKey)
+                }
+            } finally {
+                releaseSharedAdvisoryLock(lockConnection, globalLockKey)
+            }
         }
 
         val finishedAt = Instant.now()
@@ -99,7 +143,7 @@ open class ModuleSyncService(
         }
 
         val items = listOf(syncItem)
-        recordSyncRun(
+        completeSyncRun(
             normalizedSchema = normalizedSchema,
             syncRunId = syncRunId,
             scope = "ONE",
@@ -142,28 +186,62 @@ open class ModuleSyncService(
         val moduleDirs = findModuleDirectories(appsRoot)
         val items = mutableListOf<SyncItemResult>()
 
-        moduleDirs.forEach { moduleDir ->
+        connectionProvider.getConnection().use { lockConnection ->
+            val globalLockKey = advisoryLockKey("module-sync:global")
+            if (!tryAcquireExclusiveAdvisoryLock(lockConnection, globalLockKey)) {
+                return syncAllLockRejected(
+                    syncRunId = syncRunId,
+                    startedAt = startedAt,
+                    message = "Работа пока невозможна: уже идет импорт модулей в БД.",
+                )
+            }
+
+            val maintenanceLockKey = advisoryLockKey("module-sync:maintenance")
+
             try {
-                val moduleCode = moduleDir.fileName?.toString()
-                    ?: error("Не удалось определить module code для директории: $moduleDir")
-                val syncItem = syncSingleModule(
-                    connection = null,
+                if (!tryAcquireExclusiveAdvisoryLock(lockConnection, maintenanceLockKey)) {
+                    return syncAllLockRejected(
+                        syncRunId = syncRunId,
+                        startedAt = startedAt,
+                        message = "Работа пока невозможна: уже идет массовый импорт модулей в БД.",
+                    )
+                }
+
+                insertRunningSyncRun(
                     normalizedSchema = normalizedSchema,
-                    moduleCode = moduleCode,
-                    appsRoot = appsRoot,
+                    syncRunId = syncRunId,
+                    scope = "ALL",
+                    moduleCode = null,
+                    startedAt = startedAt,
                     actorId = actorId,
                     actorSource = actorSource,
                     actorDisplayName = actorDisplayName,
                 )
-                items += syncItem
-            } catch (e: Exception) {
-                items += SyncItemResult(
-                    moduleCode = moduleDir.fileName?.toString() ?: "unknown",
-                    action = "FAILED",
-                    status = "FAILED",
-                    detectedHash = "",
-                    errorMessage = e.message,
-                )
+
+                moduleDirs.forEach { moduleDir ->
+                    try {
+                        val moduleCode = moduleDir.fileName?.toString()
+                            ?: error("Не удалось определить module code для директории: $moduleDir")
+                        val syncItem = syncSingleModule(
+                            connection = null,
+                            normalizedSchema = normalizedSchema,
+                            moduleCode = moduleCode,
+                            appsRoot = appsRoot,
+                            actorId = actorId,
+                            actorSource = actorSource,
+                            actorDisplayName = actorDisplayName,
+                        )
+                        items += syncItem
+                    } catch (e: Exception) {
+                        items += failedSyncItem(
+                            moduleCode = moduleDir.fileName?.toString() ?: "unknown",
+                            exception = e,
+                        )
+                    }
+                }
+            } finally {
+                releaseExclusiveAdvisoryLock(lockConnection, maintenanceLockKey)
+                releaseExclusiveAdvisoryLock(lockConnection, globalLockKey)
             }
         }
 
@@ -171,10 +249,11 @@ open class ModuleSyncService(
         val status = when {
             items.all { it.status == "SUCCESS" } -> "SUCCESS"
             items.any { it.status == "FAILED" } -> "PARTIAL_SUCCESS"
+            items.any { it.status == "WARNING" } -> "PARTIAL_SUCCESS"
             else -> "SUCCESS"
         }
 
-        recordSyncRun(
+        completeSyncRun(
             normalizedSchema = normalizedSchema,
             syncRunId = syncRunId,
             scope = "ALL",
@@ -203,6 +282,226 @@ open class ModuleSyncService(
         )
     }
 
+    private fun loadRunningFullSyncs(
+        connection: Connection,
+        normalizedSchema: String,
+    ): List<ActiveModuleSyncRun> {
+        val sql = """
+            select
+                sync_run_id::text as sync_run_id,
+                scope,
+                started_at,
+                module_code,
+                started_by_actor_id,
+                started_by_actor_source,
+                started_by_actor_display_name
+            from $normalizedSchema.module_sync_run
+            where scope = 'ALL'
+              and status = 'RUNNING'
+              and finished_at is null
+            order by started_at desc
+        """.trimIndent()
+
+        connection.prepareStatement(sql).use { stmt ->
+            stmt.executeQuery().use { rs ->
+                val result = mutableListOf<ActiveModuleSyncRun>()
+                while (rs.next()) {
+                    result += ActiveModuleSyncRun(
+                        syncRunId = rs.getString("sync_run_id"),
+                        scope = rs.getString("scope"),
+                        startedAt = rs.getTimestamp("started_at").toInstant(),
+                        moduleCode = rs.getString("module_code"),
+                        startedByActorId = rs.getString("started_by_actor_id"),
+                        startedByActorSource = rs.getString("started_by_actor_source"),
+                        startedByActorDisplayName = rs.getString("started_by_actor_display_name"),
+                    )
+                }
+                return result
+            }
+        }
+    }
+
+    private fun loadRunningFullSync(
+        connection: Connection,
+        normalizedSchema: String,
+    ): ActiveModuleSyncRun? =
+        loadRunningFullSyncs(connection, normalizedSchema).firstOrNull()
+
+    private fun loadRunningSingleSync(
+        connection: Connection,
+        normalizedSchema: String,
+        moduleCode: String,
+    ): ActiveModuleSyncRun? =
+        loadRunningSingleSyncs(connection, normalizedSchema)
+            .firstOrNull { it.moduleCode == moduleCode }
+
+    private fun loadRunningSingleSyncs(
+        connection: Connection,
+        normalizedSchema: String,
+    ): List<ActiveModuleSyncRun> {
+        val sql = """
+            select
+                sync_run_id::text as sync_run_id,
+                scope,
+                started_at,
+                module_code,
+                started_by_actor_id,
+                started_by_actor_source,
+                started_by_actor_display_name
+            from $normalizedSchema.module_sync_run
+            where scope = 'ONE'
+              and status = 'RUNNING'
+              and finished_at is null
+            order by started_at desc
+        """.trimIndent()
+
+        connection.prepareStatement(sql).use { stmt ->
+            stmt.executeQuery().use { rs ->
+                val result = mutableListOf<ActiveModuleSyncRun>()
+                while (rs.next()) {
+                    result += ActiveModuleSyncRun(
+                        syncRunId = rs.getString("sync_run_id"),
+                        scope = rs.getString("scope"),
+                        startedAt = rs.getTimestamp("started_at").toInstant(),
+                        moduleCode = rs.getString("module_code"),
+                        startedByActorId = rs.getString("started_by_actor_id"),
+                        startedByActorSource = rs.getString("started_by_actor_source"),
+                        startedByActorDisplayName = rs.getString("started_by_actor_display_name"),
+                    )
+                }
+                return result
+            }
+        }
+    }
+
+    private fun filterActiveSingleSyncs(
+        connection: Connection,
+        normalizedSchema: String,
+        runningSingleSyncs: List<ActiveModuleSyncRun>,
+    ): List<ActiveModuleSyncRun> {
+        if (runningSingleSyncs.isEmpty()) {
+            return emptyList()
+        }
+        val activeSyncs = mutableListOf<ActiveModuleSyncRun>()
+        val staleSyncRunIds = mutableListOf<String>()
+        runningSingleSyncs.forEach { sync ->
+            val moduleCode = sync.moduleCode
+            if (moduleCode.isNullOrBlank()) {
+                staleSyncRunIds += sync.syncRunId
+                return@forEach
+            }
+            val moduleLockKey = advisoryLockKey("module-sync:module:$moduleCode")
+            if (tryAcquireExclusiveAdvisoryLock(connection, moduleLockKey)) {
+                releaseExclusiveAdvisoryLock(connection, moduleLockKey)
+                staleSyncRunIds += sync.syncRunId
+            } else {
+                activeSyncs += sync
+            }
+        }
+        if (staleSyncRunIds.isNotEmpty()) {
+            markSyncRunsAsFailed(connection, normalizedSchema, staleSyncRunIds)
+        }
+        return activeSyncs
+    }
+
+    private fun syncOneLockRejected(
+        syncRunId: String,
+        moduleCode: String,
+        startedAt: Instant,
+        message: String,
+        activeSync: ActiveModuleSyncRun? = null,
+    ): SyncRunResult {
+        val finishedAt = Instant.now()
+        val item = SyncItemResult(
+            moduleCode = moduleCode,
+            action = "FAILED",
+            status = "FAILED",
+            detectedHash = "",
+            errorMessage = message,
+            details = linkedMapOf<String, Any?>(
+                "reason" to "sync_lock_not_acquired",
+            ).apply {
+                activeSync?.let {
+                    put("activeSyncRunId", it.syncRunId)
+                    put("activeSyncScope", it.scope)
+                    put("activeSyncModuleCode", it.moduleCode)
+                    put("activeSyncStartedAt", it.startedAt.toString())
+                    put("activeSyncStartedByActorId", it.startedByActorId)
+                    put("activeSyncStartedByActorDisplayName", it.startedByActorDisplayName)
+                }
+            },
+        )
+        return SyncRunResult(
+            syncRunId = syncRunId,
+            scope = "ONE",
+            moduleCode = moduleCode,
+            status = "FAILED",
+            startedAt = startedAt,
+            finishedAt = finishedAt,
+            items = listOf(item),
+            totalProcessed = 1,
+            totalCreated = 0,
+            totalUpdated = 0,
+            totalSkipped = 0,
+            totalFailed = 1,
+            errorMessage = message,
+        )
+    }
+
+    private fun syncAllLockRejected(
+        syncRunId: String,
+        startedAt: Instant,
+        message: String,
+    ): SyncRunResult {
+        val finishedAt = Instant.now()
+        return SyncRunResult(
+            syncRunId = syncRunId,
+            scope = "ALL",
+            status = "FAILED",
+            startedAt = startedAt,
+            finishedAt = finishedAt,
+            items = emptyList(),
+            totalProcessed = 0,
+            totalCreated = 0,
+            totalUpdated = 0,
+            totalSkipped = 0,
+            totalFailed = 0,
+            errorMessage = message,
+        )
+    }
+
+    private fun tryAcquireExclusiveAdvisoryLock(connection: Connection, lockKey: Long): Boolean =
+        queryAdvisoryLock(connection, "select pg_try_advisory_lock(?) as acquired", lockKey)
+
+    private fun tryAcquireSharedAdvisoryLock(connection: Connection, lockKey: Long): Boolean =
+        queryAdvisoryLock(connection, "select pg_try_advisory_lock_shared(?) as acquired", lockKey)
+
+    private fun releaseExclusiveAdvisoryLock(connection: Connection, lockKey: Long) {
+        queryAdvisoryLock(connection, "select pg_advisory_unlock(?) as acquired", lockKey)
+    }
+
+    private fun releaseSharedAdvisoryLock(connection: Connection, lockKey: Long) {
+        queryAdvisoryLock(connection, "select pg_advisory_unlock_shared(?) as acquired", lockKey)
+    }
+
+    private fun queryAdvisoryLock(connection: Connection, sql: String, lockKey: Long): Boolean {
+        connection.prepareStatement(sql).use { stmt ->
+            stmt.setLong(1, lockKey)
+            stmt.executeQuery().use { rs ->
+                return rs.next() && rs.getBoolean("acquired")
+            }
+        }
+    }
+
+    private fun advisoryLockKey(value: String): Long {
+        val digest = MessageDigest.getInstance("SHA-256").digest(value.toByteArray(Charsets.UTF_8))
+        var result = 0L
+        repeat(8) { index ->
+            result = (result shl 8) or (digest[index].toLong() and 0xff)
+        }
+        return result
+    }
+
     private fun syncSingleModule(
         connection: Connection?,
         normalizedSchema: String,
@@ -213,22 +512,50 @@ open class ModuleSyncService(
         actorDisplayName: String?,
     ): SyncItemResult {
         val moduleDir = appsRoot.resolve(moduleCode)
-        val configFile = moduleDir.resolve("application.yml")
+        val configFile = moduleConfigFile(moduleDir)
+        val previousSyncItem = loadPreviousSyncItem(connection, normalizedSchema, moduleCode)
+        val precheckFingerprint = collectFilesystemFingerprint(
+            moduleDir = moduleDir,
+            trackedPaths = linkedSetOf<String>().apply {
+                add(moduleConfigRelativePath())
+                add("ui-module.yml")
+                previousSyncItem?.filesystemFingerprint?.trackedFiles
+                    ?.mapTo(this) { it.path }
+            },
+        )
 
         if (!configFile.toFile().exists()) {
             return SyncItemResult(
                 moduleCode = moduleCode,
                 action = "FAILED",
                 status = "FAILED",
-                detectedHash = "",
+                detectedHash = contentHash("missing:application_yml:$moduleCode", emptyMap()),
                 errorMessage = "application.yml не найден: ${configFile.toAbsolutePath()}",
+                details = syncDetails(
+                    reason = "application_yml_missing",
+                    filesystemFingerprint = precheckFingerprint,
+                ),
             )
         }
 
-        val configText = configFile.toFile().readText()
-        val detectedHash = contentHash(configText)
-
         val existingModule = loadExistingModule(connection, normalizedSchema, moduleCode)
+        val fastResult = buildFastPrecheckResult(
+            moduleCode = moduleCode,
+            existingModule = existingModule,
+            previousSyncItem = previousSyncItem,
+            precheckFingerprint = precheckFingerprint,
+        )
+        if (fastResult != null) {
+            return fastResult
+        }
+
+        val configText = configFile.toFile().readText()
+        val sqlFiles = loadSqlFiles(moduleDir, configText)
+        val detectedHash = contentHash(configText, sqlFiles)
+        val fullFingerprint = collectFilesystemFingerprint(
+            moduleDir = moduleDir,
+            trackedPaths = trackedPathsFromConfig(moduleDir, configText),
+        )
 
         if (existingModule != null) {
             if (existingModule.contentHash == detectedHash) {
@@ -238,29 +565,26 @@ open class ModuleSyncService(
                     status = "SUCCESS",
                     detectedHash = detectedHash,
                     resultRevisionId = existingModule.currentRevisionId,
-                    details = mapOf("reason" to "content_hash_match"),
+                    details = syncDetails(
+                        reason = "content_hash_match",
+                        filesystemFingerprint = fullFingerprint,
+                    ),
                 )
             }
 
-            val updatedRevisionId = updateExistingModule(
-                connection = connection,
-                normalizedSchema = normalizedSchema,
-                moduleCode = moduleCode,
-                existingModule = existingModule,
-                configText = configText,
-                detectedHash = detectedHash,
-                moduleDir = moduleDir,
-                actorId = actorId,
-                actorSource = actorSource,
-                actorDisplayName = actorDisplayName,
-            )
-
             return SyncItemResult(
                 moduleCode = moduleCode,
-                action = "UPDATED",
-                status = "SUCCESS",
+                action = "SKIPPED_CODE_CONFLICT",
+                status = "WARNING",
                 detectedHash = detectedHash,
-                resultRevisionId = updatedRevisionId,
+                resultRevisionId = existingModule.currentRevisionId,
+                details = syncDetails(
+                    reason = "module_code_already_exists",
+                    filesystemFingerprint = fullFingerprint,
+                    extra = mapOf(
+                        "message" to "DB-модуль с таким кодом уже существует. Импорт не перезаписывает существующие модули.",
+                    ),
+                ),
             )
         }
 
@@ -269,6 +593,7 @@ open class ModuleSyncService(
             normalizedSchema = normalizedSchema,
             moduleCode = moduleCode,
             configText = configText,
+            sqlFiles = sqlFiles,
             moduleDir = moduleDir,
             actorId = actorId,
             actorSource = actorSource,
@@ -281,7 +606,60 @@ open class ModuleSyncService(
             status = "SUCCESS",
             detectedHash = detectedHash,
             resultRevisionId = newModuleResult.revisionId,
+            details = syncDetails(
+                reason = "module_created",
+                filesystemFingerprint = fullFingerprint,
+            ),
         )
+    }
+
+    private fun buildFastPrecheckResult(
+        moduleCode: String,
+        existingModule: ExistingModule?,
+        previousSyncItem: PreviousModuleSyncItem?,
+        precheckFingerprint: ModuleSyncFileFingerprint,
+    ): SyncItemResult? {
+        if (existingModule == null || previousSyncItem == null) {
+            return null
+        }
+        if (previousSyncItem.status == "FAILED" || previousSyncItem.detectedHash.isBlank()) {
+            return null
+        }
+        if (previousSyncItem.filesystemFingerprint != precheckFingerprint) {
+            return null
+        }
+
+        val hashesMatch = existingModule.contentHash == previousSyncItem.detectedHash
+        return if (hashesMatch) {
+            SyncItemResult(
+                moduleCode = moduleCode,
+                action = "SKIPPED",
+                status = "SUCCESS",
+                detectedHash = previousSyncItem.detectedHash,
+                resultRevisionId = existingModule.currentRevisionId,
+                details = syncDetails(
+                    reason = "fingerprint_match",
+                    filesystemFingerprint = precheckFingerprint,
+                    extra = mapOf("precheckMatched" to true),
+                ),
+            )
+        } else {
+            SyncItemResult(
+                moduleCode = moduleCode,
+                action = "SKIPPED_CODE_CONFLICT",
+                status = "WARNING",
+                detectedHash = previousSyncItem.detectedHash,
+                resultRevisionId = existingModule.currentRevisionId,
+                details = syncDetails(
+                    reason = "module_code_already_exists",
+                    filesystemFingerprint = precheckFingerprint,
+                    extra = mapOf(
+                        "precheckMatched" to true,
+                        "message" to "DB-модуль с таким кодом уже существует. Импорт не перезаписывает существующие модули.",
+                    ),
+                ),
+            )
+        }
     }
 
     private fun createNewModuleFromFiles(
@@ -289,20 +667,21 @@ open class ModuleSyncService(
         normalizedSchema: String,
         moduleCode: String,
         configText: String,
+        sqlFiles: Map<String, String>,
         moduleDir: Path,
         actorId: String,
         actorSource: String,
         actorDisplayName: String?,
     ): CreateModuleResult {
-        val config = loadConfig(configText)
-        val title = config.app.title ?: moduleCode
-        val description = config.app.description
+        val metadata = loadModuleUiMetadata(moduleDir, moduleCode)
 
         val request = CreateModuleRequest(
-            title = title,
-            description = description,
-            tags = config.app.tags ?: emptyList(),
+            title = metadata.title,
+            description = metadata.description,
+            tags = metadata.tags,
+            sqlFiles = sqlFiles,
             configText = configText,
+            hiddenFromUi = metadata.hiddenFromUi,
         )
 
         return if (connection != null) {
@@ -314,6 +693,7 @@ open class ModuleSyncService(
                 actorId = actorId,
                 actorSource = actorSource,
                 actorDisplayName = actorDisplayName,
+                originKind = "IMPORTED_FROM_FILES",
                 request = request,
             )
         } else {
@@ -324,59 +704,9 @@ open class ModuleSyncService(
                 actorId = actorId,
                 actorSource = actorSource,
                 actorDisplayName = actorDisplayName,
+                originKind = "IMPORTED_FROM_FILES",
             )
         }
-    }
-
-    private fun updateExistingModule(
-        connection: Connection?,
-        normalizedSchema: String,
-        moduleCode: String,
-        existingModule: ExistingModule,
-        configText: String,
-        detectedHash: String,
-        moduleDir: Path,
-        actorId: String,
-        actorSource: String,
-        actorDisplayName: String?,
-    ): String {
-        val config = loadConfig(configText)
-        val title = config.app.title ?: moduleCode
-        val description = config.app.description
-
-        val newRevisionId = UUID.randomUUID().toString()
-        val newRevisionNo = existingModule.maxRevisionNo + 1
-
-        if (connection != null) {
-            insertNewRevisionDirectly(
-                connection = connection,
-                normalizedSchema = normalizedSchema,
-                revisionId = newRevisionId,
-                moduleId = existingModule.moduleId,
-                revisionNo = newRevisionNo,
-                actorDisplayName = actorDisplayName ?: actorId,
-                title = title,
-                description = description,
-                tags = config.app.tags ?: emptyList(),
-                configText = configText,
-                contentHash = detectedHash,
-            )
-        } else {
-            updateModuleDirectly(
-                normalizedSchema = normalizedSchema,
-                moduleCode = moduleCode,
-                moduleId = existingModule.moduleId,
-                newRevisionId = newRevisionId,
-                newRevisionNo = newRevisionNo,
-                title = title,
-                description = description,
-                tags = config.app.tags ?: emptyList(),
-                configText = configText,
-                contentHash = detectedHash,
-            )
-        }
-
-        return newRevisionId
     }
 
     private fun loadExistingModule(
@@ -400,7 +730,6 @@ open class ModuleSyncService(
             select
                 m.module_id::text as module_id,
                 m.current_revision_id::text as current_revision_id,
-                r.revision_no as max_revision_no,
                 r.content_hash as content_hash
             from $normalizedSchema.module m
             join $normalizedSchema.module_revision r
@@ -416,7 +745,6 @@ open class ModuleSyncService(
                 return ExistingModule(
                     moduleId = rs.getString("module_id"),
                     currentRevisionId = rs.getString("current_revision_id"),
-                    maxRevisionNo = rs.getLong("max_revision_no"),
                     contentHash = rs.getString("content_hash"),
                 )
             }
@@ -432,6 +760,62 @@ open class ModuleSyncService(
         }
     }
 
+    private fun loadPreviousSyncItem(
+        connection: Connection?,
+        normalizedSchema: String,
+        moduleCode: String,
+    ): PreviousModuleSyncItem? {
+        return if (connection != null) {
+            loadPreviousSyncItemWithConnection(connection, normalizedSchema, moduleCode)
+        } else {
+            connectionProvider.getConnection().use { localConnection ->
+                loadPreviousSyncItemWithConnection(localConnection, normalizedSchema, moduleCode)
+            }
+        }
+    }
+
+    private fun loadPreviousSyncItemWithConnection(
+        connection: Connection,
+        normalizedSchema: String,
+        moduleCode: String,
+    ): PreviousModuleSyncItem? {
+        val sql = """
+            select
+                i.action,
+                i.status,
+                i.detected_hash,
+                i.result_revision_id::text as result_revision_id,
+                i.details::text as details
+            from $normalizedSchema.module_sync_run_item i
+            join $normalizedSchema.module_sync_run r
+                on r.sync_run_id = i.sync_run_id
+            where i.module_code = ?
+            order by r.started_at desc, i.sync_run_item_id desc
+            limit 1
+        """.trimIndent()
+
+        connection.prepareStatement(sql).use { stmt ->
+            stmt.setString(1, moduleCode)
+            stmt.executeQuery().use { rs ->
+                if (!rs.next()) return null
+                val detailsJson = rs.getString("details")
+                val fingerprint = runCatching {
+                    val root = objectMapper.readTree(detailsJson)
+                    root.get("filesystemFingerprint")?.let { node ->
+                        objectMapper.treeToValue(node, ModuleSyncFileFingerprint::class.java)
+                    }
+                }.getOrNull()
+                return PreviousModuleSyncItem(
+                    action = rs.getString("action"),
+                    status = rs.getString("status"),
+                    detectedHash = rs.getString("detected_hash"),
+                    resultRevisionId = rs.getString("result_revision_id"),
+                    filesystemFingerprint = fingerprint,
+                )
+            }
+        }
+    }
+
     private fun createModuleDirectly(
         normalizedSchema: String,
         moduleCode: String,
@@ -439,6 +823,7 @@ open class ModuleSyncService(
         actorId: String,
         actorSource: String,
         actorDisplayName: String?,
+        originKind: String,
     ): CreateModuleResult {
         connectionProvider.getConnection().use { connection ->
             val previousAutoCommit = connection.autoCommit
@@ -452,6 +837,7 @@ open class ModuleSyncService(
                     actorId = actorId,
                     actorSource = actorSource,
                     actorDisplayName = actorDisplayName,
+                    originKind = originKind,
                     request = request,
                 )
                 connection.commit()
@@ -462,115 +848,6 @@ open class ModuleSyncService(
             } finally {
                 connection.autoCommit = previousAutoCommit
             }
-        }
-    }
-
-    private fun updateModuleDirectly(
-        normalizedSchema: String,
-        moduleCode: String,
-        moduleId: String,
-        newRevisionId: String,
-        newRevisionNo: Long,
-        title: String,
-        description: String?,
-        tags: List<String>,
-        configText: String,
-        contentHash: String,
-    ) {
-        connectionProvider.getConnection().use { connection ->
-            val previousAutoCommit = connection.autoCommit
-            connection.autoCommit = false
-            try {
-                insertNewRevisionDirectly(
-                    connection = connection,
-                    normalizedSchema = normalizedSchema,
-                    revisionId = newRevisionId,
-                    moduleId = moduleId,
-                    revisionNo = newRevisionNo,
-                    actorDisplayName = "sync",
-                    title = title,
-                    description = description,
-                    tags = tags,
-                    configText = configText,
-                    contentHash = contentHash,
-                )
-                connection.commit()
-            } catch (e: Exception) {
-                connection.rollback()
-                throw e
-            } finally {
-                connection.autoCommit = previousAutoCommit
-            }
-        }
-    }
-
-    private fun insertNewRevisionDirectly(
-        connection: Connection,
-        normalizedSchema: String,
-        revisionId: String,
-        moduleId: String,
-        revisionNo: Long,
-        actorDisplayName: String,
-        title: String,
-        description: String?,
-        tags: List<String>,
-        configText: String,
-        contentHash: String,
-    ) {
-        val tagsArray = objectMapper.createArrayNode()
-        tags.forEach { tagsArray.add(it) }
-
-        val snapshotJson = objectMapper.createObjectNode()
-        snapshotJson.put("configText", configText)
-        snapshotJson.set<com.fasterxml.jackson.databind.JsonNode>("sqlFiles", objectMapper.createArrayNode())
-
-        val sql = """
-            insert into $normalizedSchema.module_revision (
-                revision_id, module_id, revision_no, created_by, revision_source,
-                title, description, tags, hidden_from_ui, validation_status, validation_issues,
-                output_dir, file_format, merge_mode, error_mode, parallelism, fetch_size,
-                query_timeout_sec, progress_log_every_rows, max_merged_rows,
-                delete_output_files_after_completion, snapshot_json, snapshot_yaml, content_hash
-            ) values (
-                ?::uuid, ?::uuid, ?, ?, 'SYNC_FROM_FILES', ?, ?, ?::jsonb, false, 'VALID', '[]'::jsonb,
-                'output', 'CSV', 'PLAIN', 'CONTINUE_ON_ERROR', 4, 1000,
-                null, 10000, null, false, ?::jsonb, ?, ?
-            )
-        """.trimIndent()
-
-        connection.prepareStatement(sql).use { stmt ->
-            stmt.setString(1, revisionId)
-            stmt.setString(2, moduleId)
-            stmt.setLong(3, revisionNo)
-            stmt.setString(4, actorDisplayName)
-            stmt.setString(5, title)
-            stmt.setString(6, description)
-            stmt.setString(7, tagsArray.toString())
-            stmt.setString(8, snapshotJson.toString())
-            stmt.setString(9, configText)
-            stmt.setString(10, contentHash)
-            stmt.executeUpdate()
-        }
-
-        updateCurrentRevisionDirectly(connection, normalizedSchema, moduleId, revisionId)
-    }
-
-    private fun updateCurrentRevisionDirectly(
-        connection: Connection,
-        normalizedSchema: String,
-        moduleId: String,
-        revisionId: String,
-    ) {
-        val sql = """
-            update $normalizedSchema.module
-            set current_revision_id = ?::uuid, updated_at = now()
-            where module_id = ?::uuid
-        """.trimIndent()
-
-        connection.prepareStatement(sql).use { stmt ->
-            stmt.setString(1, revisionId)
-            stmt.setString(2, moduleId)
-            stmt.executeUpdate()
         }
     }
 
@@ -591,7 +868,7 @@ open class ModuleSyncService(
             val previousAutoCommit = connection.autoCommit
             connection.autoCommit = false
             try {
-                insertSyncRunRecord(
+                insertCompletedSyncRunRecord(
                     connection = connection,
                     normalizedSchema = normalizedSchema,
                     syncRunId = syncRunId,
@@ -624,7 +901,89 @@ open class ModuleSyncService(
         }
     }
 
-    private fun insertSyncRunRecord(
+    private fun insertRunningSyncRun(
+        normalizedSchema: String,
+        syncRunId: String,
+        scope: String,
+        moduleCode: String?,
+        startedAt: Instant,
+        actorId: String,
+        actorSource: String,
+        actorDisplayName: String?,
+    ) {
+        connectionProvider.getConnection().use { connection ->
+            connection.prepareStatement(
+                """
+                    insert into $normalizedSchema.module_sync_run (
+                        sync_run_id, started_at, finished_at, started_by_actor_id,
+                        started_by_actor_source, started_by_actor_display_name,
+                        status, scope, module_code
+                    ) values (?::uuid, ?, null, ?, ?, ?, 'RUNNING', ?, ?)
+                """.trimIndent(),
+            ).use { stmt ->
+                stmt.setString(1, syncRunId)
+                stmt.setTimestamp(2, Timestamp.from(startedAt))
+                stmt.setString(3, actorId)
+                stmt.setString(4, actorSource)
+                stmt.setString(5, actorDisplayName)
+                stmt.setString(6, scope)
+                stmt.setString(7, moduleCode)
+                stmt.executeUpdate()
+            }
+        }
+    }
+
+    private fun completeSyncRun(
+        normalizedSchema: String,
+        syncRunId: String,
+        scope: String,
+        moduleCode: String?,
+        startedAt: Instant,
+        finishedAt: Instant,
+        status: String,
+        actorId: String,
+        actorSource: String,
+        actorDisplayName: String?,
+        items: List<SyncItemResult>,
+    ) {
+        connectionProvider.getConnection().use { connection ->
+            val previousAutoCommit = connection.autoCommit
+            connection.autoCommit = false
+            try {
+                updateSyncRunRecord(
+                    connection = connection,
+                    normalizedSchema = normalizedSchema,
+                    syncRunId = syncRunId,
+                    scope = scope,
+                    moduleCode = moduleCode,
+                    startedAt = startedAt,
+                    finishedAt = finishedAt,
+                    status = status,
+                    actorId = actorId,
+                    actorSource = actorSource,
+                    actorDisplayName = actorDisplayName,
+                )
+
+                items.forEach { item ->
+                    insertSyncItemRecord(
+                        connection = connection,
+                        normalizedSchema = normalizedSchema,
+                        syncRunId = syncRunId,
+                        item = item,
+                    )
+                }
+
+                connection.commit()
+            } catch (e: Exception) {
+                connection.rollback()
+                throw e
+            } finally {
+                connection.autoCommit = previousAutoCommit
+            }
+        }
+    }
+
+    private fun insertCompletedSyncRunRecord(
         connection: Connection,
         normalizedSchema: String,
         syncRunId: String,
@@ -647,14 +1006,55 @@ open class ModuleSyncService(
 
         connection.prepareStatement(sql).use { stmt ->
             stmt.setString(1, syncRunId)
-            stmt.setObject(2, java.sql.Timestamp.from(startedAt))
-            stmt.setObject(3, java.sql.Timestamp.from(finishedAt))
+            stmt.setTimestamp(2, Timestamp.from(startedAt))
+            stmt.setTimestamp(3, Timestamp.from(finishedAt))
             stmt.setString(4, actorId)
             stmt.setString(5, actorSource)
             stmt.setString(6, actorDisplayName)
             stmt.setString(7, status)
             stmt.setString(8, scope)
             stmt.setString(9, moduleCode)
+            stmt.executeUpdate()
+        }
+    }
+
+    private fun updateSyncRunRecord(
+        connection: Connection,
+        normalizedSchema: String,
+        syncRunId: String,
+        scope: String,
+        moduleCode: String?,
+        startedAt: Instant,
+        finishedAt: Instant,
+        status: String,
+        actorId: String,
+        actorSource: String,
+        actorDisplayName: String?,
+    ) {
+        val sql = """
+            update $normalizedSchema.module_sync_run
+            set
+                started_at = ?,
+                finished_at = ?,
+                started_by_actor_id = ?,
+                started_by_actor_source = ?,
+                started_by_actor_display_name = ?,
+                status = ?,
+                scope = ?,
+                module_code = ?
+            where sync_run_id = ?::uuid
+        """.trimIndent()
+
+        connection.prepareStatement(sql).use { stmt ->
+            stmt.setObject(1, Timestamp.from(startedAt))
+            stmt.setObject(2, Timestamp.from(finishedAt))
+            stmt.setString(3, actorId)
+            stmt.setString(4, actorSource)
+            stmt.setString(5, actorDisplayName)
+            stmt.setString(6, status)
+            stmt.setString(7, scope)
+            stmt.setString(8, moduleCode)
+            stmt.setString(9, syncRunId)
             stmt.executeUpdate()
         }
     }
@@ -685,24 +1085,222 @@ open class ModuleSyncService(
         }
     }
 
+    private fun markSyncRunsAsFailed(
+        connection: Connection,
+        normalizedSchema: String,
+        syncRunIds: List<String>,
+    ) {
+        if (syncRunIds.isEmpty()) {
+            return
+        }
+        val placeholders = syncRunIds.joinToString(", ") { "?::uuid" }
+        val sql = """
+            update $normalizedSchema.module_sync_run
+            set
+                finished_at = coalesce(finished_at, ?),
+                status = 'FAILED'
+            where status = 'RUNNING'
+              and sync_run_id in ($placeholders)
+        """.trimIndent()
+        connection.prepareStatement(sql).use { stmt ->
+            stmt.setTimestamp(1, Timestamp.from(Instant.now()))
+            syncRunIds.forEachIndexed { index, syncRunId ->
+                stmt.setString(index + 2, syncRunId)
+            }
+            stmt.executeUpdate()
+        }
+    }
+
     private fun findModuleDirectories(appsRoot: Path): List<Path> {
         if (!appsRoot.toFile().exists()) return emptyList()
         return appsRoot.toFile().listFiles { file -> file.isDirectory }
             ?.map { it.toPath() }
-            ?.filter { it.resolve("application.yml").toFile().exists() }
+            ?.filter { moduleConfigFile(it).toFile().exists() }
             ?: emptyList()
     }
 
-    private fun loadConfig(configText: String): RootConfig {
+    private fun loadModuleUiMetadata(moduleDir: Path, moduleCode: String): ModuleUiMetadata {
+        val metadataFile = moduleDir.resolve("ui-module.yml").toFile()
+        if (!metadataFile.exists()) {
+            return ModuleUiMetadata(title = moduleCode)
+        }
+
         return try {
-            ConfigLoader().objectMapper().readValue(configText, RootConfig::class.java)
+            val root = ConfigLoader().objectMapper().readTree(metadataFile)
+            ModuleUiMetadata(
+                title = root.path("title")
+                    .takeIf { it.isTextual }
+                    ?.asText()
+                    ?.trim()
+                    ?.takeIf { it.isNotEmpty() }
+                    ?: moduleCode,
+                description = root.path("description")
+                    .takeIf { it.isTextual }
+                    ?.asText()
+                    ?.trim()
+                    ?.takeIf { it.isNotEmpty() },
+                tags = root.path("tags")
+                    .takeIf { it.isArray }
+                    ?.mapNotNull { node ->
+                        node.takeIf { it.isTextual }
+                            ?.asText()
+                            ?.trim()
+                            ?.takeIf { it.isNotEmpty() }
+                    }
+                    .orEmpty(),
+                hiddenFromUi = root.path("hiddenFromUi").takeIf { it.isBoolean }?.asBoolean() ?: false,
+            )
         } catch (e: Exception) {
-            RootConfig(app = com.sbrf.lt.datapool.model.AppConfig())
+            ModuleUiMetadata(title = moduleCode)
         }
     }
 
-    private fun contentHash(text: String): String {
-        val digest = MessageDigest.getInstance("SHA-256").digest(text.toByteArray(Charsets.UTF_8))
+    private fun loadSqlFiles(moduleDir: Path, configText: String): Map<String, String> {
+        val configFile = moduleConfigFile(moduleDir)
+        val resourcesDir = moduleResourcesDir(moduleDir)
+        return extractSqlFileEntries(configText)
+            .mapNotNull { entry ->
+                val file = resolveSqlPath(configFile, resourcesDir, entry.path)?.toFile()
+                if (file != null && file.isFile) entry.path to file.readText() else null
+            }
+            .toMap()
+    }
+
+    private fun extractSqlFileEntries(configText: String): List<ModuleSqlFileEntry> {
+        if (configText.isBlank()) return emptyList()
+        return try {
+            val root = ConfigLoader().objectMapper().readTree(configText) ?: return emptyList()
+            val app = root.path("app")
+            val refs = linkedMapOf<String, ModuleSqlFileEntry>()
+            app.path("commonSqlFile").takeIf { it.isTextual }?.asText()?.takeIf { it.isNotBlank() }?.let { path ->
+                refs[path] = ModuleSqlFileEntry(path = path)
+            }
+            app.path("sources").takeIf { it.isArray }?.forEach { source ->
+                source.path("sqlFile").takeIf { it.isTextual }?.asText()?.takeIf { it.isNotBlank() }?.let { path ->
+                    refs[path] = ModuleSqlFileEntry(path = path)
+                }
+            }
+            refs.values.toList()
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+    private fun trackedPathsFromConfig(moduleDir: Path, configText: String): LinkedHashSet<String> {
+        val configFile = moduleConfigFile(moduleDir)
+        val resourcesDir = moduleResourcesDir(moduleDir)
+        return linkedSetOf<String>().apply {
+            add(moduleConfigRelativePath())
+            add("ui-module.yml")
+            extractSqlFileEntries(configText).forEach { entry ->
+                resolveSqlPath(configFile, resourcesDir, entry.path)?.let { resolvedPath ->
+                    add(trackedPathKey(moduleDir, resolvedPath))
+                }
+            }
+        }
+    }
+
+    private fun collectFilesystemFingerprint(
+        moduleDir: Path,
+        trackedPaths: Set<String>,
+    ): ModuleSyncFileFingerprint {
+        val trackedFiles = trackedPaths
+            .filter { it.isNotBlank() }
+            .distinct()
+            .sorted()
+            .map { trackedPath ->
+                val file = resolveTrackedPath(moduleDir, trackedPath)
+                val exists = Files.exists(file) && Files.isRegularFile(file)
+                ModuleSyncTrackedFile(
+                    path = trackedPath,
+                    exists = exists,
+                    lastModifiedEpochMillis = file.takeIf { exists }?.let { Files.getLastModifiedTime(it).toMillis() },
+                    sizeBytes = file.takeIf { exists }?.let { Files.size(it) },
+                )
+            }
+        return ModuleSyncFileFingerprint(trackedFiles = trackedFiles)
+    }
+
+    private fun resolveTrackedPath(moduleDir: Path, trackedPath: String): Path {
+        val path = Path.of(trackedPath)
+        return if (path.isAbsolute) path.normalize() else moduleDir.resolve(trackedPath).normalize()
+    }
+
+    private fun trackedPathKey(moduleDir: Path, file: Path): String {
+        val normalizedFile = file.normalize()
+        val normalizedModuleDir = moduleDir.normalize()
+        return if (normalizedFile.startsWith(normalizedModuleDir)) {
+            normalizedModuleDir.relativize(normalizedFile).toString()
+        } else {
+            normalizedFile.toString()
+        }
+    }
+
+    private fun moduleResourcesDir(moduleDir: Path): Path =
+        moduleDir.resolve("src/main/resources").normalize()
+
+    private fun moduleConfigFile(moduleDir: Path): Path =
+        moduleResourcesDir(moduleDir).resolve("application.yml").normalize()
+
+    private fun moduleConfigRelativePath(): String = "src/main/resources/application.yml"
+
+    private fun syncDetails(
+        reason: String,
+        filesystemFingerprint: ModuleSyncFileFingerprint,
+        extra: Map<String, Any?> = emptyMap(),
+    ): Map<String, Any?> = linkedMapOf<String, Any?>(
+        "reason" to reason,
+        "filesystemFingerprint" to objectMapper.convertValue(filesystemFingerprint, Map::class.java),
+    ).apply {
+        putAll(extra)
+    }
+
+    private fun resolveSqlPath(configFile: Path, resourcesDir: Path, sqlRef: String): Path? {
+        val trimmed = sqlRef.trim()
+        if (trimmed.isBlank()) return null
+        return if (trimmed.startsWith("classpath:")) {
+            resourcesDir.resolve(trimmed.removePrefix("classpath:").removePrefix("/")).normalize()
+        } else {
+            val path = Path.of(trimmed)
+            if (path.isAbsolute) path else configFile.parent.resolve(path).normalize()
+        }
+    }
+
+    private fun failedSyncItem(
+        moduleCode: String,
+        exception: Exception,
+    ): SyncItemResult {
+        val errorMessage = exception.message
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+            ?: (exception::class.qualifiedName ?: "sync_exception")
+        return SyncItemResult(
+            moduleCode = moduleCode,
+            action = "FAILED",
+            status = "FAILED",
+            detectedHash = contentHash(
+                "sync_exception:$moduleCode:${exception::class.qualifiedName.orEmpty()}:$errorMessage",
+                emptyMap(),
+            ),
+            errorMessage = errorMessage,
+            details = linkedMapOf(
+                "reason" to "sync_exception",
+                "exceptionClass" to (exception::class.qualifiedName ?: exception::class.simpleName ?: "unknown"),
+            ),
+        )
+    }
+
+    private fun contentHash(configText: String, sqlFiles: Map<String, String>): String {
+        val input = buildString {
+            append(configText)
+            sqlFiles.toSortedMap().forEach { (path, content) ->
+                append('\n')
+                append(path)
+                append('\u0000')
+                append(content)
+            }
+        }
+        val digest = MessageDigest.getInstance("SHA-256").digest(input.toByteArray(Charsets.UTF_8))
         return digest.joinToString("") { "%02x".format(it) }
     }
 
@@ -714,10 +1312,3 @@ open class ModuleSyncService(
         return normalized
     }
 }
-
-data class ExistingModule(
-    val moduleId: String,
-    val currentRevisionId: String,
-    val maxRevisionNo: Long,
-    val contentHash: String?,
-)

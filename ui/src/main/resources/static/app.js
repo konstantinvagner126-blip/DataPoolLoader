@@ -491,15 +491,20 @@
       return;
     }
 
-    const available = currentCredentialsStatus && currentCredentialsStatus.fileAvailable;
     credentialsWarning.classList.remove("d-none");
-    if (available) {
+    if (currentModule.credentialsReady) {
       credentialsWarning.className = "alert alert-success mt-3 mb-0";
-      credentialsWarning.textContent = "Для модуля нужен credential.properties, и сейчас подходящий файл доступен. При необходимости его можно заменить загрузкой через UI.";
+      credentialsWarning.textContent = "Для модуля все обязательные placeholders ${...} сейчас разрешаются. При необходимости credential.properties можно заменить загрузкой через UI.";
       return;
     }
 
     credentialsWarning.className = "alert alert-warning mt-3 mb-0";
-    credentialsWarning.textContent = "В конфиге модуля найдены placeholders ${...}, но credential.properties не найден. Сначала ищется ui.defaultCredentialsFile, затем gradle/credential.properties в проекте, затем ~/.gradle/credential.properties. Если файл не найден, загрузи его через UI.";
+    const missingKeys = Array.isArray(currentModule.missingCredentialKeys) ? currentModule.missingCredentialKeys : [];
+    const missingKeysText = missingKeys.length ? ` Не хватает значений: ${missingKeys.join(", ")}.` : "";
+    if (currentCredentialsStatus && currentCredentialsStatus.fileAvailable) {
+      credentialsWarning.textContent = `Для модуля найден credential.properties, но обязательные placeholders разрешены не полностью.${missingKeysText} Также проверяются переменные окружения и JVM system properties.`;
+      return;
+    }
+    credentialsWarning.textContent = `В конфиге модуля найдены placeholders \${...}, но подходящие значения сейчас не найдены.${missingKeysText} Сначала ищется ui.defaultCredentialsFile, затем gradle/credential.properties в проекте, затем ~/.gradle/credential.properties. Если значений нет, загрузи файл через UI или задай их через env/JVM.`;
   }
 })(window);

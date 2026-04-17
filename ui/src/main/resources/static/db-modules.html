@@ -37,7 +37,14 @@
       <div class="db-mode-indicator-inner">
         <span class="db-mode-indicator-dot" id="dbModeDot"></span>
         <span id="dbModeText">Режим: FILES</span>
-        <a href="/" class="btn btn-sm btn-link db-mode-toggle-btn">На главную</a>
+        <span id="dbModeStatus" class="db-mode-status"></span>
+        <label class="runtime-mode-switch" aria-label="Переключатель режима UI">
+          <span class="runtime-mode-switch-label">FILES</span>
+          <input type="checkbox" id="dbModeToggle">
+          <span class="runtime-mode-switch-track"></span>
+          <span class="runtime-mode-switch-label">DB</span>
+        </label>
+        <a href="/" class="btn btn-sm btn-link db-mode-action-link">На главную</a>
       </div>
     </div>
 
@@ -69,6 +76,7 @@
             </div>
             <div class="d-flex flex-wrap gap-2">
               <button id="reloadButton" class="btn btn-outline-secondary">Обновить</button>
+              <button id="runModuleButton" class="btn btn-success" disabled>Запустить</button>
               <button id="saveWorkingCopyButton" class="btn btn-outline-primary" disabled>Сохранить working copy</button>
               <button id="discardWorkingCopyButton" class="btn btn-outline-danger" disabled>Discard working copy</button>
               <button id="publishButton" class="btn btn-success" disabled>Publish</button>
@@ -116,6 +124,11 @@
           <div class="panel-title">Информация о working copy</div>
           <div id="workingCopyDetails" class="text-secondary small">Working copy не загружена.</div>
         </div>
+
+        <div id="dbRunsInfo" class="panel mt-4">
+          <div class="panel-title">Последние DB-запуски</div>
+          <div id="dbRunsList" class="text-secondary small">Запусков пока нет.</div>
+        </div>
       </div>
     </div>
 
@@ -128,6 +141,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs/loader.min.js"></script>
   <script src="/static/js/common/dom.js?v=20260328n"></script>
   <script src="/static/js/common/http.js?v=20260328n"></script>
+  <script src="/static/js/common/runtime-mode.js?v=20260417a"></script>
   <script src="/static/js/common/monaco.js?v=20260328n"></script>
   <script src="/static/js/db/db-modules.js?v=20260328n"></script>
 </body>

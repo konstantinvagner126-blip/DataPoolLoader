@@ -1,5 +1,6 @@
 package com.sbrf.lt.datapool.db
 
+import com.sbrf.lt.datapool.app.port.TargetImporter
 import com.sbrf.lt.datapool.model.ExecutionStatus
 import com.sbrf.lt.datapool.model.TargetConfig
 import com.sbrf.lt.datapool.model.TargetLoadSummary
@@ -22,11 +23,11 @@ class PostgresImporter(
                 .copyIn(copySql, input)
         }
     },
-) {
+) : TargetImporter {
     private val logger = LoggerFactory.getLogger(javaClass)
     private val safeIdentifier = Regex("[A-Za-z_][A-Za-z0-9_]*")
 
-    fun importCsv(
+    override fun importCsv(
         target: TargetConfig,
         resolvedJdbcUrl: String,
         resolvedUsername: String,

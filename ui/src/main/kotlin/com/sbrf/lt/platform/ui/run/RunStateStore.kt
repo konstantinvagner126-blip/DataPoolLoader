@@ -1,12 +1,9 @@
 package com.sbrf.lt.platform.ui.run
 
 import com.sbrf.lt.datapool.config.ConfigLoader
-import com.sbrf.lt.datapool.model.ExecutionStatus
-import com.sbrf.lt.platform.ui.model.UiRunSnapshot
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
-import java.time.Instant
 import kotlin.io.path.createDirectories
 import kotlin.io.path.exists
 import kotlin.io.path.inputStream
@@ -42,28 +39,3 @@ class RunStateStore(
         )
     }
 }
-
-data class PersistedRunState(
-    val uploadedCredentials: PersistedUploadedCredentials? = null,
-    val history: List<UiRunSnapshot> = emptyList(),
-) {
-    fun withRecoveredInterruptedRuns(now: Instant = Instant.now()): PersistedRunState {
-        val recovered = history.map { snapshot ->
-            if (snapshot.status == ExecutionStatus.RUNNING) {
-                snapshot.copy(
-                    status = ExecutionStatus.FAILED,
-                    finishedAt = snapshot.finishedAt ?: now,
-                    errorMessage = snapshot.errorMessage ?: "UI был перезапущен до завершения запуска.",
-                )
-            } else {
-                snapshot
-            }
-        }
-        return copy(history = recovered)
-    }
-}
-
-data class PersistedUploadedCredentials(
-    val fileName: String,
-    val content: String,
-)
