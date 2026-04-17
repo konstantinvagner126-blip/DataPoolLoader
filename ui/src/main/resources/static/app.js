@@ -10,7 +10,7 @@
   const { renderCredentialsPanel } = uiBlocksNamespace;
   const { createCredentialsController } = uiCredentialsNamespace;
   const { createConfigFormController } = moduleEditorNamespace;
-  const { createSqlCatalogController, renderModuleMetadata } = moduleEditorSharedNamespace;
+  const { createSqlCatalogController, renderModuleMetadata, normalizeModuleMetadata, metadataEquals } = moduleEditorSharedNamespace;
   const { renderExecutionLogPanel, renderHistoryCurrentPanel, renderTechnicalDiagnosticsPanel, renderSummaryPanel, renderInfoPanel } = editorBlocksNamespace;
   const { createRunPanelsController } = runPanelsNamespace;
 
@@ -53,6 +53,7 @@
   let sqlContents = {};
   let persistedConfigText = "";
   let persistedSqlContents = {};
+  let persistedModuleMetadata = null;
 
   const moduleList = document.getElementById("moduleList");
   const moduleCatalogStatus = document.getElementById("moduleCatalogStatus");
@@ -148,7 +149,20 @@
     formController,
     onDraftStateChange: () => updateDraftState(),
     onCatalogChanged: () => {
-      renderModuleMetadata?.(moduleMetadata, currentModule);
+      renderModuleMetadata?.(moduleMetadata, currentModule, {
+        editable: true,
+        onChange: () => {
+          selectedModuleLabel.textContent = `${currentModule.module.title} · ${currentModule.module.configPath}`;
+          if (currentModule.module.description) {
+            selectedModuleDescription.textContent = currentModule.module.description;
+            selectedModuleDescription.classList.remove("d-none");
+          } else {
+            selectedModuleDescription.classList.add("d-none");
+            selectedModuleDescription.textContent = "";
+          }
+          updateDraftState();
+        },
+      });
     },
   });
 
@@ -185,10 +199,12 @@
     }
     await postJson(`/api/modules/${selectedModuleId}/save`, {
       configText: configEditor.getValue(),
-      sqlFiles: sqlContents
+      sqlFiles: sqlContents,
+      ...normalizeModuleMetadata(currentModule?.module),
     }, "Не удалось сохранить изменения модуля.");
     persistedConfigText = configEditor.getValue();
     persistedSqlContents = cloneSqlContents(sqlContents);
+    persistedModuleMetadata = normalizeModuleMetadata(currentModule?.module);
     updateDraftState();
   });
 
@@ -255,7 +271,7 @@
   async function loadModules() {
     try {
       const payload = await fetchJson("/api/modules/catalog", {}, "Не удалось загрузить список модулей.");
-      renderModuleCatalogStatus(payload.appsRootStatus);
+      renderModuleCatalogStatus(payload.appsRootStatus, payload.diagnostics);
       const modules = Array.isArray(payload.modules) ? payload.modules : [];
       moduleList.innerHTML = "";
 
@@ -285,12 +301,12 @@
       renderModuleCatalogStatus({
         mode: "ERROR",
         message: error.message || "Не удалось определить состояние каталога файловых модулей."
-      });
+      }, null);
       renderModuleListEmpty(error.message || "Не удалось загрузить список модулей.");
     }
   }
 
-  function renderModuleCatalogStatus(status) {
+  function renderModuleCatalogStatus(status, diagnostics) {
     if (!status) {
       moduleCatalogStatus.className = "module-catalog-status mt-3 mb-3 text-secondary small";
       moduleCatalogStatus.textContent = "Состояние каталога файловых модулей пока недоступно.";
@@ -301,6 +317,9 @@
     moduleCatalogStatus.className = `module-catalog-status mt-3 mb-3 small ${isReady ? "module-catalog-ready" : "module-catalog-warning"}`;
     moduleCatalogStatus.innerHTML = `
       <div>${escapeHtml(status.message || "Состояние каталога файловых модулей неизвестно.")}</div>
+      ${diagnostics ? `<div class="mt-1">Всего модулей: ${escapeHtml(String(diagnostics.totalModules || 0))}</div>` : ""}
+      ${diagnostics ? `<div class="mt-1">Исправных: ${escapeHtml(String(diagnostics.validModules || 0))}, с предупреждениями: ${escapeHtml(String(diagnostics.warningModules || 0))}, с ошибками: ${escapeHtml(String(diagnostics.invalidModules || 0))}</div>` : ""}
+      ${diagnostics ? `<div class="text-secondary mt-1">Всего замечаний: ${escapeHtml(String(diagnostics.totalIssues || 0))}</div>` : ""}
       ${status.configuredPath ? `<span class="module-catalog-path">${escapeHtml(status.configuredPath)}</span>` : ""}
     `;
   }
@@ -315,6 +334,7 @@
     currentModule = null;
     currentSqlPath = null;
     sqlContents = {};
+    persistedModuleMetadata = null;
     persistedSqlContents = {};
     persistedConfigText = "";
     selectedModuleLabel.textContent = "Модуль не выбран";
@@ -362,9 +382,23 @@
       sqlContents[file.path] = file.content;
     });
     persistedSqlContents = cloneSqlContents(sqlContents);
+    persistedModuleMetadata = normalizeModuleMetadata(currentModule.module);
     sqlCatalogController.render();
     renderModuleValidation(currentModule.module);
-    renderModuleMetadata?.(moduleMetadata, currentModule);
+    renderModuleMetadata?.(moduleMetadata, currentModule, {
+      editable: true,
+      onChange: () => {
+        selectedModuleLabel.textContent = `${currentModule.module.title} · ${currentModule.module.configPath}`;
+        if (currentModule.module.description) {
+          selectedModuleDescription.textContent = currentModule.module.description;
+          selectedModuleDescription.classList.remove("d-none");
+        } else {
+          selectedModuleDescription.classList.add("d-none");
+          selectedModuleDescription.textContent = "";
+        }
+        updateDraftState();
+      },
+    });
     credentialsController.renderWarning();
     updateDraftState();
 
@@ -460,7 +494,11 @@
       return true;
     }
 
-    return currentKeys.some(key => (sqlContents[key] || "") !== (persistedSqlContents[key] || ""));
+    if (currentKeys.some(key => (sqlContents[key] || "") !== (persistedSqlContents[key] || ""))) {
+      return true;
+    }
+
+    return !metadataEquals(currentModule?.module, persistedModuleMetadata);
   }
 
   function updateDraftState() {

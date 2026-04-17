@@ -19,10 +19,14 @@ class SqlConsoleStateStore(
         if (!stateFile.exists()) {
             return PersistedSqlConsoleState()
         }
-        stateFile.inputStream().bufferedReader().use {
-            return configLoader.objectMapper()
-                .readValue(it, PersistedSqlConsoleState::class.java)
-                .normalized()
+        return try {
+            stateFile.inputStream().bufferedReader().use {
+                configLoader.objectMapper()
+                    .readValue(it, PersistedSqlConsoleState::class.java)
+                    .normalized()
+            }
+        } catch (_: Exception) {
+            PersistedSqlConsoleState()
         }
     }
 

@@ -90,11 +90,23 @@
       refs.dbCatalogStatus.innerHTML = `
         <div>Режим: <strong>${shared.isDatabaseMode(state.runtimeContext) ? 'База данных' : 'Файлы'}</strong></div>
         <div>PostgreSQL: ${state.runtimeContext.database.available ? 'доступен' : 'недоступен'}</div>
+        ${renderDiagnostics(state.dbCatalogDiagnostics)}
         ${state.runtimeContext.actor?.actorId ? `<div>Пользователь: ${escapeHtml(state.runtimeContext.actor.actorId)}</div>` : ''}
         ${state.includeHiddenCatalog ? '<div class="text-secondary mt-1">Каталог открыт с показом скрытых модулей.</div>' : ''}
         ${maintenanceMode ? '<div class="text-warning-emphasis mt-1">Массовый импорт: выполняется</div>' : ''}
         ${activeSingleSyncCount > 0 ? `<div class="text-info-emphasis mt-1">Точечный импорт: ${activeSingleSyncCount}</div>` : ''}
         ${state.runtimeContext.fallbackReason ? `<div class="text-danger mt-1">Причина возврата в файловый режим: ${escapeHtml(state.runtimeContext.fallbackReason)}</div>` : ''}
+      `;
+    }
+
+    function renderDiagnostics(diagnostics) {
+      if (!diagnostics) {
+        return '';
+      }
+      return `
+        <div class="mt-1">Всего модулей: ${escapeHtml(String(diagnostics.totalModules || 0))}</div>
+        <div class="mt-1">Исправных: ${escapeHtml(String(diagnostics.validModules || 0))}, с предупреждениями: ${escapeHtml(String(diagnostics.warningModules || 0))}, с ошибками: ${escapeHtml(String(diagnostics.invalidModules || 0))}</div>
+        <div class="text-secondary mt-1">Всего замечаний: ${escapeHtml(String(diagnostics.totalIssues || 0))}</div>
       `;
     }
 

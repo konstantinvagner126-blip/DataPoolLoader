@@ -460,7 +460,8 @@ class ServerTest {
                   "sqlFiles": {
                     "classpath:sql/common.sql": "select 10",
                     "classpath:sql/db2.sql": "select 20"
-                  }
+                  },
+                  "title": "Demo App"
                 }
                 """.trimIndent(),
             )
@@ -1713,6 +1714,7 @@ class ServerTest {
                 assertEquals("OS_LOGIN", actorSource)
                 assertEquals("kwdev", actorDisplayName)
                 assertEquals(mapOf("common" to "select 1"), request.sqlFiles)
+                assertEquals("DB Demo", request.title)
             }
         }
         application {
@@ -1731,7 +1733,8 @@ class ServerTest {
                   "configText": "app:\n  mergeMode: plain\n",
                   "sqlFiles": {
                     "common": "select 1"
-                  }
+                  },
+                  "title": "DB Demo"
                 }
                 """.trimIndent()
             )

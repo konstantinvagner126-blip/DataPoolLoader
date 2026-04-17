@@ -1,6 +1,8 @@
 package com.sbrf.lt.platform.ui.model
 
 import com.sbrf.lt.datapool.model.ExecutionStatus
+import com.sbrf.lt.datapool.module.validation.ModuleValidationIssue
+import com.sbrf.lt.datapool.module.validation.ModuleValidationResult
 import com.sbrf.lt.datapool.sqlconsole.RawShardExecutionResult
 import com.sbrf.lt.datapool.sqlconsole.RawShardConnectionCheckResult
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleConnectionCheckResult
@@ -33,8 +35,17 @@ data class ModuleCatalogItemResponse(
     val title: String,
     val description: String? = null,
     val tags: List<String> = emptyList(),
+    val hiddenFromUi: Boolean = false,
     val validationStatus: String = "VALID",
     val validationIssues: List<ModuleValidationIssueResponse> = emptyList(),
+)
+
+data class ModuleCatalogDiagnosticsResponse(
+    val totalModules: Int = 0,
+    val validModules: Int = 0,
+    val warningModules: Int = 0,
+    val invalidModules: Int = 0,
+    val totalIssues: Int = 0,
 )
 
 data class AppsRootStatusResponse(
@@ -45,11 +56,13 @@ data class AppsRootStatusResponse(
 
 data class ModulesCatalogResponse(
     val appsRootStatus: AppsRootStatusResponse,
+    val diagnostics: ModuleCatalogDiagnosticsResponse = ModuleCatalogDiagnosticsResponse(),
     val modules: List<ModuleCatalogItemResponse>,
 )
 
 data class DatabaseModulesCatalogResponse(
     val runtimeContext: UiRuntimeContext,
+    val diagnostics: ModuleCatalogDiagnosticsResponse = ModuleCatalogDiagnosticsResponse(),
     val modules: List<ModuleCatalogItemResponse>,
 )
 
@@ -75,6 +88,7 @@ data class ModuleDetailsResponse(
     val title: String,
     val description: String? = null,
     val tags: List<String> = emptyList(),
+    val hiddenFromUi: Boolean = false,
     val validationStatus: String = "VALID",
     val validationIssues: List<ModuleValidationIssueResponse> = emptyList(),
     val configPath: String,
@@ -90,6 +104,10 @@ data class ModuleDetailsResponse(
 data class SaveModuleRequest(
     val configText: String,
     val sqlFiles: Map<String, String>,
+    val title: String,
+    val description: String? = null,
+    val tags: List<String> = emptyList(),
+    val hiddenFromUi: Boolean = false,
 )
 
 data class ConfigFormParseRequest(
@@ -223,15 +241,19 @@ data class SqlConsoleConnectionCheckResponse(
 data class SqlConsoleStateResponse(
     val draftSql: String,
     val recentQueries: List<String> = emptyList(),
+    val favoriteQueries: List<String> = emptyList(),
     val selectedSourceNames: List<String> = emptyList(),
     val pageSize: Int = 50,
+    val strictSafetyEnabled: Boolean = false,
 )
 
 data class SqlConsoleStateUpdateRequest(
     val draftSql: String,
     val recentQueries: List<String> = emptyList(),
+    val favoriteQueries: List<String> = emptyList(),
     val selectedSourceNames: List<String> = emptyList(),
     val pageSize: Int = 50,
+    val strictSafetyEnabled: Boolean = false,
 )
 
 data class SqlConsoleSettingsUpdateRequest(
@@ -347,6 +369,27 @@ fun ModuleDescriptor.toCatalogItemResponse(): ModuleCatalogItemResponse = Module
     title = title,
     description = description,
     tags = tags,
+    hiddenFromUi = hiddenFromUi,
     validationStatus = validationStatus,
     validationIssues = validationIssues,
 )
+
+fun ModuleValidationResult.toResponse(): List<ModuleValidationIssueResponse> =
+    issues.map { it.toResponse() }
+
+fun ModuleValidationResult.toStatusValue(): String = status.name
+
+fun List<ModuleCatalogItemResponse>.toDiagnosticsResponse(): ModuleCatalogDiagnosticsResponse =
+    ModuleCatalogDiagnosticsResponse(
+        totalModules = size,
+        validModules = count { it.validationStatus == "VALID" },
+        warningModules = count { it.validationStatus == "WARNING" },
+        invalidModules = count { it.validationStatus == "INVALID" },
+        totalIssues = sumOf { it.validationIssues.size },
+    )
+
+private fun ModuleValidationIssue.toResponse(): ModuleValidationIssueResponse =
+    ModuleValidationIssueResponse(
+        severity = severity.name,
+        message = message,
+    )

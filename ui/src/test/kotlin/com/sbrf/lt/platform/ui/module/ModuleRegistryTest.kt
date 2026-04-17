@@ -53,6 +53,7 @@ class ModuleRegistryTest {
                     "classpath:sql/common.sql" to "select 10",
                     "classpath:sql/db2.sql" to "select 20",
                 ),
+                title = "Demo App",
             ),
         )
 

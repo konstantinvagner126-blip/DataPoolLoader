@@ -259,7 +259,7 @@
     return 'Используется в нескольких местах';
   }
 
-  function renderModuleMetadata(container, session) {
+  function renderModuleMetadata(container, session, options = {}) {
     if (!container) {
       return;
     }
@@ -268,6 +268,8 @@
       return;
     }
 
+    const editable = options.editable !== false;
+    const onChange = typeof options.onChange === 'function' ? options.onChange : () => {};
     const module = session.module;
     const tags = Array.isArray(module.tags) && module.tags.length > 0
       ? module.tags.map(tag => `<span class="module-tag">${escapeHtml(tag)}</span>`).join('')
@@ -292,7 +294,48 @@
       renderMetadataRow('Теги', tags, true),
     ];
 
-    container.innerHTML = rows.join('');
+    container.innerHTML = `
+      <div class="module-metadata-grid">
+        <div class="module-metadata-card">
+          ${rows.join('')}
+        </div>
+        <div class="module-metadata-card">
+          <div class="module-metadata-form">
+            <div class="module-metadata-form-title">Редактируемые метаданные</div>
+            <label class="form-label small text-secondary" for="moduleMetadataTitleInput">Название</label>
+            <input id="moduleMetadataTitleInput" class="form-control mb-3" type="text" value="${escapeHtml(module.title || '')}" ${editable ? '' : 'disabled'}>
+            <label class="form-label small text-secondary" for="moduleMetadataDescriptionInput">Описание</label>
+            <textarea id="moduleMetadataDescriptionInput" class="form-control mb-3" rows="3" ${editable ? '' : 'disabled'}>${escapeHtml(module.description || '')}</textarea>
+            <label class="form-label small text-secondary" for="moduleMetadataTagsInput">Теги</label>
+            <input id="moduleMetadataTagsInput" class="form-control mb-3" type="text" value="${escapeHtml((module.tags || []).join(', '))}" ${editable ? '' : 'disabled'}>
+            <label class="d-flex align-items-center gap-2 small text-secondary mb-0" for="moduleMetadataHiddenInput">
+              <input id="moduleMetadataHiddenInput" class="form-check-input mt-0" type="checkbox" ${module.hiddenFromUi === true ? 'checked' : ''} ${editable ? '' : 'disabled'}>
+              <span>Скрывать модуль из основного каталога</span>
+            </label>
+          </div>
+        </div>
+      </div>
+    `;
+
+    if (!editable) {
+      return;
+    }
+
+    const titleInput = container.querySelector('#moduleMetadataTitleInput');
+    const descriptionInput = container.querySelector('#moduleMetadataDescriptionInput');
+    const tagsInput = container.querySelector('#moduleMetadataTagsInput');
+    const hiddenInput = container.querySelector('#moduleMetadataHiddenInput');
+    const handleChange = () => {
+      module.title = String(titleInput?.value || '').trim() || module.id;
+      module.description = normalizeText(descriptionInput?.value);
+      module.tags = normalizeTags(tagsInput?.value);
+      module.hiddenFromUi = hiddenInput?.checked === true;
+      onChange(normalizeModuleMetadata(module));
+    };
+    [titleInput, descriptionInput, tagsInput, hiddenInput].forEach(element => {
+      element?.addEventListener('input', handleChange);
+      element?.addEventListener('change', handleChange);
+    });
   }
 
   function renderMetadataRow(label, value, html = false) {
@@ -344,7 +387,35 @@
     return defaultSqlLabel(file.path || file.label || 'SQL-ресурс');
   }
 
+  function normalizeModuleMetadata(module) {
+    return {
+      title: String(module?.title || '').trim() || String(module?.id || '').trim(),
+      description: normalizeText(module?.description),
+      tags: normalizeTags(module?.tags),
+      hiddenFromUi: module?.hiddenFromUi === true,
+    };
+  }
+
+  function metadataEquals(left, right) {
+    return JSON.stringify(normalizeModuleMetadata(left)) === JSON.stringify(normalizeModuleMetadata(right));
+  }
+
+  function normalizeText(value) {
+    const normalized = String(value || '').trim();
+    return normalized.length > 0 ? normalized : null;
+  }
+
+  function normalizeTags(value) {
+    const source = Array.isArray(value) ? value : String(value || '').split(',');
+    return source
+      .map(item => String(item || '').trim())
+      .filter(item => item.length > 0)
+      .filter((item, index, all) => all.indexOf(item) === index);
+  }
+
   namespace.createSqlCatalogController = createSqlCatalogController;
   namespace.buildSqlResourceUsageMap = buildSqlResourceUsageMap;
   namespace.renderModuleMetadata = renderModuleMetadata;
+  namespace.normalizeModuleMetadata = normalizeModuleMetadata;
+  namespace.metadataEquals = metadataEquals;
 })(window);

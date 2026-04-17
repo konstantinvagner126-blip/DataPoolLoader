@@ -19,18 +19,36 @@ class DatabaseModuleStoreTest {
         val includeHiddenParams = mutableListOf<Boolean>()
         val rows = listOf(
             mapOf(
+                "module_id" to "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
                 "module_code" to "db-demo",
+                "current_revision_id" to "11111111-1111-1111-1111-111111111111",
                 "title" to "DB Demo",
                 "description" to "Модуль из PostgreSQL",
                 "tags_json" to """["postgres","db"]""",
+                "hidden_from_ui" to "false",
                 "validation_status" to "WARNING",
                 "validation_issues_json" to """[{"severity":"WARNING","message":"Проверить target"}]""",
+                "snapshot_yaml" to """
+                    app:
+                      sources:
+                        - name: db1
+                          sqlFile: common
+                        - name: db1
+                          sqlFile: common
+                """.trimIndent(),
             ),
         )
         val store = DatabaseModuleStore(
             connectionProvider = DatabaseConnectionProvider {
                 fakeConnection(
                     rows = rows,
+                    sqlAssetRows = listOf(
+                        mapOf(
+                            "label" to "Общий SQL",
+                            "asset_key" to "common",
+                            "sql_text" to "select 1",
+                        ),
+                    ),
                     preparedSql = preparedSql,
                     includeHiddenParams = includeHiddenParams,
                 )
@@ -40,14 +58,15 @@ class DatabaseModuleStoreTest {
         val modules = store.listModules()
 
         assertEquals(listOf(false), includeHiddenParams)
-        assertTrue(preparedSql.single().contains("ui_registry.module"))
+        assertTrue(preparedSql.any { it.contains("ui_registry.module") })
+        assertTrue(preparedSql.any { it.contains("module_revision_sql_asset") })
         assertEquals(1, modules.size)
         assertEquals("db-demo", modules.single().id)
         assertEquals("DB Demo", modules.single().title)
         assertEquals("Модуль из PostgreSQL", modules.single().description)
         assertEquals(listOf("postgres", "db"), modules.single().tags)
         assertEquals("WARNING", modules.single().validationStatus)
-        assertEquals("Проверить target", modules.single().validationIssues.single().message)
+        assertEquals("Повторяются имена sources: db1.", modules.single().validationIssues.single().message)
     }
 
     @Test
@@ -80,6 +99,7 @@ class DatabaseModuleStoreTest {
                             "title" to "DB Demo",
                             "description" to "Модуль из PostgreSQL",
                             "tags_json" to """["database"]""",
+                            "hidden_from_ui" to "false",
                             "validation_status" to "VALID",
                             "validation_issues_json" to "[]",
                             "config_text" to "app:\n  mergeMode: plain\n",
@@ -135,6 +155,7 @@ class DatabaseModuleStoreTest {
                             "title" to "DB Demo Draft",
                             "description" to null,
                             "tags_json" to "[]",
+                            "hidden_from_ui" to "false",
                             "validation_status" to "WARNING",
                             "validation_issues_json" to """[{"severity":"WARNING","message":"draft"}]""",
                             "config_text" to "app:\n  mergeMode: quota\n",
@@ -204,6 +225,8 @@ class DatabaseModuleStoreTest {
             request = SaveModuleRequest(
                 configText = "app:\n  mergeMode: plain\n",
                 sqlFiles = mapOf("common" to "select 1"),
+                title = "DB Demo",
+                tags = listOf("db"),
             ),
         )
 

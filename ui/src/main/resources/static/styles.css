@@ -2992,6 +2992,31 @@ body {
   padding: 1rem 0;
 }
 
+.module-metadata-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1rem;
+}
+
+.module-metadata-card {
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 18px;
+  padding: 1rem 1.1rem;
+  background: rgba(248, 250, 252, 0.75);
+}
+
+.module-metadata-form {
+  display: flex;
+  flex-direction: column;
+}
+
+.module-metadata-form-title {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: #1e293b;
+  margin-bottom: 0.85rem;
+}
+
 .module-metadata-row {
   display: flex;
   gap: 1rem;

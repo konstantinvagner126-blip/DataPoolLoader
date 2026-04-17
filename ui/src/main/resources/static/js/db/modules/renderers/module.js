@@ -149,7 +149,20 @@
     }
 
     function renderModuleMetadata() {
-      renderSharedModuleMetadata?.(refs.moduleMetadata, state.currentModule);
+      renderSharedModuleMetadata?.(refs.moduleMetadata, state.currentModule, {
+        editable: true,
+        onChange: () => {
+          refs.selectedModuleLabel.textContent = `${state.currentModule.module.title} · ${state.currentModule.module.configPath}`;
+          if (state.currentModule.module.description) {
+            refs.selectedModuleDescription.textContent = state.currentModule.module.description;
+            refs.selectedModuleDescription.classList.remove('d-none');
+          } else {
+            refs.selectedModuleDescription.classList.add('d-none');
+            refs.selectedModuleDescription.textContent = '';
+          }
+          renderDraftStatus();
+        },
+      });
     }
 
     function renderDraftStatus() {

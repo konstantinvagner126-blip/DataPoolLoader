@@ -5,10 +5,13 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.sbrf.lt.datapool.config.ConfigLoader
 import com.sbrf.lt.datapool.config.sql.SqlFileReferenceExtractor
 import com.sbrf.lt.datapool.db.registry.sql.ModuleRegistrySql
+import com.sbrf.lt.datapool.module.validation.ModuleValidationService
 import com.sbrf.lt.datapool.model.AppConfig
 import com.sbrf.lt.datapool.model.RootConfig
 import com.sbrf.lt.datapool.model.SourceConfig
 import com.sbrf.lt.platform.ui.model.ModuleFileContent
+import com.sbrf.lt.platform.ui.model.toResponse
+import com.sbrf.lt.platform.ui.model.toStatusValue
 import java.math.BigDecimal
 import java.security.MessageDigest
 import java.sql.Connection
@@ -21,6 +24,7 @@ import java.util.UUID
  */
 internal class DatabaseModuleRevisionWriter(
     private val objectMapper: ObjectMapper,
+    private val validationService: ModuleValidationService = ModuleValidationService(),
 ) {
     fun insertPublishedRevision(
         connection: Connection,
@@ -36,25 +40,35 @@ internal class DatabaseModuleRevisionWriter(
         contentHash: String,
     ) {
         val appConfig = parseAppConfig(workingCopyYaml)
+        val snapshot = readSnapshot(workingCopyJson)
+        val validation = validationService.validate(
+            configText = workingCopyYaml,
+            sqlReferenceExists = { entry -> snapshot.sqlFiles.any { it.path == entry.path } },
+        )
         connection.prepareStatement(ModuleRegistrySql.insertPublishedRevision(normalizedSchema)).use { stmt ->
             stmt.setString(1, revisionId)
-            stmt.setLong(2, revisionNo)
-            stmt.setString(3, actorDisplayName ?: actorId)
-            stmt.setString(4, appConfig.outputDir)
-            stmt.setString(5, appConfig.fileFormat.uppercase())
-            stmt.setString(6, appConfig.mergeMode.name)
-            stmt.setString(7, appConfig.errorMode.name)
-            stmt.setInt(8, appConfig.parallelism)
-            stmt.setInt(9, appConfig.fetchSize)
-            setNullableInt(stmt, 10, appConfig.queryTimeoutSec)
-            stmt.setLong(11, appConfig.progressLogEveryRows)
-            setNullableLong(stmt, 12, appConfig.maxMergedRows)
-            stmt.setBoolean(13, appConfig.deleteOutputFilesAfterCompletion)
-            stmt.setString(14, workingCopyJson)
-            stmt.setString(15, workingCopyYaml)
-            stmt.setString(16, contentHash)
-            stmt.setString(17, moduleId)
-            stmt.setString(18, currentRevisionId)
+            stmt.setString(2, moduleId)
+            stmt.setLong(3, revisionNo)
+            stmt.setString(4, actorDisplayName ?: actorId)
+            stmt.setString(5, snapshot.title ?: "")
+            stmt.setString(6, snapshot.description)
+            stmt.setString(7, objectMapper.writeValueAsString(snapshot.tags))
+            stmt.setBoolean(8, snapshot.hiddenFromUi)
+            stmt.setString(9, validation.toStatusValue())
+            stmt.setString(10, objectMapper.writeValueAsString(validation.toResponse()))
+            stmt.setString(11, appConfig.outputDir)
+            stmt.setString(12, appConfig.fileFormat.uppercase())
+            stmt.setString(13, appConfig.mergeMode.name)
+            stmt.setString(14, appConfig.errorMode.name)
+            stmt.setInt(15, appConfig.parallelism)
+            stmt.setInt(16, appConfig.fetchSize)
+            setNullableInt(stmt, 17, appConfig.queryTimeoutSec)
+            stmt.setLong(18, appConfig.progressLogEveryRows)
+            setNullableLong(stmt, 19, appConfig.maxMergedRows)
+            stmt.setBoolean(20, appConfig.deleteOutputFilesAfterCompletion)
+            stmt.setString(21, workingCopyJson)
+            stmt.setString(22, workingCopyYaml)
+            stmt.setString(23, contentHash)
             check(stmt.executeUpdate() == 1) {
                 "Не удалось создать published revision для module_id=$moduleId current_revision_id=$currentRevisionId"
             }
@@ -74,7 +88,18 @@ internal class DatabaseModuleRevisionWriter(
         request.tags?.forEach { tagsArray.add(it) }
 
         val appConfig = parseAppConfig(request.configText)
-        val snapshotJson = buildSnapshotJson(request.configText, request.sqlFiles)
+        val snapshotJson = buildSnapshotJson(
+            configText = request.configText,
+            sqlFileContents = request.sqlFiles,
+            title = request.title,
+            description = request.description,
+            tags = request.tags,
+            hiddenFromUi = request.hiddenFromUi,
+        )
+        val validation = validationService.validate(
+            configText = request.configText,
+            sqlReferenceExists = { entry -> request.sqlFiles.containsKey(entry.path) },
+        )
 
         connection.prepareStatement(ModuleRegistrySql.insertRevision(normalizedSchema)).use { stmt ->
             stmt.setString(1, revisionId)
@@ -86,19 +111,21 @@ internal class DatabaseModuleRevisionWriter(
             stmt.setString(7, request.description)
             stmt.setString(8, tagsArray.toString())
             stmt.setBoolean(9, request.hiddenFromUi)
-            stmt.setString(10, appConfig.outputDir)
-            stmt.setString(11, appConfig.fileFormat.uppercase())
-            stmt.setString(12, appConfig.mergeMode.name)
-            stmt.setString(13, appConfig.errorMode.name)
-            stmt.setInt(14, appConfig.parallelism)
-            stmt.setInt(15, appConfig.fetchSize)
-            setNullableInt(stmt, 16, appConfig.queryTimeoutSec)
-            stmt.setLong(17, appConfig.progressLogEveryRows)
-            setNullableLong(stmt, 18, appConfig.maxMergedRows)
-            stmt.setBoolean(19, appConfig.deleteOutputFilesAfterCompletion)
-            stmt.setString(20, snapshotJson)
-            stmt.setString(21, request.configText)
-            stmt.setString(22, contentHashForCreate(request))
+            stmt.setString(10, validation.toStatusValue())
+            stmt.setString(11, objectMapper.writeValueAsString(validation.toResponse()))
+            stmt.setString(12, appConfig.outputDir)
+            stmt.setString(13, appConfig.fileFormat.uppercase())
+            stmt.setString(14, appConfig.mergeMode.name)
+            stmt.setString(15, appConfig.errorMode.name)
+            stmt.setInt(16, appConfig.parallelism)
+            stmt.setInt(17, appConfig.fetchSize)
+            setNullableInt(stmt, 18, appConfig.queryTimeoutSec)
+            stmt.setLong(19, appConfig.progressLogEveryRows)
+            setNullableLong(stmt, 20, appConfig.maxMergedRows)
+            stmt.setBoolean(21, appConfig.deleteOutputFilesAfterCompletion)
+            stmt.setString(22, snapshotJson)
+            stmt.setString(23, request.configText)
+            stmt.setString(24, contentHashForCreate(request))
             stmt.executeUpdate()
         }
     }
@@ -247,6 +274,14 @@ internal class DatabaseModuleRevisionWriter(
     fun contentHashForCreate(request: CreateModuleRequest): String {
         val input = buildString {
             append(request.configText)
+            append('\u0000')
+            append(request.title)
+            append('\u0000')
+            append(request.description.orEmpty())
+            append('\u0000')
+            append(request.tags.orEmpty().joinToString("|"))
+            append('\u0000')
+            append(request.hiddenFromUi)
             request.sqlFiles.toSortedMap().forEach { (path, content) ->
                 append('\n')
                 append(path)
@@ -304,7 +339,14 @@ internal class DatabaseModuleRevisionWriter(
             AppConfig()
         }
 
-    private fun buildSnapshotJson(configText: String, sqlFileContents: Map<String, String>): String {
+    private fun buildSnapshotJson(
+        configText: String,
+        sqlFileContents: Map<String, String>,
+        title: String,
+        description: String?,
+        tags: List<String>,
+        hiddenFromUi: Boolean,
+    ): String {
         val sqlLabels = SqlFileReferenceExtractor.labelsByPathOrEmpty(configText, objectMapper)
         val sqlFiles = sqlFileContents.entries
             .sortedBy { it.key }
@@ -318,9 +360,16 @@ internal class DatabaseModuleRevisionWriter(
             }
         val root = objectMapper.createObjectNode()
         root.put("configText", configText)
+        root.put("title", title)
+        root.put("description", description)
+        root.set<JsonNode>("tags", objectMapper.valueToTree(tags))
+        root.put("hiddenFromUi", hiddenFromUi)
         root.set<JsonNode>("sqlFiles", objectMapper.valueToTree(sqlFiles))
         return objectMapper.writeValueAsString(root)
     }
+
+    private fun readSnapshot(workingCopyJson: String): WorkingCopySnapshot =
+        objectMapper.readValue(workingCopyJson, WorkingCopySnapshot::class.java)
 
     private fun sourceInlineSqlAssetKey(sourceName: String): String = "source:$sourceName"
 

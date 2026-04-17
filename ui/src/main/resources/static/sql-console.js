@@ -11,8 +11,10 @@
   let sqlConsoleState = {
     draftSql: "select 1 as check_value",
     recentQueries: [],
+    favoriteQueries: [],
     selectedSourceNames: [],
-    pageSize: 50
+    pageSize: 50,
+    strictSafetyEnabled: false
   };
   let selectedSourceNames = [];
   let currentExecutionId = null;
@@ -51,6 +53,11 @@
   const recentQuerySelectEl = document.getElementById("sqlRecentQuerySelect");
   const applyRecentQueryButtonEl = document.getElementById("sqlApplyRecentQueryButton");
   const clearRecentQueriesButtonEl = document.getElementById("sqlClearRecentQueriesButton");
+  const favoriteQuerySelectEl = document.getElementById("sqlFavoriteQuerySelect");
+  const applyFavoriteQueryButtonEl = document.getElementById("sqlApplyFavoriteQueryButton");
+  const rememberFavoriteQueryButtonEl = document.getElementById("sqlRememberFavoriteQueryButton");
+  const removeFavoriteQueryButtonEl = document.getElementById("sqlRemoveFavoriteQueryButton");
+  const strictSafetyCheckboxEl = document.getElementById("sqlStrictSafetyCheckbox");
   const commandGuardrailEl = document.getElementById("sqlCommandGuardrail");
   const uploadCredentialsButtonEl = document.getElementById("sqlUploadCredentialsButton");
 
@@ -124,9 +131,14 @@
 
   runButtonEl.addEventListener("click", async () => {
     const sql = sqlConsoleEditor.getValue();
-    const statementKeyword = queryToolsController.detectStatementKeyword(sql);
-    if (!queryToolsController.isReadOnlyLikeStatement(statementKeyword)) {
-      const confirmMessage = queryToolsController.isDangerousStatement(statementKeyword)
+    const statementAnalysis = queryToolsController.analyzeStatement(sql);
+    const statementKeyword = statementAnalysis.keyword;
+    if (sqlConsoleState.strictSafetyEnabled && !statementAnalysis.readOnly) {
+      global.alert("Строгая защита включена. Для выполнения изменяющего запроса сначала отключи этот режим.");
+      return;
+    }
+    if (!statementAnalysis.readOnly) {
+      const confirmMessage = statementAnalysis.dangerous
         ? `Команда ${statementKeyword} считается потенциально опасной и будет выполнена на всех выбранных sources. Проверь SQL еще раз. Продолжить?`
         : `Запрос типа ${statementKeyword} может изменить данные или структуру на всех настроенных sources. Продолжить?`;
       if (!window.confirm(confirmMessage)) {
@@ -221,10 +233,17 @@
       recentQuerySelectEl,
       applyRecentQueryButtonEl,
       clearRecentQueriesButtonEl,
+      favoriteQuerySelectEl,
+      applyFavoriteQueryButtonEl,
+      rememberFavoriteQueryButtonEl,
+      removeFavoriteQueryButtonEl,
+      strictSafetyCheckboxEl,
       commandGuardrailEl,
       runButtonEl,
       initialDraft: sqlConsoleState.draftSql,
       initialRecentQueries: sqlConsoleState.recentQueries,
+      initialFavoriteQueries: sqlConsoleState.favoriteQueries,
+      initialStrictSafetyEnabled: sqlConsoleState.strictSafetyEnabled,
       onStateChanged: partialState => {
         sqlConsoleState = {
           ...sqlConsoleState,
@@ -284,8 +303,10 @@
     sqlConsoleState = {
       draftSql: sqlConsoleState.draftSql || "select 1 as check_value",
       recentQueries: Array.isArray(sqlConsoleState.recentQueries) ? sqlConsoleState.recentQueries : [],
+      favoriteQueries: Array.isArray(sqlConsoleState.favoriteQueries) ? sqlConsoleState.favoriteQueries : [],
       selectedSourceNames: Array.isArray(sqlConsoleState.selectedSourceNames) ? sqlConsoleState.selectedSourceNames : [],
-      pageSize: normalizePageSize(sqlConsoleState.pageSize)
+      pageSize: normalizePageSize(sqlConsoleState.pageSize),
+      strictSafetyEnabled: sqlConsoleState.strictSafetyEnabled === true
     };
     selectedSourceNames = [...sqlConsoleState.selectedSourceNames];
   }
@@ -598,8 +619,10 @@
           body: JSON.stringify({
             draftSql: sqlConsoleState.draftSql || queryToolsController?.getInitialDraft?.() || "select 1 as check_value",
             recentQueries: sqlConsoleState.recentQueries || [],
+            favoriteQueries: sqlConsoleState.favoriteQueries || [],
             selectedSourceNames: selectedSourceNames,
-            pageSize: normalizePageSize(pageSizeSelectEl.value)
+            pageSize: normalizePageSize(pageSizeSelectEl.value),
+            strictSafetyEnabled: sqlConsoleState.strictSafetyEnabled === true
           })
         },
         "Не удалось сохранить состояние SQL-консоли."

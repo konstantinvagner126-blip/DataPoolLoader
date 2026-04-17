@@ -25,6 +25,7 @@ internal data class DatabaseEditableModuleRow(
     val title: String,
     val description: String?,
     val tags: List<String>,
+    val hiddenFromUi: Boolean,
     val validationStatus: String,
     val validationIssues: List<ModuleValidationIssueResponse>,
     val configText: String,

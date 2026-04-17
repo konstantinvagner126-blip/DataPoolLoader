@@ -1,6 +1,8 @@
 (function registerDbModulesController(global) {
   const root = global.DataPoolDb = global.DataPoolDb || {};
   const modules = root.modules = root.modules || {};
+  const moduleEditorSharedNamespace = global.DataPoolModuleEditorShared || {};
+  const { normalizeModuleMetadata } = moduleEditorSharedNamespace;
 
   function createController(ctx, renderer) {
     const { fetchJson, postJson } = ctx.common;
@@ -40,6 +42,7 @@
       try {
         const catalogUrl = state.includeHiddenCatalog ? '/api/db/modules/catalog?includeHidden=true' : '/api/db/modules/catalog';
         const payload = await fetchJson(catalogUrl, {}, 'Не удалось загрузить каталог модулей из базы данных.');
+        state.dbCatalogDiagnostics = payload.diagnostics || null;
         const modulesList = Array.isArray(payload.modules) ? payload.modules : [];
 
         if (modulesList.length === 0) {
@@ -96,6 +99,7 @@
       });
       state.persistedConfigText = state.currentModule.module.configText;
       state.persistedSqlContents = modules.cloneSqlContents(state.sqlContents);
+      state.persistedModuleMetadata = normalizeModuleMetadata(state.currentModule.module);
       renderer.applyCurrentModule();
       await ctx.formController?.syncFromYaml();
       ctx.sqlCatalogController?.render();
@@ -190,6 +194,7 @@
         {
           configText: editors.configEditor.getValue(),
           sqlFiles: state.sqlContents,
+          ...normalizeModuleMetadata(state.currentModule?.module),
         },
         'Не удалось сохранить черновик.',
       );

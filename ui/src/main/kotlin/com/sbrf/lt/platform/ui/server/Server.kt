@@ -30,6 +30,7 @@ import com.sbrf.lt.platform.ui.model.SqlConsoleQueryRequest
 import com.sbrf.lt.platform.ui.model.StartRunRequest
 import com.sbrf.lt.platform.ui.model.CreateDbModuleRequest
 import com.sbrf.lt.platform.ui.model.SyncOneModuleRequest
+import com.sbrf.lt.platform.ui.model.toDiagnosticsResponse
 import com.sbrf.lt.platform.ui.model.toResponse
 import com.sbrf.lt.platform.ui.model.toStartResponse
 import com.sbrf.lt.platform.ui.module.ConfigFormService
@@ -535,7 +536,13 @@ fun Application.uiModule(
             } else {
                 emptyList()
             }
-            call.respond(DatabaseModulesCatalogResponse(runtimeContext = runtimeContext, modules = modules))
+            call.respond(
+                DatabaseModulesCatalogResponse(
+                    runtimeContext = runtimeContext,
+                    diagnostics = modules.toDiagnosticsResponse(),
+                    modules = modules,
+                ),
+            )
         }
 
         get("/api/db/modules/{id}") {
@@ -761,10 +768,12 @@ fun Application.uiModule(
         }
 
         get("/api/modules/catalog") {
+            val modules = filesModuleBackend.listModules()
             call.respond(
                 ModulesCatalogResponse(
                     appsRootStatus = requireNotNull(filesModuleBackend.catalogStatus()),
-                    modules = filesModuleBackend.listModules(),
+                    diagnostics = modules.toDiagnosticsResponse(),
+                    modules = modules,
                 ),
             )
         }

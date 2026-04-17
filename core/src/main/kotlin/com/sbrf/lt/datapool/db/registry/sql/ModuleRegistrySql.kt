@@ -7,12 +7,16 @@ object ModuleRegistrySql {
     fun catalog(schema: String): String =
         """
         select
+            m.module_id::text as module_id,
             m.module_code as module_code,
+            r.revision_id::text as current_revision_id,
             r.title as title,
             r.description as description,
             r.tags::text as tags_json,
+            r.hidden_from_ui as hidden_from_ui,
             r.validation_status as validation_status,
-            r.validation_issues::text as validation_issues_json
+            r.validation_issues::text as validation_issues_json,
+            r.snapshot_yaml as snapshot_yaml
         from $schema.module m
         join $schema.module_revision r
             on r.module_id = m.module_id
@@ -29,6 +33,7 @@ object ModuleRegistrySql {
             r.title as title,
             r.description as description,
             r.tags::text as tags_json,
+            r.hidden_from_ui as hidden_from_ui,
             r.validation_status as validation_status,
             r.validation_issues::text as validation_issues_json,
             coalesce(w.working_copy_yaml, r.snapshot_yaml) as config_text,
@@ -185,8 +190,8 @@ object ModuleRegistrySql {
             ?,
             ?::jsonb,
             ?,
-            'VALID',
-            '[]'::jsonb,
+            ?,
+            ?::jsonb,
             ?,
             ?,
             ?,
@@ -230,19 +235,17 @@ object ModuleRegistrySql {
             snapshot_json,
             snapshot_yaml,
             content_hash
-        )
-        select
+        ) values (
             ?::uuid,
-            r.module_id,
+            ?::uuid,
             ?,
             ?,
             'PUBLISH',
-            r.title,
-            r.description,
-            r.tags,
-            r.hidden_from_ui,
-            r.validation_status,
-            r.validation_issues,
+            ?,
+            ?::jsonb,
+            ?,
+            ?,
+            ?::jsonb,
             ?,
             ?,
             ?,
@@ -256,9 +259,6 @@ object ModuleRegistrySql {
             ?::jsonb,
             ?,
             ?
-        from $schema.module_revision r
-        where r.module_id = ?::uuid
-            and r.revision_id = ?::uuid
         """.trimIndent()
 
     fun copySqlAssets(schema: String): String =

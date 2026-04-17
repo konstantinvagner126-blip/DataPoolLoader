@@ -2,6 +2,8 @@
   const root = global.DataPoolDb = global.DataPoolDb || {};
   const modules = root.modules = root.modules || {};
   const shared = root.shared || {};
+  const moduleEditorSharedNamespace = global.DataPoolModuleEditorShared || {};
+  const { metadataEquals } = moduleEditorSharedNamespace;
 
   function createPageContext() {
     return {
@@ -62,7 +64,9 @@
         sqlContents: {},
         persistedConfigText: '',
         persistedSqlContents: {},
+        persistedModuleMetadata: null,
         runtimeContext: null,
+        dbCatalogDiagnostics: null,
         syncState: null,
         currentRuns: [],
         runHistoryFilter: 'ALL',
@@ -92,7 +96,11 @@
       return true;
     }
 
-    return currentKeys.some(key => (state.sqlContents[key] || '') !== (state.persistedSqlContents[key] || ''));
+    if (currentKeys.some(key => (state.sqlContents[key] || '') !== (state.persistedSqlContents[key] || ''))) {
+      return true;
+    }
+
+    return !metadataEquals(state.currentModule?.module, state.persistedModuleMetadata);
   }
 
   function canWorkWithDbModules(ctx) {

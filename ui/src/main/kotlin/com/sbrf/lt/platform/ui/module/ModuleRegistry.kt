@@ -10,6 +10,9 @@ import com.sbrf.lt.platform.ui.model.ModuleValidationIssueResponse
 import com.sbrf.lt.platform.ui.model.SaveModuleRequest
 import com.fasterxml.jackson.databind.JsonNode
 import com.sbrf.lt.datapool.config.sql.SqlFileReferenceExtractor
+import com.sbrf.lt.datapool.module.validation.ModuleValidationIssue
+import com.sbrf.lt.datapool.module.validation.ModuleValidationService
+import com.sbrf.lt.datapool.module.validation.ModuleValidationSeverity
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.deleteIfExists
@@ -21,6 +24,7 @@ import kotlin.io.path.writeText
 class ModuleRegistry(
     private val configLoader: ConfigLoader = ConfigLoader(),
     private val appsRoot: Path? = null,
+    private val validationService: ModuleValidationService = ModuleValidationService(),
 ) {
     private val mapper = configLoader.objectMapper()
 
@@ -95,6 +99,7 @@ class ModuleRegistry(
             title = module.title,
             description = module.description,
             tags = module.tags,
+            hiddenFromUi = module.hiddenFromUi,
             validationStatus = module.validationStatus,
             validationIssues = module.validationIssues,
             configPath = module.configFile.toString(),
@@ -118,6 +123,7 @@ class ModuleRegistry(
         val managedFilesBeforeSave = managedSqlReferences(module, request.configText) + discoverSqlCatalogKeys(module)
         module.configFile.parent.createDirectories()
         module.configFile.writeText(request.configText)
+        writeMetadata(module, request)
 
         request.sqlFiles.toSortedMap().forEach { (sqlRef, content) ->
             val file = resolveSqlPath(module, sqlRef)
@@ -208,71 +214,32 @@ class ModuleRegistry(
         val configFile = resourcesDir.resolve("application.yml")
         val metadataFile = appDir.resolve("ui-module.yml")
         val metadata = loadMetadata(metadataFile)
-        val issues = mutableListOf<ModuleValidationIssueResponse>()
-
-        if (metadata.issue != null) {
-            issues += metadata.issue
-        }
-
-        val configText = if (configFile.exists()) {
-            configFile.readText()
-        } else {
-            issues += ModuleValidationIssueResponse(
-                severity = "ERROR",
-                message = "Не найден файл src/main/resources/application.yml.",
-            )
-            ""
-        }
-
-        var parsedRoot: JsonNode? = null
-        if (configText.isNotBlank()) {
-            try {
-                parsedRoot = mapper.readTree(configText)
-            } catch (error: Exception) {
-                issues += ModuleValidationIssueResponse(
-                    severity = "ERROR",
-                    message = "application.yml не удалось разобрать: ${error.message ?: "ошибка синтаксиса YAML"}",
-                )
-            }
-        }
-
-        if (parsedRoot != null) {
-            val sqlRefs = SqlFileReferenceExtractor.extractOrEmpty(configText, mapper)
-            sqlRefs.forEach { entry ->
+        val configText = configFile.takeIf { it.exists() }?.readText().orEmpty()
+        val validation = validationService.validate(
+            configText = configText,
+            sqlReferenceExists = { entry ->
                 val sqlPath = resolveSqlPath(configFile, resourcesDir, entry.path)
-                if (sqlPath == null || !Files.exists(sqlPath)) {
-                    issues += ModuleValidationIssueResponse(
-                        severity = "ERROR",
-                        message = "Не найден SQL-файл ${entry.path} (${entry.label}).",
+                sqlPath != null && Files.exists(sqlPath)
+            },
+            additionalIssues = buildList {
+                if (!configFile.exists()) {
+                    add(
+                        ModuleValidationIssue(
+                            severity = ModuleValidationSeverity.ERROR,
+                            message = "Не найден файл src/main/resources/application.yml.",
+                        ),
                     )
                 }
-            }
-
-            val duplicateSourceNames = parsedRoot.path("app").path("sources")
-                .takeIf { it.isArray }
-                ?.mapNotNull { source ->
-                    source.path("name").takeIf { it.isTextual }?.asText()?.trim()?.takeIf { it.isNotEmpty() }
+                metadata.issue?.let { issue ->
+                    add(
+                        ModuleValidationIssue(
+                            severity = ModuleValidationSeverity.valueOf(issue.severity),
+                            message = issue.message,
+                        ),
+                    )
                 }
-                ?.groupingBy { it }
-                ?.eachCount()
-                ?.filterValues { it > 1 }
-                ?.keys
-                ?.sorted()
-                .orEmpty()
-
-            if (duplicateSourceNames.isNotEmpty()) {
-                issues += ModuleValidationIssueResponse(
-                    severity = "WARNING",
-                    message = "Повторяются имена sources: ${duplicateSourceNames.joinToString(", ")}.",
-                )
-            }
-        }
-
-        val validationStatus = when {
-            issues.any { it.severity == "ERROR" } -> "INVALID"
-            issues.any { it.severity == "WARNING" } -> "WARNING"
-            else -> "VALID"
-        }
+            },
+        )
 
         return ModuleDescriptor(
             id = appDir.fileName.toString(),
@@ -280,8 +247,13 @@ class ModuleRegistry(
             description = metadata.description,
             tags = metadata.tags,
             hiddenFromUi = metadata.hiddenFromUi,
-            validationStatus = validationStatus,
-            validationIssues = issues,
+            validationStatus = validation.status.name,
+            validationIssues = validation.issues.map { issue ->
+                ModuleValidationIssueResponse(
+                    severity = issue.severity.name,
+                    message = issue.message,
+                )
+            },
             configFile = configFile,
             resourcesDir = resourcesDir,
         )
@@ -323,6 +295,29 @@ class ModuleRegistry(
             val path = Path.of(trimmed)
             if (path.isAbsolute) path else configFile.parent.resolve(path).normalize()
         }
+    }
+
+    private fun writeMetadata(module: ModuleDescriptor, request: SaveModuleRequest) {
+        val metadataFile = module.configFile.parent.parent.parent.parent.resolve("ui-module.yml")
+        val normalizedTitle = request.title.trim()
+        val normalizedDescription = request.description?.trim()?.takeIf { it.isNotEmpty() }
+        val normalizedTags = request.tags.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+        val normalizedHidden = request.hiddenFromUi
+        if (normalizedTitle == module.id && normalizedDescription == null && normalizedTags.isEmpty() && !normalizedHidden) {
+            metadataFile.deleteIfExists()
+            return
+        }
+        val root = linkedMapOf<String, Any>(
+            "title" to normalizedTitle,
+        )
+        normalizedDescription?.let { root["description"] = it }
+        if (normalizedTags.isNotEmpty()) {
+            root["tags"] = normalizedTags
+        }
+        if (normalizedHidden) {
+            root["hiddenFromUi"] = true
+        }
+        metadataFile.writeText(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(root))
     }
 
 }

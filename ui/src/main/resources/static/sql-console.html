@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Load Testing Data Platform • SQL Console</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link href="/static/styles.css?v=20260328s" rel="stylesheet">
+  <link href="/static/styles.css?v=20260417-sqlconsole-fix" rel="stylesheet">
 </head>
 <body>
   <div class="container-fluid py-4">
@@ -101,6 +101,23 @@
                 <button id="sqlClearRecentQueriesButton" class="btn btn-outline-secondary btn-sm" type="button">Очистить</button>
               </div>
             </div>
+            <div class="sql-query-library-block">
+              <label class="small text-secondary mb-1" for="sqlFavoriteQuerySelect">Избранные запросы</label>
+              <div class="d-flex flex-wrap gap-2">
+                <select id="sqlFavoriteQuerySelect" class="form-select form-select-sm sql-recent-query-select">
+                  <option value="">Избранное пока пусто</option>
+                </select>
+                <button id="sqlApplyFavoriteQueryButton" class="btn btn-outline-secondary btn-sm" type="button" disabled>Подставить</button>
+                <button id="sqlRememberFavoriteQueryButton" class="btn btn-outline-primary btn-sm" type="button">В избранное</button>
+                <button id="sqlRemoveFavoriteQueryButton" class="btn btn-outline-danger btn-sm" type="button" disabled>Убрать</button>
+              </div>
+            </div>
+            <div class="sql-query-library-block">
+              <label class="d-flex align-items-center gap-2 small text-secondary mb-0" for="sqlStrictSafetyCheckbox">
+                <input id="sqlStrictSafetyCheckbox" class="form-check-input mt-0" type="checkbox">
+                <span>Строгая защита: разрешать только read-only запросы</span>
+              </label>
+            </div>
           </div>
           <div id="sqlEditor" class="editor-frame sql-editor-frame"></div>
 
@@ -171,8 +188,8 @@
   <script src="/static/js/common/http.js?v=20260328s"></script>
   <script src="/static/js/common/storage.js?v=20260328s"></script>
   <script src="/static/js/common/monaco.js?v=20260417b"></script>
-  <script src="/static/js/sql-console/query-tools.js?v=20260328s"></script>
-  <script src="/static/js/sql-console/results-view.js?v=20260328s"></script>
-  <script src="/static/sql-console.js?v=20260417n"></script>
+  <script src="/static/js/sql-console/query-tools.js?v=20260417-sqlconsole-fix"></script>
+  <script src="/static/js/sql-console/results-view.js?v=20260417-sqlconsole-fix"></script>
+  <script src="/static/sql-console.js?v=20260417-sqlconsole-fix"></script>
 </body>
 </html>

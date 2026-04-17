@@ -17,8 +17,10 @@ class SqlConsoleStateService(
         state = PersistedSqlConsoleState(
             draftSql = request.draftSql,
             recentQueries = request.recentQueries,
+            favoriteQueries = request.favoriteQueries,
             selectedSourceNames = request.selectedSourceNames,
             pageSize = request.pageSize,
+            strictSafetyEnabled = request.strictSafetyEnabled,
         ).normalized()
         stateStore.save(state)
         state.toResponse()
@@ -28,6 +30,8 @@ class SqlConsoleStateService(
 private fun PersistedSqlConsoleState.toResponse(): SqlConsoleStateResponse = SqlConsoleStateResponse(
     draftSql = draftSql,
     recentQueries = recentQueries,
+    favoriteQueries = favoriteQueries,
     selectedSourceNames = selectedSourceNames,
     pageSize = pageSize,
+    strictSafetyEnabled = strictSafetyEnabled,
 )

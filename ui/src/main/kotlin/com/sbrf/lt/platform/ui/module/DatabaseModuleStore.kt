@@ -8,14 +8,17 @@ import com.sbrf.lt.datapool.db.registry.DatabaseConnectionProvider
 import com.sbrf.lt.datapool.db.registry.DriverManagerDatabaseConnectionProvider
 import com.sbrf.lt.datapool.db.registry.sql.ModuleRegistrySql
 import com.sbrf.lt.datapool.db.registry.sql.normalizeRegistrySchemaName
+import com.sbrf.lt.datapool.module.validation.ModuleValidationService
 import com.sbrf.lt.platform.ui.config.UiModuleStorePostgresConfig
 import com.sbrf.lt.platform.ui.config.schemaName
 import com.sbrf.lt.platform.ui.model.CredentialsStatusResponse
+import com.sbrf.lt.platform.ui.model.ModuleCatalogItemResponse
 import com.sbrf.lt.platform.ui.model.ModuleDetailsResponse
 import com.sbrf.lt.platform.ui.model.ModuleFileContent
-import com.sbrf.lt.platform.ui.model.ModuleCatalogItemResponse
 import com.sbrf.lt.platform.ui.model.ModuleValidationIssueResponse
 import com.sbrf.lt.platform.ui.model.SaveModuleRequest
+import com.sbrf.lt.platform.ui.model.toResponse
+import com.sbrf.lt.platform.ui.model.toStatusValue
 import java.sql.Connection
 import java.sql.ResultSet
 import java.security.MessageDigest
@@ -25,11 +28,12 @@ open class DatabaseModuleStore(
     private val connectionProvider: DatabaseConnectionProvider,
     private val schema: String = UiModuleStorePostgresConfig.DEFAULT_SCHEMA,
     private val objectMapper: ObjectMapper = jacksonObjectMapper(),
+    private val validationService: ModuleValidationService = ModuleValidationService(),
 ) {
     private val tagsType = object : TypeReference<List<String>>() {}
     private val issuesType = object : TypeReference<List<ModuleValidationIssueResponse>>() {}
     private val sqlFilesType = object : TypeReference<List<ModuleFileContent>>() {}
-    private val revisionWriter = DatabaseModuleRevisionWriter(objectMapper)
+    private val revisionWriter = DatabaseModuleRevisionWriter(objectMapper, validationService)
 
     open fun listModules(includeHidden: Boolean = false): List<ModuleCatalogItemResponse> {
         val normalizedSchema = normalizeRegistrySchemaName(schema)
@@ -39,7 +43,18 @@ open class DatabaseModuleStore(
                 statement.executeQuery().use { resultSet ->
                     val modules = mutableListOf<ModuleCatalogItemResponse>()
                     while (resultSet.next()) {
-                        modules += resultSet.toCatalogItem()
+                        val configText = resultSet.getString("snapshot_yaml")
+                        val sqlFiles = loadRevisionSqlAssets(connection, normalizedSchema, resultSet.getString("current_revision_id"))
+                        val validation = validateModule(configText, sqlFiles)
+                        modules += ModuleCatalogItemResponse(
+                            id = resultSet.getString("module_code"),
+                            title = resultSet.getString("title"),
+                            description = resultSet.getString("description"),
+                            tags = readJsonList(resultSet.getString("tags_json"), tagsType),
+                            hiddenFromUi = resultSet.getBoolean("hidden_from_ui"),
+                            validationStatus = validation.toStatusValue(),
+                            validationIssues = validation.toResponse(),
+                        )
                     }
                     return modules
                 }
@@ -70,15 +85,18 @@ open class DatabaseModuleStore(
             } else {
                 loadRevisionSqlAssets(connection, normalizedSchema, row.currentRevisionId)
             }
+            val workingCopySnapshot = row.workingCopyJson?.let(::readWorkingCopySnapshot)
+            val validation = validateModule(row.configText, sqlFiles)
 
             return DatabaseEditableModule(
                 module = ModuleDetailsResponse(
                     id = row.moduleCode,
-                    title = row.title,
-                    description = row.description,
-                    tags = row.tags,
-                    validationStatus = row.validationStatus,
-                    validationIssues = row.validationIssues,
+                    title = workingCopySnapshot?.title ?: row.title,
+                    description = workingCopySnapshot?.description ?: row.description,
+                    tags = workingCopySnapshot?.tags ?: row.tags,
+                    hiddenFromUi = workingCopySnapshot?.hiddenFromUi ?: row.hiddenFromUi,
+                    validationStatus = validation.toStatusValue(),
+                    validationIssues = validation.toResponse(),
                     configPath = "db:${row.moduleCode}",
                     configText = row.configText,
                     sqlFiles = sqlFiles,
@@ -384,10 +402,24 @@ open class DatabaseModuleStore(
     }
 
     private fun buildWorkingCopyJson(request: SaveModuleRequest): String {
-        return buildSnapshotJson(request.configText, request.sqlFiles)
+        return buildSnapshotJson(
+            configText = request.configText,
+            sqlFileContents = request.sqlFiles,
+            title = request.title,
+            description = request.description,
+            tags = request.tags,
+            hiddenFromUi = request.hiddenFromUi,
+        )
     }
 
-    private fun buildSnapshotJson(configText: String, sqlFileContents: Map<String, String>): String {
+    private fun buildSnapshotJson(
+        configText: String,
+        sqlFileContents: Map<String, String>,
+        title: String,
+        description: String?,
+        tags: List<String>,
+        hiddenFromUi: Boolean,
+    ): String {
         val sqlLabels = SqlFileReferenceExtractor.labelsByPathOrEmpty(configText, objectMapper)
         val sqlFiles = sqlFileContents.entries
             .sortedBy { it.key }
@@ -401,6 +433,10 @@ open class DatabaseModuleStore(
             }
         val root = objectMapper.createObjectNode()
         root.put("configText", configText)
+        root.put("title", title)
+        root.put("description", description)
+        root.putPOJO("tags", tags)
+        root.put("hiddenFromUi", hiddenFromUi)
         root.set<com.fasterxml.jackson.databind.JsonNode>("sqlFiles", objectMapper.valueToTree(sqlFiles))
         return objectMapper.writeValueAsString(root)
     }
@@ -408,6 +444,14 @@ open class DatabaseModuleStore(
     private fun contentHash(request: SaveModuleRequest): String {
         val input = buildString {
             append(request.configText)
+            append('\u0000')
+            append(request.title)
+            append('\u0000')
+            append(request.description.orEmpty())
+            append('\u0000')
+            append(request.tags.joinToString("|"))
+            append('\u0000')
+            append(request.hiddenFromUi)
             request.sqlFiles.toSortedMap().forEach { (path, content) ->
                 append('\n')
                 append(path)
@@ -442,11 +486,8 @@ open class DatabaseModuleStore(
     }
 
     private fun readWorkingCopySqlFiles(workingCopyJson: String): List<ModuleFileContent> {
-        val root = objectMapper.readTree(workingCopyJson)
-        val sqlFilesNode = root.path("sqlFiles").takeIf { it.isArray } ?: return emptyList()
-        val sqlFiles = objectMapper.readValue<List<ModuleFileContent>>(sqlFilesNode.traverse(objectMapper), sqlFilesType)
-        val configText = root.path("configText").takeIf { it.isTextual }?.asText().orEmpty()
-        return relabelSqlFiles(configText, sqlFiles)
+        val snapshot = readWorkingCopySnapshot(workingCopyJson)
+        return relabelSqlFiles(snapshot.configText, snapshot.sqlFiles)
     }
 
     private fun readSqlFileContents(workingCopyJson: String?): Map<String, String> {
@@ -563,7 +604,14 @@ open class DatabaseModuleStore(
         actorDisplayName: String?,
         request: CreateModuleRequest,
     ) {
-        val snapshotJson = buildSnapshotJson(request.configText, request.sqlFiles)
+        val snapshotJson = buildSnapshotJson(
+            configText = request.configText,
+            sqlFileContents = request.sqlFiles,
+            title = request.title,
+            description = request.description,
+            tags = request.tags,
+            hiddenFromUi = request.hiddenFromUi,
+        )
 
         connection.prepareStatement(ModuleRegistrySql.upsertWorkingCopy(normalizedSchema)).use { stmt ->
             stmt.setString(1, workingCopyId)
@@ -601,22 +649,13 @@ open class DatabaseModuleStore(
         }
     }
 
-    private fun ResultSet.toCatalogItem(): ModuleCatalogItemResponse =
-        ModuleCatalogItemResponse(
-            id = getString("module_code"),
-            title = getString("title"),
-            description = getString("description"),
-            tags = readJsonList(getString("tags_json"), tagsType),
-            validationStatus = getString("validation_status"),
-            validationIssues = readJsonList(getString("validation_issues_json"), issuesType),
-        )
-
     private fun ResultSet.toEditableModuleRow(): DatabaseEditableModuleRow =
         DatabaseEditableModuleRow(
             moduleCode = getString("module_code"),
             title = getString("title"),
             description = getString("description"),
             tags = readJsonList(getString("tags_json"), tagsType),
+            hiddenFromUi = getBoolean("hidden_from_ui"),
             validationStatus = getString("validation_status"),
             validationIssues = readJsonList(getString("validation_issues_json"), issuesType),
             configText = getString("config_text"),
@@ -661,4 +700,15 @@ open class DatabaseModuleStore(
             }
         }
     }
+
+    private fun readWorkingCopySnapshot(workingCopyJson: String): WorkingCopySnapshot =
+        objectMapper.readValue(workingCopyJson, WorkingCopySnapshot::class.java)
+
+    private fun validateModule(
+        configText: String,
+        sqlFiles: List<ModuleFileContent>,
+    ) = validationService.validate(
+        configText = configText,
+        sqlReferenceExists = { entry -> sqlFiles.any { it.path == entry.path } },
+    )
 }
