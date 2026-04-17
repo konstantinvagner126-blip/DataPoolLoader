@@ -1612,6 +1612,15 @@ body {
   border: 1px solid rgba(22, 163, 74, 0.18);
 }
 
+.human-log-entry-warning {
+  margin: 0.25rem 0;
+  padding: 0.85rem 0.95rem;
+  border-radius: 14px;
+  border-bottom: 0;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
 .human-log-entry-error {
   background: rgba(220, 38, 38, 0.1);
   border: 1px solid rgba(220, 38, 38, 0.16);
@@ -2016,9 +2025,19 @@ body {
   color: #0d9488;
 }
 
+.status-success_with_warnings {
+  background: rgba(245, 158, 11, 0.16);
+  color: #b45309;
+}
+
 .status-failed {
   background: rgba(220, 38, 38, 0.12);
   color: #b91c1c;
+}
+
+.status-not_enabled {
+  background: rgba(100, 116, 139, 0.12);
+  color: #475569;
 }
 
 .status-skipped,

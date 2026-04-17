@@ -8,6 +8,7 @@ import com.sbrf.lt.datapool.app.ApplicationRunner
 import com.sbrf.lt.datapool.app.ExecutionEvent
 import com.sbrf.lt.datapool.app.ExecutionListener
 import com.sbrf.lt.datapool.model.ExecutionStatus
+import com.sbrf.lt.platform.ui.model.DatabaseModuleRunDetailsResponse
 import com.sbrf.lt.platform.ui.model.DatabaseModuleRunsResponse
 import com.sbrf.lt.platform.ui.model.DatabaseRunStartResponse
 import com.sbrf.lt.platform.ui.module.DatabaseModuleStore
@@ -112,6 +113,9 @@ open class DatabaseModuleRunService(
             moduleCode = moduleCode,
             runs = runStore.listRuns(moduleCode, limit),
         )
+
+    open fun loadRunDetails(moduleCode: String, runId: String): DatabaseModuleRunDetailsResponse =
+        runStore.loadRunDetails(moduleCode, runId)
 
     private fun validateCredentialsBeforeRun(configText: String) {
         val requirement = analyzeCredentialRequirements(configText, credentialsProvider.currentProperties())

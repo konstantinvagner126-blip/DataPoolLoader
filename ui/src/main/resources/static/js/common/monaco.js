@@ -1,6 +1,7 @@
 (function initDataPoolMonaco(global) {
   const namespace = global.DataPoolCommon || (global.DataPoolCommon = {});
   let monacoConfigured = false;
+  const monacoVsPath = "/static/vendor/monaco-editor/min/vs";
 
   function withMonacoReady(callback) {
     const requireFn = global.require;
@@ -9,7 +10,7 @@
     }
     if (!monacoConfigured) {
       requireFn.config({
-        paths: { vs: "https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs" }
+        paths: { vs: monacoVsPath }
       });
       monacoConfigured = true;
     }

@@ -1508,6 +1508,72 @@ class ServerTest {
                         ),
                     ),
                 )
+
+            override fun loadRunDetails(
+                moduleCode: String,
+                runId: String,
+            ): com.sbrf.lt.platform.ui.model.DatabaseModuleRunDetailsResponse =
+                com.sbrf.lt.platform.ui.model.DatabaseModuleRunDetailsResponse(
+                    run = com.sbrf.lt.platform.ui.model.DatabaseModuleRunSummaryResponse(
+                        runId = runId,
+                        executionSnapshotId = "snapshot-1",
+                        status = "SUCCESS",
+                        launchSourceKind = "WORKING_COPY",
+                        requestedAt = Instant.parse("2026-04-17T10:00:00Z"),
+                        startedAt = Instant.parse("2026-04-17T10:00:01Z"),
+                        finishedAt = Instant.parse("2026-04-17T10:01:00Z"),
+                        moduleCode = moduleCode,
+                        moduleTitle = "DB Demo",
+                        outputDir = "/tmp/out",
+                        mergedRowCount = 10,
+                        successfulSourceCount = 1,
+                        failedSourceCount = 0,
+                        skippedSourceCount = 0,
+                        targetStatus = "SUCCESS",
+                        targetTableName = "demo_target",
+                        targetRowsLoaded = 10,
+                        errorMessage = null,
+                    ),
+                    summaryJson = """{"mergedRowCount":10}""",
+                    sourceResults = listOf(
+                        com.sbrf.lt.platform.ui.model.DatabaseRunSourceResultResponse(
+                            runSourceResultId = "source-1",
+                            sourceName = "db1",
+                            sortOrder = 0,
+                            status = "SUCCESS",
+                            startedAt = Instant.parse("2026-04-17T10:00:02Z"),
+                            finishedAt = Instant.parse("2026-04-17T10:00:30Z"),
+                            exportedRowCount = 10,
+                            mergedRowCount = 10,
+                            errorMessage = null,
+                        ),
+                    ),
+                    events = listOf(
+                        com.sbrf.lt.platform.ui.model.DatabaseRunEventResponse(
+                            runEventId = "event-1",
+                            seqNo = 1,
+                            createdAt = Instant.parse("2026-04-17T10:00:01Z"),
+                            stage = "RUN",
+                            eventType = "RUN_FINISHED",
+                            severity = "SUCCESS",
+                            sourceName = null,
+                            message = "DB-запуск завершен.",
+                            payloadJson = mapOf("status" to "SUCCESS"),
+                        ),
+                    ),
+                    artifacts = listOf(
+                        com.sbrf.lt.platform.ui.model.DatabaseRunArtifactResponse(
+                            runArtifactId = "artifact-1",
+                            artifactKind = "SUMMARY_JSON",
+                            artifactKey = "summary",
+                            filePath = "/tmp/out/summary.json",
+                            storageStatus = "PRESENT",
+                            fileSizeBytes = 128,
+                            contentHash = null,
+                            createdAt = Instant.parse("2026-04-17T10:01:00Z"),
+                        ),
+                    ),
+                )
         }
         application {
             uiModule(
@@ -1523,6 +1589,13 @@ class ServerTest {
         assertTrue(response.bodyAsText().contains("\"moduleCode\":\"db-demo\""))
         assertTrue(response.bodyAsText().contains("\"runId\":\"run-1\""))
         assertTrue(response.bodyAsText().contains("\"launchSourceKind\":\"WORKING_COPY\""))
+
+        val detailsResponse = client.get("/api/db/modules/db-demo/runs/run-1")
+
+        assertEquals(HttpStatusCode.OK, detailsResponse.status)
+        assertTrue(detailsResponse.bodyAsText().contains("\"summaryJson\":\"{\\\"mergedRowCount\\\":10}\""))
+        assertTrue(detailsResponse.bodyAsText().contains("\"sourceName\":\"db1\""))
+        assertTrue(detailsResponse.bodyAsText().contains("\"artifactKind\":\"SUMMARY_JSON\""))
     }
 
     @Test

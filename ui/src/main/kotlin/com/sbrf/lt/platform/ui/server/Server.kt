@@ -420,6 +420,23 @@ fun Application.uiModule(
             call.respond(runService.listRuns(requireNotNull(call.parameters["id"])))
         }
 
+        get("/api/db/modules/{id}/runs/{runId}") {
+            requireDatabaseMaintenanceIsInactive()
+            val runtimeContext = currentRuntimeContext()
+            require(runtimeContext.effectiveMode == UiModuleStoreMode.DATABASE) {
+                "DB-режим недоступен: ${runtimeContext.fallbackReason ?: "effective mode is ${runtimeContext.effectiveMode.toConfigValue()}"}"
+            }
+            val runService = requireNotNull(currentDatabaseModuleRunService()) {
+                "DB run service не настроен."
+            }
+            call.respond(
+                runService.loadRunDetails(
+                    moduleCode = requireNotNull(call.parameters["id"]),
+                    runId = requireNotNull(call.parameters["runId"]),
+                ),
+            )
+        }
+
         post("/api/db/modules/{id}/save") {
             requireDatabaseMaintenanceIsInactive()
             val runtimeContext = currentRuntimeContext()

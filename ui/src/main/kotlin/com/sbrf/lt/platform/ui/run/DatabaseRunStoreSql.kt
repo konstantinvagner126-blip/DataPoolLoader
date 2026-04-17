@@ -294,4 +294,82 @@ internal object DatabaseRunStoreSql {
         order by mr.requested_at desc
         limit ?
         """.trimIndent()
+
+    fun loadRunDetails(schema: String): String =
+        """
+        select
+            mr.run_id::text as run_id,
+            mr.execution_snapshot_id::text as execution_snapshot_id,
+            mr.status as status,
+            mr.launch_source_kind as launch_source_kind,
+            mr.requested_at as requested_at,
+            mr.started_at as started_at,
+            mr.finished_at as finished_at,
+            mr.module_code_snapshot as module_code_snapshot,
+            mr.module_title_snapshot as module_title_snapshot,
+            mr.output_dir as output_dir,
+            mr.merged_row_count as merged_row_count,
+            mr.successful_source_count as successful_source_count,
+            mr.failed_source_count as failed_source_count,
+            mr.skipped_source_count as skipped_source_count,
+            mr.target_status as target_status,
+            mr.target_table_name as target_table_name,
+            mr.target_rows_loaded as target_rows_loaded,
+            mr.error_message as error_message,
+            mr.summary_json::text as summary_json
+        from $schema.module_run mr
+        join $schema.module m on m.module_id = mr.module_id
+        where m.module_code = ?
+          and mr.run_id = ?::uuid
+        """.trimIndent()
+
+    fun listRunSourceResults(schema: String): String =
+        """
+        select
+            run_source_result_id::text as run_source_result_id,
+            source_name,
+            sort_order,
+            status,
+            started_at,
+            finished_at,
+            exported_row_count,
+            merged_row_count,
+            error_message
+        from $schema.module_run_source_result
+        where run_id = ?::uuid
+        order by sort_order asc
+        """.trimIndent()
+
+    fun listRunEvents(schema: String): String =
+        """
+        select
+            run_event_id::text as run_event_id,
+            seq_no,
+            created_at,
+            stage,
+            event_type,
+            severity,
+            source_name,
+            message,
+            payload_json::text as payload_json
+        from $schema.module_run_event
+        where run_id = ?::uuid
+        order by seq_no asc
+        """.trimIndent()
+
+    fun listRunArtifacts(schema: String): String =
+        """
+        select
+            run_artifact_id::text as run_artifact_id,
+            artifact_kind,
+            artifact_key,
+            file_path,
+            storage_status,
+            file_size_bytes,
+            content_hash,
+            created_at
+        from $schema.module_run_artifact
+        where run_id = ?::uuid
+        order by artifact_kind asc, artifact_key asc
+        """.trimIndent()
 }
