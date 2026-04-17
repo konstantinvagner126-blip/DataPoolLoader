@@ -80,13 +80,31 @@ enum class ModuleEditorTab(
 data class ModuleEditorPageState(
     val loading: Boolean = true,
     val errorMessage: String? = null,
+    val successMessage: String? = null,
+    val actionInProgress: String? = null,
     val filesCatalog: FilesModulesCatalogResponse? = null,
     val databaseCatalog: DatabaseModulesCatalogResponse? = null,
     val selectedModuleId: String? = null,
     val session: ModuleEditorSessionResponse? = null,
     val activeTab: ModuleEditorTab = ModuleEditorTab.SETTINGS,
     val selectedSqlPath: String? = null,
+    val configTextDraft: String = "",
+    val sqlContentsDraft: Map<String, String> = emptyMap(),
+    val configFormState: ConfigFormStateDto? = null,
+    val configFormLoading: Boolean = false,
+    val configFormError: String? = null,
+    val configFormSourceText: String = "",
 ) {
     val modules: List<ModuleCatalogItem>
         get() = filesCatalog?.modules ?: databaseCatalog?.modules.orEmpty()
+
+    val hasDraftChanges: Boolean
+        get() {
+            val module = session?.module ?: return false
+            val persistedSql = module.sqlFiles.associate { it.path to it.content }
+            return configTextDraft != module.configText || sqlContentsDraft != persistedSql
+        }
+
+    val configFormNeedsSync: Boolean
+        get() = configTextDraft != configFormSourceText
 }

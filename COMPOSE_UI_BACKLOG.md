@@ -19,6 +19,50 @@
   - fallback-кандидат `CodeMirror`;
 - SQL-консоль не трогаем до конца миграции основных экранов.
 
+## Архитектурный вектор
+
+- текущий `ui-compose-web` остается рабочим web-front для миграции, но не считается конечной архитектурой;
+- целевая модель: `shared + web + future desktop`, а не углубление в web-only Compose-код;
+- browser-specific код должен оставаться только в web-слое:
+  - DOM composables;
+  - browser routing;
+  - `window.fetch`;
+  - `Monaco` JS bridge;
+  - `WebSocket` browser lifecycle;
+- все, что не обязано знать про browser, постепенно выносится в будущий shared-слой:
+  - screen models;
+  - state/store логика;
+  - route state модели;
+  - formatters;
+  - API contracts;
+  - use-case orchestration для экранов.
+
+## Кандидаты на перенос в будущий shared-слой
+
+В первую очередь:
+
+- `model/RuntimeModels.kt`
+- `home/HomePageState.kt`
+- `home/HomePageStore.kt`
+- `module_runs/ModuleRunsModels.kt`
+- `module_runs/ModuleRunsStore.kt`
+- `module_runs/ModuleRunsFilters.kt`
+- `module_runs/ModuleRunsSummary.kt`
+- `module_runs/ModuleRunsFormatters.kt`
+- `module_editor/ModuleEditorModels.kt`
+- `module_editor/ModuleEditorStore.kt`
+- `module_editor/ModuleEditorActions.kt`
+- `module_editor/ModuleEditorConfigFormDtos.kt`
+
+Оставить в web-слое:
+
+- `foundation/http/ComposeHttpClient.kt`
+- `foundation/updates/LiveUpdates.kt`
+- `foundation/component/MonacoEditorPane.kt`
+- `App.kt`
+- `Main.kt`
+- DOM-based page composables и route adapters.
+
 ## Definition of Done для экрана
 
 - экран доступен по отдельному Compose-route;
@@ -272,13 +316,32 @@
   - SQL catalog preview;
   - raw `application.yml`;
   - metadata и DB lifecycle summary.
+- `2026-04-18`: подключен первый embedded `Monaco` bridge в Compose editor shell:
+  - `application.yml` открывается в `Monaco`;
+  - выбранный SQL-ресурс открывается в `Monaco`;
+  - локальное редактирование `application.yml` и SQL уже работает внутри Compose-state без сохранения в backend;
+  - route и backend-контракты при этом не менялись.
+- `2026-04-18`: подключены первые реальные действия editor shell поверх текущих backend API:
+  - `FILES`: `Сохранить`, `Запустить`;
+  - `DB`: `Сохранить черновик`, `Опубликовать`, `Сбросить черновик`, `Запустить`;
+  - после успешных действий Compose-shell перезагружает session модуля и показывает feedback banner.
+- `2026-04-18`: вкладка `Настройки модуля` перестала быть заглушкой:
+  - Compose-форма теперь работает через те же `parse/apply` endpoint-ы `config-form`, что и production UI;
+  - поддержаны базовые секции:
+    - общие настройки;
+    - SQL по умолчанию;
+    - источники;
+    - квоты;
+    - целевая загрузка;
+  - изменение формы обновляет реальный `application.yml` внутри Compose editor shell;
+  - ручное редактирование YAML и форма синхронизируются через явное действие `Перечитать из application.yml`.
 
 Осталось:
 
 - довести visual parity shell до уровня production `index.html` / `db-modules.html`;
-- подключить реальные действия editor toolbar поэтапно;
-- заменить read-only preview вкладок `SQL` и `application.yml` на editor bridge;
-- перевести form-state для `Настройки модуля`.
+- добавить metadata form-state вместо текущего preview;
+- добавить `Новый модуль` и `Удалить модуль`;
+- после стабилизации editor shell начать вынос state/store слоя в будущий shared-модуль.
 
 ## Эпик 5. Импорт `files -> database`
 
@@ -318,7 +381,7 @@
 
 ## Ближайшие шаги
 
-1. Довести `compose-spike` до полного паритета с текущей главной страницей.
-2. Вынести общий Compose API/state foundation.
-3. Перевести общий экран `История и результаты`.
-4. Только потом заходить в editor shell.
+1. Довести visual parity editor shell до уровня production UI.
+2. Перевести metadata tab с preview на рабочую Compose-форму.
+3. Подключить `Новый модуль` и `Удалить модуль`.
+4. После стабилизации editor shell начать декомпозицию на `shared + web`.

@@ -10,8 +10,10 @@ import androidx.compose.runtime.setValue
 import com.sbrf.lt.platform.composeui.foundation.component.AlertBanner
 import com.sbrf.lt.platform.composeui.foundation.component.EmptyStateCard
 import com.sbrf.lt.platform.composeui.foundation.component.LoadingStateCard
+import com.sbrf.lt.platform.composeui.foundation.component.MonacoEditorPane
 import com.sbrf.lt.platform.composeui.foundation.component.PageScaffold
 import com.sbrf.lt.platform.composeui.foundation.dom.classes
+import kotlinx.browser.window
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.web.attributes.disabled
 import org.jetbrains.compose.web.attributes.href
@@ -55,6 +57,9 @@ fun ComposeModuleEditorPage(
         content = {
             if (state.errorMessage != null) {
                 AlertBanner(state.errorMessage ?: "", "warning")
+            }
+            if (state.successMessage != null) {
+                AlertBanner(state.successMessage ?: "", "success")
             }
 
             Div({ classes("row", "g-4") }) {
@@ -144,6 +149,42 @@ fun ComposeModuleEditorPage(
                             route = route,
                             state = state,
                             onTabSelect = { tab -> state = store.selectTab(state, tab) },
+                            onRun = {
+                                scope.launch {
+                                    state = store.beginAction(state, "run")
+                                    state = if (route.storage == "database") {
+                                        store.runDatabaseModule(state)
+                                    } else {
+                                        store.runFilesModule(state)
+                                    }
+                                }
+                            },
+                            onSave = {
+                                scope.launch {
+                                    state = store.beginAction(state, "save")
+                                    state = if (route.storage == "database") {
+                                        store.saveDatabaseWorkingCopy(state, route)
+                                    } else {
+                                        store.saveFilesModule(state, route)
+                                    }
+                                }
+                            },
+                            onDiscardWorkingCopy = {
+                                if (window.confirm("Сбросить личный черновик? Несохраненные изменения будут потеряны.")) {
+                                    scope.launch {
+                                        state = store.beginAction(state, "discard")
+                                        state = store.discardDatabaseWorkingCopy(state, route)
+                                    }
+                                }
+                            },
+                            onPublishWorkingCopy = {
+                                if (window.confirm("Опубликовать черновик как новую ревизию? После публикации личный черновик будет удален.")) {
+                                    scope.launch {
+                                        state = store.beginAction(state, "publish")
+                                        state = store.publishDatabaseWorkingCopy(state, route)
+                                    }
+                                }
+                            },
                         )
 
                         ValidationAlert(session)
@@ -154,13 +195,33 @@ fun ComposeModuleEditorPage(
                         )
 
                         when (state.activeTab) {
-                            ModuleEditorTab.SETTINGS -> SettingsPreview(session)
+                            ModuleEditorTab.SETTINGS -> ModuleEditorSettingsForm(
+                                storageMode = route.storage,
+                                state = state,
+                                module = session.module,
+                                onRefreshFromConfig = {
+                                    scope.launch {
+                                        state = store.startConfigFormSync(state)
+                                        state = store.syncConfigFormFromConfigDraft(state)
+                                    }
+                                },
+                                onApplyFormState = { nextFormState ->
+                                    scope.launch {
+                                        state = store.startConfigFormSync(state)
+                                        state = store.applyConfigForm(state, nextFormState)
+                                    }
+                                },
+                            )
                             ModuleEditorTab.SQL -> SqlPreview(
-                                session = session,
+                                state = state,
                                 selectedSqlPath = selectedSql?.path,
                                 onSelectSql = { path -> state = store.selectSqlResource(state, path) },
+                                onSqlChange = { path, value -> state = store.updateSqlText(state, path, value) },
                             )
-                            ModuleEditorTab.CONFIG -> ConfigPreview(session)
+                            ModuleEditorTab.CONFIG -> ConfigPreview(
+                                configText = state.configTextDraft,
+                                onConfigChange = { value -> state = store.updateConfigText(state, value) },
+                            )
                             ModuleEditorTab.META -> MetadataPreview(session)
                         }
                     }
@@ -205,10 +266,15 @@ private fun EditorShellHeader(
     route: ModuleEditorRouteState,
     state: ModuleEditorPageState,
     onTabSelect: (ModuleEditorTab) -> Unit,
+    onRun: () -> Unit,
+    onSave: () -> Unit,
+    onDiscardWorkingCopy: () -> Unit,
+    onPublishWorkingCopy: () -> Unit,
 ) {
     val session = requireNotNull(state.session)
     val module = session.module
     val capabilities = session.capabilities
+    val actionBusy = state.actionInProgress != null
 
     Div({ classes("panel", "mb-4") }) {
         Div({ classes("d-flex", "flex-wrap", "align-items-center", "justify-content-between", "gap-3") }) {
@@ -246,7 +312,7 @@ private fun EditorShellHeader(
                     Div({ classes("module-editor-toolbar-row") }) {
                         Div({ classes("module-editor-toolbar-group", "module-editor-toolbar-group-primary") }) {
                             Div({ classes("module-editor-toolbar-group-label") }) { Text("Выполнение") }
-                            EditorActionButton("Запустить", capabilities.run, true)
+                            EditorActionButton("Запустить", capabilities.run && !actionBusy, true, onRun)
                             A(attrs = {
                                 classes(
                                     "btn",
@@ -262,20 +328,20 @@ private fun EditorShellHeader(
                         }
                         Div({ classes("module-editor-toolbar-group", "module-editor-toolbar-group-draft") }) {
                             Div({ classes("module-editor-toolbar-group-label") }) { Text("Личный черновик") }
-                            EditorActionButton("Сохранить черновик", capabilities.saveWorkingCopy)
-                            EditorActionButton("Опубликовать", capabilities.publish, true)
-                            EditorActionButton("Сбросить черновик", capabilities.discardWorkingCopy)
+                            EditorActionButton("Сохранить черновик", capabilities.saveWorkingCopy && !actionBusy, false, onSave)
+                            EditorActionButton("Опубликовать", capabilities.publish && !actionBusy && !state.hasDraftChanges, true, onPublishWorkingCopy)
+                            EditorActionButton("Сбросить черновик", capabilities.discardWorkingCopy && !actionBusy, false, onDiscardWorkingCopy)
                         }
                         Div({ classes("module-editor-toolbar-group", "module-editor-toolbar-group-secondary") }) {
                             Div({ classes("module-editor-toolbar-group-label") }) { Text("Редактор") }
-                            EditorActionButton("Отменить изменения", false)
+                            EditorActionButton("Отменить изменения", false, false) {}
                         }
                     }
                     Div({ classes("module-editor-toolbar-row") }) {
                         Div({ classes("module-editor-toolbar-group", "module-editor-toolbar-group-admin") }) {
                             Div({ classes("module-editor-toolbar-group-label") }) { Text("Администрирование") }
-                            EditorActionButton("Новый модуль", capabilities.createModule)
-                            EditorActionButton("Удалить модуль", capabilities.deleteModule)
+                            EditorActionButton("Новый модуль", capabilities.createModule && !actionBusy, false) {}
+                            EditorActionButton("Удалить модуль", capabilities.deleteModule && !actionBusy, false) {}
                             A(attrs = {
                                 classes("btn", "btn-outline-secondary")
                                 href("/db-sync")
@@ -285,8 +351,8 @@ private fun EditorShellHeader(
                 }
             } else {
                 Div({ classes("d-flex", "flex-wrap", "gap-2") }) {
-                    EditorActionButton("Отменить изменения", false)
-                    EditorActionButton("Сохранить", capabilities.save)
+                    EditorActionButton("Отменить изменения", false, false) {}
+                    EditorActionButton("Сохранить", capabilities.save && !actionBusy, false, onSave)
                     A(attrs = {
                         classes(
                             "btn",
@@ -299,7 +365,7 @@ private fun EditorShellHeader(
                             attr("aria-disabled", "true")
                         }
                     }) { Text("История и результаты") }
-                    EditorActionButton("Запустить", capabilities.run, true)
+                    EditorActionButton("Запустить", capabilities.run && !actionBusy, true, onRun)
                 }
             }
         }
@@ -363,44 +429,24 @@ private fun TabNavigation(
 }
 
 @Composable
-private fun SettingsPreview(session: ModuleEditorSessionResponse) {
-    val module = session.module
-    Div({ classes("panel") }) {
-        Div({ classes("config-form-note", "text-secondary", "small", "mb-3") }) {
-            Text("Это первый Compose-shell для редактора. Здесь пока read-only preview без form-state и Monaco bridge.")
-        }
-        Div({ classes("module-metadata-grid") }) {
-            PreviewCard("Credentials") {
-                MetadataRow("Режим", module.credentialsStatus.mode)
-                MetadataRow("Источник", module.credentialsStatus.displayName)
-                MetadataRow("Файл доступен", if (module.credentialsStatus.fileAvailable) "Да" else "Нет")
-                MetadataRow("Загружен через UI", if (module.credentialsStatus.uploaded) "Да" else "Нет")
-                MetadataRow("Требуются credentials", if (module.requiresCredentials) "Да" else "Нет")
-                MetadataRow("Готово к запуску", if (module.credentialsReady) "Да" else "Нет")
-            }
-            PreviewCard("Плейсхолдеры") {
-                MetadataRow("Требуемые ключи", module.requiredCredentialKeys.joinToString(", ").ifBlank { "-" })
-                MetadataRow("Отсутствующие ключи", module.missingCredentialKeys.joinToString(", ").ifBlank { "-" })
-                MetadataRow("Путь config", module.configPath)
-            }
-        }
-    }
-}
-
-@Composable
 private fun SqlPreview(
-    session: ModuleEditorSessionResponse,
+    state: ModuleEditorPageState,
     selectedSqlPath: String?,
     onSelectSql: (String) -> Unit,
+    onSqlChange: (String, String) -> Unit,
 ) {
+    val session = requireNotNull(state.session)
     val selectedSql = session.module.sqlFiles.firstOrNull { it.path == selectedSqlPath } ?: session.module.sqlFiles.firstOrNull()
+    val selectedSqlContent = selectedSql?.let { sqlFile ->
+        state.sqlContentsDraft[sqlFile.path] ?: sqlFile.content
+    } ?: "-- SQL-ресурс не выбран"
     Div({ classes("panel") }) {
         Div({ classes("sql-catalog-layout") }) {
             Div({ classes("sql-catalog-sidebar") }) {
                 Div({ classes("sql-catalog-toolbar") }) {
                     Div {
                         Div({ classes("sql-catalog-title") }) { Text("Каталог SQL-ресурсов") }
-                        Div({ classes("sql-catalog-note") }) { Text("На этом шаге Compose показывает read-only preview SQL-ресурсов.") }
+                        Div({ classes("sql-catalog-note") }) { Text("SQL-ресурсы уже открываются в Monaco. Сохранение в backend будет подключено следующим этапом.") }
                     }
                 }
                 Div({ classes("sql-catalog-list") }) {
@@ -429,25 +475,44 @@ private fun SqlPreview(
                         Text(selectedSql?.path ?: "-")
                     }
                     Div({ classes("sql-catalog-resource-usage") }) {
+                        Span({ classes("sql-resource-usage-badge") }) {
+                            Text("Monaco")
+                        }
                         Span({ classes("sql-resource-usage-badge", "sql-resource-usage-badge-muted") }) {
-                            Text("Monaco bridge будет подключен на следующем этапе")
+                            Text("Локальное редактирование")
                         }
                     }
                 }
-                Pre({ classes("editor-frame", "p-3", "bg-light", "border", "rounded-3", "mb-0") }) {
-                    Text(selectedSql?.content ?: "-- SQL-ресурс не выбран")
-                }
+                MonacoEditorPane(
+                    instanceKey = "module-editor-sql-${selectedSql?.path ?: "empty"}",
+                    language = "sql",
+                    value = selectedSqlContent,
+                    readOnly = selectedSql == null,
+                    onValueChange = { nextValue ->
+                        val path = selectedSql?.path ?: return@MonacoEditorPane
+                        onSqlChange(path, nextValue)
+                    },
+                )
             }
         }
     }
 }
 
 @Composable
-private fun ConfigPreview(session: ModuleEditorSessionResponse) {
+private fun ConfigPreview(
+    configText: String,
+    onConfigChange: (String) -> Unit,
+) {
     Div({ classes("panel") }) {
-        Pre({ classes("editor-frame", "p-3", "bg-light", "border", "rounded-3", "mb-0") }) {
-            Text(session.module.configText)
+        Div({ classes("config-form-note", "text-secondary", "small", "mb-3") }) {
+            Text("Редактор application.yml уже работает через Monaco. Изменения пока живут локально в Compose-shell.")
         }
+        MonacoEditorPane(
+            instanceKey = "module-editor-config",
+            language = "yaml",
+            value = configText,
+            onValueChange = onConfigChange,
+        )
     }
 }
 
@@ -465,10 +530,10 @@ private fun MetadataPreview(session: ModuleEditorSessionResponse) {
             }
             PreviewCard("DB lifecycle") {
                 MetadataRow("Источник", translateSourceKind(session.sourceKind))
-                MetadataRow("Current revision", session.currentRevisionId ?: "-")
-                MetadataRow("Working copy", session.workingCopyId ?: "-")
+                MetadataRow("Текущая ревизия", session.currentRevisionId ?: "-")
+                MetadataRow("Личный черновик", session.workingCopyId ?: "-")
                 MetadataRow("Статус черновика", session.workingCopyStatus ?: "-")
-                MetadataRow("Base revision", session.baseRevisionId ?: "-")
+                MetadataRow("Базовая ревизия", session.baseRevisionId ?: "-")
             }
         }
     }
@@ -503,6 +568,7 @@ private fun EditorActionButton(
     label: String,
     enabled: Boolean,
     primary: Boolean = false,
+    onClick: () -> Unit,
 ) {
     Button(attrs = {
         classes("btn", if (primary) "btn-success" else "btn-outline-secondary")
@@ -510,6 +576,9 @@ private fun EditorActionButton(
             disabled()
         }
         attr("type", "button")
+        if (enabled) {
+            onClick { onClick() }
+        }
     }) {
         Text(label)
     }

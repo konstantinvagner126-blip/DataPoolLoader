@@ -58,4 +58,22 @@ class ComposeHttpClient(
         }
         return jsonCodec.decodeFromString(deserializer, text)
     }
+
+    suspend fun <T> delete(
+        path: String,
+        deserializer: KSerializer<T>,
+    ): T {
+        val response = window.fetch(
+            input = "$baseUrl$path",
+            init = RequestInit(
+                method = "DELETE",
+                headers = json("Content-Type" to "application/json"),
+            ),
+        ).await()
+        val text = response.text().await()
+        if (!response.ok) {
+            error(text.ifBlank { "HTTP ${response.status.toInt()} для $path" })
+        }
+        return jsonCodec.decodeFromString(deserializer, text)
+    }
 }
