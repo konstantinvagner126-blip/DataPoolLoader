@@ -6,6 +6,24 @@ val packagedAppName = "LoadTestingDataPlatform"
 
 version = rootProject.version
 
+sourceSets {
+    main {
+        resources.srcDir(layout.buildDirectory.dir("generated/composeSpikeResources"))
+    }
+}
+
+val syncComposeSpikeAssets by tasks.registering(Sync::class) {
+    group = "build"
+    description = "Копирует собранный Compose Web spike в ресурсы UI"
+    dependsOn(":ui-compose-web:exportComposeSpike")
+    from(project(":ui-compose-web").layout.buildDirectory.dir("exportedComposeSpike"))
+    into(layout.buildDirectory.dir("generated/composeSpikeResources/static/compose-spike"))
+}
+
+tasks.named("processResources") {
+    dependsOn(syncComposeSpikeAssets)
+}
+
 dependencies {
     implementation(project(":core"))
     implementation("org.flywaydb:flyway-core:10.20.1")

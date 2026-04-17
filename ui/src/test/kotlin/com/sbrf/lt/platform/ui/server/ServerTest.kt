@@ -274,6 +274,27 @@ class ServerTest {
         assertTrue(homeHtml.contains("SQL-консоль"))
         assertTrue(homeHtml.contains("Справка"))
 
+        val noRedirectClient = createClient {
+            followRedirects = false
+        }
+        val composeSpikeRedirect = noRedirectClient.get("/compose-spike")
+        assertEquals(HttpStatusCode.Found, composeSpikeRedirect.status)
+        assertEquals("/static/compose-spike/index.html", composeSpikeRedirect.headers[HttpHeaders.Location])
+
+        val composeRunsRedirect = noRedirectClient.get("/compose-runs?storage=files&module=demo-app")
+        assertEquals(HttpStatusCode.Found, composeRunsRedirect.status)
+        assertEquals(
+            "/static/compose-spike/index.html?screen=module-runs&storage=files&module=demo-app",
+            composeRunsRedirect.headers[HttpHeaders.Location]
+        )
+
+        val composeEditorRedirect = noRedirectClient.get("/compose-editor?storage=files&module=demo-app")
+        assertEquals(HttpStatusCode.Found, composeEditorRedirect.status)
+        assertEquals(
+            "/static/compose-spike/index.html?screen=module-editor&storage=files&module=demo-app",
+            composeEditorRedirect.headers[HttpHeaders.Location]
+        )
+
         val html = client.get("/modules").bodyAsText()
         assertTrue(html.contains("Редактор модуля"))
 
@@ -781,6 +802,64 @@ class ServerTest {
 
         assertEquals(HttpStatusCode.Found, response.status)
         assertEquals("/?modeAccessError=db-modules", response.headers[HttpHeaders.Location])
+    }
+
+    @Test
+    fun `compose runs route redirects to compose bundle with module runs screen`() = testApplication {
+        val noRedirectClient = createClient {
+            followRedirects = false
+        }
+        val uiConfig = UiAppConfig(
+            storageDir = Files.createTempDirectory("ui-compose-runs-route-state-").toString(),
+            moduleStore = UiModuleStoreConfig(mode = UiModuleStoreMode.FILES),
+            sqlConsole = SqlConsoleConfig(),
+        )
+        application {
+            uiModule(
+                uiConfig = uiConfig,
+                runtimeContextService = object : UiRuntimeContextService() {
+                    override fun resolve(uiConfig: UiAppConfig): UiRuntimeContext =
+                        testRuntimeContext(UiModuleStoreMode.FILES)
+                },
+            )
+        }
+
+        val response = noRedirectClient.get("/compose-runs?storage=files&module=demo-app")
+
+        assertEquals(HttpStatusCode.Found, response.status)
+        assertEquals(
+            "/static/compose-spike/index.html?screen=module-runs&storage=files&module=demo-app",
+            response.headers[HttpHeaders.Location],
+        )
+    }
+
+    @Test
+    fun `compose editor route redirects to compose bundle with editor screen`() = testApplication {
+        val noRedirectClient = createClient {
+            followRedirects = false
+        }
+        val uiConfig = UiAppConfig(
+            storageDir = Files.createTempDirectory("ui-compose-editor-route-state-").toString(),
+            moduleStore = UiModuleStoreConfig(mode = UiModuleStoreMode.FILES),
+            sqlConsole = SqlConsoleConfig(),
+        )
+        application {
+            uiModule(
+                uiConfig = uiConfig,
+                runtimeContextService = object : UiRuntimeContextService() {
+                    override fun resolve(uiConfig: UiAppConfig): UiRuntimeContext =
+                        testRuntimeContext(UiModuleStoreMode.FILES)
+                },
+            )
+        }
+
+        val response = noRedirectClient.get("/compose-editor?storage=files&module=demo-app")
+
+        assertEquals(HttpStatusCode.Found, response.status)
+        assertEquals(
+            "/static/compose-spike/index.html?screen=module-editor&storage=files&module=demo-app",
+            response.headers[HttpHeaders.Location],
+        )
     }
 
     @Test

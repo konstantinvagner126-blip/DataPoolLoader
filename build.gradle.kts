@@ -7,6 +7,10 @@ apply(from = "repositories.gradle")
 
 plugins {
     kotlin("jvm") version "2.2.0" apply false
+    kotlin("multiplatform") version "2.2.0" apply false
+    kotlin("plugin.compose") version "2.2.0" apply false
+    kotlin("plugin.serialization") version "2.2.0" apply false
+    id("org.jetbrains.compose") version "1.8.2" apply false
     id("org.jetbrains.kotlinx.kover") version "0.9.1"
 }
 
@@ -14,6 +18,10 @@ group = "com.sbrf.lt.datapool"
 version = "1.0.0"
 
 subprojects {
+    if (path == ":ui-compose-web") {
+        return@subprojects
+    }
+
     apply(plugin = "org.jetbrains.kotlin.jvm")
     apply(plugin = "org.jetbrains.kotlinx.kover")
 

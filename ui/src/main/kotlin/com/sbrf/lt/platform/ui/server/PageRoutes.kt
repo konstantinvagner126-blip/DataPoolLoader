@@ -2,6 +2,7 @@ package com.sbrf.lt.platform.ui.server
 
 import com.sbrf.lt.platform.ui.config.UiModuleStoreMode
 import io.ktor.http.ContentType
+import io.ktor.http.formUrlEncode
 import io.ktor.server.application.call
 import io.ktor.server.http.content.staticResources
 import io.ktor.server.response.respondRedirect
@@ -29,6 +30,19 @@ internal fun Route.registerPageRoutes(context: UiServerContext) {
     }
     get("/help/api") {
         call.respondText(loadStaticText("static/help-api.html"), ContentType.Text.Html)
+    }
+    get("/compose-spike") {
+        call.respondRedirect("/static/compose-spike/index.html", permanent = false)
+    }
+    get("/compose-runs") {
+        val query = call.request.queryParameters.formUrlEncode()
+        val suffix = if (query.isBlank()) "" else "&$query"
+        call.respondRedirect("/static/compose-spike/index.html?screen=module-runs$suffix", permanent = false)
+    }
+    get("/compose-editor") {
+        val query = call.request.queryParameters.formUrlEncode()
+        val suffix = if (query.isBlank()) "" else "&$query"
+        call.respondRedirect("/static/compose-spike/index.html?screen=module-editor$suffix", permanent = false)
     }
     get("/module-runs") {
         when (call.request.queryParameters["storage"]?.lowercase()) {

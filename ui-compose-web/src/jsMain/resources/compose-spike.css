@@ -1,0 +1,25 @@
+body {
+  min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.compose-home-root {
+  box-sizing: border-box;
+}
+
+.compose-home-root .home-card,
+.compose-home-root .home-group-card,
+.compose-home-root .hero-card {
+  box-sizing: border-box;
+}
+
+.compose-home-root .db-mode-indicator {
+  display: block;
+}
+
+.compose-home-root .home-card[aria-disabled="true"] {
+  user-select: none;
+}
