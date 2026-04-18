@@ -16,6 +16,13 @@ import com.sbrf.lt.platform.composeui.foundation.dom.classes
 import com.sbrf.lt.platform.composeui.foundation.http.ComposeHttpClient
 import com.sbrf.lt.platform.composeui.foundation.updates.PollingEffect
 import com.sbrf.lt.platform.composeui.model.CredentialsStatusResponse
+import com.sbrf.lt.platform.composeui.sql_console.buildConnectionCheckStatusText
+import com.sbrf.lt.platform.composeui.sql_console.buildConsoleInfoText
+import com.sbrf.lt.platform.composeui.sql_console.buildCredentialsStatusText
+import com.sbrf.lt.platform.composeui.sql_console.runButtonTone
+import com.sbrf.lt.platform.composeui.sql_console.sourceStatusSuffix
+import com.sbrf.lt.platform.composeui.sql_console.sourceStatusTone
+import com.sbrf.lt.platform.composeui.sql_console.translateSourceStatus
 import kotlinx.browser.window
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -72,6 +79,7 @@ fun ComposeSqlConsolePage(
     val statementAnalysis = analyzeSqlStatement(state.draftSql)
     val isRunning = currentExecution?.status.equals("RUNNING", ignoreCase = true)
     val runButtonClass = buildRunButtonClass(statementAnalysis, state.strictSafetyEnabled)
+    val connectionStatusBySource = state.connectionCheck?.sourceResults?.associateBy { it.sourceName }.orEmpty()
     val activeExportShard = currentResult
         ?.takeIf { it.statementType == "RESULT_SET" }
         ?.shardResults
@@ -138,7 +146,7 @@ fun ComposeSqlConsolePage(
             Div({ classes("hero-actions", "mb-3") }) {
                 A(attrs = {
                     classes("btn", "btn-outline-secondary")
-                    href("/compose-spike")
+                    href("/")
                 }) { Text("На главную") }
                 Button(attrs = {
                     classes("btn", "btn-dark")
@@ -162,6 +170,11 @@ fun ComposeSqlConsolePage(
                 LoadingStateCard(title = "SQL-консоль", text = "Конфигурация SQL-консоли загружается.")
                 return@PageScaffold
             }
+
+            SqlConsoleOverviewStrip(
+                state = state,
+                connectionStatusText = state.connectionCheck?.let(::buildConnectionCheckStatusText),
+            )
 
             Div({ classes("row", "g-4") }) {
                 Div({ classes("col-12", "col-xl-3") }) {
@@ -232,9 +245,6 @@ fun ComposeSqlConsolePage(
                             Div({ classes("small", "text-secondary", "mt-2") }) {
                                 Text(buildConnectionCheckStatusText(connectionCheck))
                             }
-                            Div({ classes("mt-4") }) {
-                                ConnectionStatusList(connectionCheck)
-                            }
                         } ?: Div({ classes("small", "text-secondary", "mt-2") }) {
                             Text("Проверка подключений еще не выполнялась.")
                         }
@@ -243,19 +253,38 @@ fun ComposeSqlConsolePage(
                         }
                         Div({ classes("mt-3", "sql-source-selection") }) {
                             state.info?.sourceNames?.forEach { sourceName ->
-                                Label(attrs = { classes("config-form-check", "mb-2") }) {
+                                val sourceStatus = connectionStatusBySource[sourceName]
+                                val selected = sourceName in state.selectedSourceNames
+                                Label(attrs = {
+                                    classes("sql-source-checkbox", sourceStatusCardClass(sourceStatus))
+                                    if (selected) {
+                                        classes("sql-source-checkbox-selected")
+                                    }
+                                }) {
                                     Input(type = InputType.Checkbox, attrs = {
-                                        classes("form-check-input")
-                                        if (sourceName in state.selectedSourceNames) {
+                                        if (selected) {
                                             attr("checked", "checked")
                                         }
                                         onClick {
-                                            val selected = sourceName !in state.selectedSourceNames
-                                            state = store.updateSelectedSources(state, sourceName, selected)
+                                            state = store.updateSelectedSources(state, sourceName, !selected)
                                         }
                                     })
-                                    Span({ classes("form-check-label") }) {
-                                        Text(sourceName)
+                                    Div({ classes("sql-source-checkbox-body") }) {
+                                        Div({ classes("sql-source-checkbox-head") }) {
+                                            Span({ classes("sql-source-checkbox-name") }) {
+                                                Text(sourceName)
+                                            }
+                                            Span({ classes("sql-source-checkbox-status") }) {
+                                                Text(sourceStatus?.let { translateSourceStatus(it.status) } ?: "Не проверено")
+                                            }
+                                        }
+                                        Div({ classes("sql-source-checkbox-message") }) {
+                                            Text(
+                                                sourceStatus?.errorMessage
+                                                    ?: sourceStatus?.message
+                                                    ?: "Подключение еще не проверялось. Выбери source и запусти проверку.",
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -503,6 +532,59 @@ fun ComposeSqlConsolePage(
             }
         },
     )
+}
+
+@Composable
+private fun SqlConsoleOverviewStrip(
+    state: SqlConsolePageState,
+    connectionStatusText: String?,
+) {
+    val execution = state.currentExecution
+    val selectedSourcesCount = state.selectedSourceNames.size
+    val executionLabel = when {
+        execution == null -> "Запусков еще не было"
+        execution.status.equals("RUNNING", ignoreCase = true) -> "Выполняется"
+        execution.status.equals("SUCCESS", ignoreCase = true) -> "Успешно"
+        execution.status.equals("FAILED", ignoreCase = true) -> "Ошибка"
+        execution.status.equals("CANCELLED", ignoreCase = true) -> "Остановлен"
+        else -> execution.status
+    }
+    val safetyLabel = if (state.strictSafetyEnabled) "Только read-only" else "Разрешены mutating SQL"
+
+    Div({ classes("sql-console-overview-grid", "mb-4") }) {
+        SqlConsoleOverviewCard(
+            label = "Выбрано sources",
+            value = selectedSourcesCount.toString(),
+            note = state.selectedSourceNames.joinToString(", ").ifBlank { "Ни один источник пока не выбран." },
+        )
+        SqlConsoleOverviewCard(
+            label = "Guardrail",
+            value = safetyLabel,
+            note = if (state.strictSafetyEnabled) {
+                "Опасные и mutating-команды будут блокироваться до отключения строгой защиты."
+            } else {
+                "UI предупреждает о mutating и dangerous SQL, но не блокирует их автоматически."
+            },
+        )
+        SqlConsoleOverviewCard(
+            label = "Последний запуск",
+            value = executionLabel,
+            note = connectionStatusText ?: "Проверка подключений еще не выполнялась.",
+        )
+    }
+}
+
+@Composable
+private fun SqlConsoleOverviewCard(
+    label: String,
+    value: String,
+    note: String,
+) {
+    Div({ classes("sql-console-overview-card") }) {
+        Div({ classes("sync-overview-label") }) { Text(label) }
+        Div({ classes("sync-overview-value") }) { Text(value) }
+        Div({ classes("sync-overview-note") }) { Text(note) }
+    }
 }
 
 @Composable
@@ -1036,31 +1118,6 @@ private fun StatusResultPane(
 }
 
 @Composable
-private fun ConnectionStatusList(result: SqlConsoleConnectionCheckResponse) {
-    Div {
-        Div({ classes("small", "text-secondary", "mb-2") }) {
-            Text(if (result.configured) "Последняя проверка подключений:" else "SQL-консоль не настроена.")
-        }
-        Ul({ classes("list-unstyled", "mb-0") }) {
-            result.sourceResults.forEach { source ->
-                Li({ classes("mb-2") }) {
-                    Div({ classes("d-flex", "align-items-start", "justify-content-between", "gap-2") }) {
-                        Div {
-                            Div { Text(source.sourceName) }
-                            val details = source.errorMessage ?: source.message
-                            if (!details.isNullOrBlank()) {
-                                Div({ classes("small", "text-secondary") }) { Text(details) }
-                            }
-                        }
-                        StatusBadge(source.status)
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
 private fun StatusBadge(status: String) {
     val cssClass = "status-badge status-${statusCssSuffix(status)}"
     Span({ classes(*cssClass.split(" ").toTypedArray()) }) {
@@ -1081,47 +1138,18 @@ private fun buildConnectionCheckStatusText(result: SqlConsoleConnectionCheckResp
     return "Проверка подключений завершена. Успешно: $success, с ошибкой: $failed."
 }
 
+private fun sourceStatusCardClass(status: SqlConsoleSourceConnectionStatus?): String =
+    "sql-source-checkbox-${sourceStatusTone(status)}"
+
 private fun Boolean?.orFalse(): Boolean = this == true
 
 private fun buildRunButtonClass(
     analysis: SqlStatementAnalysis,
     strictSafetyEnabled: Boolean,
-): String =
-    when {
-        analysis.keyword == "SQL" -> "btn-primary"
-        strictSafetyEnabled && !analysis.readOnly -> "btn-danger"
-        analysis.dangerous -> "btn-danger"
-        !analysis.readOnly -> "btn-warning"
-        else -> "btn-primary"
-    }
-
-private fun translateSourceStatus(status: String): String =
-    when {
-        status.equals("SUCCESS", ignoreCase = true) || status.equals("OK", ignoreCase = true) -> "Успешно"
-        status.equals("FAILED", ignoreCase = true) || status.equals("ERROR", ignoreCase = true) -> "Ошибка"
-        status.equals("RUNNING", ignoreCase = true) -> "Выполняется"
-        status.equals("SUCCESS_WITH_WARNINGS", ignoreCase = true) -> "С предупреждениями"
-        else -> status
-    }
+): String = "btn-${runButtonTone(analysis, strictSafetyEnabled)}"
 
 private fun statusCssSuffix(status: String): String =
-    when {
-        status.equals("SUCCESS", ignoreCase = true) || status.equals("OK", ignoreCase = true) -> "success"
-        status.equals("FAILED", ignoreCase = true) || status.equals("ERROR", ignoreCase = true) -> "failed"
-        status.equals("RUNNING", ignoreCase = true) -> "running"
-        status.equals("SUCCESS_WITH_WARNINGS", ignoreCase = true) -> "success_with_warnings"
-        else -> "not_enabled"
-    }
-
-private fun buildCredentialsStatusText(status: CredentialsStatusResponse): String {
-    val sourceLabel = when {
-        status.uploaded -> "загружен через UI"
-        status.mode.equals("FILE", ignoreCase = true) -> "файл по умолчанию"
-        else -> "файл не задан"
-    }
-    val availability = if (status.fileAvailable) "доступен" else "не найден"
-    return "$sourceLabel: ${status.displayName} ($availability)"
-}
+    sourceStatusSuffix(status)
 
 private suspend fun loadCredentialsStatus(
     httpClient: ComposeHttpClient,

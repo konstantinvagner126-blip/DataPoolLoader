@@ -23,7 +23,14 @@ import com.sbrf.lt.platform.composeui.foundation.http.ComposeHttpClient
 import com.sbrf.lt.platform.composeui.foundation.updates.PollingEffect
 import com.sbrf.lt.platform.composeui.foundation.updates.WebSocketEffect
 import com.sbrf.lt.platform.composeui.model.CredentialsStatusResponse
+import com.sbrf.lt.platform.composeui.module_editor.buildCatalogStatus
+import com.sbrf.lt.platform.composeui.module_editor.buildCredentialsStatusText
+import com.sbrf.lt.platform.composeui.module_editor.buildCredentialsWarningText
+import com.sbrf.lt.platform.composeui.module_editor.buildDraftStatusText
+import com.sbrf.lt.platform.composeui.module_editor.translateSourceKind
+import com.sbrf.lt.platform.composeui.module_editor.translateValidationStatus
 import kotlinx.browser.window
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.web.attributes.disabled
 import org.jetbrains.compose.web.attributes.href
@@ -68,17 +75,19 @@ fun ComposeModuleEditorPage(
             api = api,
             syncRoute = { storage, moduleId, includeHidden ->
                 val query = buildString {
-                    append("?storage=")
-                    append(storage)
+                    var separator = '?'
                     if (!moduleId.isNullOrBlank()) {
-                        append("&module=")
+                        append(separator)
+                        append("module=")
                         append(moduleId)
+                        separator = '&'
                     }
-                    if (includeHidden) {
-                        append("&includeHidden=true")
+                    if (storage == "database" && includeHidden) {
+                        append(separator)
+                        append("includeHidden=true")
                     }
                 }
-                window.history.replaceState(null, "", "/compose-editor$query")
+                window.history.replaceState(null, "", buildPrimaryEditorUrl(storage, query))
             },
         )
     }
@@ -96,6 +105,23 @@ fun ComposeModuleEditorPage(
     var credentialsUploadMessageLevel by remember(route.storage, route.moduleId) { mutableStateOf("success") }
     var credentialsUploadInProgress by remember(route.storage, route.moduleId) { mutableStateOf(false) }
 
+    suspend fun refreshEditorRunPanel(moduleId: String) {
+        if (runPanelRefreshInProgress) {
+            return
+        }
+        runPanelRefreshInProgress = true
+        try {
+            val routeState = ModuleRunsRouteState(currentRoute.storage, moduleId)
+            runPanelState = if (runPanelState.history == null) {
+                runsStore.load(route = routeState, historyLimit = runPanelState.historyLimit)
+            } else {
+                runsStore.reloadHistory(current = runPanelState, route = routeState)
+            }
+        } finally {
+            runPanelRefreshInProgress = false
+        }
+    }
+
     LaunchedEffect(currentRoute.storage, currentRoute.moduleId, currentRoute.includeHidden, currentRoute.openCreateDialog) {
         state = store.startLoading(state)
         val loadedState = store.load(currentRoute)
@@ -112,6 +138,13 @@ fun ComposeModuleEditorPage(
             store.openCreateModuleDialog(loadedState)
         } else {
             loadedState
+        }
+    }
+
+    LaunchedEffect(state.successMessage) {
+        if (!state.successMessage.isNullOrBlank()) {
+            delay(5_000)
+            state = store.clearSuccessMessage(state)
         }
     }
 
@@ -186,6 +219,21 @@ fun ComposeModuleEditorPage(
         } else {
             "Выбери модуль, поправь YAML и SQL, затем запусти выгрузку прямо из браузера."
         },
+        heroHeader = {
+            Div({ classes("hero-actions", "mb-3") }) {
+                A(attrs = {
+                    classes("btn", "btn-outline-secondary")
+                    href("/")
+                }) { Text("На главную") }
+                Button(attrs = {
+                    classes("btn", "btn-dark")
+                    attr("type", "button")
+                    disabled()
+                }) {
+                    Text(if (currentRoute.storage == "database") "Модули из базы данных" else "Модули")
+                }
+            }
+        },
         content = {
             if (state.errorMessage != null) {
                 AlertBanner(state.errorMessage ?: "", "warning")
@@ -199,14 +247,6 @@ fun ComposeModuleEditorPage(
             Div({ classes("row", "g-4") }) {
                 Div({ classes("col-12", "col-xl-3") }) {
                     Div({ classes("panel", "h-100") }) {
-                        Div({ classes("mb-3") }) {
-                            A(attrs = {
-                                classes("btn", "btn-outline-dark", "w-100")
-                                href("/compose-spike")
-                            }) {
-                                Text("На главную")
-                            }
-                        }
                         Div({ classes("panel-title") }) {
                             Text(if (currentRoute.storage == "database") "Модули из базы данных" else "Модули")
                         }
@@ -315,6 +355,43 @@ fun ComposeModuleEditorPage(
                             text = "Модуль не выбран или недоступен.",
                         )
                     } else {
+                        CredentialsPanel(
+                            module = session.module,
+                            sectionStateKey = "module-editor.sections.${currentRoute.storage}.${session.module.id}.credentials",
+                            uploadInProgress = credentialsUploadInProgress,
+                            selectedFileName = selectedCredentialsFile?.name,
+                            uploadMessage = credentialsUploadMessage,
+                            uploadMessageLevel = credentialsUploadMessageLevel,
+                            onFileSelected = { file ->
+                                selectedCredentialsFile = file
+                                credentialsUploadMessage = null
+                            },
+                            onUpload = {
+                                val file = selectedCredentialsFile ?: return@CredentialsPanel
+                                val moduleId = state.selectedModuleId ?: return@CredentialsPanel
+                                scope.launch {
+                                    credentialsUploadInProgress = true
+                                    credentialsUploadMessage = null
+                                    try {
+                                        uploadCredentialsFile(credentialsHttpClient, file)
+                                        state = store.startLoading(state)
+                                        val refreshed = store.selectModule(state, currentRoute, moduleId)
+                                        state = refreshed.copy(
+                                            successMessage = "Файл credential.properties загружен: ${file.name}.",
+                                        )
+                                        selectedCredentialsFile = null
+                                        credentialsUploadMessageLevel = "success"
+                                        credentialsUploadMessage = "Статус credentials обновлен."
+                                    } catch (error: Throwable) {
+                                        credentialsUploadMessageLevel = "warning"
+                                        credentialsUploadMessage = error.message ?: "Не удалось загрузить credential.properties."
+                                    } finally {
+                                        credentialsUploadInProgress = false
+                                    }
+                                }
+                            },
+                        )
+
                         EditorShellHeader(
                             route = currentRoute,
                             state = state,
@@ -326,6 +403,9 @@ fun ComposeModuleEditorPage(
                                         store.runDatabaseModule(state)
                                     } else {
                                         store.runFilesModule(state)
+                                    }
+                                    state.selectedModuleId?.let { moduleId ->
+                                        refreshEditorRunPanel(moduleId)
                                     }
                                 }
                             },
@@ -379,44 +459,7 @@ fun ComposeModuleEditorPage(
                                 }
                             },
                         )
-
                         ValidationAlert(session)
-
-                        CredentialsPanel(
-                            module = session.module,
-                            uploadInProgress = credentialsUploadInProgress,
-                            selectedFileName = selectedCredentialsFile?.name,
-                            uploadMessage = credentialsUploadMessage,
-                            uploadMessageLevel = credentialsUploadMessageLevel,
-                            onFileSelected = { file ->
-                                selectedCredentialsFile = file
-                                credentialsUploadMessage = null
-                            },
-                            onUpload = {
-                                val file = selectedCredentialsFile ?: return@CredentialsPanel
-                                val moduleId = state.selectedModuleId ?: return@CredentialsPanel
-                                scope.launch {
-                                    credentialsUploadInProgress = true
-                                    credentialsUploadMessage = null
-                                    try {
-                                        uploadCredentialsFile(credentialsHttpClient, file)
-                                        state = store.startLoading(state)
-                                        val refreshed = store.selectModule(state, currentRoute, moduleId)
-                                        state = refreshed.copy(
-                                            successMessage = "Файл credential.properties загружен: ${file.name}.",
-                                        )
-                                        selectedCredentialsFile = null
-                                        credentialsUploadMessageLevel = "success"
-                                        credentialsUploadMessage = "Статус credentials обновлен."
-                                    } catch (error: Throwable) {
-                                        credentialsUploadMessageLevel = "warning"
-                                        credentialsUploadMessage = error.message ?: "Не удалось загрузить credential.properties."
-                                    } finally {
-                                        credentialsUploadInProgress = false
-                                    }
-                                }
-                            },
-                        )
 
                         val currentModuleId = state.selectedModuleId
                         if (currentModuleId != null) {
@@ -608,16 +651,16 @@ private fun EditorShellHeader(
                     Span({
                         classes(
                             "module-draft-dot",
-                            if (route.storage == "database" && !session.workingCopyId.isNullOrBlank()) {
-                                "module-draft-dot-warning"
-                            } else {
-                                "module-draft-dot-saved"
+                            when {
+                                state.hasDraftChanges -> "module-draft-dot-dirty"
+                                route.storage == "database" && !session.workingCopyId.isNullOrBlank() -> "module-draft-dot-neutral"
+                                else -> "module-draft-dot-saved"
                             },
                         )
                         attr("aria-hidden", "true")
                     })
                     Span {
-                        Text(buildDraftStatusText(route, session))
+                        Text(buildDraftStatusText(route, session, state.hasDraftChanges))
                     }
                 }
                 if (route.storage == "database" && !session.sourceKind.isNullOrBlank()) {
@@ -647,13 +690,18 @@ private fun EditorShellHeader(
                         }
                         Div({ classes("module-editor-toolbar-group", "module-editor-toolbar-group-draft") }) {
                             Div({ classes("module-editor-toolbar-group-label") }) { Text("Личный черновик") }
-                            EditorActionButton("Сохранить черновик", capabilities.saveWorkingCopy && !actionBusy, EditorActionStyle.PrimaryOutline, onSave)
+                            EditorActionButton(
+                                "Сохранить черновик",
+                                capabilities.saveWorkingCopy && state.hasDraftChanges && !actionBusy,
+                                EditorActionStyle.PrimarySolid,
+                                onSave,
+                            )
                             EditorActionButton("Опубликовать", capabilities.publish && !actionBusy && !state.hasDraftChanges, EditorActionStyle.Success, onPublishWorkingCopy)
                             EditorActionButton("Сбросить черновик", capabilities.discardWorkingCopy && !actionBusy, EditorActionStyle.DangerOutline, onDiscardWorkingCopy)
                         }
                         Div({ classes("module-editor-toolbar-group", "module-editor-toolbar-group-secondary") }) {
                             Div({ classes("module-editor-toolbar-group-label") }) { Text("Редактор") }
-                            EditorActionButton("Отменить изменения", state.hasDraftChanges && !actionBusy, EditorActionStyle.SecondaryOutline, onReload)
+                            EditorActionButton("Отменить изменения", state.hasDraftChanges && !actionBusy, EditorActionStyle.DangerOutline, onReload)
                         }
                     }
                     Div({ classes("module-editor-toolbar-row") }) {
@@ -663,27 +711,35 @@ private fun EditorShellHeader(
                             EditorActionButton("Удалить модуль", capabilities.deleteModule && !actionBusy && state.selectedModuleId != null, EditorActionStyle.DangerOutline, onDeleteModule)
                             A(attrs = {
                                 classes("btn", "btn-outline-secondary")
-                                href("/compose-sync")
+                                href("/db-sync")
                             }) { Text("Импорт из файлов") }
                         }
                     }
                 }
             } else {
-                Div({ classes("d-flex", "flex-wrap", "gap-2") }) {
-                    EditorActionButton("Отменить изменения", state.hasDraftChanges && !actionBusy, EditorActionStyle.SecondaryOutline, onReload)
-                    EditorActionButton("Сохранить", capabilities.save && !actionBusy, EditorActionStyle.PrimaryOutline, onSave)
-                    A(attrs = {
-                        classes("btn", "btn-outline-secondary")
-                        if (state.selectedModuleId == null) {
-                            classes("disabled")
+                Div({ classes("module-editor-toolbar") }) {
+                    Div({ classes("module-editor-toolbar-row") }) {
+                        Div({ classes("module-editor-toolbar-group", "module-editor-toolbar-group-primary") }) {
+                            Div({ classes("module-editor-toolbar-group-label") }) { Text("Выполнение") }
+                            A(attrs = {
+                                classes("btn", "btn-outline-secondary")
+                                if (state.selectedModuleId == null) {
+                                    classes("disabled")
+                                }
+                                if (state.selectedModuleId != null) {
+                                    href(buildRunsHref(route, state.selectedModuleId))
+                                } else {
+                                    attr("aria-disabled", "true")
+                                }
+                            }) { Text("История и результаты") }
+                            EditorActionButton("Запустить", capabilities.run && !actionBusy, EditorActionStyle.PrimarySolid, onRun)
                         }
-                        if (state.selectedModuleId != null) {
-                            href(buildRunsHref(route, state.selectedModuleId))
-                        } else {
-                            attr("aria-disabled", "true")
+                        Div({ classes("module-editor-toolbar-group", "module-editor-toolbar-group-secondary") }) {
+                            Div({ classes("module-editor-toolbar-group-label") }) { Text("Редактор") }
+                            EditorActionButton("Отменить изменения", state.hasDraftChanges && !actionBusy, EditorActionStyle.DangerOutline, onReload)
+                            EditorActionButton("Сохранить", capabilities.save && state.hasDraftChanges && !actionBusy, EditorActionStyle.PrimarySolid, onSave)
                         }
-                    }) { Text("История и результаты") }
-                    EditorActionButton("Запустить", capabilities.run && !actionBusy, EditorActionStyle.PrimarySolid, onRun)
+                    }
                 }
             }
         }
@@ -726,12 +782,6 @@ private fun EditorRunOverviewPanel(
 
             else -> {
                 val details = requireNotNull(state.selectedRunDetails)
-                if (!details.run.status.equals("RUNNING", ignoreCase = true)) {
-                    Div({ classes("text-secondary", "small") }) {
-                        Text("Активного запуска сейчас нет. Детали прошлых запусков открываются на отдельном экране.")
-                    }
-                    return@SectionCard
-                }
                 val currentStageKey = detectRunStageKey(details.run, details.events)
                 val successCount = details.run.successfulSourceCount
                     ?: details.sourceResults.count { it.status.equals("SUCCESS", ignoreCase = true) }
@@ -739,13 +789,14 @@ private fun EditorRunOverviewPanel(
                     ?: details.sourceResults.count { it.status.equals("FAILED", ignoreCase = true) }
                 val warningCount = details.sourceResults.count { it.status.equals("SUCCESS_WITH_WARNINGS", ignoreCase = true) }
                 val latestEvents = details.events.takeLast(4).reversed()
+                val runIsActive = details.run.status.equals("RUNNING", ignoreCase = true)
 
                 RunProgressWidget(
-                    title = "Текущий запуск",
+                    title = if (runIsActive) "Текущий запуск" else "Последний запуск",
                     subtitle = "${translateStage(currentStageKey)} · ${formatDateTime(details.run.requestedAt ?: details.run.startedAt)}",
                     statusLabel = translateRunStatus(details.run.status),
                     statusClassName = runStatusCssClass(details.run.status),
-                    running = true,
+                    running = runIsActive,
                     stages = buildRunProgressStages(currentStageKey, details.run.status),
                     metrics = listOf(
                         RunProgressMetric("Строк в merged", formatNumber(details.run.mergedRowCount)),
@@ -925,6 +976,7 @@ private fun ValidationAlert(session: ModuleEditorSessionResponse) {
 @Composable
 private fun CredentialsPanel(
     module: ModuleDetailsResponse,
+    sectionStateKey: String?,
     uploadInProgress: Boolean,
     selectedFileName: String?,
     uploadMessage: String?,
@@ -933,56 +985,94 @@ private fun CredentialsPanel(
     onUpload: () -> Unit,
 ) {
     val status = module.credentialsStatus
+    var expanded by remember(sectionStateKey) {
+        mutableStateOf(loadEditorSectionExpanded(sectionStateKey, defaultExpanded = true))
+    }
     val warningClass = when {
-        !module.requiresCredentials -> "alert alert-light mt-3 mb-0"
-        module.credentialsReady -> "alert alert-success mt-3 mb-0"
-        else -> "alert alert-warning mt-3 mb-0"
+        !module.requiresCredentials -> "alert alert-light mb-0"
+        module.credentialsReady -> "alert alert-success mb-0"
+        else -> "alert alert-warning mb-0"
     }
 
-    Div({ classes("panel", "mb-4") }) {
-        Div({ classes("d-flex", "flex-wrap", "align-items-center", "justify-content-between", "gap-3") }) {
-            Div {
-                Div({ classes("panel-title", "mb-1") }) { Text("credential.properties") }
-                Div({ classes("text-secondary", "small") }) {
-                    Text(buildCredentialsStatusText(status))
+    SectionCard(
+        title = "credential.properties",
+        subtitle = buildCredentialsStatusText(status),
+        actions = {
+            Button(attrs = {
+                classes("btn", "btn-outline-secondary", "btn-sm", "config-section-toggle")
+                attr("type", "button")
+                onClick {
+                    val nextValue = !expanded
+                    expanded = nextValue
+                    saveEditorSectionExpanded(sectionStateKey, nextValue)
+                }
+            }) {
+                Text(if (expanded) "Свернуть" else "Развернуть")
+            }
+        }
+    ) {
+        if (expanded) {
+            Div({ classes("d-flex", "flex-wrap", "align-items-center", "justify-content-between", "gap-3") }) {
+                Div({ classes("d-flex", "flex-wrap", "align-items-center", "gap-2") }) {
+                    Input(type = org.jetbrains.compose.web.attributes.InputType.File, attrs = {
+                        classes("form-control")
+                        attr("accept", ".properties,text/plain")
+                        onChange { event ->
+                            val input = event.target as? HTMLInputElement
+                            onFileSelected(input?.files?.item(0))
+                        }
+                    })
+                    Button(attrs = {
+                        classes("btn", "btn-outline-dark")
+                        attr("type", "button")
+                        if (uploadInProgress || selectedFileName.isNullOrBlank()) {
+                            disabled()
+                        }
+                        onClick { onUpload() }
+                    }) {
+                        Text(if (uploadInProgress) "Загрузка..." else "Загрузить файл")
+                    }
                 }
             }
-            Div({ classes("d-flex", "flex-wrap", "align-items-center", "gap-2") }) {
-                Input(type = org.jetbrains.compose.web.attributes.InputType.File, attrs = {
-                    classes("form-control")
-                    attr("accept", ".properties,text/plain")
-                    onChange { event ->
-                        val input = event.target as? HTMLInputElement
-                        onFileSelected(input?.files?.item(0))
-                    }
-                })
-                Button(attrs = {
-                    classes("btn", "btn-outline-dark")
-                    attr("type", "button")
-                    if (uploadInProgress || selectedFileName.isNullOrBlank()) {
-                        disabled()
-                    }
-                    onClick { onUpload() }
-                }) {
-                    Text(if (uploadInProgress) "Загрузка..." else "Загрузить файл")
+
+            if (!selectedFileName.isNullOrBlank()) {
+                Div({ classes("text-secondary", "small", "mt-2") }) {
+                    Text("Выбран файл: $selectedFileName")
                 }
             }
-        }
 
-        if (!selectedFileName.isNullOrBlank()) {
-            Div({ classes("text-secondary", "small", "mt-2") }) {
-                Text("Выбран файл: $selectedFileName")
+            if (!uploadMessage.isNullOrBlank()) {
+                AlertBanner(uploadMessage, uploadMessageLevel)
             }
-        }
 
-        if (!uploadMessage.isNullOrBlank()) {
-            AlertBanner(uploadMessage, uploadMessageLevel)
-        }
-
-        Div({ classes(*warningClass.split(" ").filter { it.isNotBlank() }.toTypedArray()) }) {
-            Text(buildCredentialsWarningText(module))
+            Div({ classes(*warningClass.split(" ").filter { it.isNotBlank() }.toTypedArray()) }) {
+                Text(buildCredentialsWarningText(module))
+            }
         }
     }
+}
+
+private fun loadEditorSectionExpanded(
+    sectionStateKey: String?,
+    defaultExpanded: Boolean,
+): Boolean {
+    if (sectionStateKey == null) {
+        return defaultExpanded
+    }
+    return runCatching { window.localStorage.getItem(sectionStateKey) }
+        .getOrNull()
+        ?.let { storedValue -> storedValue == "true" }
+        ?: defaultExpanded
+}
+
+private fun saveEditorSectionExpanded(
+    sectionStateKey: String?,
+    expanded: Boolean,
+) {
+    if (sectionStateKey == null) {
+        return
+    }
+    runCatching { window.localStorage.setItem(sectionStateKey, expanded.toString()) }
 }
 
 @Composable
@@ -1329,41 +1419,12 @@ private enum class EditorActionStyle(
     DangerOutline("btn-outline-danger"),
 }
 
-private fun buildCatalogStatus(
-    state: ModuleEditorPageState,
-    storage: String,
-): String {
-    return if (storage == "database") {
-        val diagnostics = state.databaseCatalog?.diagnostics
-        buildString {
-            append("Каталог модулей из базы данных.")
-            diagnostics?.let {
-                append(" Всего: ${it.totalModules}.")
-                append(" Исправных: ${it.validModules}, с предупреждениями: ${it.warningModules}, с ошибками: ${it.invalidModules}.")
-                append(" Замечаний: ${it.totalIssues}.")
-            }
-        }
-    } else {
-        val filesCatalog = state.filesCatalog
-        val appsRootStatus = filesCatalog?.appsRootStatus
-        val diagnostics = filesCatalog?.diagnostics
-        buildString {
-            append(appsRootStatus?.message ?: "Состояние каталога файловых модулей пока недоступно.")
-            diagnostics?.let {
-                append(" Всего модулей: ${it.totalModules}.")
-                append(" Исправных: ${it.validModules}, с предупреждениями: ${it.warningModules}, с ошибками: ${it.invalidModules}.")
-                append(" Замечаний: ${it.totalIssues}.")
-            }
-        }
-    }
-}
-
 private fun buildRunsHref(
     route: ModuleEditorRouteState,
     moduleId: String?,
 ): String {
     val includeHiddenPart = if (route.includeHidden) "&includeHidden=true" else ""
-    return "/compose-runs?storage=${route.storage}&module=${moduleId.orEmpty()}$includeHiddenPart"
+    return "/module-runs?storage=${route.storage}&module=${moduleId.orEmpty()}$includeHiddenPart"
 }
 
 private fun buildEditorWebSocketUrl(): String {
@@ -1377,108 +1438,30 @@ private fun buildComposeEditorUrl(
     includeHidden: Boolean,
 ): String {
     val query = buildString {
-        append("?storage=")
-        append(storage)
+        var separator = '?'
         if (!moduleId.isNullOrBlank()) {
-            append("&module=")
+            append(separator)
+            append("module=")
             append(moduleId)
+            separator = '&'
         }
-        if (includeHidden) {
-            append("&includeHidden=true")
+        if (storage == "database" && includeHidden) {
+            append(separator)
+            append("includeHidden=true")
         }
     }
-    return "/compose-editor$query"
+    return buildPrimaryEditorUrl(storage, query)
 }
 
-private fun buildDraftSqlFiles(state: ModuleEditorPageState): List<ModuleFileContent> {
-    val session = state.session ?: return emptyList()
-    val persistedSqlFiles = session.module.sqlFiles.associateBy { it.path }
-    return state.sqlContentsDraft.entries.sortedBy { it.key }.map { (path, content) ->
-        val persisted = persistedSqlFiles[path]
-        ModuleFileContent(
-            label = persisted?.label ?: defaultSqlLabel(path),
-            path = path,
-            content = content,
-            exists = persisted?.exists ?: true,
-        )
-    }
-}
-
-private fun buildSqlUsageBadges(
-    state: ModuleEditorPageState,
-    path: String?,
-): List<SqlUsageBadge> {
-    if (path.isNullOrBlank()) {
-        return listOf(SqlUsageBadge("Сведения об использовании пока недоступны.", true))
-    }
-    val formState = state.configFormState ?: return listOf(SqlUsageBadge("Не используется", true))
-    val usages = buildList {
-        if (formState.commonSqlFile == path) {
-            add("SQL по умолчанию")
-        }
-        formState.sources.forEach { source ->
-            if (source.sqlFile == path) {
-                add("Источник: ${source.name}")
-            }
-        }
-    }
-    return if (usages.isEmpty()) {
-        listOf(SqlUsageBadge("Не используется", true))
-    } else {
-        usages.map { SqlUsageBadge(it, false) }
-    }
-}
-
-private fun defaultSqlLabel(path: String): String =
-    path.replace('\\', '/').substringAfterLast('/')
-
-private fun buildDraftStatusText(
-    route: ModuleEditorRouteState,
-    session: ModuleEditorSessionResponse,
+private fun buildPrimaryEditorUrl(
+    storage: String,
+    query: String,
 ): String =
-    if (route.storage == "database") {
-        when {
-            !session.workingCopyId.isNullOrBlank() -> "Есть личный черновик."
-            else -> "Изменений в личном черновике нет."
-        }
+    if (storage == "database") {
+        "/db-modules$query"
     } else {
-        "Изменений нет."
+        "/modules$query"
     }
-
-private fun buildCredentialsStatusText(status: CredentialsStatusResponse): String {
-    val sourceLabel = when {
-        status.uploaded -> "загружен через UI"
-        status.mode.equals("FILE", ignoreCase = true) -> "файл по умолчанию"
-        else -> "файл не задан"
-    }
-    val availability = if (status.fileAvailable) "доступен" else "не найден"
-    return "$sourceLabel: ${status.displayName} ($availability)"
-}
-
-private fun buildCredentialsWarningText(module: ModuleDetailsResponse): String {
-    return when {
-        !module.requiresCredentials -> {
-            "У этого модуля нет обязательных placeholders \${...}. credential.properties нужен только для модулей и SQL-источников, где параметры вынесены во внешний файл."
-        }
-        module.credentialsReady -> {
-            "Для модуля все обязательные placeholders \${...} сейчас разрешаются. При необходимости credential.properties можно заменить загрузкой через UI."
-        }
-        module.credentialsStatus.fileAvailable -> {
-            val missingKeysText = module.missingCredentialKeys
-                .takeIf { it.isNotEmpty() }
-                ?.joinToString(", ", prefix = " Не хватает значений: ", postfix = ".")
-                .orEmpty()
-            "Для модуля найден credential.properties, но обязательные placeholders разрешены не полностью.$missingKeysText Также проверяются переменные окружения и JVM system properties."
-        }
-        else -> {
-            val missingKeysText = module.missingCredentialKeys
-                .takeIf { it.isNotEmpty() }
-                ?.joinToString(", ", prefix = " Не хватает значений: ", postfix = ".")
-                .orEmpty()
-            "В конфиге модуля найдены placeholders \${...}, но подходящие значения сейчас не найдены.$missingKeysText Сначала ищется ui.defaultCredentialsFile, затем gradle/credential.properties в проекте, затем ~/.gradle/credential.properties. Если значений нет, загрузи файл через UI или задай их через env/JVM."
-        }
-    }
-}
 
 private suspend fun uploadCredentialsFile(
     httpClient: ComposeHttpClient,
@@ -1493,29 +1476,9 @@ private suspend fun uploadCredentialsFile(
     )
 }
 
-private fun translateSourceKind(sourceKind: String?): String =
-    when (sourceKind?.uppercase()) {
-        "WORKING_COPY" -> "Личный черновик"
-        "CURRENT_REVISION" -> "Текущая ревизия"
-        null -> "-"
-        else -> sourceKind
-    }
-
 private fun validationBadgeClass(validationStatus: String): String =
     when (validationStatus.uppercase()) {
         "VALID" -> "module-validation-badge-valid"
         "WARNING" -> "module-validation-badge-warning"
         else -> "module-validation-badge-invalid"
     }
-
-private fun translateValidationStatus(validationStatus: String): String =
-    when (validationStatus.uppercase()) {
-        "VALID" -> "Валидно"
-        "WARNING" -> "Есть предупреждения"
-        else -> "Есть ошибки"
-    }
-
-private data class SqlUsageBadge(
-    val label: String,
-    val muted: Boolean,
-)

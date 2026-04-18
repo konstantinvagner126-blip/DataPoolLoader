@@ -76,6 +76,19 @@ fun RunProgressWidget(
                     }
                     attr("aria-hidden", "true")
                 })
+                if (running) {
+                    Div({
+                        classes("run-progress-spinner-arrows")
+                        attr("aria-hidden", "true")
+                    }) {
+                        Span({ classes("run-progress-spinner-arrow", "run-progress-spinner-arrow-forward") }) {
+                            Text("↻")
+                        }
+                        Span({ classes("run-progress-spinner-arrow", "run-progress-spinner-arrow-backward") }) {
+                            Text("↺")
+                        }
+                    }
+                }
                 Span({ classes(*statusClassName.split(" ").filter { it.isNotBlank() }.toTypedArray()) }) {
                     Text(statusLabel)
                 }

@@ -26,6 +26,7 @@ import kotlinx.browser.window
 import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import org.jetbrains.compose.web.attributes.disabled
 import org.jetbrains.compose.web.attributes.InputType
 import org.jetbrains.compose.web.attributes.href
 import org.jetbrains.compose.web.attributes.placeholder
@@ -111,6 +112,19 @@ fun ComposeModuleRunsPage(
         } else {
             "Полная история файловых запусков, подробный ход выполнения, результаты по источникам и итоговые артефакты."
         },
+        heroHeader = {
+            Div({ classes("hero-actions", "mb-3") }) {
+                A(attrs = {
+                    classes("btn", "btn-outline-secondary")
+                    href(buildBackHref(route))
+                }) { Text("Вернуться к модулю") }
+                Button(attrs = {
+                    classes("btn", "btn-dark")
+                    attr("type", "button")
+                    disabled()
+                }) { Text("История и результаты") }
+            }
+        },
         content = {
             if (state.errorMessage != null) {
                 AlertBanner(state.errorMessage ?: "", "warning")
@@ -122,12 +136,15 @@ fun ComposeModuleRunsPage(
                 SectionCard(
                     title = session?.moduleTitle ?: "Модуль не выбран",
                     subtitle = session?.moduleMeta ?: "Открой этот экран из карточки выбранного модуля.",
-                    actions = {
-                        A(attrs = { classes("btn", "btn-outline-dark"); href(buildBackHref(route)) }) {
-                            Text("Вернуться к модулю")
-                        }
-                    },
                 ) {}
+
+                ModuleRunsOverviewStrip(
+                    route = route,
+                    session = session,
+                    history = history,
+                    details = details,
+                    state = state,
+                )
 
                 if (history == null || history.runs.isEmpty()) {
                     EmptyStateCard(
@@ -268,6 +285,21 @@ fun ComposeModuleRunsPage(
                                     title = "Выбранный запуск",
                                     subtitle = "Краткая сводка по текущему запуску.",
                                 ) {
+                                    Div({ classes("run-summary-header") }) {
+                                        Div {
+                                            Div({ classes("run-summary-title") }) {
+                                                Text(details.run.moduleTitle.ifBlank { details.run.moduleId })
+                                            }
+                                            Div({ classes("run-summary-subtitle") }) {
+                                                Text("Запуск ${details.run.runId} · ${formatDateTime(details.run.requestedAt ?: details.run.startedAt)}")
+                                            }
+                                        }
+                                        Div({ classes("run-summary-metrics") }) {
+                                            SummaryMetricBadge("Статус", translateRunStatus(details.run.status))
+                                            SummaryMetricBadge("Источник запуска", translateLaunchSource(details.run.launchSourceKind))
+                                            SummaryMetricBadge("Target", translateRunStatus(details.run.targetStatus))
+                                        }
+                                    }
                                     RunProgressWidget(
                                         title = details.run.moduleTitle,
                                         subtitle = "${translateStageKey(currentStageKey)} · запуск ${details.run.runId}",
@@ -389,7 +421,7 @@ fun ComposeModuleRunsPage(
                                                             org.jetbrains.compose.web.dom.Td { Text(item.sourceName) }
                                                             org.jetbrains.compose.web.dom.Td { Text(formatNumber(item.availableRows)) }
                                                             org.jetbrains.compose.web.dom.Td { Text(formatNumber(item.mergedRows)) }
-                                                            org.jetbrains.compose.web.dom.Td { Text(formatPercent(item.mergedPercent)) }
+                                                            org.jetbrains.compose.web.dom.Td { Text(formatPercentValue(item.mergedPercent)) }
                                                         }
                                                     }
                                                 }
@@ -613,6 +645,64 @@ fun ComposeModuleRunsPage(
 }
 
 @Composable
+private fun SummaryMetricBadge(
+    label: String,
+    value: String,
+) {
+    Div({ classes("run-summary-metric") }) {
+        Div({ classes("run-summary-metric-label") }) { Text(label) }
+        Div({ classes("run-summary-metric-value") }) { Text(value) }
+    }
+}
+
+@Composable
+private fun ModuleRunsOverviewStrip(
+    route: ModuleRunsRouteState,
+    session: ModuleRunPageSessionResponse?,
+    history: ModuleRunHistoryResponse?,
+    details: ModuleRunDetailsResponse?,
+    state: ModuleRunsPageState,
+) {
+    val storageLabel = if (route.storage == "database") "База данных" else "Файлы"
+    val transportLabel = if (route.storage == "database") "Polling" else "WebSocket"
+    val runsCount = history?.runs?.size ?: 0
+    val selectedRunLabel = details?.run?.let { "${translateRunStatus(it.status)} · ${it.runId}" }
+        ?: history?.activeRunId?.let { "Активный запуск · $it" }
+        ?: "Нет активного запуска"
+
+    Div({ classes("runs-overview-grid", "mb-4") }) {
+        RunsOverviewCard(
+            label = "Хранилище",
+            value = storageLabel,
+            note = session?.moduleId ?: route.moduleId,
+        )
+        RunsOverviewCard(
+            label = "История на экране",
+            value = "$runsCount запусков",
+            note = "Лимит ${state.historyLimit}. Фильтр: ${state.historyFilter.label}.",
+        )
+        RunsOverviewCard(
+            label = "Live transport",
+            value = transportLabel,
+            note = selectedRunLabel,
+        )
+    }
+}
+
+@Composable
+private fun RunsOverviewCard(
+    label: String,
+    value: String,
+    note: String,
+) {
+    Div({ classes("runs-overview-card") }) {
+        Div({ classes("runs-overview-label") }) { Text(label) }
+        Div({ classes("runs-overview-value") }) { Text(value) }
+        Div({ classes("runs-overview-note") }) { Text(note) }
+    }
+}
+
+@Composable
 private fun RunsHistoryPanel(
     state: ModuleRunsPageState,
     runs: List<ModuleRunSummaryResponse>,
@@ -625,7 +715,7 @@ private fun RunsHistoryPanel(
         title = "История запусков",
         subtitle = "Выбери запуск, чтобы посмотреть подробности.",
         actions = {
-            Div({ classes("run-history-controls") }) {
+            Div({ classes("run-history-toolbar") }) {
                 org.jetbrains.compose.web.dom.Span({ classes("run-history-control-label") }) {
                     Text("Показывать")
                 }
@@ -642,10 +732,21 @@ private fun RunsHistoryPanel(
                         }
                     }
                 }
+                org.jetbrains.compose.web.dom.Span({ classes("run-history-control-label") }) {
+                    Text("Поиск")
+                }
+                Input(type = InputType.Search, attrs = {
+                    classes("run-history-search-input")
+                    placeholder("runId, модуль, target, output...")
+                    value(state.searchQuery)
+                    onInput { event ->
+                        onSearchQueryChange(event.value)
+                    }
+                })
             }
         },
     ) {
-        Div({ classes("run-history-controls", "mb-3", "flex-wrap", "gap-2") }) {
+        Div({ classes("run-history-filters", "mb-3") }) {
             ModuleRunsHistoryFilter.entries.forEach { filter ->
                 Button(attrs = {
                     classes("run-history-filter")
@@ -657,20 +758,6 @@ private fun RunsHistoryPanel(
                     Text(filter.label)
                 }
             }
-        }
-
-        Div({ classes("run-history-controls", "run-history-controls-search", "mb-3") }) {
-            org.jetbrains.compose.web.dom.Span({ classes("run-history-control-label") }) {
-                Text("Поиск")
-            }
-            Input(type = InputType.Search, attrs = {
-                classes("run-history-search-input")
-                placeholder("runId, модуль, target, output...")
-                value(state.searchQuery)
-                onInput { event ->
-                    onSearchQueryChange(event.value)
-                }
-            })
         }
 
         Div({ classes("run-history-list") }) {
@@ -742,7 +829,7 @@ private fun ArtifactCard(item: ModuleRunArtifactResponse) {
                 tone = artifactStatusTone(item.storageStatus),
             )
             org.jetbrains.compose.web.dom.Span({ classes("run-artifact-note") }) {
-                Text(formatFileSize(item.fileSizeBytes))
+                Text(formatFileSizeValue(item.fileSizeBytes))
             }
         }
         Div({ classes("run-artifact-note") }) {

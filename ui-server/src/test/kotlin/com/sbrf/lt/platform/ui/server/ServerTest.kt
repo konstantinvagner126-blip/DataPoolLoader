@@ -95,7 +95,7 @@ class ServerTest {
 
     @Test
     fun `loads static text and fails for missing resource`() {
-        assertTrue(loadStaticText("static/compose-spike/index.html").contains("compose-ui-spike"))
+        assertTrue(loadStaticText("static/compose-app/index.html").contains("compose-ui-web"))
 
         val error = assertFailsWith<IllegalStateException> {
             loadStaticText(
@@ -271,44 +271,47 @@ class ServerTest {
         }
         val homeRedirect = noRedirectClient.get("/")
         assertEquals(HttpStatusCode.Found, homeRedirect.status)
-        assertEquals("/static/compose-spike/index.html", homeRedirect.headers[HttpHeaders.Location])
+        assertEquals("/static/compose-app/index.html", homeRedirect.headers[HttpHeaders.Location])
 
-        val composeSpikeRedirect = noRedirectClient.get("/compose-spike")
-        assertEquals(HttpStatusCode.Found, composeSpikeRedirect.status)
-        assertEquals("/static/compose-spike/index.html", composeSpikeRedirect.headers[HttpHeaders.Location])
+        val staticCompatibilityRedirect = noRedirectClient.get("/static/compose-spike/index.html?screen=sql-console")
+        assertEquals(HttpStatusCode.Found, staticCompatibilityRedirect.status)
+        assertEquals(
+            "/static/compose-app/index.html?screen=sql-console",
+            staticCompatibilityRedirect.headers[HttpHeaders.Location],
+        )
 
         val composeRunsRedirect = noRedirectClient.get("/compose-runs?storage=files&module=demo-app")
         assertEquals(HttpStatusCode.Found, composeRunsRedirect.status)
         assertEquals(
-            "/static/compose-spike/index.html?screen=module-runs&storage=files&module=demo-app",
+            "/static/compose-app/index.html?screen=module-runs&storage=files&module=demo-app",
             composeRunsRedirect.headers[HttpHeaders.Location]
         )
 
         val composeEditorRedirect = noRedirectClient.get("/compose-editor?storage=files&module=demo-app")
         assertEquals(HttpStatusCode.Found, composeEditorRedirect.status)
         assertEquals(
-            "/static/compose-spike/index.html?screen=module-editor&storage=files&module=demo-app",
+            "/static/compose-app/index.html?screen=module-editor&storage=files&module=demo-app",
             composeEditorRedirect.headers[HttpHeaders.Location]
         )
 
         val composeSyncRedirect = noRedirectClient.get("/compose-sync")
         assertEquals(HttpStatusCode.Found, composeSyncRedirect.status)
         assertEquals(
-            "/static/compose-spike/index.html?screen=module-sync",
+            "/static/compose-app/index.html?screen=module-sync",
             composeSyncRedirect.headers[HttpHeaders.Location]
         )
 
         val composeSqlConsoleRedirect = noRedirectClient.get("/compose-sql-console")
         assertEquals(HttpStatusCode.Found, composeSqlConsoleRedirect.status)
         assertEquals(
-            "/static/compose-spike/index.html?screen=sql-console",
+            "/static/compose-app/index.html?screen=sql-console",
             composeSqlConsoleRedirect.headers[HttpHeaders.Location]
         )
 
         val modulesRedirect = noRedirectClient.get("/modules")
         assertEquals(HttpStatusCode.Found, modulesRedirect.status)
         assertEquals(
-            "/static/compose-spike/index.html?screen=module-editor&storage=files",
+            "/static/compose-app/index.html?screen=module-editor&storage=files",
             modulesRedirect.headers[HttpHeaders.Location],
         )
 
@@ -321,7 +324,7 @@ class ServerTest {
         val sqlConsoleRedirect = noRedirectClient.get("/sql-console")
         assertEquals(HttpStatusCode.Found, sqlConsoleRedirect.status)
         assertEquals(
-            "/static/compose-spike/index.html?screen=sql-console",
+            "/static/compose-app/index.html?screen=sql-console",
             sqlConsoleRedirect.headers[HttpHeaders.Location],
         )
 
@@ -593,6 +596,96 @@ class ServerTest {
     }
 
     @Test
+    fun `config form update ignores unknown fields in request body`() = testApplication {
+        application {
+            uiModule()
+        }
+
+        val updateResponse = client.post("/api/config-form/update") {
+            contentType(ContentType.Application.Json)
+            setBody(
+                """
+                {
+                  "configText": "app:\n  outputDir: ./output\n",
+                  "formState": {
+                    "outputDir": "./output",
+                    "fileFormat": "csv",
+                    "mergeMode": "plain",
+                    "errorMode": "continue_on_error",
+                    "parallelism": 2,
+                    "fetchSize": 1000,
+                    "queryTimeoutSec": 30,
+                    "progressLogEveryRows": 1000,
+                    "maxMergedRows": null,
+                    "deleteOutputFilesAfterCompletion": false,
+                    "commonSql": "",
+                    "commonSqlFile": null,
+                    "sources": [],
+                    "quotas": [],
+                    "targetEnabled": false,
+                    "targetJdbcUrl": "",
+                    "targetUsername": "",
+                    "targetPassword": "",
+                    "targetTable": "",
+                    "targetTruncateBeforeLoad": false,
+                    "warnings": [],
+                    "uiOnlySectionState": {
+                      "sourcesExpanded": false
+                    }
+                  }
+                }
+                """.trimIndent(),
+            )
+        }
+
+        assertEquals(HttpStatusCode.OK, updateResponse.status)
+        val responseBody = updateResponse.bodyAsText()
+        assertTrue(responseBody.contains("\"parallelism\":2"))
+    }
+
+    @Test
+    fun `config form update accepts omitted empty collections`() = testApplication {
+        application {
+            uiModule()
+        }
+
+        val updateResponse = client.post("/api/config-form/update") {
+            contentType(ContentType.Application.Json)
+            setBody(
+                """
+                {
+                  "configText": "app:\n  outputDir: ./output\n",
+                  "formState": {
+                    "outputDir": "./output",
+                    "fileFormat": "csv",
+                    "mergeMode": "plain",
+                    "errorMode": "continue_on_error",
+                    "parallelism": 6,
+                    "fetchSize": 1000,
+                    "queryTimeoutSec": 30,
+                    "progressLogEveryRows": 1000,
+                    "maxMergedRows": null,
+                    "deleteOutputFilesAfterCompletion": false,
+                    "commonSql": "",
+                    "commonSqlFile": null,
+                    "targetEnabled": false,
+                    "targetJdbcUrl": "",
+                    "targetUsername": "",
+                    "targetPassword": "",
+                    "targetTable": "",
+                    "targetTruncateBeforeLoad": false
+                  }
+                }
+                """.trimIndent(),
+            )
+        }
+
+        assertEquals(HttpStatusCode.OK, updateResponse.status)
+        val responseBody = updateResponse.bodyAsText()
+        assertTrue(responseBody.contains("\"parallelism\":6"))
+    }
+
+    @Test
     fun `supports async sql console lifecycle and service routes`() = testApplication {
         val root = createProject()
         val registry = ModuleRegistry(appsRoot = root.resolve("apps"))
@@ -714,7 +807,7 @@ class ServerTest {
 
         assertEquals(HttpStatusCode.Found, response.status)
         assertEquals(
-            "/static/compose-spike/index.html?modeAccessError=modules",
+            "/static/compose-app/index.html?modeAccessError=modules",
             response.headers[HttpHeaders.Location],
         )
     }
@@ -745,17 +838,17 @@ class ServerTest {
 
         assertEquals(HttpStatusCode.Found, dbModulesResponse.status)
         assertEquals(
-            "/static/compose-spike/index.html?modeAccessError=db-modules",
+            "/static/compose-app/index.html?modeAccessError=db-modules",
             dbModulesResponse.headers[HttpHeaders.Location],
         )
         assertEquals(HttpStatusCode.Found, dbCreateResponse.status)
         assertEquals(
-            "/static/compose-spike/index.html?modeAccessError=db-modules",
+            "/static/compose-app/index.html?modeAccessError=db-modules",
             dbCreateResponse.headers[HttpHeaders.Location],
         )
         assertEquals(HttpStatusCode.Found, dbSyncResponse.status)
         assertEquals(
-            "/static/compose-spike/index.html?modeAccessError=db-sync",
+            "/static/compose-app/index.html?modeAccessError=db-sync",
             dbSyncResponse.headers[HttpHeaders.Location],
         )
     }
@@ -784,7 +877,7 @@ class ServerTest {
 
         assertEquals(HttpStatusCode.Found, response.status)
         assertEquals(
-            "/static/compose-spike/index.html?screen=module-editor&storage=database&openCreate=true",
+            "/static/compose-app/index.html?screen=module-editor&storage=database&openCreate=true",
             response.headers[HttpHeaders.Location],
         )
     }
@@ -813,7 +906,7 @@ class ServerTest {
 
         assertEquals(HttpStatusCode.Found, response.status)
         assertEquals(
-            "/static/compose-spike/index.html?screen=module-runs&storage=files&module=demo-app",
+            "/static/compose-app/index.html?screen=module-runs&storage=files&module=demo-app",
             response.headers[HttpHeaders.Location],
         )
     }
@@ -842,7 +935,7 @@ class ServerTest {
 
         assertEquals(HttpStatusCode.Found, response.status)
         assertEquals(
-            "/static/compose-spike/index.html?modeAccessError=db-modules",
+            "/static/compose-app/index.html?modeAccessError=db-modules",
             response.headers[HttpHeaders.Location],
         )
     }
@@ -871,7 +964,7 @@ class ServerTest {
 
         assertEquals(HttpStatusCode.Found, response.status)
         assertEquals(
-            "/static/compose-spike/index.html?screen=module-runs&storage=files&module=demo-app",
+            "/static/compose-app/index.html?screen=module-runs&storage=files&module=demo-app",
             response.headers[HttpHeaders.Location],
         )
     }
@@ -900,7 +993,7 @@ class ServerTest {
 
         assertEquals(HttpStatusCode.Found, response.status)
         assertEquals(
-            "/static/compose-spike/index.html?screen=module-editor&storage=files&module=demo-app",
+            "/static/compose-app/index.html?screen=module-editor&storage=files&module=demo-app",
             response.headers[HttpHeaders.Location],
         )
     }

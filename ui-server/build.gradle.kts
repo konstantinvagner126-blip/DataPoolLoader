@@ -8,20 +8,20 @@ version = rootProject.version
 
 sourceSets {
     main {
-        resources.srcDir(layout.buildDirectory.dir("generated/composeSpikeResources"))
+        resources.srcDir(layout.buildDirectory.dir("generated/composeWebResources"))
     }
 }
 
-val syncComposeSpikeAssets by tasks.registering(Sync::class) {
+val syncComposeWebAssets by tasks.registering(Sync::class) {
     group = "build"
-    description = "Копирует собранный Compose Web spike в ресурсы UI"
-    dependsOn(":ui-compose-web:exportComposeSpike")
-    from(project(":ui-compose-web").layout.buildDirectory.dir("exportedComposeSpike"))
-    into(layout.buildDirectory.dir("generated/composeSpikeResources/static/compose-spike"))
+    description = "Копирует собранный Compose Web UI в ресурсы UI"
+    dependsOn(":ui-compose-web:exportComposeWebAssets")
+    from(project(":ui-compose-web").layout.buildDirectory.dir("exportedComposeWeb"))
+    into(layout.buildDirectory.dir("generated/composeWebResources/static/compose-app"))
 }
 
 tasks.named("processResources") {
-    dependsOn(syncComposeSpikeAssets)
+    dependsOn(syncComposeWebAssets)
 }
 
 dependencies {

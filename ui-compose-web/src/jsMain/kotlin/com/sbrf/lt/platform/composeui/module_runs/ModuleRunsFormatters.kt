@@ -16,22 +16,3 @@ fun eventEntryCssClass(severity: String?): String =
         "WARNING" -> "human-log-entry human-log-entry-warning"
         else -> "human-log-entry"
     }
-
-fun formatPercent(value: Double?): String {
-    if (value == null) {
-        return "-"
-    }
-    return js("new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(value)") as String + "%"
-}
-
-fun formatFileSize(bytes: Long?): String {
-    if (bytes == null) {
-        return "-"
-    }
-    val size = bytes.toDouble()
-    return when {
-        size < 1024 -> "${bytes} B"
-        size < 1024 * 1024 -> "${((size / 1024) * 10).toInt() / 10.0} KB"
-        else -> "${((size / (1024 * 1024)) * 10).toInt() / 10.0} MB"
-    }
-}

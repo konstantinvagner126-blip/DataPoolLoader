@@ -3,20 +3,20 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Compose UI Spike</title>
+  <title>Compose UI</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="./styles.css?v=20260418a">
-  <link rel="stylesheet" href="./compose-spike.css">
+  <link rel="stylesheet" href="./compose-ui.css">
 </head>
 <body>
   <div id="root"></div>
   <script>
     (function () {
       function ensureOverlay() {
-        var existing = document.getElementById("compose-spike-error-overlay");
+        var existing = document.getElementById("compose-ui-error-overlay");
         if (existing) return existing;
         var overlay = document.createElement("div");
-        overlay.id = "compose-spike-error-overlay";
+        overlay.id = "compose-ui-error-overlay";
         overlay.style.position = "fixed";
         overlay.style.right = "16px";
         overlay.style.bottom = "16px";
@@ -34,23 +34,27 @@
         return overlay;
       }
 
-      function showComposeSpikeError(prefix, message) {
+      function showComposeUiError(prefix, message) {
         var overlay = ensureOverlay();
         overlay.style.display = "block";
         overlay.textContent = prefix + ": " + message;
       }
 
       window.addEventListener("error", function (event) {
-        showComposeSpikeError("JS error", event.message || "Unknown error");
+        showComposeUiError("JS error", event.message || "Unknown error");
       });
 
       window.addEventListener("unhandledrejection", function (event) {
         var reason = event.reason;
         var message = reason && (reason.message || String(reason)) || "Unknown rejection";
-        showComposeSpikeError("Promise rejection", message);
+        var normalized = String(message || "").trim();
+        if (normalized === "Canceled" || normalized === "AbortError") {
+          return;
+        }
+        showComposeUiError("Promise rejection", message);
       });
     })();
   </script>
-  <script src="./compose-ui-spike.js"></script>
+  <script src="./compose-ui-web.js"></script>
 </body>
 </html>

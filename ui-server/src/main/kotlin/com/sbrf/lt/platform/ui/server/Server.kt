@@ -1,8 +1,10 @@
 package com.sbrf.lt.platform.ui.server
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
+import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleService
 import com.sbrf.lt.platform.ui.config.UiAppConfig
 import com.sbrf.lt.platform.ui.config.UiConfigLoader
@@ -209,7 +211,9 @@ fun Application.uiModule(
     databaseModuleRunHistoryService: ModuleRunHistoryService? = null,
 ) {
     val mapper = ObjectMapper()
+        .registerKotlinModule()
         .registerModule(JavaTimeModule())
+        .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
         .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
 
     install(CallLogging) {
@@ -218,7 +222,9 @@ fun Application.uiModule(
     install(WebSockets)
     install(ContentNegotiation) {
         jackson {
+            registerKotlinModule()
             registerModule(JavaTimeModule())
+            configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
             disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
         }
     }

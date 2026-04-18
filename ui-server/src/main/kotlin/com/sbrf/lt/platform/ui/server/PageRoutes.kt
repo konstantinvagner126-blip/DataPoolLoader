@@ -38,9 +38,6 @@ internal fun Route.registerPageRoutes(context: UiServerContext) {
     get("/help/api") {
         call.respondText(loadStaticText("static/help-api.html"), io.ktor.http.ContentType.Text.Html)
     }
-    get("/compose-spike") {
-        call.respondRedirect(composeBundleLocation(call.request.queryParameters.toQueryParametersMap()), permanent = false)
-    }
     get("/compose-runs") {
         val params = linkedMapOf<String, List<String>>("screen" to listOf("module-runs"))
         call.request.queryParameters["storage"]?.let { params["storage"] = listOf(it) }
@@ -142,6 +139,25 @@ internal fun Route.registerPageRoutes(context: UiServerContext) {
             call.respondText("", status = HttpStatusCode.NotFound)
             return@get
         }
+        if (path == "compose-spike" || path.startsWith("compose-spike/")) {
+            val migratedPath = path.removePrefix("compose-spike").removePrefix("/")
+            val query = call.request.queryParameters.toQueryParametersMap()
+                .flatMap { (key, values) -> values.map { key to it } }
+                .formUrlEncode()
+            val target = buildString {
+                append("/static/compose-app")
+                if (migratedPath.isNotBlank()) {
+                    append("/")
+                    append(migratedPath)
+                }
+                if (query.isNotBlank()) {
+                    append("?")
+                    append(query)
+                }
+            }
+            call.respondRedirect(target, permanent = false)
+            return@get
+        }
         val resourcePath = "static/$path"
         val content = loadStaticBytes(resourcePath)
         if (content == null) {
@@ -162,9 +178,9 @@ private fun composeBundleLocation(
         .flatMap { (key, values) -> values.map { key to it } }
         .formUrlEncode()
     return if (query.isBlank()) {
-        "/static/compose-spike/index.html"
+        "/static/compose-app/index.html"
     } else {
-        "/static/compose-spike/index.html?$query"
+        "/static/compose-app/index.html?$query"
     }
 }
 

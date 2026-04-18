@@ -4,6 +4,9 @@ class ModuleEditorStore(
     private val api: ModuleEditorApi,
     private val syncRoute: (storage: String, moduleId: String?, includeHidden: Boolean) -> Unit = { _, _, _ -> },
 ) {
+    fun clearSuccessMessage(current: ModuleEditorPageState): ModuleEditorPageState =
+        current.copy(successMessage = null)
+
     suspend fun load(route: ModuleEditorRouteState): ModuleEditorPageState {
         return runCatching {
             if (route.storage == "database") {

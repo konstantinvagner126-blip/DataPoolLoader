@@ -71,3 +71,7 @@ body {
   text-transform: uppercase;
   color: #5c7087;
 }
+
+.compose-home-root .config-section-toggle {
+  min-width: 7.5rem;
+}

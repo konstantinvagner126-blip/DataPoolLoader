@@ -9,6 +9,7 @@ import com.sbrf.lt.platform.composeui.foundation.component.AlertBanner
 import com.sbrf.lt.platform.composeui.foundation.component.LoadingStateCard
 import com.sbrf.lt.platform.composeui.foundation.component.SectionCard
 import com.sbrf.lt.platform.composeui.foundation.dom.classes
+import kotlinx.browser.window
 import org.jetbrains.compose.web.attributes.InputType
 import org.jetbrains.compose.web.attributes.disabled
 import org.jetbrains.compose.web.attributes.placeholder
@@ -77,6 +78,9 @@ fun ModuleEditorSettingsForm(
             exists = it.exists,
         )
     }
+    val sectionStateKeyPrefix = remember(storageMode, module.id) {
+        "module-editor.config-sections.$storageMode.${module.id}"
+    }
 
     SectionCard(
         title = "Настройки модуля",
@@ -111,6 +115,7 @@ fun ModuleEditorSettingsForm(
 
         GeneralSettingsSection(
             formState = formState,
+            sectionStateKey = "$sectionStateKeyPrefix.general",
             disabled = state.configFormLoading,
             onCommit = onApplyFormState,
         )
@@ -118,6 +123,7 @@ fun ModuleEditorSettingsForm(
             formState = formState,
             sqlResources = sqlResources,
             storageMode = storageMode,
+            sectionStateKey = "$sectionStateKeyPrefix.default-sql",
             disabled = state.configFormLoading,
             onCommit = onApplyFormState,
         )
@@ -125,16 +131,19 @@ fun ModuleEditorSettingsForm(
             formState = formState,
             sqlResources = sqlResources,
             storageMode = storageMode,
+            sectionStateKey = "$sectionStateKeyPrefix.sources",
             disabled = state.configFormLoading,
             onCommit = onApplyFormState,
         )
         QuotasSection(
             formState = formState,
+            sectionStateKey = "$sectionStateKeyPrefix.quotas",
             disabled = state.configFormLoading,
             onCommit = onApplyFormState,
         )
         TargetSection(
             formState = formState,
+            sectionStateKey = "$sectionStateKeyPrefix.target",
             disabled = state.configFormLoading,
             onCommit = onApplyFormState,
         )
@@ -144,12 +153,14 @@ fun ModuleEditorSettingsForm(
 @Composable
 private fun GeneralSettingsSection(
     formState: ConfigFormStateDto,
+    sectionStateKey: String,
     disabled: Boolean,
     onCommit: (ConfigFormStateDto) -> Unit,
 ) {
     ConfigSectionCard(
         title = "Общие настройки",
         subtitle = "Базовые параметры запуска и формирования выходных файлов.",
+        sectionStateKey = sectionStateKey,
     ) {
         Div({ classes("config-form-fields") }) {
             CommitTextField(
@@ -231,6 +242,7 @@ private fun DefaultSqlSection(
     formState: ConfigFormStateDto,
     sqlResources: List<SqlResourceOption>,
     storageMode: String,
+    sectionStateKey: String,
     disabled: Boolean,
     onCommit: (ConfigFormStateDto) -> Unit,
 ) {
@@ -238,6 +250,7 @@ private fun DefaultSqlSection(
     ConfigSectionCard(
         title = "SQL по умолчанию",
         subtitle = "Используется для источников без собственного SQL.",
+        sectionStateKey = sectionStateKey,
     ) {
         Div({ classes("config-form-fields") }) {
             CommitSelectField(
@@ -277,12 +290,15 @@ private fun SourcesSection(
     formState: ConfigFormStateDto,
     sqlResources: List<SqlResourceOption>,
     storageMode: String,
+    sectionStateKey: String,
     disabled: Boolean,
     onCommit: (ConfigFormStateDto) -> Unit,
 ) {
     ConfigSectionCard(
         title = "Источники",
         subtitle = "Подключения и SQL по каждому источнику.",
+        sectionStateKey = sectionStateKey,
+        defaultExpanded = false,
         actions = {
             Button(attrs = {
                 classes("btn", "btn-outline-secondary", "btn-sm")
@@ -403,12 +419,14 @@ private fun SourcesSection(
 @Composable
 private fun QuotasSection(
     formState: ConfigFormStateDto,
+    sectionStateKey: String,
     disabled: Boolean,
     onCommit: (ConfigFormStateDto) -> Unit,
 ) {
     ConfigSectionCard(
         title = "Квоты",
         subtitle = "Используются в режиме quota.",
+        sectionStateKey = sectionStateKey,
         actions = {
             Button(attrs = {
                 classes("btn", "btn-outline-secondary", "btn-sm")
@@ -472,12 +490,14 @@ private fun QuotasSection(
 @Composable
 private fun TargetSection(
     formState: ConfigFormStateDto,
+    sectionStateKey: String,
     disabled: Boolean,
     onCommit: (ConfigFormStateDto) -> Unit,
 ) {
     ConfigSectionCard(
         title = "Целевая загрузка",
         subtitle = "Параметры final import в целевую таблицу.",
+        sectionStateKey = sectionStateKey,
     ) {
         CommitCheckboxField(
             label = "Загрузка в target включена",
@@ -524,12 +544,60 @@ private fun TargetSection(
 private fun ConfigSectionCard(
     title: String,
     subtitle: String? = null,
+    sectionStateKey: String? = null,
+    defaultExpanded: Boolean = true,
     actions: (@Composable () -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
-    SectionCard(title = title, subtitle = subtitle, actions = actions) {
-        content()
+    var expanded by remember(sectionStateKey) {
+        mutableStateOf(loadConfigSectionExpanded(sectionStateKey, defaultExpanded))
     }
+    SectionCard(
+        title = title,
+        subtitle = subtitle,
+        actions = {
+            if (actions != null) {
+                actions()
+            }
+            if (sectionStateKey != null) {
+                Button(attrs = {
+                    classes("btn", "btn-outline-secondary", "btn-sm", "config-section-toggle")
+                    attr("type", "button")
+                    onClick {
+                        val nextValue = !expanded
+                        expanded = nextValue
+                        saveConfigSectionExpanded(sectionStateKey, nextValue)
+                    }
+                }) {
+                    Text(if (expanded) "Свернуть" else "Развернуть")
+                }
+            }
+        },
+    ) {
+        if (expanded) {
+            content()
+        }
+    }
+}
+
+private fun loadConfigSectionExpanded(
+    sectionStateKey: String?,
+    defaultExpanded: Boolean,
+): Boolean {
+    if (sectionStateKey == null) {
+        return defaultExpanded
+    }
+    return runCatching { window.localStorage.getItem(sectionStateKey) }
+        .getOrNull()
+        ?.let { storedValue -> storedValue == "true" }
+        ?: defaultExpanded
+}
+
+private fun saveConfigSectionExpanded(
+    sectionStateKey: String,
+    expanded: Boolean,
+) {
+    runCatching { window.localStorage.setItem(sectionStateKey, expanded.toString()) }
 }
 
 @Composable

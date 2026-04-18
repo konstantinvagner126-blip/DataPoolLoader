@@ -5,6 +5,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import kotlinx.browser.window
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import org.w3c.dom.MessageEvent
 import org.w3c.dom.WebSocket
@@ -29,7 +30,11 @@ fun PollingEffect(
             val handle = window.setInterval(
                 handler = {
                     scope.launch {
-                        latestOnTick.value()
+                        try {
+                            latestOnTick.value()
+                        } catch (_: CancellationException) {
+                            // Игнорируем штатную отмену coroutine scope при смене экрана/эффекта.
+                        }
                     }
                 },
                 timeout = intervalMs,
@@ -63,7 +68,11 @@ fun WebSocketEffect(
             socket.onmessage = { event: MessageEvent ->
                 val payload = event.data?.toString()
                 scope.launch {
-                    latestOnMessage.value(payload)
+                    try {
+                        latestOnMessage.value(payload)
+                    } catch (_: CancellationException) {
+                        // Игнорируем штатную отмену coroutine scope при смене экрана/эффекта.
+                    }
                 }
             }
             socket.onerror = { _: Event ->

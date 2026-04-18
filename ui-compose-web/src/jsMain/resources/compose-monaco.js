@@ -1,7 +1,7 @@
 (function initComposeMonaco(global) {
   const namespace = global.ComposeMonaco || (global.ComposeMonaco = {});
   let monacoConfigured = false;
-  const monacoVsPath = "/static/compose-spike/vendor/monaco-editor/min/vs";
+  const monacoVsPath = "/static/compose-app/vendor/monaco-editor/min/vs";
 
   function withMonacoReady(callback) {
     const requireFn = global.require;

@@ -15,6 +15,11 @@ import com.sbrf.lt.platform.composeui.foundation.component.SectionCard
 import com.sbrf.lt.platform.composeui.foundation.dom.classes
 import com.sbrf.lt.platform.composeui.foundation.updates.PollingEffect
 import com.sbrf.lt.platform.composeui.model.ModuleStoreMode
+import com.sbrf.lt.platform.composeui.module_sync.activeSingleSyncFor
+import com.sbrf.lt.platform.composeui.module_sync.syncRunTitle
+import com.sbrf.lt.platform.composeui.module_sync.translateSyncAction
+import com.sbrf.lt.platform.composeui.module_sync.translateSyncScope
+import com.sbrf.lt.platform.composeui.module_sync.translateSyncStatus
 import kotlinx.browser.window
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.web.attributes.disabled
@@ -29,8 +34,8 @@ import org.jetbrains.compose.web.dom.Div
 import org.jetbrains.compose.web.dom.Input
 import org.jetbrains.compose.web.dom.Label
 import org.jetbrains.compose.web.dom.Li
-import org.jetbrains.compose.web.dom.P
 import org.jetbrains.compose.web.dom.Option
+import org.jetbrains.compose.web.dom.P
 import org.jetbrains.compose.web.dom.Pre
 import org.jetbrains.compose.web.dom.Select
 import org.jetbrains.compose.web.dom.Span
@@ -67,6 +72,19 @@ fun ComposeModuleSyncPage(
         eyebrow = "Режим базы данных",
         title = "Импорт модулей из файлов",
         subtitle = "Синхронизация файловых модулей из каталога apps в базу данных. Создание модулей на основе application.yml и SQL-ресурсов.",
+        heroHeader = {
+            Div({ classes("hero-actions", "mb-3") }) {
+                A(attrs = {
+                    classes("btn", "btn-outline-secondary")
+                    href("/")
+                }) { Text("На главную") }
+                Button(attrs = {
+                    classes("btn", "btn-dark")
+                    attr("type", "button")
+                    disabled()
+                }) { Text("Импорт из файлов") }
+            }
+        },
         content = {
             if (state.errorMessage != null) {
                 AlertBanner(state.errorMessage ?: "", "warning")
@@ -85,6 +103,8 @@ fun ComposeModuleSyncPage(
                             "Модули с тем же составом конфигурации и SQL-ресурсов пропускаются.",
                     )
                 }
+
+                SyncOverviewPanel(state)
 
                 SyncActionsPanel(
                     state = state,
@@ -177,26 +197,34 @@ private fun SyncActionsPanel(
     val canSyncAll = databaseModeActive && !maintenanceMode && state.actionInProgress == null && activeSingleSync == null
     val canSyncOne = databaseModeActive && !maintenanceMode && state.actionInProgress == null
 
-    Div({ classes("d-flex", "flex-wrap", "gap-2", "mb-4") }) {
-        Button(attrs = {
-            classes("btn", "btn-primary")
-            attr("type", "button")
-            if (!canSyncAll) {
-                disabled()
+    Div({ classes("module-sync-toolbar", "mb-4") }) {
+        Div({ classes("module-sync-toolbar-row") }) {
+            Div({ classes("module-editor-toolbar-group", "module-editor-toolbar-group-primary") }) {
+                Div({ classes("module-editor-toolbar-group-label") }) { Text("Массовый импорт") }
+                Button(attrs = {
+                    classes("btn", "btn-primary")
+                    attr("type", "button")
+                    if (!canSyncAll) {
+                        disabled()
+                    }
+                    onClick { onSyncAll() }
+                }) {
+                    Text(if (state.actionInProgress == "sync-all") "Синхронизация..." else "Синхронизировать все модули")
+                }
             }
-            onClick { onSyncAll() }
-        }) {
-            Text(if (state.actionInProgress == "sync-all") "Синхронизация..." else "Синхронизировать все модули")
-        }
-        Button(attrs = {
-            classes("btn", "btn-outline-primary")
-            attr("type", "button")
-            if (!canSyncOne) {
-                disabled()
+            Div({ classes("module-editor-toolbar-group", "module-editor-toolbar-group-secondary") }) {
+                Div({ classes("module-editor-toolbar-group-label") }) { Text("Точечный импорт") }
+                Button(attrs = {
+                    classes("btn", "btn-outline-primary")
+                    attr("type", "button")
+                    if (!canSyncOne) {
+                        disabled()
+                    }
+                    onClick { onToggleSyncOneInput() }
+                }) {
+                    Text(if (state.syncOneInputVisible) "Скрыть форму одного модуля" else "Синхронизировать один модуль")
+                }
             }
-            onClick { onToggleSyncOneInput() }
-        }) {
-            Text(if (state.syncOneInputVisible) "Скрыть форму одного модуля" else "Синхронизировать один модуль")
         }
     }
 
@@ -236,34 +264,83 @@ private fun SyncActionsPanel(
 }
 
 @Composable
+private fun SyncOverviewPanel(state: ModuleSyncPageState) {
+    val runtimeContext = state.runtimeContext
+    val syncState = state.syncState
+    val runtimeLabel = when (runtimeContext?.effectiveMode) {
+        ModuleStoreMode.DATABASE -> "База данных"
+        ModuleStoreMode.FILES -> "Файлы"
+        else -> "Не определен"
+    }
+    val syncLabel = when {
+        syncState?.maintenanceMode == true -> "Массовая синхронизация"
+        !syncState?.activeSingleSyncs.isNullOrEmpty() -> "Точечный импорт"
+        else -> "Ожидание"
+    }
+    val syncNote = when {
+        syncState?.maintenanceMode == true -> buildMaintenanceMessage(syncState)
+        !syncState?.activeSingleSyncs.isNullOrEmpty() -> syncState.activeSingleSyncs.joinToString(" ") { describeActiveSingleSync(it) }
+        else -> syncState?.message?.takeIf { it.isNotBlank() } ?: "Новых операций синхронизации сейчас нет."
+    }
+
+    Div({ classes("sync-overview-grid", "mb-4") }) {
+        SyncOverviewCard(
+            label = "Активный runtime",
+            value = runtimeLabel,
+            note = runtimeContext?.fallbackReason ?: "Текущий экран работает только в режиме базы данных.",
+        )
+        SyncOverviewCard(
+            label = "Состояние импорта",
+            value = syncLabel,
+            note = syncNote,
+        )
+        SyncOverviewCard(
+            label = "История на экране",
+            value = "${state.runs.size} запусков",
+            note = "Лимит списка: ${state.historyLimit}. Выбранный запуск: ${state.selectedRunId ?: "нет"}.",
+        )
+    }
+}
+
+@Composable
+private fun SyncOverviewCard(
+    label: String,
+    value: String,
+    note: String,
+) {
+    Div({ classes("sync-overview-card") }) {
+        Div({ classes("sync-overview-label") }) { Text(label) }
+        Div({ classes("sync-overview-value") }) { Text(value) }
+        Div({ classes("sync-overview-note") }) { Text(note) }
+    }
+}
+
+@Composable
 private fun SyncRunsHistoryPanel(
     state: ModuleSyncPageState,
     onLimitChange: (Int) -> Unit,
     onSelectRun: (String) -> Unit,
 ) {
     Div({ classes("panel", "h-100") }) {
-        Div({ classes("d-flex", "flex-wrap", "justify-content-between", "align-items-center", "gap-2") }) {
+        Div({ classes("run-history-toolbar") }) {
             Div({ classes("panel-title", "mb-0") }) { Text("История импортов") }
-            Div({ classes("d-flex", "align-items-center", "gap-2") }) {
-                Label(attrs = { classes("small", "text-secondary", "mb-0") }) { Text("Показывать") }
-                Select(attrs = {
-                    classes("form-select", "form-select-sm")
-                    attr("style", "width: auto;")
-                    if (state.actionInProgress != null) {
-                        disabled()
-                    }
-                    onChange {
-                        onLimitChange(it.value?.toIntOrNull() ?: state.historyLimit)
-                    }
-                }) {
-                    listOf(10, 20, 50).forEach { limit ->
-                        Option(value = limit.toString(), attrs = {
-                            if (state.historyLimit == limit) {
-                                selected()
-                            }
-                        }) {
-                            Text(limit.toString())
+            Label(attrs = { classes("run-history-control-label", "mb-0") }) { Text("Показывать") }
+            Select(attrs = {
+                classes("run-history-limit-select")
+                if (state.actionInProgress != null) {
+                    disabled()
+                }
+                onChange {
+                    onLimitChange(it.value?.toIntOrNull() ?: state.historyLimit)
+                }
+            }) {
+                listOf(10, 20, 50).forEach { limit ->
+                    Option(value = limit.toString(), attrs = {
+                        if (state.historyLimit == limit) {
+                            selected()
                         }
+                    }) {
+                        Text(limit.toString())
                     }
                 }
             }
@@ -327,14 +404,23 @@ private fun SyncRunDetailsPanel(state: ModuleSyncPageState) {
             }
 
             val run = details.run
-            Div({ classes("d-flex", "flex-wrap", "gap-3", "mb-3") }) {
-                Span({ classes("badge", *syncStatusBadgeClass(run.status).split(" ").filter { it.isNotBlank() }.toTypedArray()) }) { Text(translateSyncStatus(run.status)) }
-                SummaryMetric("Область", translateSyncScope(run.scope))
-                SummaryMetric("Обработано", run.totalProcessed.toString())
-                SummaryMetric("Создано", run.totalCreated.toString())
-                SummaryMetric("Обновлено", run.totalUpdated.toString())
-                SummaryMetric("Пропущено", run.totalSkipped.toString())
-                SummaryMetric("С ошибкой", run.totalFailed.toString())
+            Div({ classes("run-summary-header") }) {
+                Div {
+                    Div({ classes("run-summary-title") }) {
+                        Text(syncRunTitle(run))
+                    }
+                    Div({ classes("run-summary-subtitle") }) {
+                        Text("${translateSyncStatus(run.status)} · ${formatInstant(run.startedAt)}")
+                    }
+                }
+                Div({ classes("run-summary-metrics") }) {
+                    SyncMetricBadge("Область", translateSyncScope(run.scope))
+                    SyncMetricBadge("Обработано", run.totalProcessed.toString())
+                    SyncMetricBadge("Создано", run.totalCreated.toString())
+                    SyncMetricBadge("Обновлено", run.totalUpdated.toString())
+                    SyncMetricBadge("Пропущено", run.totalSkipped.toString())
+                    SyncMetricBadge("С ошибкой", run.totalFailed.toString())
+                }
             }
 
             Div({ classes("run-summary-list") }) {
@@ -391,13 +477,13 @@ private fun SyncRunDetailsPanel(state: ModuleSyncPageState) {
 }
 
 @Composable
-private fun SummaryMetric(
+private fun SyncMetricBadge(
     label: String,
     value: String,
 ) {
-    Span {
-        Text("$label: ")
-        Span({ classes("fw-semibold") }) { Text(value) }
+    Div({ classes("run-summary-metric") }) {
+        Div({ classes("run-summary-metric-label") }) { Text(label) }
+        Div({ classes("run-summary-metric-value") }) { Text(value) }
     }
 }
 
@@ -423,17 +509,6 @@ private fun buildMaintenanceMessage(syncState: ModuleSyncStateResponse): String 
     ).filterNotNull().joinToString(" ")
 }
 
-private fun activeSingleSyncFor(
-    moduleCode: String,
-    syncState: ModuleSyncStateResponse?,
-): ActiveModuleSyncRunResponse? {
-    val normalized = moduleCode.trim()
-    if (normalized.isBlank() || syncState == null) {
-        return null
-    }
-    return syncState.activeSingleSyncs.firstOrNull { it.moduleCode == normalized }
-}
-
 private fun describeActiveSingleSync(sync: ActiveModuleSyncRunResponse): String {
     val actor = sync.startedByActorDisplayName ?: sync.startedByActorId
     val startedAt = formatInstant(sync.startedAt)
@@ -446,13 +521,6 @@ private fun describeActiveSingleSync(sync: ActiveModuleSyncRunResponse): String 
     }
 }
 
-private fun syncRunTitle(run: ModuleSyncRunSummaryResponse): String =
-    if (run.scope.equals("ONE", ignoreCase = true) && !run.moduleCode.isNullOrBlank()) {
-        "Модуль ${run.moduleCode}"
-    } else {
-        translateSyncScope(run.scope)
-    }
-
 private fun syncRunMeta(run: ModuleSyncRunSummaryResponse): String {
     val actor = run.startedByActorDisplayName ?: run.startedByActorId
     val finishedAt = run.finishedAt?.let(::formatInstant) ?: "Запуск еще выполняется"
@@ -461,33 +529,6 @@ private fun syncRunMeta(run: ModuleSyncRunSummaryResponse): String {
         "Завершение: $finishedAt",
     ).joinToString(" · ")
 }
-
-private fun translateSyncStatus(status: String): String =
-    when (status.uppercase()) {
-        "SUCCESS" -> "Успешно"
-        "FAILED" -> "Ошибка"
-        "RUNNING" -> "Выполняется"
-        "PARTIAL_SUCCESS" -> "Частично успешно"
-        else -> status
-    }
-
-private fun translateSyncScope(scope: String): String =
-    when (scope.uppercase()) {
-        "ALL" -> "Все модули"
-        "ONE" -> "Один модуль"
-        else -> scope
-    }
-
-private fun translateSyncAction(action: String): String =
-    when (action.uppercase()) {
-        "CREATED" -> "Создан"
-        "UPDATED" -> "Обновлён"
-        "SKIPPED" -> "Пропущен"
-        "SKIPPED_NO_CHANGES" -> "Пропущен без изменений"
-        "SKIPPED_CODE_CONFLICT" -> "Пропущен из-за конфликта кода"
-        "FAILED" -> "Ошибка"
-        else -> action
-    }
 
 private fun syncStatusBadgeClass(status: String): String =
     when (status.uppercase()) {

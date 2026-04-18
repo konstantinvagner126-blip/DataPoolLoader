@@ -16,6 +16,7 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.content.PartData
 import io.ktor.server.application.call
 import io.ktor.server.request.receive
+import io.ktor.server.request.receiveText
 import io.ktor.server.request.receiveMultipart
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
@@ -26,6 +27,7 @@ import io.ktor.utils.io.core.readText
 import io.ktor.utils.io.readRemaining
 import io.ktor.websocket.Frame
 import kotlinx.coroutines.flow.collect
+import org.slf4j.LoggerFactory
 
 /**
  * Общие UI API: runtime mode, файловые модули, config-form, credentials и websocket.
@@ -34,6 +36,7 @@ internal fun Route.registerCommonRoutes(
     context: UiServerContext,
     mapper: ObjectMapper,
 ) {
+    val logger = LoggerFactory.getLogger("ConfigFormRoutes")
     get("/api/modules") {
         call.respond(context.filesModuleBackend.listModules())
     }
@@ -83,7 +86,25 @@ internal fun Route.registerCommonRoutes(
     }
 
     post("/api/config-form/update") {
-        val request = call.receive<ConfigFormUpdateRequest>()
+        val payload = call.receiveText()
+        val request = try {
+            mapper.readValue(payload, ConfigFormUpdateRequest::class.java)
+        } catch (error: Exception) {
+            logger.warn("Некорректный payload для /api/config-form/update: {}", payload.take(4_000), error)
+            val rootCauseMessage = generateSequence<Throwable>(error) { it.cause }
+                .lastOrNull()
+                ?.message
+                ?.takeIf { it.isNotBlank() }
+            throw IllegalArgumentException(
+                buildString {
+                    append("Некорректные данные формы настроек.")
+                    if (!rootCauseMessage.isNullOrBlank()) {
+                        append(" ")
+                        append(rootCauseMessage)
+                    }
+                },
+            )
+        }
         call.respond(context.configFormService.apply(request.configText, request.formState))
     }
 

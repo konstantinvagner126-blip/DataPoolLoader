@@ -13,7 +13,7 @@ kotlin {
     js(IR) {
         browser {
             commonWebpackConfig {
-                outputFileName = "compose-ui-spike.js"
+                outputFileName = "compose-ui-web.js"
                 devServer = (devServer ?: KotlinWebpackConfig.DevServer()).apply {
                     static = (static ?: mutableListOf()).apply {
                         add(project.projectDir.path)
@@ -34,13 +34,13 @@ kotlin {
         }
     }
 }
-val exportComposeSpike by tasks.registering(Sync::class) {
+val exportComposeWebAssets by tasks.registering(Sync::class) {
     group = "distribution"
-    description = "Собирает и подготавливает артефакты Compose Web spike"
+    description = "Собирает и подготавливает артефакты Compose Web UI"
     dependsOn(tasks.named("jsBrowserDistribution"))
     from(layout.buildDirectory.dir("dist/js/productionExecutable"))
     from(layout.projectDirectory.dir("vendor/monaco-editor")) {
         into("vendor/monaco-editor")
     }
-    into(layout.buildDirectory.dir("exportedComposeSpike"))
+    into(layout.buildDirectory.dir("exportedComposeWeb"))
 }
