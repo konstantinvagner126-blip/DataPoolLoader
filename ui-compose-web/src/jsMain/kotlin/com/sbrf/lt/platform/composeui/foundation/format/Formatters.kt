@@ -24,6 +24,48 @@ fun formatNumber(value: Number?): String {
     }
 }
 
+fun formatDuration(
+    startedAt: String?,
+    finishedAt: String?,
+    running: Boolean = false,
+): String {
+    val startMillis = parseEpochMillis(startedAt) ?: return "-"
+    val endMillis = parseEpochMillis(finishedAt) ?: if (running) {
+        js("Date.now()") as Double
+    } else {
+        return "-"
+    }
+    val durationMillis = (endMillis - startMillis).toLong().coerceAtLeast(0L)
+    return formatDurationMillis(durationMillis)
+}
+
+fun formatDurationMillis(durationMillis: Long?): String {
+    if (durationMillis == null) {
+        return "-"
+    }
+    val totalSeconds = (durationMillis / 1000L).coerceAtLeast(0L)
+    val hours = totalSeconds / 3600L
+    val minutes = (totalSeconds % 3600L) / 60L
+    val seconds = totalSeconds % 60L
+    return when {
+        hours > 0L -> "${hours}ч ${minutes}м ${seconds}с"
+        minutes > 0L -> "${minutes}м ${seconds}с"
+        else -> "${seconds}с"
+    }
+}
+
+private fun parseEpochMillis(value: String?): Double? {
+    if (value.isNullOrBlank()) {
+        return null
+    }
+    return try {
+        val result = js("Date.parse(value)") as Double
+        if (result.isNaN()) null else result
+    } catch (_: dynamic) {
+        null
+    }
+}
+
 fun statusTone(status: String?): String =
     when (status?.uppercase()) {
         "SUCCESS", "COMPLETED" -> "success"

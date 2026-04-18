@@ -4,6 +4,16 @@ import com.sbrf.lt.platform.composeui.model.RuntimeContext
 import kotlinx.serialization.Serializable
 
 @Serializable
+data class CurrentStorageModuleResponse(
+    val moduleCode: String,
+    val currentRunsCount: Int,
+    val currentStorageBytes: Long,
+    val currentOutputDirs: Int? = null,
+    val oldestRequestedAt: String? = null,
+    val newestRequestedAt: String? = null,
+)
+
+@Serializable
 data class RunHistoryCleanupModuleResponse(
     val moduleCode: String,
     val totalRunsToDelete: Int,
@@ -18,6 +28,13 @@ data class RunHistoryCleanupPreviewResponse(
     val retentionDays: Int,
     val keepMinRunsPerModule: Int,
     val cutoffTimestamp: String,
+    val currentRunsCount: Int = 0,
+    val currentModulesCount: Int = 0,
+    val currentStorageBytes: Long = 0,
+    val currentOldestRequestedAt: String? = null,
+    val currentNewestRequestedAt: String? = null,
+    val currentTopModules: List<CurrentStorageModuleResponse> = emptyList(),
+    val estimatedBytesToFree: Long? = null,
     val totalModulesAffected: Int = 0,
     val totalRunsToDelete: Int = 0,
     val totalSourceResultsToDelete: Int = 0,
@@ -66,6 +83,13 @@ data class OutputRetentionPreviewResponse(
     val retentionDays: Int,
     val keepMinRunsPerModule: Int,
     val cutoffTimestamp: String,
+    val currentRunsWithOutput: Int = 0,
+    val currentModulesWithOutput: Int = 0,
+    val currentOutputDirs: Int = 0,
+    val currentBytes: Long = 0,
+    val currentOldestRequestedAt: String? = null,
+    val currentNewestRequestedAt: String? = null,
+    val currentTopModules: List<CurrentStorageModuleResponse> = emptyList(),
     val totalModulesAffected: Int = 0,
     val totalRunsAffected: Int = 0,
     val totalOutputDirsToDelete: Int = 0,

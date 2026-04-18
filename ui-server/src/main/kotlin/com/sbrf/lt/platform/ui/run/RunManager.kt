@@ -9,6 +9,7 @@ import com.sbrf.lt.platform.ui.config.UiAppConfig
 import com.sbrf.lt.platform.ui.config.UiConfigLoader
 import com.sbrf.lt.platform.ui.config.storageDirPath
 import com.sbrf.lt.platform.ui.model.CredentialsStatusResponse
+import com.sbrf.lt.platform.ui.model.CurrentStorageModuleResponse
 import com.sbrf.lt.platform.ui.model.ModuleDescriptor
 import com.sbrf.lt.platform.ui.model.ModuleDetailsResponse
 import com.sbrf.lt.platform.ui.model.RunHistoryCleanupModuleResponse
@@ -246,6 +247,13 @@ class RunManager(
             retentionDays = retentionDays,
             keepMinRunsPerModule = keepMinRunsPerModule,
             cutoffTimestamp = cutoffTimestamp,
+            currentRunsCount = snapshots.size,
+            currentModulesCount = snapshots.map { it.moduleId }.distinct().size,
+            currentStorageBytes = stateStore.currentFileSizeBytes(),
+            currentOldestRequestedAt = snapshots.minOfOrNull { it.startedAt },
+            currentNewestRequestedAt = snapshots.maxOfOrNull { it.startedAt },
+            currentTopModules = buildCurrentHistoryUsageModules(),
+            estimatedBytesToFree = estimateHistoryCleanupBytesToFree(preview.runIds),
             totalModulesAffected = preview.modules.size,
             totalRunsToDelete = preview.runIds.size,
             totalEventsToDelete = preview.totalEventsToDelete,
@@ -345,6 +353,49 @@ class RunManager(
             modules = deletableByModule.map { it.summary }.sortedBy { it.moduleCode },
         )
     }
+
+    private fun estimateHistoryCleanupBytesToFree(runIdsToDelete: Set<String>): Long? {
+        val currentSize = stateStore.currentFileSizeBytes()
+        if (currentSize <= 0L || runIdsToDelete.isEmpty()) {
+            return 0L
+        }
+        val projectedState = PersistedRunState(
+            history = snapshots
+                .filterNot { it.id in runIdsToDelete }
+                .sortedByDescending { it.startedAt }
+                .map { it.toUi() },
+        )
+        val projectedBytes = mapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(projectedState).size.toLong()
+        return (currentSize - projectedBytes).coerceAtLeast(0L)
+    }
+
+    private fun buildCurrentHistoryUsageModules(): List<CurrentStorageModuleResponse> =
+        snapshots
+            .groupBy { it.moduleId }
+            .map { (moduleCode, moduleSnapshots) ->
+                CurrentStorageModuleResponse(
+                    moduleCode = moduleCode,
+                    currentRunsCount = moduleSnapshots.size,
+                    currentStorageBytes = estimateHistoryStorageBytesForSnapshots(moduleSnapshots),
+                    oldestRequestedAt = moduleSnapshots.minOfOrNull { it.startedAt },
+                    newestRequestedAt = moduleSnapshots.maxOfOrNull { it.startedAt },
+                )
+            }
+            .sortedWith(
+                compareByDescending<CurrentStorageModuleResponse> { it.currentStorageBytes }
+                    .thenByDescending { it.currentRunsCount }
+                    .thenBy { it.moduleCode },
+            )
+            .take(5)
+
+    private fun estimateHistoryStorageBytesForSnapshots(moduleSnapshots: List<MutableRunSnapshot>): Long =
+        mapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(
+            PersistedRunState(
+                history = moduleSnapshots
+                    .sortedByDescending { it.startedAt }
+                    .map { it.toUi() },
+            ),
+        ).size.toLong()
 
     private data class FilesHistoryCleanupPreview(
         val retentionDays: Int,

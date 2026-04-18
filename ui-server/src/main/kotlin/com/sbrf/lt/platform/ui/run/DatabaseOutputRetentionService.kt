@@ -1,5 +1,7 @@
 package com.sbrf.lt.platform.ui.run
 
+import com.sbrf.lt.platform.ui.model.CurrentStorageModuleResponse
+import com.sbrf.lt.platform.ui.model.output.OutputRetentionModuleResponse
 import com.sbrf.lt.platform.ui.model.output.OutputRetentionPreviewResponse
 import com.sbrf.lt.platform.ui.model.output.OutputRetentionResultResponse
 import java.time.Instant
@@ -12,6 +14,7 @@ open class DatabaseOutputRetentionService(
 ) {
     open fun previewCleanup(disableSafeguard: Boolean = false): OutputRetentionPreviewResponse {
         val cutoffTimestamp = cleanupCutoff()
+        val currentUsage = buildCurrentUsagePlan()
         val plan = buildPlan(cutoffTimestamp, disableSafeguard)
         return OutputRetentionPreviewResponse(
             storageMode = "DATABASE",
@@ -19,6 +22,29 @@ open class DatabaseOutputRetentionService(
             retentionDays = retentionDays,
             keepMinRunsPerModule = keepMinRunsPerModule,
             cutoffTimestamp = cutoffTimestamp,
+            currentRunsWithOutput = currentUsage.totalRunsAffected,
+            currentModulesWithOutput = currentUsage.modules.size,
+            currentOutputDirs = currentUsage.directories.size,
+            currentBytes = currentUsage.totalBytesToFree,
+            currentOldestRequestedAt = currentUsage.runs.minOfOrNull { it.requestedAt },
+            currentNewestRequestedAt = currentUsage.runs.maxOfOrNull { it.requestedAt },
+            currentTopModules = currentUsage.modules
+                .sortedWith(
+                    compareByDescending<OutputRetentionModuleResponse> { it.totalBytesToFree }
+                        .thenByDescending { it.totalOutputDirsToDelete }
+                        .thenBy { it.moduleCode },
+                )
+                .take(5)
+                .map { module ->
+                    CurrentStorageModuleResponse(
+                        moduleCode = module.moduleCode,
+                        currentRunsCount = module.totalRunsAffected,
+                        currentStorageBytes = module.totalBytesToFree,
+                        currentOutputDirs = module.totalOutputDirsToDelete,
+                        oldestRequestedAt = module.oldestRequestedAt,
+                        newestRequestedAt = module.newestRequestedAt,
+                    )
+                },
             totalModulesAffected = plan.modules.size,
             totalRunsAffected = plan.totalRunsAffected,
             totalOutputDirsToDelete = plan.totalOutputDirsToDelete,
@@ -59,6 +85,9 @@ open class DatabaseOutputRetentionService(
                 disableSafeguard = disableSafeguard,
             ),
         )
+
+    private fun buildCurrentUsagePlan(): OutputRetentionPlan =
+        OutputRetentionPlanner.buildPlan(runStore.listCurrentOutputUsageCandidates())
 
     private fun cleanupCutoff(): Instant =
         Instant.now().minus(retentionDays.toLong(), ChronoUnit.DAYS)

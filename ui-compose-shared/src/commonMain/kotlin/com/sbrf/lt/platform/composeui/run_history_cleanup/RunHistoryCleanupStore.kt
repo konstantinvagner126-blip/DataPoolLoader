@@ -31,7 +31,7 @@ class RunHistoryCleanupStore(
             errorMessage = listOfNotNull(
                 previewResult.exceptionOrNull()?.message,
                 outputPreviewResult.exceptionOrNull()?.message,
-            ).takeIf { it.isNotEmpty() }?.joinToString("\n"),
+            ).distinct().takeIf { it.isNotEmpty() }?.joinToString("\n"),
         )
     }
 

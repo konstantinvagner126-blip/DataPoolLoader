@@ -493,6 +493,110 @@ object RunHistorySql {
         order by requested_at desc, module_code asc
         """.trimIndent()
 
+    fun listCurrentOutputUsageCandidates(schema: String): String =
+        """
+        select
+            m.module_code,
+            mr.requested_at,
+            mr.output_dir
+        from $schema.module_run mr
+        join $schema.module m on m.module_id = mr.module_id
+        where mr.output_dir is not null
+          and btrim(mr.output_dir) <> ''
+        order by mr.requested_at desc, m.module_code asc
+        """.trimIndent()
+
+    fun currentHistoryStorageOverview(schema: String): String =
+        """
+        select
+            count(*) as total_runs,
+            count(distinct m.module_code) as total_modules,
+            min(mr.requested_at) as oldest_requested_at,
+            max(mr.requested_at) as newest_requested_at
+        from $schema.module_run mr
+        join $schema.module m on m.module_id = mr.module_id
+        """.trimIndent()
+
+    fun currentHistoryStorageTopModules(schema: String): String =
+        """
+        with run_bytes as (
+            select
+                m.module_code,
+                count(*) as current_runs_count,
+                min(mr.requested_at) as oldest_requested_at,
+                max(mr.requested_at) as newest_requested_at,
+                coalesce(sum(pg_column_size(ROW(mr.*))), 0)::bigint as run_bytes
+            from $schema.module_run mr
+            join $schema.module m on m.module_id = mr.module_id
+            group by m.module_code
+        ),
+        source_bytes as (
+            select
+                m.module_code,
+                coalesce(sum(pg_column_size(ROW(rs.*))), 0)::bigint as source_bytes
+            from $schema.module_run_source_result rs
+            join $schema.module_run mr on mr.run_id = rs.run_id
+            join $schema.module m on m.module_id = mr.module_id
+            group by m.module_code
+        ),
+        event_bytes as (
+            select
+                m.module_code,
+                coalesce(sum(pg_column_size(ROW(re.*))), 0)::bigint as event_bytes
+            from $schema.module_run_event re
+            join $schema.module_run mr on mr.run_id = re.run_id
+            join $schema.module m on m.module_id = mr.module_id
+            group by m.module_code
+        ),
+        artifact_bytes as (
+            select
+                m.module_code,
+                coalesce(sum(pg_column_size(ROW(ra.*))), 0)::bigint as artifact_bytes
+            from $schema.module_run_artifact ra
+            join $schema.module_run mr on mr.run_id = ra.run_id
+            join $schema.module m on m.module_id = mr.module_id
+            group by m.module_code
+        ),
+        snapshot_bytes as (
+            select
+                m.module_code,
+                coalesce(sum(pg_column_size(ROW(es.*))), 0)::bigint as snapshot_bytes
+            from $schema.execution_snapshot es
+            join $schema.module m on m.module_id = es.module_id
+            group by m.module_code
+        )
+        select
+            rb.module_code,
+            rb.current_runs_count,
+            rb.oldest_requested_at,
+            rb.newest_requested_at,
+            (
+                rb.run_bytes +
+                coalesce(sb.source_bytes, 0) +
+                coalesce(eb.event_bytes, 0) +
+                coalesce(ab.artifact_bytes, 0) +
+                coalesce(xb.snapshot_bytes, 0)
+            )::bigint as current_storage_bytes
+        from run_bytes rb
+        left join source_bytes sb on sb.module_code = rb.module_code
+        left join event_bytes eb on eb.module_code = rb.module_code
+        left join artifact_bytes ab on ab.module_code = rb.module_code
+        left join snapshot_bytes xb on xb.module_code = rb.module_code
+        order by current_storage_bytes desc, rb.current_runs_count desc, rb.module_code asc
+        limit 5
+        """.trimIndent()
+
+    fun currentHistoryStorageBytes(schema: String): String =
+        """
+        select
+            coalesce(pg_total_relation_size('$schema.module_run'), 0) +
+            coalesce(pg_total_relation_size('$schema.module_run_source_result'), 0) +
+            coalesce(pg_total_relation_size('$schema.module_run_event'), 0) +
+            coalesce(pg_total_relation_size('$schema.module_run_artifact'), 0) +
+            coalesce(pg_total_relation_size('$schema.execution_snapshot'), 0)
+            as total_history_storage_bytes
+        """.trimIndent()
+
     fun deleteCleanupRuns(schema: String): String =
         """
         ${cleanupCandidateRunsCte(schema)}

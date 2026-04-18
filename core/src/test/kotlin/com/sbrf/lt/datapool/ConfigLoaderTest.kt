@@ -5,12 +5,37 @@ import com.sbrf.lt.datapool.model.MergeMode
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 import java.nio.file.Files
 import kotlin.io.path.createDirectories
 import kotlin.io.path.writeText
 
 class ConfigLoaderTest {
     private val loader = ConfigLoader()
+
+    @Test
+    fun `yaml writer minimizes quotes for simple application config values`() {
+        val root = loader.objectMapper().createObjectNode()
+        val app = root.putObject("app")
+        app.put("outputDir", "./output")
+        app.put("fileFormat", "csv")
+        app.put("mergeMode", "round_robin")
+        app.put("commonSqlFile", "classpath:sql/common.sql")
+        val source = app.putArray("sources").addObject()
+        source.put("name", "db1")
+        source.put("jdbcUrl", "\${DB1_JDBC_URL}")
+
+        val yaml = loader.objectMapper().writeValueAsString(root)
+
+        assertFalse(yaml.startsWith("---"))
+        assertTrue("outputDir: ./output" in yaml)
+        assertTrue("fileFormat: csv" in yaml)
+        assertTrue("mergeMode: round_robin" in yaml)
+        assertTrue("commonSqlFile: classpath:sql/common.sql" in yaml)
+        assertTrue("jdbcUrl:" in yaml)
+        assertFalse("fileFormat: \"csv\"" in yaml)
+    }
 
     @Test
     fun `loads source override sql`() {

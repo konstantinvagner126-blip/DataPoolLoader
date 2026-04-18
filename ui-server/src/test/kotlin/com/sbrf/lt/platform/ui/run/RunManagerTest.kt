@@ -542,6 +542,10 @@ class RunManagerTest {
         )
 
         assertEquals("FILES", preview.storageMode)
+        assertEquals(35, preview.currentRunsCount)
+        assertEquals(1, preview.currentModulesCount)
+        assertTrue(preview.currentStorageBytes > 0)
+        assertTrue((preview.estimatedBytesToFree ?: 0L) > 0L)
         assertEquals(1, preview.totalModulesAffected)
         assertEquals(4, preview.totalRunsToDelete)
         assertEquals(8, preview.totalEventsToDelete)

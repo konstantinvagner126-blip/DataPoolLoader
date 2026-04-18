@@ -18,6 +18,7 @@ import com.sbrf.lt.platform.composeui.foundation.component.StatusBadge
 import com.sbrf.lt.platform.composeui.foundation.component.buildRunProgressStages
 import com.sbrf.lt.platform.composeui.foundation.dom.classes
 import com.sbrf.lt.platform.composeui.foundation.format.formatDateTime
+import com.sbrf.lt.platform.composeui.foundation.format.formatDuration
 import com.sbrf.lt.platform.composeui.foundation.format.formatNumber
 import com.sbrf.lt.platform.composeui.foundation.format.statusTone
 import com.sbrf.lt.platform.composeui.foundation.updates.PollingEffect
@@ -298,6 +299,23 @@ fun ComposeModuleRunsPage(
                                     ?: details.sourceResults.count { it.status.equals("SKIPPED", ignoreCase = true) }
                                 val warningCount = failedCount + skippedCount
                                 val currentStageKey = detectRunStageKey(details.run, details.events)
+                                val runDuration = formatDuration(
+                                    details.run.startedAt,
+                                    details.run.finishedAt,
+                                    running = details.run.status.equals("RUNNING", ignoreCase = true),
+                                )
+                                val mergeDuration = formatStageDuration(
+                                    details.events,
+                                    stage = "MERGE",
+                                    running = details.run.status.equals("RUNNING", ignoreCase = true) &&
+                                        currentStageKey == "merge",
+                                )
+                                val targetDuration = formatStageDuration(
+                                    details.events,
+                                    stage = "TARGET",
+                                    running = details.run.status.equals("RUNNING", ignoreCase = true) &&
+                                        currentStageKey == "target",
+                                )
                                 SectionCard(
                                     title = "Выбранный запуск",
                                     subtitle = "Краткая сводка по текущему запуску.",
@@ -334,6 +352,11 @@ fun ComposeModuleRunsPage(
                                                 label = "Строк в merged",
                                                 value = formatNumber(details.run.mergedRowCount),
                                                 tone = "important",
+                                            ),
+                                            RunProgressMetric(
+                                                label = "Длительность",
+                                                value = runDuration,
+                                                tone = if (runDuration != "-") "important" else "default",
                                             ),
                                             RunProgressMetric(
                                                 label = "Успешные источники",
@@ -382,6 +405,9 @@ fun ComposeModuleRunsPage(
                                     SummaryRow("Запрошен", formatDateTime(details.run.requestedAt ?: details.run.startedAt))
                                     SummaryRow("Старт", formatDateTime(details.run.startedAt))
                                     SummaryRow("Завершение", formatDateTime(details.run.finishedAt))
+                                    SummaryRow("Длительность", runDuration)
+                                    SummaryRow("Длительность merge", mergeDuration)
+                                    SummaryRow("Длительность target", targetDuration)
                                     SummaryRow("Источник запуска", translateLaunchSource(details.run.launchSourceKind))
                                     SummaryRow("Строк в merged", formatNumber(details.run.mergedRowCount))
                                     SummaryRow("Target", details.run.targetTableName ?: "-")
@@ -407,6 +433,7 @@ fun ComposeModuleRunsPage(
                                         SummaryRow("Файл merged", structuredSummary.mergedFile ?: "-")
                                         SummaryRow("Старт", formatDateTime(structuredSummary.startedAt))
                                         SummaryRow("Завершение", formatDateTime(structuredSummary.finishedAt))
+                                        SummaryRow("Длительность", formatDuration(structuredSummary.startedAt, structuredSummary.finishedAt))
                                         SummaryRow("Строк в merged", formatNumber(structuredSummary.mergedRowCount))
                                         SummaryRow("Макс. строк merged", formatNumber(structuredSummary.maxMergedRows))
                                         SummaryRow("Статус target", translateRunStatus(structuredSummary.targetStatus))
@@ -508,6 +535,7 @@ fun ComposeModuleRunsPage(
                                                         org.jetbrains.compose.web.dom.Th { Text("Попало в merged") }
                                                         org.jetbrains.compose.web.dom.Th { Text("Старт") }
                                                         org.jetbrains.compose.web.dom.Th { Text("Финиш") }
+                                                        org.jetbrains.compose.web.dom.Th { Text("Длительность") }
                                                         org.jetbrains.compose.web.dom.Th { Text("Ошибка") }
                                                     }
                                                 }
@@ -525,6 +553,15 @@ fun ComposeModuleRunsPage(
                                                             org.jetbrains.compose.web.dom.Td { Text(formatNumber(item.mergedRowCount)) }
                                                             org.jetbrains.compose.web.dom.Td { Text(formatDateTime(item.startedAt)) }
                                                             org.jetbrains.compose.web.dom.Td { Text(formatDateTime(item.finishedAt)) }
+                                                            org.jetbrains.compose.web.dom.Td {
+                                                                Text(
+                                                                    formatDuration(
+                                                                        item.startedAt,
+                                                                        item.finishedAt,
+                                                                        running = item.status.equals("RUNNING", ignoreCase = true),
+                                                                    ),
+                                                                )
+                                                            }
                                                             org.jetbrains.compose.web.dom.Td { Text(item.errorMessage ?: "-") }
                                                         }
                                                     }
@@ -664,6 +701,29 @@ fun ComposeModuleRunsPage(
         },
     )
 }
+
+private fun formatStageDuration(
+    events: List<ModuleRunEventResponse>,
+    stage: String,
+    running: Boolean,
+): String {
+    val stageEvents = events.filter { it.stage.equals(stage, ignoreCase = true) }
+    val startedAt = stageEvents
+        .firstOrNull { isStageStartEvent(it) }
+        ?.timestamp
+        ?: stageEvents.firstOrNull()?.timestamp
+    val finishedAt = stageEvents
+        .lastOrNull { isStageFinishedEvent(it) }
+        ?.timestamp
+    return formatDuration(startedAt, finishedAt, running = running)
+}
+
+private fun isStageStartEvent(event: ModuleRunEventResponse): Boolean =
+    event.eventType.uppercase().contains("STARTED")
+
+private fun isStageFinishedEvent(event: ModuleRunEventResponse): Boolean =
+    event.eventType.uppercase().contains("FINISHED") ||
+        event.eventType.uppercase().contains("FAILED")
 
 @Composable
 private fun SummaryMetricBadge(

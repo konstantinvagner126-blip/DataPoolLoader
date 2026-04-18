@@ -8,6 +8,7 @@ import kotlin.io.path.createDirectories
 import kotlin.io.path.exists
 import kotlin.io.path.inputStream
 import kotlin.io.path.outputStream
+import kotlin.io.path.fileSize
 
 class RunStateStore(
     private val storageDir: Path,
@@ -38,4 +39,7 @@ class RunStateStore(
             StandardCopyOption.ATOMIC_MOVE,
         )
     }
+
+    fun currentFileSizeBytes(): Long =
+        if (stateFile.exists()) stateFile.fileSize() else 0L
 }

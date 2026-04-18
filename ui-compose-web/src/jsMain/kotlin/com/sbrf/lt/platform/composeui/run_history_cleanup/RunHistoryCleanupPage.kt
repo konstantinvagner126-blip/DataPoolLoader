@@ -40,7 +40,7 @@ fun ComposeRunHistoryCleanupPage(
     }
 
     val runtimeContext = state.runtimeContext
-    val storageMode = runtimeContext?.effectiveMode
+    val storageMode = runtimeContext?.requestedMode
 
     PageScaffold(
         eyebrow = "Нагрузочное тестирование",
@@ -60,6 +60,12 @@ fun ComposeRunHistoryCleanupPage(
             }
         },
         content = {
+            runtimeContext?.takeIf { it.requestedMode != it.effectiveMode }?.let { fallbackContext ->
+                AlertBanner(
+                    buildFallbackWarning(fallbackContext),
+                    "warning",
+                )
+            }
             if (state.errorMessage != null) {
                 AlertBanner(state.errorMessage ?: "", "warning")
             }
@@ -134,14 +140,14 @@ private fun CleanupSection(
     val canExecute = state.actionInProgress == null &&
         preview != null &&
         (preview.totalRunsToDelete > 0 || preview.totalOrphanExecutionSnapshotsToDelete > 0)
-    val storageLabel = when (state.runtimeContext?.effectiveMode) {
+    val storageLabel = when (state.runtimeContext?.requestedMode) {
         ModuleStoreMode.DATABASE -> "База данных"
         ModuleStoreMode.FILES -> "Файлы"
         null -> "Загрузка..."
     }
 
     SectionCard(
-        title = "Текущий режим: $storageLabel",
+        title = "Выбранный режим: $storageLabel",
         subtitle = "Очистка сохраненной истории запусков без удаления output-каталогов.",
         actions = {
             Button(attrs = {
@@ -177,7 +183,7 @@ private fun CleanupSection(
                 onChange { onToggleDisableSafeguard(!state.cleanupDisableSafeguard) }
             })
             Span({ classes("module-sync-cleanup-toggle-copy") }) {
-                Text(buildSafeguardLabel(state.runtimeContext?.effectiveMode))
+                Text(buildSafeguardLabel(state.runtimeContext?.requestedMode))
             }
         }
 
@@ -199,19 +205,29 @@ private fun CleanupSection(
                 },
             )
             CleanupOverviewCard(
+                label = "Текущий объем",
+                value = formatBytes(preview.currentStorageBytes),
+                note = buildCurrentHistoryNote(preview),
+            )
+            CleanupOverviewCard(
+                label = "Период истории",
+                value = "${preview.currentRunsCount} запусков",
+                note = "${preview.currentModulesCount} модулей · ${formatInstant(preview.currentOldestRequestedAt)} .. ${formatInstant(preview.currentNewestRequestedAt)}",
+            )
+            CleanupOverviewCard(
                 label = "Кандидаты на удаление",
                 value = "${preview.totalRunsToDelete} запусков",
                 note = "${preview.totalModulesAffected} модулей · cutoff ${formatInstant(preview.cutoffTimestamp)}",
             )
             CleanupOverviewCard(
-                label = "События",
-                value = preview.totalEventsToDelete.toString(),
-                note = buildRelatedRecordsNote(preview),
+                label = "Освобождение",
+                value = buildCleanupFreedValue(preview),
+                note = buildCleanupFreedNote(preview),
             )
             CleanupOverviewCard(
                 label = "Дополнительно",
                 value = preview.totalOrphanExecutionSnapshotsToDelete.toString(),
-                note = buildExtraCleanupNote(preview),
+                note = buildRelatedRecordsNote(preview),
             )
         }
 
@@ -234,6 +250,17 @@ private fun CleanupSection(
                             )
                         }
                     }
+                }
+            }
+        }
+
+        if (preview.currentTopModules.isNotEmpty()) {
+            Div({ classes("small", "text-secondary", "mt-3", "mb-2") }) {
+                Text("Самые тяжелые модули сейчас")
+            }
+            Div({ classes("module-sync-cleanup-modules") }) {
+                preview.currentTopModules.forEach { module ->
+                    CurrentTopModuleRow(module = module, includeOutputDirs = false)
                 }
             }
         }
@@ -312,6 +339,16 @@ private fun OutputRetentionSection(
                 },
             )
             CleanupOverviewCard(
+                label = "Текущий объем",
+                value = formatBytes(preview.currentBytes),
+                note = "${preview.currentOutputDirs} каталогов · ${preview.currentRunsWithOutput} запусков с output.",
+            )
+            CleanupOverviewCard(
+                label = "Период output",
+                value = "${preview.currentModulesWithOutput} модулей",
+                note = "${formatInstant(preview.currentOldestRequestedAt)} .. ${formatInstant(preview.currentNewestRequestedAt)}",
+            )
+            CleanupOverviewCard(
                 label = "Каталоги",
                 value = preview.totalOutputDirsToDelete.toString(),
                 note = "${preview.totalModulesAffected} модулей · cutoff ${formatInstant(preview.cutoffTimestamp)}",
@@ -352,6 +389,17 @@ private fun OutputRetentionSection(
                 }
             }
         }
+
+        if (preview.currentTopModules.isNotEmpty()) {
+            Div({ classes("small", "text-secondary", "mt-3", "mb-2") }) {
+                Text("Самые тяжелые модули сейчас")
+            }
+            Div({ classes("module-sync-cleanup-modules") }) {
+                preview.currentTopModules.forEach { module ->
+                    CurrentTopModuleRow(module = module, includeOutputDirs = true)
+                }
+            }
+        }
     }
 }
 
@@ -368,6 +416,28 @@ private fun CleanupOverviewCard(
     }
 }
 
+@Composable
+private fun CurrentTopModuleRow(
+    module: CurrentStorageModuleResponse,
+    includeOutputDirs: Boolean,
+) {
+    Div({ classes("module-sync-cleanup-module-row") }) {
+        Div({ classes("module-sync-cleanup-module-code") }) { Text(module.moduleCode) }
+        Div({ classes("module-sync-cleanup-module-meta") }) {
+            val outputPart = if (includeOutputDirs) {
+                " · ${module.currentOutputDirs ?: 0} каталогов"
+            } else {
+                ""
+            }
+            Text(
+                "${formatBytes(module.currentStorageBytes)} · " +
+                    "${module.currentRunsCount} запусков$outputPart · " +
+                    "${formatInstant(module.oldestRequestedAt)} .. ${formatInstant(module.newestRequestedAt)}",
+            )
+        }
+    }
+}
+
 private fun buildSubtitle(storageMode: ModuleStoreMode?): String =
     when (storageMode) {
         ModuleStoreMode.DATABASE ->
@@ -376,6 +446,16 @@ private fun buildSubtitle(storageMode: ModuleStoreMode?): String =
             "Cleanup истории и output-каталогов файловых запусков по retention policy."
         null ->
             "Очистка истории запусков и output-каталогов в зависимости от выбранного режима UI."
+    }
+
+private fun buildFallbackWarning(runtimeContext: com.sbrf.lt.platform.composeui.model.RuntimeContext): String =
+    buildString {
+        append("Выбран режим базы данных, но он сейчас недоступен.")
+        runtimeContext.fallbackReason?.takeIf { it.isNotBlank() }?.let { reason ->
+            append(" Причина: ")
+            append(reason)
+        }
+        append(" Экран показывает состояние выбранного режима, а операции для БД будут недоступны до восстановления подключения.")
     }
 
 private fun buildSafeguardLabel(storageMode: ModuleStoreMode?): String =
@@ -388,16 +468,26 @@ private fun buildSafeguardLabel(storageMode: ModuleStoreMode?): String =
 
 private fun buildRelatedRecordsNote(preview: RunHistoryCleanupPreviewResponse): String =
     if (preview.storageMode == "DATABASE") {
-        "Source results: ${preview.totalSourceResultsToDelete} · artifacts: ${preview.totalArtifactsToDelete}"
+        "Source results: ${preview.totalSourceResultsToDelete} · artifacts: ${preview.totalArtifactsToDelete} · events: ${preview.totalEventsToDelete}"
     } else {
         "Для FILES удаляются встроенные события из сохраненных snapshot-ов."
     }
 
-private fun buildExtraCleanupNote(preview: RunHistoryCleanupPreviewResponse): String =
+private fun buildCurrentHistoryNote(preview: RunHistoryCleanupPreviewResponse): String =
     if (preview.storageMode == "DATABASE") {
-        "Orphan snapshots: ${preview.totalOrphanExecutionSnapshotsToDelete}"
+        "Физический размер history-таблиц PostgreSQL в текущем режиме."
     } else {
-        "Output-каталоги не затрагиваются."
+        "Размер persisted history файла run-state.json."
+    }
+
+private fun buildCleanupFreedValue(preview: RunHistoryCleanupPreviewResponse): String =
+    preview.estimatedBytesToFree?.let(::formatBytes) ?: "Через VACUUM"
+
+private fun buildCleanupFreedNote(preview: RunHistoryCleanupPreviewResponse): String =
+    if (preview.storageMode == "DATABASE") {
+        "DELETE уменьшит данные логически, а физическое место PostgreSQL вернет после autovacuum/VACUUM."
+    } else {
+        "Оценка уменьшения persisted history после cleanup preview."
     }
 
 private fun formatInstant(value: String?): String =

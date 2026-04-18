@@ -1329,6 +1329,61 @@ class ServerTest {
     }
 
     @Test
+    fun `common maintenance endpoints respect requested database mode when database is unavailable`() = testApplication {
+        val uiConfig = UiAppConfig(
+            moduleStore = UiModuleStoreConfig(
+                mode = UiModuleStoreMode.DATABASE,
+                postgres = UiModuleStorePostgresConfig(),
+            ),
+            storageDir = Files.createTempDirectory("ui-maintenance-db-fallback-state-").toString(),
+            sqlConsole = SqlConsoleConfig(),
+        )
+        application {
+            uiModule(
+                uiConfig = uiConfig,
+                runtimeContextService = UiRuntimeContextService(
+                    actorResolver = object : com.sbrf.lt.platform.ui.config.UiActorResolver() {
+                        override fun resolveAutomaticActor() = null
+                    },
+                    connectionChecker = object : UiDatabaseConnectionChecker() {
+                        override fun check(config: UiModuleStorePostgresConfig): UiDatabaseConnectionStatus {
+                            return UiDatabaseConnectionStatus(
+                                configured = false,
+                                available = false,
+                                schema = config.schemaName(),
+                                message = "Параметры подключения к базе данных не настроены.",
+                            )
+                        }
+                    },
+                ),
+            )
+        }
+
+        val cleanupPreview = client.get("/api/run-history/cleanup/preview")
+        val cleanupExecute = client.post("/api/run-history/cleanup") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"disableSafeguard":false}""")
+        }
+        val outputPreview = client.get("/api/output-retention/preview")
+        val outputExecute = client.post("/api/output-retention") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"disableSafeguard":false}""")
+        }
+
+        assertEquals(HttpStatusCode.BadRequest, cleanupPreview.status)
+        assertTrue(cleanupPreview.bodyAsText().contains("Режим базы данных сейчас недоступен."))
+
+        assertEquals(HttpStatusCode.BadRequest, cleanupExecute.status)
+        assertTrue(cleanupExecute.bodyAsText().contains("Режим базы данных сейчас недоступен."))
+
+        assertEquals(HttpStatusCode.BadRequest, outputPreview.status)
+        assertTrue(outputPreview.bodyAsText().contains("Режим базы данных сейчас недоступен."))
+
+        assertEquals(HttpStatusCode.BadRequest, outputExecute.status)
+        assertTrue(outputExecute.bodyAsText().contains("Режим базы данных сейчас недоступен."))
+    }
+
+    @Test
     fun `runtime context switches to database after credentials upload`() = testApplication {
         val uiConfig = UiAppConfig(
             moduleStore = UiModuleStoreConfig(

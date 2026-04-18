@@ -1,30 +1,30 @@
+---
 app:
-  outputDir: ./output
-  fileFormat: csv
-  mergeMode: round_robin
-  errorMode: continue_on_error
+  outputDir: "./output"
+  fileFormat: "csv"
+  mergeMode: "round_robin"
+  errorMode: "continue_on_error"
   parallelism: 5
   fetchSize: 1000
   queryTimeoutSec: 60
   progressLogEveryRows: 10000
-  maxMergedRows:
   deleteOutputFilesAfterCompletion: false
-  commonSqlFile: classpath:sql/common.sql
+  commonSqlFile: "classpath:sql/common.sql"
   sources:
-    - name: db1
-      jdbcUrl: ${DB1_JDBC_URL}
-      username: ${DB1_USERNAME}
-      password: ${DB1_PASSWORD}
-    - name: db2
-      jdbcUrl: ${DB2_JDBC_URL}
-      username: ${DB2_USERNAME}
-      password: local-dev-password
-      sqlFile: classpath:sql/db2_override.sql
-
+  - name: "db1"
+    jdbcUrl: "${DB1_JDBC_URL}"
+    username: "${DB1_USERNAME}"
+    password: "${DB1_PASSWORD}"
+  - name: "db2"
+    jdbcUrl: "${DB2_JDBC_URL}"
+    username: "${DB2_USERNAME}"
+    password: "local-dev-password"
+    sqlFile: "classpath:sql/db2_override.sql"
   target:
     enabled: true
-    jdbcUrl: ${TARGET_JDBC_URL}
-    username: ${TARGET_USERNAME}
-    password: ${TARGET_DB_PASSWORD}
-    table: public.test_data_pool
+    jdbcUrl: "${TARGET_JDBC_URL}"
+    username: "${TARGET_USERNAME}"
+    password: "${TARGET_DB_PASSWORD}"
+    table: "public.test_data_pool"
     truncateBeforeLoad: true
+  quotas: []

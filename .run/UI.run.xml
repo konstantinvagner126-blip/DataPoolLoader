@@ -1,7 +1,7 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="UI" type="JetRunConfigurationType">
+  <configuration default="false" name="UI Server" type="JetRunConfigurationType">
     <option name="MAIN_CLASS_NAME" value="com.sbrf.lt.platform.ui.app.MainKt" />
-    <module name="DataPoolLoader.ui.main" />
+    <module name="DataPoolLoader.ui-server.main" />
     <shortenClasspath name="NONE" />
     <method v="2">
       <option name="Make" enabled="true" />

@@ -1,6 +1,8 @@
-title: SMS Offer Data Pool
-description: Выгрузка данных из нескольких PostgreSQL-источников с объединением и загрузкой результата в target БД.
+---
+title: "SMS Offer Data Pool"
+description: "Выгрузка данных из нескольких PostgreSQL-источников с объединением и\
+  \ загрузкой результата в target БД."
 tags:
-  - postgres
-  - round_robin
-  - target-load
+- "postgres"
+- "round_robin"
+- "target-load"

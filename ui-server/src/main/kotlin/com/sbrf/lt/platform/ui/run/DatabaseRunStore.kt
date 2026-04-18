@@ -18,6 +18,7 @@ import com.sbrf.lt.platform.ui.model.DatabaseRunArtifactResponse
 import com.sbrf.lt.platform.ui.model.DatabaseRunEventResponse
 import com.sbrf.lt.platform.ui.model.DatabaseRunSourceResultResponse
 import com.sbrf.lt.platform.ui.model.DatabaseModuleRunSummaryResponse
+import com.sbrf.lt.platform.ui.model.CurrentStorageModuleResponse
 import java.nio.file.Files
 import java.nio.file.Path
 import java.sql.Connection
@@ -533,11 +534,18 @@ open class DatabaseRunStore(
                 keepMinRunsPerModule = keepMinRunsPerModule,
                 disableSafeguard = disableSafeguard,
             )
+            val currentUsage = loadCurrentHistoryStorageUsage(connection, normalizedSchema)
             return DatabaseRunHistoryCleanupPreviewResponse(
                 safeguardEnabled = !disableSafeguard,
                 retentionDays = retentionDays,
                 keepMinRunsPerModule = keepMinRunsPerModule,
                 cutoffTimestamp = cutoffTimestamp,
+                currentRunsCount = currentUsage.totalRuns,
+                currentModulesCount = currentUsage.totalModules,
+                currentStorageBytes = currentUsage.totalStorageBytes,
+                currentOldestRequestedAt = currentUsage.oldestRequestedAt,
+                currentNewestRequestedAt = currentUsage.newestRequestedAt,
+                currentTopModules = currentUsage.topModules,
                 totalModulesAffected = preview.modules.size,
                 totalRunsToDelete = preview.totalRunsToDelete,
                 totalSourceResultsToDelete = preview.totalSourceResultsToDelete,
@@ -562,6 +570,29 @@ open class DatabaseRunStore(
                 cutoffTimestamp = cutoffTimestamp,
                 keepMinRunsPerModule = keepMinRunsPerModule,
                 disableSafeguard = disableSafeguard,
+            ).use { stmt ->
+                stmt.executeQuery().use { rs ->
+                    buildList {
+                        while (rs.next()) {
+                            add(
+                                OutputRetentionRunRef(
+                                    moduleCode = rs.getString("module_code"),
+                                    requestedAt = rs.getTimestamp("requested_at").toInstant(),
+                                    outputDir = rs.getString("output_dir"),
+                                ),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    internal open fun listCurrentOutputUsageCandidates(): List<OutputRetentionRunRef> {
+        val normalizedSchema = normalizeRegistrySchemaName(schema)
+        connectionProvider.getConnection().use { connection ->
+            return connection.prepareStatement(
+                RunHistorySql.listCurrentOutputUsageCandidates(normalizedSchema),
             ).use { stmt ->
                 stmt.executeQuery().use { rs ->
                     buildList {
@@ -719,6 +750,55 @@ open class DatabaseRunStore(
         )
     }
 
+    private fun loadCurrentHistoryStorageUsage(
+        connection: Connection,
+        normalizedSchema: String,
+    ): DatabaseHistoryStorageUsage {
+        val overview = connection.prepareStatement(
+            RunHistorySql.currentHistoryStorageOverview(normalizedSchema),
+        ).use { stmt ->
+            stmt.executeQuery().use { rs ->
+                if (!rs.next()) {
+                    DatabaseHistoryStorageUsage()
+                } else {
+                    DatabaseHistoryStorageUsage(
+                        totalRuns = rs.getInt("total_runs"),
+                        totalModules = rs.getInt("total_modules"),
+                        oldestRequestedAt = rs.getTimestamp("oldest_requested_at")?.toInstant(),
+                        newestRequestedAt = rs.getTimestamp("newest_requested_at")?.toInstant(),
+                    )
+                }
+            }
+        }
+        val totalBytes = connection.prepareStatement(
+            RunHistorySql.currentHistoryStorageBytes(normalizedSchema),
+        ).use { stmt ->
+            stmt.executeQuery().use { rs ->
+                if (!rs.next()) 0L else rs.getLong("total_history_storage_bytes")
+            }
+        }
+        val topModules = connection.prepareStatement(
+            RunHistorySql.currentHistoryStorageTopModules(normalizedSchema),
+        ).use { stmt ->
+            stmt.executeQuery().use { rs ->
+                buildList {
+                    while (rs.next()) {
+                        add(
+                            CurrentStorageModuleResponse(
+                                moduleCode = rs.getString("module_code"),
+                                currentRunsCount = rs.getInt("current_runs_count"),
+                                currentStorageBytes = rs.getLong("current_storage_bytes"),
+                                oldestRequestedAt = rs.getTimestamp("oldest_requested_at")?.toInstant(),
+                                newestRequestedAt = rs.getTimestamp("newest_requested_at")?.toInstant(),
+                            ),
+                        )
+                    }
+                }
+            }
+        }
+        return overview.copy(totalStorageBytes = totalBytes, topModules = topModules)
+    }
+
     private fun queryCleanupCount(
         connection: Connection,
         sql: String,
@@ -770,6 +850,15 @@ open class DatabaseRunStore(
         val totalEventsToDelete: Int,
         val totalArtifactsToDelete: Int,
         val totalOrphanExecutionSnapshotsToDelete: Int,
+    )
+
+    private data class DatabaseHistoryStorageUsage(
+        val totalRuns: Int = 0,
+        val totalModules: Int = 0,
+        val totalStorageBytes: Long = 0,
+        val oldestRequestedAt: Instant? = null,
+        val newestRequestedAt: Instant? = null,
+        val topModules: List<CurrentStorageModuleResponse> = emptyList(),
     )
 
     private fun setNullableLong(stmt: PreparedStatement, index: Int, value: Long?) {

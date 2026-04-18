@@ -40,11 +40,12 @@
 - из compact-ленты убраны технические события типа `RUN_CREATED`.
 - частота live-refresh для `FILES` выровнена между editor и экраном `История и результаты`;
 - из compact-ленты убраны стартовые технические события `RUN_STARTED / SOURCE_STARTED / MERGE_STARTED / TARGET_STARTED`.
+- в compact-блоке live-лента теперь умеет синтезировать уже существующее сообщение прогресса вида `Источник X: выгружено N строк` из `sourceResults`, если event еще не успел попасть в ленту.
 
 Что осталось:
 
-- убедиться, что в compact-блоке `Ход выполнения` онлайн и стабильно появляются уже существующие сообщения прогресса вида `Источник X: выгружено N строк` без открытия отдельного экрана;
-- финально выровнять UX progress-сценария между `FILES` и `DB`.
+- финально проверить на длинных сценариях `FILES` и `DB`, что compact-блок стабильно показывает живой прогресс без ручного refresh;
+- при необходимости дочистить только UX-подачу progress-сценария между `FILES` и `DB`, без нового backend-контракта.
 
 Критичное требование:
 
@@ -71,7 +72,8 @@
 - runtime context с fallback в `FILES`;
 - live-состояние import-flow для DB-страниц;
 - runtime-mode control без перезапуска UI;
-- route-guard для `modules / db-modules / db-sync`.
+- route-guard для `modules / db-modules / db-sync`;
+- отдельный screen обслуживания запусков и output-retention уже работает в `DB`-режиме через общий runtime-aware backend.
 
 Что осталось:
 
@@ -83,18 +85,24 @@
 
 Статус:
 
-- не реализовано
+- частично реализовано
 
 Цель:
 
 - улучшить наблюдаемость запуска.
 
+Что уже сделано:
+
+- на экране `История и результаты` показывается:
+  - общая длительность запуска;
+  - длительность `merge`;
+  - длительность `target`;
+  - длительность по каждому source.
+
 Что нужно сделать:
 
-- длительность по каждому source;
-- длительность merge;
-- длительность target import;
-- фактический timeout и runtime-параметры запуска.
+- фактический timeout и runtime-параметры запуска;
+- при необходимости добавить те же длительности и в compact summary editor-экрана.
 
 ### 18. Metadata модулей
 
@@ -106,7 +114,8 @@
 
 - metadata читается из `ui-module.yml` и переносится в DB;
 - metadata редактируется в UI для `FILES` и `DB`;
-- storage-слой выровнен по `title / description / tags / hiddenFromUi`.
+- storage-слой выровнен по `title / description / tags / hiddenFromUi`;
+- editor и catalog уже работают поверх единой модели metadata для `FILES` и `DB`.
 
 Что осталось:
 
@@ -123,7 +132,8 @@
 
 - единый `ModuleValidationService` в `core`;
 - каталог модулей отдает агрегированную диагностику;
-- `FILES` и `DB` используют единые правила live-валидации.
+- `FILES` и `DB` используют единые правила live-валидации;
+- editor показывает validation-state и пользовательские сообщения по текущему модулю.
 
 Что осталось:
 
@@ -163,7 +173,7 @@
   - [ApplicationRunner.kt](/Users/kwdev/DataPoolLoader/core/src/main/kotlin/com/sbrf/lt/datapool/app/ApplicationRunner.kt)
   - [SqlConsoleService.kt](/Users/kwdev/DataPoolLoader/core/src/main/kotlin/com/sbrf/lt/datapool/sqlconsole/SqlConsoleService.kt)
   - [DatabaseModuleStore.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/DatabaseModuleStore.kt)
-  - при необходимости [RunManager.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/RunManager.kt)
+  - при необходимости [RunManager.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/RunManager.kt) и [DatabaseRunStore.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStore.kt)
 
 
 ## Рекомендуемый порядок выполнения

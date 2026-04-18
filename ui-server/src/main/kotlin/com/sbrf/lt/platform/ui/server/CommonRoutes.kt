@@ -130,7 +130,7 @@ internal fun Route.registerCommonRoutes(
     get("/api/run-history/cleanup/preview") {
         val runtimeContext = context.currentRuntimeContext()
         val disableSafeguard = context.includeHiddenQueryParam(call.request.queryParameters["disableSafeguard"])
-        val response = when (runtimeContext.effectiveMode) {
+        val response = when (runtimeContext.requestedMode) {
             com.sbrf.lt.platform.ui.config.UiModuleStoreMode.FILES -> {
                 context.currentFilesRunHistoryCleanupService().previewCleanup(disableSafeguard)
             }
@@ -158,7 +158,7 @@ internal fun Route.registerCommonRoutes(
         } catch (_: Exception) {
             throw IllegalArgumentException("Некорректные данные для cleanup истории запусков.")
         }
-        val response = when (runtimeContext.effectiveMode) {
+        val response = when (runtimeContext.requestedMode) {
             com.sbrf.lt.platform.ui.config.UiModuleStoreMode.FILES -> {
                 context.currentFilesRunHistoryCleanupService().executeCleanup(request.disableSafeguard)
             }
@@ -177,7 +177,7 @@ internal fun Route.registerCommonRoutes(
     get("/api/output-retention/preview") {
         val runtimeContext = context.currentRuntimeContext()
         val disableSafeguard = context.includeHiddenQueryParam(call.request.queryParameters["disableSafeguard"])
-        val response = when (runtimeContext.effectiveMode) {
+        val response = when (runtimeContext.requestedMode) {
             com.sbrf.lt.platform.ui.config.UiModuleStoreMode.FILES -> {
                 context.currentFilesOutputRetentionService().previewCleanup(disableSafeguard)
             }
@@ -205,7 +205,7 @@ internal fun Route.registerCommonRoutes(
         } catch (_: Exception) {
             throw IllegalArgumentException("Некорректные данные для retention output-каталогов.")
         }
-        val response = when (runtimeContext.effectiveMode) {
+        val response = when (runtimeContext.requestedMode) {
             com.sbrf.lt.platform.ui.config.UiModuleStoreMode.FILES -> {
                 context.currentFilesOutputRetentionService().executeCleanup(request.disableSafeguard)
             }
@@ -255,6 +255,22 @@ private fun com.sbrf.lt.platform.ui.model.DatabaseRunHistoryCleanupPreviewRespon
         retentionDays = retentionDays,
         keepMinRunsPerModule = keepMinRunsPerModule,
         cutoffTimestamp = cutoffTimestamp,
+        currentRunsCount = currentRunsCount,
+        currentModulesCount = currentModulesCount,
+        currentStorageBytes = currentStorageBytes,
+        currentOldestRequestedAt = currentOldestRequestedAt,
+        currentNewestRequestedAt = currentNewestRequestedAt,
+        currentTopModules = currentTopModules.map { module ->
+            com.sbrf.lt.platform.ui.model.CurrentStorageModuleResponse(
+                moduleCode = module.moduleCode,
+                currentRunsCount = module.currentRunsCount,
+                currentStorageBytes = module.currentStorageBytes,
+                currentOutputDirs = module.currentOutputDirs,
+                oldestRequestedAt = module.oldestRequestedAt,
+                newestRequestedAt = module.newestRequestedAt,
+            )
+        },
+        estimatedBytesToFree = estimatedBytesToFree,
         totalModulesAffected = totalModulesAffected,
         totalRunsToDelete = totalRunsToDelete,
         totalSourceResultsToDelete = totalSourceResultsToDelete,
