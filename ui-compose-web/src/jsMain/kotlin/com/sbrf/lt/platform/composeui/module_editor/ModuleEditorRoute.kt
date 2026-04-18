@@ -9,5 +9,6 @@ fun parseModuleEditorRoute(params: Map<String, String>): ModuleEditorRouteState?
         storage = storage,
         moduleId = params["module"]?.trim()?.ifBlank { null },
         includeHidden = params["includeHidden"] == "true" || params["includeHidden"] == "1",
+        openCreateDialog = params["openCreate"] == "true" || params["openCreate"] == "1",
     )
 }

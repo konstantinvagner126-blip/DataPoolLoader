@@ -62,7 +62,7 @@ fun ComposeModuleEditorPage(
     route: ModuleEditorRouteState,
     api: ModuleEditorApi = remember { ModuleEditorApiClient() },
 ) {
-    var currentRoute by remember(route.storage, route.moduleId, route.includeHidden) { mutableStateOf(route) }
+    var currentRoute by remember(route.storage, route.moduleId, route.includeHidden, route.openCreateDialog) { mutableStateOf(route) }
     val store = remember(api) {
         ModuleEditorStore(
             api = api,
@@ -86,7 +86,7 @@ fun ComposeModuleEditorPage(
     val runsApi = remember { ModuleRunsApiClient() }
     val runsStore = remember(runsApi) { ModuleRunsStore(runsApi) }
     val scope = rememberCoroutineScope()
-    var state by remember(route.storage, route.moduleId, route.includeHidden) { mutableStateOf(ModuleEditorPageState()) }
+    var state by remember(route.storage, route.moduleId, route.includeHidden, route.openCreateDialog) { mutableStateOf(ModuleEditorPageState()) }
     var runPanelState by remember(route.storage, route.moduleId) {
         mutableStateOf(ModuleRunsPageState(loading = false, historyLimit = 3))
     }
@@ -96,9 +96,23 @@ fun ComposeModuleEditorPage(
     var credentialsUploadMessageLevel by remember(route.storage, route.moduleId) { mutableStateOf("success") }
     var credentialsUploadInProgress by remember(route.storage, route.moduleId) { mutableStateOf(false) }
 
-    LaunchedEffect(currentRoute.storage, currentRoute.moduleId, currentRoute.includeHidden) {
+    LaunchedEffect(currentRoute.storage, currentRoute.moduleId, currentRoute.includeHidden, currentRoute.openCreateDialog) {
         state = store.startLoading(state)
-        state = store.load(currentRoute)
+        val loadedState = store.load(currentRoute)
+        state = if (currentRoute.storage == "database" && currentRoute.openCreateDialog) {
+            window.history.replaceState(
+                null,
+                "",
+                buildComposeEditorUrl(
+                    storage = currentRoute.storage,
+                    moduleId = currentRoute.moduleId,
+                    includeHidden = currentRoute.includeHidden,
+                ),
+            )
+            store.openCreateModuleDialog(loadedState)
+        } else {
+            loadedState
+        }
     }
 
     LaunchedEffect(currentRoute.storage, state.selectedModuleId) {
@@ -209,7 +223,10 @@ fun ComposeModuleEditorPage(
                                         attr("checked", "checked")
                                     }
                                     onClick {
-                                        val nextRoute = currentRoute.copy(includeHidden = !currentRoute.includeHidden)
+                                        val nextRoute = currentRoute.copy(
+                                            includeHidden = !currentRoute.includeHidden,
+                                            openCreateDialog = false,
+                                        )
                                         currentRoute = nextRoute
                                         scope.launch {
                                             state = store.startLoading(state)
@@ -241,7 +258,10 @@ fun ComposeModuleEditorPage(
                                         onClick {
                                             scope.launch {
                                                 state = store.startLoading(state)
-                                                currentRoute = currentRoute.copy(moduleId = module.id)
+                                                currentRoute = currentRoute.copy(
+                                                    moduleId = module.id,
+                                                    openCreateDialog = false,
+                                                )
                                                 state = store.selectModule(state, currentRoute, module.id)
                                             }
                                         }
@@ -344,7 +364,10 @@ fun ComposeModuleEditorPage(
                                     scope.launch {
                                         state = store.beginAction(state, "delete")
                                         state = store.deleteDatabaseModule(state, currentRoute)
-                                        currentRoute = currentRoute.copy(moduleId = state.selectedModuleId)
+                                        currentRoute = currentRoute.copy(
+                                            moduleId = state.selectedModuleId,
+                                            openCreateDialog = false,
+                                        )
                                     }
                                 }
                             },
@@ -422,6 +445,7 @@ fun ComposeModuleEditorPage(
                                         currentRoute = currentRoute.copy(
                                             moduleId = state.selectedModuleId,
                                             includeHidden = currentRoute.includeHidden || state.session?.module?.hiddenFromUi == true,
+                                            openCreateDialog = false,
                                         )
                                     }
                                 },
@@ -1345,6 +1369,25 @@ private fun buildRunsHref(
 private fun buildEditorWebSocketUrl(): String {
     val protocol = if (window.location.protocol == "https:") "wss" else "ws"
     return "$protocol://${window.location.host}/ws"
+}
+
+private fun buildComposeEditorUrl(
+    storage: String,
+    moduleId: String?,
+    includeHidden: Boolean,
+): String {
+    val query = buildString {
+        append("?storage=")
+        append(storage)
+        if (!moduleId.isNullOrBlank()) {
+            append("&module=")
+            append(moduleId)
+        }
+        if (includeHidden) {
+            append("&includeHidden=true")
+        }
+    }
+    return "/compose-editor$query"
 }
 
 private fun buildDraftSqlFiles(state: ModuleEditorPageState): List<ModuleFileContent> {

@@ -8,7 +8,7 @@ pluginManagement {
 rootProject.name = "DataPoolLoader"
 
 include(":core")
-include(":ui")
+include(":ui-server")
 include(":ui-compose-shared")
 include(":ui-compose-web")
 include(":ui-compose-desktop")

@@ -66,6 +66,7 @@ data class ModuleEditorRouteState(
     val storage: String,
     val moduleId: String? = null,
     val includeHidden: Boolean = false,
+    val openCreateDialog: Boolean = false,
 )
 
 enum class ModuleEditorTab(

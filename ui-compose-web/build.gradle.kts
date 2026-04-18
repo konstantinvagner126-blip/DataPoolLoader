@@ -39,5 +39,8 @@ val exportComposeSpike by tasks.registering(Sync::class) {
     description = "Собирает и подготавливает артефакты Compose Web spike"
     dependsOn(tasks.named("jsBrowserDistribution"))
     from(layout.buildDirectory.dir("dist/js/productionExecutable"))
+    from(layout.projectDirectory.dir("vendor/monaco-editor")) {
+        into("vendor/monaco-editor")
+    }
     into(layout.buildDirectory.dir("exportedComposeSpike"))
 }

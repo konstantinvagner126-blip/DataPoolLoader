@@ -19,8 +19,8 @@
 - `apps/*`  
   Прикладные модули запуска. Каждый модуль содержит собственный `MainKt`, `application.yml` и SQL-ресурсы.
 
-- `ui`  
-  Локальный Ktor UI. Через него можно:
+- `ui-server`  
+  Серверная часть Compose UI в каталоге `ui-server/`. Через нее можно:
   - запускать app-модули;
   - редактировать `application.yml` и SQL-файлы;
   - смотреть историю запусков и summary;
@@ -81,7 +81,7 @@
 Запуск UI:
 
 ```bash
-./gradlew :ui:run
+./gradlew :ui-server:run
 ```
 
 После старта открыть:
@@ -472,7 +472,7 @@ sqlFile: classpath:sql/source1.sql
 Запуск:
 
 ```bash
-./gradlew :ui:run
+./gradlew :ui-server:run
 ```
 
 После запуска открыть:
@@ -550,13 +550,13 @@ UI можно упаковать как desktop-приложение без IDEA
 Команды:
 
 ```bash
-./gradlew :ui:jpackageAppImage
-./gradlew :ui:jpackageInstaller
+./gradlew :ui-server:jpackageAppImage
+./gradlew :ui-server:jpackageInstaller
 ```
 
 Результат сборки появляется в:
 
-- `ui/build/jpackage`
+- `ui-server/build/jpackage`
 
 Примеры артефактов:
 
@@ -581,7 +581,7 @@ Packaged UI сначала ищет внешний конфиг:
 2. `DATAPOOL_UI_CONFIG`
 3. `ui-application.yml` рядом с собранным приложением
 4. `~/.datapool-loader/ui/application.yml`
-5. затем fallback на встроенный `ui/src/main/resources/application.yml`
+5. затем fallback на встроенный `ui-server/src/main/resources/application.yml`
 
 Пример:
 
@@ -594,11 +594,11 @@ ui:
 
 Полный пример:
 
-- `ui/src/jpackage/ui-application.example.yml`
+- `ui-server/src/jpackage/ui-application.example.yml`
 
-После `./gradlew :ui:jpackageAppImage` рядом с собранным приложением автоматически появляется шаблон:
+После `./gradlew :ui-server:jpackageAppImage` рядом с собранным приложением автоматически появляется шаблон:
 
-- `ui/build/jpackage/ui-application.yml`
+- `ui-server/build/jpackage/ui-application.yml`
 
 Его можно отредактировать и затем запускать `.app` без IDE и без дополнительных параметров.
 
@@ -672,7 +672,7 @@ ui:
 Текущая целевая планка:
 
 - `core` >= 90%
-- `ui` >= 90%
+- `ui-server` >= 90%
 
 ## Создание нового app-модуля
 
@@ -699,8 +699,8 @@ Task:
 ## Полезные файлы
 
 - `apps/dc-sms-offer/src/main/resources/application.yml`
-- `ui/src/main/resources/application.yml`
-- `ui/src/jpackage/ui-application.example.yml`
+- `ui-server/src/main/resources/application.yml`
+- `ui-server/src/jpackage/ui-application.example.yml`
 - `gradle/credential.properties`
 - `gradle/local-postgres-test.properties`
 - `PLAN.md`

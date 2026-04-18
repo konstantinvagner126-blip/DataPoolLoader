@@ -898,9 +898,9 @@
 
 - `core/src/main/kotlin/com/sbrf/lt/datapool/app/ApplicationRunner.kt`
 - `core/src/main/kotlin/com/sbrf/lt/datapool/sqlconsole/SqlConsoleService.kt`
-- `ui/src/main/kotlin/com/sbrf/lt/platform/ui/run/RunManager.kt`
-- `ui/src/main/kotlin/com/sbrf/lt/platform/ui/server/Server.kt`
-- `ui/src/main/kotlin/com/sbrf/lt/platform/ui/module/DatabaseModuleStore.kt`
+- `ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/RunManager.kt`
+- `ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/Server.kt`
+- `ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/DatabaseModuleStore.kt`
 
 Цель:
 

@@ -162,8 +162,8 @@
 
 - `core/src/main/kotlin/com/sbrf/lt/datapool/app/ApplicationRunner.kt`
 - `core/src/main/kotlin/com/sbrf/lt/datapool/sqlconsole/SqlConsoleService.kt`
-- `ui/src/main/kotlin/com/sbrf/lt/datapool/ui/RunManager.kt`
-- `ui/src/main/kotlin/com/sbrf/lt/datapool/ui/Server.kt`
+- `ui-server/src/main/kotlin/com/sbrf/lt/datapool/ui/RunManager.kt`
+- `ui-server/src/main/kotlin/com/sbrf/lt/datapool/ui/Server.kt`
 
 Задачи:
 

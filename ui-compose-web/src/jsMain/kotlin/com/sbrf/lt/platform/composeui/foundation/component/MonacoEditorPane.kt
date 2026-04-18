@@ -14,8 +14,8 @@ import org.w3c.dom.HTMLScriptElement
 import org.jetbrains.compose.web.dom.Div
 
 private var monacoEditorCounter = 0
-private const val MONACO_LOADER_URL = "/static/vendor/monaco-editor/min/vs/loader.js"
-private const val MONACO_HELPER_URL = "/static/js/common/monaco.js?v=20260417b"
+private const val MONACO_LOADER_URL = "/static/compose-spike/vendor/monaco-editor/min/vs/loader.js"
+private const val MONACO_HELPER_URL = "/static/compose-spike/compose-monaco.js?v=20260418a"
 
 @Composable
 fun MonacoEditorPane(
@@ -40,17 +40,17 @@ fun MonacoEditorPane(
     DisposableEffect(elementId, language, readOnly) {
         var disposed = false
         ensureMonacoReady {
-            val dataPoolCommon = window.asDynamic().DataPoolCommon
-            if (dataPoolCommon == null || dataPoolCommon.withMonacoReady == undefined) {
+            val composeMonaco = window.asDynamic().ComposeMonaco
+            if (composeMonaco == null || composeMonaco.withMonacoReady == undefined) {
                 return@ensureMonacoReady
             }
-            dataPoolCommon.withMonacoReady {
+            composeMonaco.withMonacoReady {
                 if (!disposed) {
                     val options = js("{}")
                     options.value = value
                     options.language = language
                     options.readOnly = readOnly
-                    val editor = dataPoolCommon.createMonacoEditor(elementId, options)
+                    val editor = composeMonaco.createMonacoEditor(elementId, options)
                     editor.onDidChangeModelContent {
                         onValueChange(editor.getValue() as String)
                     }
@@ -76,7 +76,7 @@ fun MonacoEditorPane(
 
 private fun ensureMonacoReady(onReady: () -> Unit) {
     val global = window.asDynamic()
-    if (global.monaco?.editor != undefined && global.DataPoolCommon?.withMonacoReady != undefined) {
+    if (global.monaco?.editor != undefined && global.ComposeMonaco?.withMonacoReady != undefined) {
         onReady()
         return
     }
@@ -97,12 +97,12 @@ private fun ensureMonacoReady(onReady: () -> Unit) {
 
     loadScriptOnce(MONACO_LOADER_URL, "__composeMonacoLoaderLoaded") {
         loadScriptOnce(MONACO_HELPER_URL, "__composeMonacoHelperLoaded") {
-            val common = global.DataPoolCommon
-            if (common == null || common.withMonacoReady == undefined) {
+            val composeMonaco = global.ComposeMonaco
+            if (composeMonaco == null || composeMonaco.withMonacoReady == undefined) {
                 global.__composeMonacoLoading = false
                 return@loadScriptOnce
             }
-            common.withMonacoReady {
+            composeMonaco.withMonacoReady {
                 global.__composeMonacoLoading = false
                 val pending = global.__composeMonacoCallbacks
                 global.__composeMonacoCallbacks = js("[]")
