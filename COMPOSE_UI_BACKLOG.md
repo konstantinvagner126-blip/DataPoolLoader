@@ -17,12 +17,15 @@
 - для `YAML/SQL` редакторов используется встраиваемый browser editor через JS interop:
   - основной кандидат `Monaco`;
   - fallback-кандидат `CodeMirror`;
-- SQL-консоль не трогаем до конца миграции основных экранов.
 
 ## Архитектурный вектор
 
 - текущий `ui-compose-web` остается рабочим web-front для миграции, но не считается конечной архитектурой;
 - целевая модель: `shared + web + future desktop`, а не углубление в web-only Compose-код;
+- для desktop не закладываем обязательный отдельный сервер:
+  - desktop UI должен уметь работать как толстый клиент;
+  - web остается transport-слоем через Ktor;
+  - общий application/service слой должен обслуживать обе платформы;
 - browser-specific код должен оставаться только в web-слое:
   - DOM composables;
   - browser routing;
@@ -48,7 +51,7 @@
 - `module_runs/ModuleRunsStore.kt`
 - `module_runs/ModuleRunsFilters.kt`
 - `module_runs/ModuleRunsSummary.kt`
-- `module_runs/ModuleRunsFormatters.kt`
+- `module_runs/ModuleRunsFormatters.kt` в части pure labels/stage helpers
 - `module_editor/ModuleEditorModels.kt`
 - `module_editor/ModuleEditorStore.kt`
 - `module_editor/ModuleEditorActions.kt`
@@ -62,6 +65,83 @@
 - `App.kt`
 - `Main.kt`
 - DOM-based page composables и route adapters.
+
+Техническая оговорка по сборке:
+
+- для стабильной сборки `Compose Web` production bundle добавлен root `gradle.properties` с повышенными JVM limits для Gradle и Kotlin daemon;
+- иначе `:ui-compose-web:jsBrowserDistribution` начинает падать по памяти на `compileProductionExecutableKotlinJs`.
+
+## Эпик 7. Переход к `ui-compose-shared`
+
+Статус:
+
+- в работе
+
+Цель:
+
+- перестроить Compose-ветку так, чтобы web был только одной платформенной реализацией;
+- подготовить кодовую базу к будущему `ui-compose-desktop`, а не углублять web-only архитектуру.
+
+Выполнено:
+
+- `2026-04-18`: создан отдельный модуль [ui-compose-shared](/Users/kwdev/DataPoolLoader/ui-compose-shared);
+- `2026-04-18`: `ui-compose-web` переключен на зависимость от `ui-compose-shared`;
+- `2026-04-18`: в shared перенесены первые чистые срезы:
+  - runtime/catalog модели;
+  - `home` state/store/API contract;
+  - `module-runs` models/filter state;
+  - `module-editor` models;
+  - `module-editor` action/config-form DTO.
+- `2026-04-18`: в shared перенесен первый реальный store-слой:
+  - `module-runs` API contract;
+  - `module-runs` store;
+  - summary parser для `summary.json`;
+  - `module-editor` API contract;
+  - `module-editor` store c вынесением browser navigation в web callback.
+- `2026-04-18`: в shared вынесен первый слой pure formatters/helpers для `module-runs`:
+  - переводы статусов;
+  - переводы launch source и artifact labels;
+  - определение активной стадии запуска;
+  - summary counters.
+
+Осталось:
+
+- продолжить перенос pure logic:
+  - `module_runs/ModuleRunsFormatters.kt` там, где нет web-specific API;
+  - `module_editor` вспомогательные pure mappers/state helpers;
+- вынести shared formatters, не завязанные на DOM/browser;
+- оставить в web только:
+  - HTTP transport;
+  - browser routing;
+  - DOM composables;
+  - `Monaco` bridge;
+  - websocket lifecycle.
+
+## Эпик 8. Desktop shell
+
+Статус:
+
+- в работе
+
+Цель:
+
+- подготовить первую desktop-оболочку поверх того же `shared`-слоя, не смешивая ее с web-specific кодом;
+- подтвердить, что `ui-compose-shared` реально пригоден для JVM/desktop-платформы.
+
+Выполнено:
+
+- `2026-04-18`: добавлен модуль `ui-compose-desktop`;
+- `2026-04-18`: собран первый desktop-shell на Compose Desktop:
+  - отдельное окно приложения;
+  - использование `HomePageStore` из `ui-compose-shared`;
+  - локальный preview transport без browser API;
+  - переключение режима в рамках desktop-preview.
+
+Осталось:
+
+- добавить реальный desktop transport к Ktor backend вместо preview API;
+- вынести platform-specific desktop navigation/window actions в отдельный слой;
+- начать перенос первых экранов с общего `shared`-state на desktop UI.
 
 ## Definition of Done для экрана
 
@@ -259,11 +339,16 @@
   - карточки истории запусков используют production-классы списка и meta-строк;
   - human-readable timeline перенесен на production-классы `human-log-entry*`;
   - добавлена `Техническая диагностика` с раскрытием и raw JSON событий.
+- `2026-04-18`: добит еще один слой visual parity `module-runs`:
+  - subtitle экрана синхронизирован с production отдельно для `FILES` и `DB`;
+  - control-блок истории теперь повторяет production-модель `Показывать / Поиск`;
+  - summary-строки переведены на production-классы `run-summary-*`;
+  - блок артефактов переведен с таблицы на production-like карточки `run-artifact-*`.
 
 Осталось:
 
-- выровнять visual parity с текущим `module-runs.html`;
-- при необходимости дотянуть quick actions, compact/full режимы и оставшиеся мелкие отличия от production renderer.
+- дочистить оставшиеся мелкие spacing/layout-различия с текущим `module-runs.html`;
+- при необходимости дотянуть последние мелкие отличия quick actions и shell-подачи относительно production renderer.
 
 ## Эпик 4. Редактор модулей
 
@@ -335,19 +420,57 @@
     - целевая загрузка;
   - изменение формы обновляет реальный `application.yml` внутри Compose editor shell;
   - ручное редактирование YAML и форма синхронизируются через явное действие `Перечитать из application.yml`.
+- `2026-04-18`: вкладка `Метаданные` переведена с preview на рабочую Compose-форму:
+  - `title`;
+  - `description`;
+  - `tags`;
+  - `hiddenFromUi`;
+  - сохранение использует тот же `save/saveWorkingCopy` контракт, что и основной UI.
+- `2026-04-18`: в Compose editor добавлен parity-блок `credential.properties`:
+  - показывается текущий статус файла;
+  - показываются предупреждения по обязательным placeholders и отсутствующим ключам;
+  - загрузка `credential.properties` выполняется прямо из Compose editor через тот же backend endpoint;
+  - после upload session модуля перечитывается и блок сразу показывает обновленный статус.
+- `2026-04-18`: SQL-вкладка в Compose editor переведена из preview в рабочий каталог ресурсов:
+  - `Создать SQL`;
+  - `Переименовать` с переносом ссылок `commonSqlFile/sqlFile` через тот же `config-form` контракт;
+  - `Удалить` с запретом удаления ресурса, который еще используется;
+  - каталог строится из draft-state, поэтому новые и переименованные SQL-ресурсы сразу видны до сохранения.
+- `2026-04-18`: подключены действия администрирования DB-модуля в Compose editor:
+  - `Новый модуль` как inline-форма с `Monaco` для стартового `application.yml`;
+  - `Удалить модуль` через backend call и обновление каталога после удаления.
+- `2026-04-18`: в editor shell добавлен compact live-блок `Ход выполнения`:
+  - использует существующий `module-runs` API;
+  - показывает прогресс стадий;
+  - показывает последние события текущего или последнего запуска;
+  - обновляется через те же transport-механизмы, что и Compose `module-runs` (`FILES` через websocket, `DB` через polling).
+- `2026-04-18`: каталог DB-модулей в Compose editor доведен до production flow по скрытым модулям:
+  - добавлен toggle `Показывать скрытые модули`;
+  - route/state сохраняют `includeHidden`;
+  - скрытый модуль можно создать и сразу оставить каталог в том же режиме;
+  - скрытые модули помечаются badge `Скрыт`.
+- `2026-04-18`: action bar Compose editor приведен к production-цветовой модели:
+  - `Запустить` и `Опубликовать` используют `btn-success`;
+  - `Сохранить` и `Сохранить черновик` используют `btn-outline-primary`;
+  - `Сбросить черновик` и `Удалить модуль` используют `btn-outline-danger`;
+  - вторичные действия оставлены на `btn-outline-secondary`.
+- `2026-04-18`: кнопка `Отменить изменения` в Compose editor перестала быть декоративной:
+  - перечитывает выбранный модуль из backend;
+  - сбрасывает локальные изменения `application.yml`, SQL и metadata;
+  - ведет себя как production-действие rollback к последнему сохраненному состоянию.
+- `2026-04-18`: в Compose DB editor добавлен production-like context alert:
+  - если активный runtime не находится в режиме `База данных`, экран показывает тот же понятный warning-контекст, что и legacy UI, а не только вторичную ошибку каталога.
 
 Осталось:
 
 - довести visual parity shell до уровня production `index.html` / `db-modules.html`;
-- добавить metadata form-state вместо текущего preview;
-- добавить `Новый модуль` и `Удалить модуль`;
-- после стабилизации editor shell начать вынос state/store слоя в будущий shared-модуль.
+- после стабилизации editor shell продолжить вынос pure helpers/state logic в `ui-compose-shared`.
 
 ## Эпик 5. Импорт `files -> database`
 
 Статус:
 
-- не начато
+- в работе
 
 Цель:
 
@@ -360,17 +483,89 @@
 - сохранить историю import-run и detail-view;
 - повторить текущую текстовую и цветовую модель.
 
+Выполнено:
+
+- `2026-04-18`: добавлен Compose-route `/compose-sync`, который открывает тот же bundle с `screen=module-sync`;
+- `2026-04-18`: поднят новый slice `module_sync` в `ui-compose-shared`:
+  - общие модели sync-state;
+  - история import-run;
+  - detail-view;
+  - store с polling-refresh и действиями `sync all / sync one`;
+- `2026-04-18`: в `ui-compose-web` добавлен Compose-экран импорта модулей:
+  - текущее runtime/sync state;
+  - maintenance mode;
+  - история импортов;
+  - детали выбранного запуска;
+  - запуск `sync all` и `sync one`;
+- `2026-04-18`: ссылка `Импорт из файлов` из Compose DB editor теперь ведет в `/compose-sync`, а не в legacy `/db-sync`.
+- `2026-04-18`: action-flow `sync one` приведен к production UX:
+  - отдельная кнопка `Синхронизировать один модуль`;
+  - форма точечного импорта раскрывается и скрывается отдельно;
+  - после успешного запуска точечного импорта форма закрывается;
+  - экран остается на выбранном import-run и продолжает polling live state.
+- `2026-04-18`: история и детали `compose-sync` переведены на production panel-структуру:
+  - отдельные `panel h-100` для истории и деталей;
+  - selector лимита истории вместо временных кнопок;
+  - detail-pane выровнен под текущий `db-sync.html` по подаче summary и item-list.
+- `2026-04-18`: из `compose-sync` убран пустой hero-art контейнер, чтобы верхняя часть экрана соответствовала production `db-sync.html`, где hero без отдельной декоративной правой секции.
+
+Осталось:
+
+- довести visual parity `compose-sync` до уровня production `db-sync.html` по мелким layout-отличиям и toolbar-подаче;
+- после этого считать экран импорта функционально закрытым.
+
 ## Эпик 6. SQL-консоль
 
 Статус:
 
-- отложено
+- в работе
 
-Причина:
+Что уже сделано:
 
-- самый дорогой экран по риску;
-- зависит от embedded editor (`Monaco` или `CodeMirror`), таблиц результатов, toolbar-состояния, favorites и строгой защиты;
-- переводить только после стабилизации foundation, истории и редактора.
+- поднят отдельный Compose route `/compose-sql-console`;
+- добавлен `shared` slice:
+  - `sql_console/SqlConsoleModels.kt`;
+  - `sql_console/SqlConsoleApi.kt`;
+  - `sql_console/SqlConsoleAnalysis.kt`;
+  - `sql_console/SqlConsoleStore.kt`;
+- добавлен web transport:
+  - `sql_console/SqlConsoleApi.kt`;
+- добавлена первая рабочая Compose-страница:
+  - `sql_console/SqlConsolePage.kt`;
+- экран уже использует реальные backend endpoint-ы:
+  - `GET /api/sql-console/info`;
+  - `GET /api/sql-console/state`;
+  - `POST /api/sql-console/state`;
+  - `POST /api/sql-console/settings`;
+  - `POST /api/sql-console/connections/check`;
+  - `POST /api/sql-console/query/start`;
+  - `GET /api/sql-console/query/{id}`;
+  - `POST /api/sql-console/query/{id}/cancel`;
+- уже работают:
+  - `Monaco` editor;
+  - выбор источников;
+  - persisted draft-state;
+  - recent/favorite queries;
+  - strict safety;
+  - async run/cancel/polling;
+  - базовый вывод результатов по `shard/source`;
+  - sidebar-блок `credential.properties` с upload через UI;
+  - export `ZIP` для полного result set;
+  - export `CSV` по конкретному `shard/source`.
+  - tabs `Данные / Статусы`;
+  - отдельный data-pane c выбором активного `shard/source`;
+  - status-pane с карточками результатов по каждому source;
+  - status-table `Source / Статус / Затронуто строк / Сообщение / Ошибка`;
+  - production-like hero actions и shell toolbar;
+  - collapsible `credential.properties` через `details/summary`;
+  - двухколоночный layout блока `Последние / Избранные запросы`;
+  - постоянный output shell с tabs и placeholder/error states даже до первого запуска.
+
+Что осталось:
+
+- добить оставшиеся мелкие layout/spacing-расхождения относительно production `sql-console.html`;
+- при необходимости вынести часть table/result helpers в `shared`;
+- после этого только считать Compose SQL-консоль функционально закрытой.
 
 ## Риски
 
@@ -382,6 +577,7 @@
 ## Ближайшие шаги
 
 1. Довести visual parity editor shell до уровня production UI.
-2. Перевести metadata tab с preview на рабочую Compose-форму.
-3. Подключить `Новый модуль` и `Удалить модуль`.
-4. После стабилизации editor shell начать декомпозицию на `shared + web`.
+2. Довести visual parity `compose-sync` по layout и toolbar-подаче.
+3. Довести первый Compose-slice SQL-консоли до production parity по toolbar/results/export.
+4. Продолжить перенос pure helpers и state logic из `ui-compose-web` в `ui-compose-shared`.
+5. После стабилизации `shared + web` начать реальный desktop transport к Ktor backend.

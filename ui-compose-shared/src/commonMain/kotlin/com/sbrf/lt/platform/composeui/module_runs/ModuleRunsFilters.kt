@@ -54,9 +54,9 @@ private fun matchesSearchQuery(
         run.targetTableName,
         run.executionSnapshotId,
         run.launchSourceKind,
-        translateLaunchSource(run.launchSourceKind),
-        translateRunStatus(run.status),
-        translateRunStatus(run.targetStatus),
+        run.launchSourceKind?.replace('_', ' '),
+        run.status,
+        run.targetStatus,
     ).joinToString(" ").lowercase()
     return haystack.contains(searchQuery)
 }

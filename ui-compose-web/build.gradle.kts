@@ -26,6 +26,7 @@ kotlin {
 
     sourceSets {
         jsMain.dependencies {
+            implementation(project(":ui-compose-shared"))
             implementation(compose.runtime)
             implementation(compose.html.core)
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")

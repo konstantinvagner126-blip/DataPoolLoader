@@ -9,7 +9,9 @@ rootProject.name = "DataPoolLoader"
 
 include(":core")
 include(":ui")
+include(":ui-compose-shared")
 include(":ui-compose-web")
+include(":ui-compose-desktop")
 
 val appsDir = file("apps")
 if (appsDir.exists()) {

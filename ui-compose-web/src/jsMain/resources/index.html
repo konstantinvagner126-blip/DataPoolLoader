@@ -10,6 +10,47 @@
 </head>
 <body>
   <div id="root"></div>
+  <script>
+    (function () {
+      function ensureOverlay() {
+        var existing = document.getElementById("compose-spike-error-overlay");
+        if (existing) return existing;
+        var overlay = document.createElement("div");
+        overlay.id = "compose-spike-error-overlay";
+        overlay.style.position = "fixed";
+        overlay.style.right = "16px";
+        overlay.style.bottom = "16px";
+        overlay.style.maxWidth = "640px";
+        overlay.style.padding = "12px 14px";
+        overlay.style.background = "rgba(120, 20, 20, 0.96)";
+        overlay.style.color = "#fff";
+        overlay.style.font = "12px/1.45 Menlo, Monaco, monospace";
+        overlay.style.borderRadius = "10px";
+        overlay.style.boxShadow = "0 12px 28px rgba(0,0,0,.35)";
+        overlay.style.zIndex = "2147483647";
+        overlay.style.whiteSpace = "pre-wrap";
+        overlay.style.display = "none";
+        document.body.appendChild(overlay);
+        return overlay;
+      }
+
+      function showComposeSpikeError(prefix, message) {
+        var overlay = ensureOverlay();
+        overlay.style.display = "block";
+        overlay.textContent = prefix + ": " + message;
+      }
+
+      window.addEventListener("error", function (event) {
+        showComposeSpikeError("JS error", event.message || "Unknown error");
+      });
+
+      window.addEventListener("unhandledrejection", function (event) {
+        var reason = event.reason;
+        var message = reason && (reason.message || String(reason)) || "Unknown rejection";
+        showComposeSpikeError("Promise rejection", message);
+      });
+    })();
+  </script>
   <script src="./compose-ui-spike.js"></script>
 </body>
 </html>

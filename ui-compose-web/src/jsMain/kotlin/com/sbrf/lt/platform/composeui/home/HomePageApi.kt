@@ -8,12 +8,6 @@ import com.sbrf.lt.platform.composeui.model.RuntimeContext
 import com.sbrf.lt.platform.composeui.model.RuntimeModeUpdateRequest
 import com.sbrf.lt.platform.composeui.model.RuntimeModeUpdateResponse
 
-interface HomePageApi {
-    suspend fun loadHomePageData(): HomePageData
-
-    suspend fun updateRuntimeMode(mode: ModuleStoreMode): RuntimeModeUpdateResponse
-}
-
 class HomePageApiClient(
     private val httpClient: ComposeHttpClient = ComposeHttpClient(),
 ) : HomePageApi {

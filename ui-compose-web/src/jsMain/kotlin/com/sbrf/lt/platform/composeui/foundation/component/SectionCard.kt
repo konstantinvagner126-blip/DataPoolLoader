@@ -81,7 +81,7 @@ private fun SpanBadge(
     className: String,
     text: String,
 ) {
-    org.jetbrains.compose.web.dom.Span({ classes(className) }) {
+    org.jetbrains.compose.web.dom.Span({ classes(*className.split(" ").filter { it.isNotBlank() }.toTypedArray()) }) {
         Text(text)
     }
 }

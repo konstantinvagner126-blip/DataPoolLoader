@@ -295,6 +295,20 @@ class ServerTest {
             composeEditorRedirect.headers[HttpHeaders.Location]
         )
 
+        val composeSyncRedirect = noRedirectClient.get("/compose-sync")
+        assertEquals(HttpStatusCode.Found, composeSyncRedirect.status)
+        assertEquals(
+            "/static/compose-spike/index.html?screen=module-sync",
+            composeSyncRedirect.headers[HttpHeaders.Location]
+        )
+
+        val composeSqlConsoleRedirect = noRedirectClient.get("/compose-sql-console")
+        assertEquals(HttpStatusCode.Found, composeSqlConsoleRedirect.status)
+        assertEquals(
+            "/static/compose-spike/index.html?screen=sql-console",
+            composeSqlConsoleRedirect.headers[HttpHeaders.Location]
+        )
+
         val html = client.get("/modules").bodyAsText()
         assertTrue(html.contains("Редактор модуля"))
 

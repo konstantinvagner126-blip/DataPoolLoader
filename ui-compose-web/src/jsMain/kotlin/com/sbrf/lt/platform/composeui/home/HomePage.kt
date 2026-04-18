@@ -146,7 +146,7 @@ fun ComposeHomePage(
                 title = "SQL-консоль",
                 text = "Ручное выполнение SQL по выбранным источникам, просмотр результатов по shard/source и служебные операции.",
                 action = "Открыть SQL-консоль",
-                href = "/sql-console",
+                href = "/compose-sql-console",
             )
 
             SimpleCard(

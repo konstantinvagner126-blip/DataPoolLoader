@@ -106,7 +106,11 @@ fun ComposeModuleRunsPage(
     PageScaffold(
         eyebrow = if (route.storage == "database") "История запусков · База данных" else "История запусков · Файлы",
         title = "История и результаты",
-        subtitle = "Здесь собраны история запусков, итоговые результаты и подробности выполнения выбранного модуля.",
+        subtitle = if (route.storage == "database") {
+            "Полная история DB-запусков, подробный ход выполнения, результаты по источникам и итоговые артефакты."
+        } else {
+            "Полная история файловых запусков, подробный ход выполнения, результаты по источникам и итоговые артефакты."
+        },
         content = {
             if (state.errorMessage != null) {
                 AlertBanner(state.errorMessage ?: "", "warning")
@@ -487,7 +491,7 @@ fun ComposeModuleRunsPage(
                                     } else {
                                         Div {
                                             details.events.takeLast(60).forEach { event ->
-                                                Div({ classes(eventEntryCssClass(event.severity)) }) {
+                                                Div({ classes(*eventEntryCssClass(event.severity).split(" ").filter { it.isNotBlank() }.toTypedArray()) }) {
                                                     Div({ classes("human-log-time") }) {
                                                         Text(
                                                             listOfNotNull(
@@ -550,39 +554,15 @@ fun ComposeModuleRunsPage(
                                         title = "Результаты запуска",
                                         subtitle = "Итоговые артефакты выбранного запуска.",
                                     ) {
-                                    if (details.artifacts.isEmpty()) {
-                                        P({ classes("text-secondary", "mb-0") }) { Text("Результаты запуска пока недоступны.") }
-                                    } else {
-                                        Div({ classes("table-responsive") }) {
-                                            org.jetbrains.compose.web.dom.Table({ classes("table", "source-status-table", "align-middle", "mb-0") }) {
-                                                org.jetbrains.compose.web.dom.Thead {
-                                                    org.jetbrains.compose.web.dom.Tr {
-                                                        org.jetbrains.compose.web.dom.Th { Text("Тип результата") }
-                                                        org.jetbrains.compose.web.dom.Th { Text("Файл") }
-                                                        org.jetbrains.compose.web.dom.Th { Text("Статус") }
-                                                        org.jetbrains.compose.web.dom.Th { Text("Размер") }
-                                                        org.jetbrains.compose.web.dom.Th { Text("Путь") }
-                                                    }
-                                                }
-                                                org.jetbrains.compose.web.dom.Tbody {
-                                                    details.artifacts.forEach { item ->
-                                                        org.jetbrains.compose.web.dom.Tr {
-                                                            org.jetbrains.compose.web.dom.Td { Text(translateArtifactKind(item.artifactKind)) }
-                                                            org.jetbrains.compose.web.dom.Td { Text(extractArtifactName(item.filePath, item.artifactKey)) }
-                                                            org.jetbrains.compose.web.dom.Td {
-                                                                StatusBadge(
-                                                                    text = translateArtifactStatus(item.storageStatus),
-                                                                    tone = artifactStatusTone(item.storageStatus),
-                                                                )
-                                                            }
-                                                            org.jetbrains.compose.web.dom.Td { Text(formatFileSize(item.fileSizeBytes)) }
-                                                            org.jetbrains.compose.web.dom.Td { Text(item.filePath) }
-                                                        }
-                                                    }
+                                        if (details.artifacts.isEmpty()) {
+                                            P({ classes("text-secondary", "mb-0") }) { Text("Результаты запуска пока недоступны.") }
+                                        } else {
+                                            Div({ classes("run-artifact-grid") }) {
+                                                details.artifacts.forEach { item ->
+                                                    ArtifactCard(item)
                                                 }
                                             }
                                         }
-                                    }
                                     }
                                 }
 
@@ -645,16 +625,21 @@ private fun RunsHistoryPanel(
         title = "История запусков",
         subtitle = "Выбери запуск, чтобы посмотреть подробности.",
         actions = {
-            Select(attrs = {
-                classes("run-history-limit-select")
-                attr("value", state.historyLimit.toString())
-                onChange { event ->
-                    event.value?.toIntOrNull()?.let(onHistoryLimitChange)
+            Div({ classes("run-history-controls") }) {
+                org.jetbrains.compose.web.dom.Span({ classes("run-history-control-label") }) {
+                    Text("Показывать")
                 }
-            }) {
-                listOf(20, 50, 100).forEach { limit ->
-                    Option(value = limit.toString()) {
-                        Text(limit.toString())
+                Select(attrs = {
+                    classes("run-history-limit-select")
+                    attr("value", state.historyLimit.toString())
+                    onChange { event ->
+                        event.value?.toIntOrNull()?.let(onHistoryLimitChange)
+                    }
+                }) {
+                    listOf(20, 50, 100).forEach { limit ->
+                        Option(value = limit.toString()) {
+                            Text(limit.toString())
+                        }
                     }
                 }
             }
@@ -663,10 +648,10 @@ private fun RunsHistoryPanel(
         Div({ classes("run-history-controls", "mb-3", "flex-wrap", "gap-2") }) {
             ModuleRunsHistoryFilter.entries.forEach { filter ->
                 Button(attrs = {
-                    classes(
-                        "run-history-filter",
-                        if (state.historyFilter == filter) "run-history-filter-active" else "",
-                    )
+                    classes("run-history-filter")
+                    if (state.historyFilter == filter) {
+                        classes("run-history-filter-active")
+                    }
                     onClick { onHistoryFilterChange(filter) }
                 }) {
                     Text(filter.label)
@@ -675,6 +660,9 @@ private fun RunsHistoryPanel(
         }
 
         Div({ classes("run-history-controls", "run-history-controls-search", "mb-3") }) {
+            org.jetbrains.compose.web.dom.Span({ classes("run-history-control-label") }) {
+                Text("Поиск")
+            }
             Input(type = InputType.Search, attrs = {
                 classes("run-history-search-input")
                 placeholder("runId, модуль, target, output...")
@@ -688,10 +676,10 @@ private fun RunsHistoryPanel(
         Div({ classes("run-history-list") }) {
             runs.forEach { run ->
                 Button(attrs = {
-                    classes(
-                        "run-history-item",
-                        if (run.runId == state.selectedRunId) "run-history-item-active" else "",
-                    )
+                    classes("run-history-item")
+                    if (run.runId == state.selectedRunId) {
+                        classes("run-history-item-active")
+                    }
                     onClick { onSelectRun(run.runId) }
                 }) {
                     Div({ classes("run-history-head") }) {
@@ -733,9 +721,38 @@ private fun SummaryRow(
     label: String,
     value: String,
 ) {
-    Div({ classes("d-flex", "justify-content-between", "gap-3", "py-2", "border-bottom") }) {
-        Div({ classes("text-secondary") }) { Text(label) }
-        Div({ classes("text-break", "text-end") }) { Text(value) }
+    Div({ classes("run-summary-item") }) {
+        Div({ classes("run-summary-label") }) { Text(label) }
+        Div({ classes("run-summary-value") }) { Text(value) }
+    }
+}
+
+@Composable
+private fun ArtifactCard(item: ModuleRunArtifactResponse) {
+    Div({ classes("run-artifact-card") }) {
+        Div({ classes("run-artifact-kind") }) {
+            Text(translateArtifactKind(item.artifactKind))
+        }
+        Div({ classes("run-artifact-title") }) {
+            Text(extractArtifactName(item.filePath, item.artifactKey))
+        }
+        Div({ classes("d-flex", "flex-wrap", "align-items-center", "gap-2") }) {
+            StatusBadge(
+                text = translateArtifactStatus(item.storageStatus),
+                tone = artifactStatusTone(item.storageStatus),
+            )
+            org.jetbrains.compose.web.dom.Span({ classes("run-artifact-note") }) {
+                Text(formatFileSize(item.fileSizeBytes))
+            }
+        }
+        Div({ classes("run-artifact-note") }) {
+            Text("Ключ: ${item.artifactKey.ifBlank { "-" }}")
+        }
+        Div({ classes("run-artifact-path") }) {
+            org.jetbrains.compose.web.dom.Code {
+                Text(item.filePath)
+            }
+        }
     }
 }
 

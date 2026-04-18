@@ -1,0 +1,30 @@
+package com.sbrf.lt.platform.composeui.module_editor
+
+fun defaultCreateModuleConfigTemplate(): String =
+    listOf(
+        "app:",
+        "  outputDir: ./output",
+        "  mergeMode: plain",
+        "  parallelism: 5",
+        "  fetchSize: 1000",
+        "  queryTimeoutSec: 60",
+        "  progressLogEveryRows: 10000",
+        "  deleteOutputFilesAfterCompletion: false",
+        "",
+        "  sources:",
+        "    - name: source1",
+        "      jdbcUrl: \${SOURCE1_JDBC_URL}",
+        "      username: \${SOURCE1_USERNAME}",
+        "      password: \${SOURCE1_PASSWORD}",
+        "      sql: |",
+        "        select 1 as id",
+        "",
+        "  target:",
+        "    enabled: false",
+        "    jdbcUrl: \${TARGET_JDBC_URL}",
+        "    username: \${TARGET_USERNAME}",
+        "    password: \${TARGET_PASSWORD}",
+        "    table: public.target_table",
+        "    truncateBeforeLoad: false",
+        "",
+    ).joinToString("\n")

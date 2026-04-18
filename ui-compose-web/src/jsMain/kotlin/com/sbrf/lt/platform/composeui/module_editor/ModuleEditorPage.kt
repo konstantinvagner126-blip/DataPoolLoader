@@ -12,47 +12,165 @@ import com.sbrf.lt.platform.composeui.foundation.component.EmptyStateCard
 import com.sbrf.lt.platform.composeui.foundation.component.LoadingStateCard
 import com.sbrf.lt.platform.composeui.foundation.component.MonacoEditorPane
 import com.sbrf.lt.platform.composeui.foundation.component.PageScaffold
+import com.sbrf.lt.platform.composeui.foundation.component.RunProgressMetric
+import com.sbrf.lt.platform.composeui.foundation.component.RunProgressWidget
+import com.sbrf.lt.platform.composeui.foundation.component.SectionCard
+import com.sbrf.lt.platform.composeui.foundation.component.buildRunProgressStages
 import com.sbrf.lt.platform.composeui.foundation.dom.classes
+import com.sbrf.lt.platform.composeui.foundation.format.formatDateTime
+import com.sbrf.lt.platform.composeui.foundation.format.formatNumber
+import com.sbrf.lt.platform.composeui.foundation.http.ComposeHttpClient
+import com.sbrf.lt.platform.composeui.foundation.updates.PollingEffect
+import com.sbrf.lt.platform.composeui.foundation.updates.WebSocketEffect
+import com.sbrf.lt.platform.composeui.model.CredentialsStatusResponse
 import kotlinx.browser.window
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.web.attributes.disabled
 import org.jetbrains.compose.web.attributes.href
+import org.jetbrains.compose.web.attributes.rows
 import org.jetbrains.compose.web.attributes.type
+import org.jetbrains.compose.web.attributes.value
 import org.jetbrains.compose.web.dom.A
 import org.jetbrains.compose.web.dom.Button
 import org.jetbrains.compose.web.dom.Div
+import org.jetbrains.compose.web.dom.Input
+import org.jetbrains.compose.web.dom.Label
 import org.jetbrains.compose.web.dom.Li
 import org.jetbrains.compose.web.dom.P
 import org.jetbrains.compose.web.dom.Pre
 import org.jetbrains.compose.web.dom.Span
 import org.jetbrains.compose.web.dom.Text
+import org.jetbrains.compose.web.dom.TextArea
 import org.jetbrains.compose.web.dom.Ul
+import org.w3c.dom.HTMLInputElement
+import org.w3c.files.File
+import org.w3c.xhr.FormData
+import com.sbrf.lt.platform.composeui.module_runs.ModuleRunDetailsResponse
+import com.sbrf.lt.platform.composeui.module_runs.ModuleRunsApiClient
+import com.sbrf.lt.platform.composeui.module_runs.ModuleRunsPageState
+import com.sbrf.lt.platform.composeui.module_runs.ModuleRunsRouteState
+import com.sbrf.lt.platform.composeui.module_runs.ModuleRunsStore
+import com.sbrf.lt.platform.composeui.module_runs.detectRunStageKey
+import com.sbrf.lt.platform.composeui.module_runs.eventEntryCssClass
+import com.sbrf.lt.platform.composeui.module_runs.runStatusCssClass
+import com.sbrf.lt.platform.composeui.module_runs.translateRunStatus
+import com.sbrf.lt.platform.composeui.module_runs.translateStage
+import com.sbrf.lt.platform.composeui.model.ModuleStoreMode
 
 @Composable
 fun ComposeModuleEditorPage(
     route: ModuleEditorRouteState,
     api: ModuleEditorApi = remember { ModuleEditorApiClient() },
 ) {
-    val store = remember(api) { ModuleEditorStore(api) }
+    var currentRoute by remember(route.storage, route.moduleId, route.includeHidden) { mutableStateOf(route) }
+    val store = remember(api) {
+        ModuleEditorStore(
+            api = api,
+            syncRoute = { storage, moduleId, includeHidden ->
+                val query = buildString {
+                    append("?storage=")
+                    append(storage)
+                    if (!moduleId.isNullOrBlank()) {
+                        append("&module=")
+                        append(moduleId)
+                    }
+                    if (includeHidden) {
+                        append("&includeHidden=true")
+                    }
+                }
+                window.history.replaceState(null, "", "/compose-editor$query")
+            },
+        )
+    }
+    val credentialsHttpClient = remember { ComposeHttpClient() }
+    val runsApi = remember { ModuleRunsApiClient() }
+    val runsStore = remember(runsApi) { ModuleRunsStore(runsApi) }
     val scope = rememberCoroutineScope()
     var state by remember(route.storage, route.moduleId, route.includeHidden) { mutableStateOf(ModuleEditorPageState()) }
+    var runPanelState by remember(route.storage, route.moduleId) {
+        mutableStateOf(ModuleRunsPageState(loading = false, historyLimit = 3))
+    }
+    var runPanelRefreshInProgress by remember(route.storage, route.moduleId) { mutableStateOf(false) }
+    var selectedCredentialsFile by remember(route.storage, route.moduleId) { mutableStateOf<File?>(null) }
+    var credentialsUploadMessage by remember(route.storage, route.moduleId) { mutableStateOf<String?>(null) }
+    var credentialsUploadMessageLevel by remember(route.storage, route.moduleId) { mutableStateOf("success") }
+    var credentialsUploadInProgress by remember(route.storage, route.moduleId) { mutableStateOf(false) }
 
-    LaunchedEffect(route.storage, route.moduleId, route.includeHidden) {
+    LaunchedEffect(currentRoute.storage, currentRoute.moduleId, currentRoute.includeHidden) {
         state = store.startLoading(state)
-        state = store.load(route)
+        state = store.load(currentRoute)
+    }
+
+    LaunchedEffect(currentRoute.storage, state.selectedModuleId) {
+        val moduleId = state.selectedModuleId
+        if (moduleId.isNullOrBlank()) {
+            runPanelState = ModuleRunsPageState(loading = false, historyLimit = 3)
+        } else {
+            val loadingState = ModuleRunsPageState(loading = true, historyLimit = 3)
+            runPanelState = runsStore.startLoading(loadingState)
+            runPanelState = runsStore.load(
+                route = ModuleRunsRouteState(currentRoute.storage, moduleId),
+                historyLimit = 3,
+            )
+        }
     }
 
     val session = state.session
     val selectedSql = session?.module?.sqlFiles?.firstOrNull { it.path == state.selectedSqlPath }
         ?: session?.module?.sqlFiles?.firstOrNull()
+    val selectedModuleId = state.selectedModuleId
+    val hasRunningRun = runPanelState.history?.runs?.any { it.status.equals("RUNNING", ignoreCase = true) } == true
+
+    PollingEffect(
+        enabled = currentRoute.storage == "database" && !selectedModuleId.isNullOrBlank() && !runPanelState.loading && hasRunningRun,
+        intervalMs = 3000,
+        onTick = {
+            val moduleId = selectedModuleId ?: return@PollingEffect
+            if (runPanelRefreshInProgress) {
+                return@PollingEffect
+            }
+            runPanelRefreshInProgress = true
+            try {
+                runPanelState = runsStore.reloadHistory(
+                    current = runPanelState,
+                    route = ModuleRunsRouteState(currentRoute.storage, moduleId),
+                )
+            } finally {
+                runPanelRefreshInProgress = false
+            }
+        },
+    )
+
+    WebSocketEffect(
+        enabled = currentRoute.storage == "files" && !selectedModuleId.isNullOrBlank() && !runPanelState.loading,
+        url = buildEditorWebSocketUrl(),
+        onMessage = {
+            val moduleId = selectedModuleId ?: return@WebSocketEffect
+            if (runPanelRefreshInProgress) {
+                return@WebSocketEffect
+            }
+            runPanelRefreshInProgress = true
+            try {
+                runPanelState = runsStore.reloadHistory(
+                    current = runPanelState,
+                    route = ModuleRunsRouteState(currentRoute.storage, moduleId),
+                )
+            } finally {
+                runPanelRefreshInProgress = false
+            }
+        },
+        onError = { message ->
+            runPanelState = runPanelState.copy(errorMessage = message)
+        },
+    )
 
     PageScaffold(
-        eyebrow = if (route.storage == "database") "Режим базы данных" else "Файловый режим",
-        title = if (route.storage == "database") "Модули из базы данных" else "Управление пулами данных НТ",
-        subtitle = if (route.storage == "database") {
-            "Просмотр и поэтапный перевод DB-редактора на Compose без замены production UI."
+        eyebrow = if (currentRoute.storage == "database") "Режим базы данных" else "DataPool Loader",
+        title = if (currentRoute.storage == "database") "Модули из базы данных" else "Управление пулами данных НТ",
+        subtitle = if (currentRoute.storage == "database") {
+            "Просмотр, редактирование и запуск модулей из PostgreSQL. Личный черновик, публикация изменений и история запусков."
         } else {
-            "Просмотр и поэтапный перевод файлового редактора на Compose без замены production UI."
+            "Выбери модуль, поправь YAML и SQL, затем запусти выгрузку прямо из браузера."
         },
         content = {
             if (state.errorMessage != null) {
@@ -62,6 +180,8 @@ fun ComposeModuleEditorPage(
                 AlertBanner(state.successMessage ?: "", "success")
             }
 
+            DatabaseModeAlert(currentRoute, state)
+
             Div({ classes("row", "g-4") }) {
                 Div({ classes("col-12", "col-xl-3") }) {
                     Div({ classes("panel", "h-100") }) {
@@ -70,16 +190,40 @@ fun ComposeModuleEditorPage(
                                 classes("btn", "btn-outline-dark", "w-100")
                                 href("/compose-spike")
                             }) {
-                                Text("На Compose-главную")
+                                Text("На главную")
                             }
                         }
                         Div({ classes("panel-title") }) {
-                            Text(if (route.storage == "database") "Модули из базы данных" else "Модули")
+                            Text(if (currentRoute.storage == "database") "Модули из базы данных" else "Модули")
                         }
                         Div({
                             classes("module-catalog-status", "mt-3", "mb-3", "text-secondary", "small")
                         }) {
-                            Text(buildCatalogStatus(state, route.storage))
+                            Text(buildCatalogStatus(state, currentRoute.storage))
+                        }
+                        if (currentRoute.storage == "database") {
+                            Label(attrs = { classes("config-form-check", "mb-3") }) {
+                                Input(type = org.jetbrains.compose.web.attributes.InputType.Checkbox, attrs = {
+                                    classes("form-check-input")
+                                    if (currentRoute.includeHidden) {
+                                        attr("checked", "checked")
+                                    }
+                                    onClick {
+                                        val nextRoute = currentRoute.copy(includeHidden = !currentRoute.includeHidden)
+                                        currentRoute = nextRoute
+                                        scope.launch {
+                                            state = store.startLoading(state)
+                                            state = store.load(nextRoute)
+                                        }
+                                    }
+                                })
+                                Span({ classes("form-check-label") }) { Text("Показывать скрытые модули") }
+                            }
+                        }
+                        if (currentRoute.storage == "database" && currentRoute.includeHidden) {
+                            Div({ classes("text-secondary", "small", "mb-3") }) {
+                                Text("Каталог открыт с показом скрытых модулей.")
+                            }
                         }
                         if (state.loading && state.modules.isEmpty()) {
                             P({ classes("text-secondary", "small", "mb-0") }) {
@@ -89,27 +233,28 @@ fun ComposeModuleEditorPage(
                             Div({ classes("list-group", "module-list") }) {
                                 state.modules.forEach { module ->
                                     Button(attrs = {
-                                        classes(
-                                            "list-group-item",
-                                            "list-group-item-action",
-                                            if (module.id == state.selectedModuleId) "active" else "",
-                                        )
+                                        classes("list-group-item", "list-group-item-action")
+                                        if (module.id == state.selectedModuleId) {
+                                            classes("active")
+                                        }
                                         attr("type", "button")
                                         onClick {
                                             scope.launch {
                                                 state = store.startLoading(state)
-                                                state = store.selectModule(state, route, module.id)
+                                                currentRoute = currentRoute.copy(moduleId = module.id)
+                                                state = store.selectModule(state, currentRoute, module.id)
                                             }
                                         }
                                     }) {
+                                        val moduleDescription = module.description
                                         Div({ classes("module-list-head") }) {
                                             Div {
                                                 Div({ classes("module-list-title") }) {
                                                     Text(module.title.ifBlank { module.id })
                                                 }
-                                                if (!module.description.isNullOrBlank()) {
+                                                if (!moduleDescription.isNullOrBlank()) {
                                                     Div({ classes("module-list-description") }) {
-                                                        Text(module.description)
+                                                        Text(moduleDescription)
                                                     }
                                                 }
                                             }
@@ -117,6 +262,11 @@ fun ComposeModuleEditorPage(
                                                 classes("module-validation-badge", validationBadgeClass(module.validationStatus))
                                             }) {
                                                 Text(translateValidationStatus(module.validationStatus))
+                                            }
+                                            if (module.hiddenFromUi) {
+                                                Span({ classes("module-validation-badge", "module-validation-badge-warning") }) {
+                                                    Text("Скрыт")
+                                                }
                                             }
                                         }
                                         if (module.tags.isNotEmpty()) {
@@ -146,13 +296,13 @@ fun ComposeModuleEditorPage(
                         )
                     } else {
                         EditorShellHeader(
-                            route = route,
+                            route = currentRoute,
                             state = state,
                             onTabSelect = { tab -> state = store.selectTab(state, tab) },
                             onRun = {
                                 scope.launch {
                                     state = store.beginAction(state, "run")
-                                    state = if (route.storage == "database") {
+                                    state = if (currentRoute.storage == "database") {
                                         store.runDatabaseModule(state)
                                     } else {
                                         store.runFilesModule(state)
@@ -162,10 +312,10 @@ fun ComposeModuleEditorPage(
                             onSave = {
                                 scope.launch {
                                     state = store.beginAction(state, "save")
-                                    state = if (route.storage == "database") {
-                                        store.saveDatabaseWorkingCopy(state, route)
+                                    state = if (currentRoute.storage == "database") {
+                                        store.saveDatabaseWorkingCopy(state, currentRoute)
                                     } else {
-                                        store.saveFilesModule(state, route)
+                                        store.saveFilesModule(state, currentRoute)
                                     }
                                 }
                             },
@@ -173,7 +323,7 @@ fun ComposeModuleEditorPage(
                                 if (window.confirm("Сбросить личный черновик? Несохраненные изменения будут потеряны.")) {
                                     scope.launch {
                                         state = store.beginAction(state, "discard")
-                                        state = store.discardDatabaseWorkingCopy(state, route)
+                                        state = store.discardDatabaseWorkingCopy(state, currentRoute)
                                     }
                                 }
                             },
@@ -181,13 +331,102 @@ fun ComposeModuleEditorPage(
                                 if (window.confirm("Опубликовать черновик как новую ревизию? После публикации личный черновик будет удален.")) {
                                     scope.launch {
                                         state = store.beginAction(state, "publish")
-                                        state = store.publishDatabaseWorkingCopy(state, route)
+                                        state = store.publishDatabaseWorkingCopy(state, currentRoute)
                                     }
+                                }
+                            },
+                            onOpenCreateModule = {
+                                state = store.openCreateModuleDialog(state)
+                            },
+                            onDeleteModule = {
+                                val moduleId = state.selectedModuleId ?: return@EditorShellHeader
+                                if (window.confirm("Удалить модуль '$moduleId'? Это действие необратимо.")) {
+                                    scope.launch {
+                                        state = store.beginAction(state, "delete")
+                                        state = store.deleteDatabaseModule(state, currentRoute)
+                                        currentRoute = currentRoute.copy(moduleId = state.selectedModuleId)
+                                    }
+                                }
+                            },
+                            onReload = {
+                                val moduleId = state.selectedModuleId ?: return@EditorShellHeader
+                                scope.launch {
+                                    state = store.startLoading(state)
+                                    state = store.selectModule(state, currentRoute, moduleId)
                                 }
                             },
                         )
 
                         ValidationAlert(session)
+
+                        CredentialsPanel(
+                            module = session.module,
+                            uploadInProgress = credentialsUploadInProgress,
+                            selectedFileName = selectedCredentialsFile?.name,
+                            uploadMessage = credentialsUploadMessage,
+                            uploadMessageLevel = credentialsUploadMessageLevel,
+                            onFileSelected = { file ->
+                                selectedCredentialsFile = file
+                                credentialsUploadMessage = null
+                            },
+                            onUpload = {
+                                val file = selectedCredentialsFile ?: return@CredentialsPanel
+                                val moduleId = state.selectedModuleId ?: return@CredentialsPanel
+                                scope.launch {
+                                    credentialsUploadInProgress = true
+                                    credentialsUploadMessage = null
+                                    try {
+                                        uploadCredentialsFile(credentialsHttpClient, file)
+                                        state = store.startLoading(state)
+                                        val refreshed = store.selectModule(state, currentRoute, moduleId)
+                                        state = refreshed.copy(
+                                            successMessage = "Файл credential.properties загружен: ${file.name}.",
+                                        )
+                                        selectedCredentialsFile = null
+                                        credentialsUploadMessageLevel = "success"
+                                        credentialsUploadMessage = "Статус credentials обновлен."
+                                    } catch (error: Throwable) {
+                                        credentialsUploadMessageLevel = "warning"
+                                        credentialsUploadMessage = error.message ?: "Не удалось загрузить credential.properties."
+                                    } finally {
+                                        credentialsUploadInProgress = false
+                                    }
+                                }
+                            },
+                        )
+
+                        val currentModuleId = state.selectedModuleId
+                        if (currentModuleId != null) {
+                            EditorRunOverviewPanel(
+                                route = currentRoute,
+                                state = runPanelState,
+                                moduleId = currentModuleId,
+                            )
+                        }
+
+                        if (currentRoute.storage == "database" && state.createModuleDialogOpen) {
+                            CreateModulePanel(
+                                state = state,
+                                onModuleCodeChange = { value -> state = store.updateCreateModuleCode(state, value) },
+                                onTitleChange = { value -> state = store.updateCreateModuleTitle(state, value) },
+                                onDescriptionChange = { value -> state = store.updateCreateModuleDescription(state, value) },
+                                onTagsChange = { value -> state = store.updateCreateModuleTagsText(state, value) },
+                                onHiddenFromUiChange = { value -> state = store.updateCreateModuleHiddenFromUi(state, value) },
+                                onConfigTextChange = { value -> state = store.updateCreateModuleConfigText(state, value) },
+                                onRestoreTemplate = { state = store.restoreCreateModuleTemplate(state) },
+                                onCancel = { state = store.closeCreateModuleDialog(state) },
+                                onCreate = {
+                                    scope.launch {
+                                        state = store.beginAction(state, "create")
+                                        state = store.createDatabaseModule(state, currentRoute)
+                                        currentRoute = currentRoute.copy(
+                                            moduleId = state.selectedModuleId,
+                                            includeHidden = currentRoute.includeHidden || state.session?.module?.hiddenFromUi == true,
+                                        )
+                                    }
+                                },
+                            )
+                        }
 
                         TabNavigation(
                             activeTab = state.activeTab,
@@ -196,7 +435,7 @@ fun ComposeModuleEditorPage(
 
                         when (state.activeTab) {
                             ModuleEditorTab.SETTINGS -> ModuleEditorSettingsForm(
-                                storageMode = route.storage,
+                                storageMode = currentRoute.storage,
                                 state = state,
                                 module = session.module,
                                 onRefreshFromConfig = {
@@ -217,19 +456,48 @@ fun ComposeModuleEditorPage(
                                 selectedSqlPath = selectedSql?.path,
                                 onSelectSql = { path -> state = store.selectSqlResource(state, path) },
                                 onSqlChange = { path, value -> state = store.updateSqlText(state, path, value) },
+                                onCreateSql = {
+                                    val rawName = window.prompt("Введите имя SQL-ресурса:")
+                                    if (!rawName.isNullOrBlank()) {
+                                        state = store.createSqlResource(state, rawName)
+                                    }
+                                },
+                                onRenameSql = {
+                                    val currentPath = state.selectedSqlPath ?: return@SqlPreview
+                                    val rawName = window.prompt("Введите новое имя SQL-ресурса:", currentPath)
+                                    if (!rawName.isNullOrBlank()) {
+                                        scope.launch {
+                                            state = store.renameSqlResource(state, rawName)
+                                        }
+                                    }
+                                },
+                                onDeleteSql = {
+                                    val currentPath = state.selectedSqlPath ?: return@SqlPreview
+                                    if (window.confirm("Удалить SQL-ресурс '$currentPath'?")) {
+                                        state = store.deleteSqlResource(state)
+                                    }
+                                },
                             )
                             ModuleEditorTab.CONFIG -> ConfigPreview(
                                 configText = state.configTextDraft,
                                 onConfigChange = { value -> state = store.updateConfigText(state, value) },
                             )
-                            ModuleEditorTab.META -> MetadataPreview(session)
+                            ModuleEditorTab.META -> MetadataForm(
+                                route = currentRoute,
+                                state = state,
+                                session = session,
+                                onTitleChange = { value -> state = store.updateMetadataTitle(state, value) },
+                                onDescriptionChange = { value -> state = store.updateMetadataDescription(state, value) },
+                                onTagsChange = { value -> state = store.updateMetadataTags(state, value) },
+                                onHiddenFromUiChange = { value -> state = store.updateMetadataHiddenFromUi(state, value) },
+                            )
                         }
                     }
                 }
             }
         },
         heroArt = {
-            if (route.storage == "database") {
+            if (currentRoute.storage == "database") {
                 Div({ classes("platform-stage") }) {
                     Div({ classes("platform-node", "platform-node-db") }) { Text("POSTGRESQL") }
                     Div({ classes("platform-node", "platform-node-kafka") }) { Text("REGISTRY") }
@@ -262,6 +530,30 @@ fun ComposeModuleEditorPage(
 }
 
 @Composable
+private fun DatabaseModeAlert(
+    route: ModuleEditorRouteState,
+    state: ModuleEditorPageState,
+) {
+    if (route.storage != "database") {
+        return
+    }
+    val runtimeContext = state.databaseCatalog?.runtimeContext ?: return
+    if (runtimeContext.effectiveMode == ModuleStoreMode.DATABASE) {
+        return
+    }
+
+    Div({ classes("alert", "alert-warning", "mb-4") }) {
+        Div({ classes("fw-semibold", "mb-1") }) {
+            Text("Режим базы данных недоступен")
+        }
+        Text(
+            runtimeContext.fallbackReason
+                ?: "Для работы с модулями из базы данных нужно переключить режим на «База данных» и убедиться, что PostgreSQL доступен.",
+        )
+    }
+}
+
+@Composable
 private fun EditorShellHeader(
     route: ModuleEditorRouteState,
     state: ModuleEditorPageState,
@@ -270,19 +562,23 @@ private fun EditorShellHeader(
     onSave: () -> Unit,
     onDiscardWorkingCopy: () -> Unit,
     onPublishWorkingCopy: () -> Unit,
+    onOpenCreateModule: () -> Unit,
+    onDeleteModule: () -> Unit,
+    onReload: () -> Unit,
 ) {
     val session = requireNotNull(state.session)
     val module = session.module
     val capabilities = session.capabilities
     val actionBusy = state.actionInProgress != null
+    val moduleDescription = module.description
 
     Div({ classes("panel", "mb-4") }) {
-        Div({ classes("d-flex", "flex-wrap", "align-items-center", "justify-content-between", "gap-3") }) {
+        Div({ classes("module-editor-header-shell") }) {
             Div {
                 Div({ classes("panel-title", "mb-1") }) { Text("Редактор модуля") }
                 Div({ classes("text-secondary", "small") }) { Text(module.title.ifBlank { module.id }) }
-                if (!module.description.isNullOrBlank()) {
-                    Div({ classes("text-secondary", "small", "mt-1") }) { Text(module.description) }
+                if (!moduleDescription.isNullOrBlank()) {
+                    Div({ classes("text-secondary", "small", "mt-1") }) { Text(moduleDescription) }
                 }
                 Div({ classes("module-draft-status", "small", "mt-1", "text-secondary") }) {
                     Span({
@@ -312,13 +608,12 @@ private fun EditorShellHeader(
                     Div({ classes("module-editor-toolbar-row") }) {
                         Div({ classes("module-editor-toolbar-group", "module-editor-toolbar-group-primary") }) {
                             Div({ classes("module-editor-toolbar-group-label") }) { Text("Выполнение") }
-                            EditorActionButton("Запустить", capabilities.run && !actionBusy, true, onRun)
+                            EditorActionButton("Запустить", capabilities.run && !actionBusy, EditorActionStyle.Success, onRun)
                             A(attrs = {
-                                classes(
-                                    "btn",
-                                    "btn-outline-secondary",
-                                    if (state.selectedModuleId == null) "disabled" else "",
-                                )
+                                classes("btn", "btn-outline-secondary")
+                                if (state.selectedModuleId == null) {
+                                    classes("disabled")
+                                }
                                 if (state.selectedModuleId != null) {
                                     href(buildRunsHref(route, state.selectedModuleId))
                                 } else {
@@ -328,44 +623,239 @@ private fun EditorShellHeader(
                         }
                         Div({ classes("module-editor-toolbar-group", "module-editor-toolbar-group-draft") }) {
                             Div({ classes("module-editor-toolbar-group-label") }) { Text("Личный черновик") }
-                            EditorActionButton("Сохранить черновик", capabilities.saveWorkingCopy && !actionBusy, false, onSave)
-                            EditorActionButton("Опубликовать", capabilities.publish && !actionBusy && !state.hasDraftChanges, true, onPublishWorkingCopy)
-                            EditorActionButton("Сбросить черновик", capabilities.discardWorkingCopy && !actionBusy, false, onDiscardWorkingCopy)
+                            EditorActionButton("Сохранить черновик", capabilities.saveWorkingCopy && !actionBusy, EditorActionStyle.PrimaryOutline, onSave)
+                            EditorActionButton("Опубликовать", capabilities.publish && !actionBusy && !state.hasDraftChanges, EditorActionStyle.Success, onPublishWorkingCopy)
+                            EditorActionButton("Сбросить черновик", capabilities.discardWorkingCopy && !actionBusy, EditorActionStyle.DangerOutline, onDiscardWorkingCopy)
                         }
                         Div({ classes("module-editor-toolbar-group", "module-editor-toolbar-group-secondary") }) {
                             Div({ classes("module-editor-toolbar-group-label") }) { Text("Редактор") }
-                            EditorActionButton("Отменить изменения", false, false) {}
+                            EditorActionButton("Отменить изменения", state.hasDraftChanges && !actionBusy, EditorActionStyle.SecondaryOutline, onReload)
                         }
                     }
                     Div({ classes("module-editor-toolbar-row") }) {
                         Div({ classes("module-editor-toolbar-group", "module-editor-toolbar-group-admin") }) {
                             Div({ classes("module-editor-toolbar-group-label") }) { Text("Администрирование") }
-                            EditorActionButton("Новый модуль", capabilities.createModule && !actionBusy, false) {}
-                            EditorActionButton("Удалить модуль", capabilities.deleteModule && !actionBusy, false) {}
+                            EditorActionButton("Новый модуль", capabilities.createModule && !actionBusy, EditorActionStyle.PrimaryOutline, onOpenCreateModule)
+                            EditorActionButton("Удалить модуль", capabilities.deleteModule && !actionBusy && state.selectedModuleId != null, EditorActionStyle.DangerOutline, onDeleteModule)
                             A(attrs = {
                                 classes("btn", "btn-outline-secondary")
-                                href("/db-sync")
+                                href("/compose-sync")
                             }) { Text("Импорт из файлов") }
                         }
                     }
                 }
             } else {
                 Div({ classes("d-flex", "flex-wrap", "gap-2") }) {
-                    EditorActionButton("Отменить изменения", false, false) {}
-                    EditorActionButton("Сохранить", capabilities.save && !actionBusy, false, onSave)
+                    EditorActionButton("Отменить изменения", state.hasDraftChanges && !actionBusy, EditorActionStyle.SecondaryOutline, onReload)
+                    EditorActionButton("Сохранить", capabilities.save && !actionBusy, EditorActionStyle.PrimaryOutline, onSave)
                     A(attrs = {
-                        classes(
-                            "btn",
-                            "btn-outline-secondary",
-                            if (state.selectedModuleId == null) "disabled" else "",
-                        )
+                        classes("btn", "btn-outline-secondary")
+                        if (state.selectedModuleId == null) {
+                            classes("disabled")
+                        }
                         if (state.selectedModuleId != null) {
                             href(buildRunsHref(route, state.selectedModuleId))
                         } else {
                             attr("aria-disabled", "true")
                         }
                     }) { Text("История и результаты") }
-                    EditorActionButton("Запустить", capabilities.run && !actionBusy, true, onRun)
+                    EditorActionButton("Запустить", capabilities.run && !actionBusy, EditorActionStyle.PrimarySolid, onRun)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EditorRunOverviewPanel(
+    route: ModuleEditorRouteState,
+    state: ModuleRunsPageState,
+    moduleId: String,
+) {
+    SectionCard(
+        title = "Ход выполнения",
+        subtitle = "Компактный live-блок по текущему или последнему запуску. Полные детали остаются на отдельном экране.",
+        actions = {
+            A(attrs = {
+                classes("btn", "btn-outline-secondary")
+                href(buildRunsHref(route, moduleId))
+            }) { Text("История и результаты") }
+        },
+    ) {
+        val history = state.history
+        if (state.errorMessage != null) {
+            AlertBanner(state.errorMessage ?: "", "warning")
+        }
+
+        when {
+            state.loading && history == null -> {
+                Div({ classes("text-secondary", "small") }) {
+                    Text("Загружаю информацию о запусках модуля.")
+                }
+            }
+
+            history == null || history.runs.isEmpty() || state.selectedRunDetails == null -> {
+                Div({ classes("text-secondary", "small") }) {
+                    Text("Активного запуска сейчас нет. Детали прошлых запусков открываются на отдельном экране.")
+                }
+            }
+
+            else -> {
+                val details = requireNotNull(state.selectedRunDetails)
+                if (!details.run.status.equals("RUNNING", ignoreCase = true)) {
+                    Div({ classes("text-secondary", "small") }) {
+                        Text("Активного запуска сейчас нет. Детали прошлых запусков открываются на отдельном экране.")
+                    }
+                    return@SectionCard
+                }
+                val currentStageKey = detectRunStageKey(details.run, details.events)
+                val successCount = details.run.successfulSourceCount
+                    ?: details.sourceResults.count { it.status.equals("SUCCESS", ignoreCase = true) }
+                val failedCount = details.run.failedSourceCount
+                    ?: details.sourceResults.count { it.status.equals("FAILED", ignoreCase = true) }
+                val warningCount = details.sourceResults.count { it.status.equals("SUCCESS_WITH_WARNINGS", ignoreCase = true) }
+                val latestEvents = details.events.takeLast(4).reversed()
+
+                RunProgressWidget(
+                    title = "Текущий запуск",
+                    subtitle = "${translateStage(currentStageKey)} · ${formatDateTime(details.run.requestedAt ?: details.run.startedAt)}",
+                    statusLabel = translateRunStatus(details.run.status),
+                    statusClassName = runStatusCssClass(details.run.status),
+                    running = true,
+                    stages = buildRunProgressStages(currentStageKey, details.run.status),
+                    metrics = listOf(
+                        RunProgressMetric("Строк в merged", formatNumber(details.run.mergedRowCount)),
+                        RunProgressMetric("Успешных источников", formatNumber(successCount), tone = "success"),
+                        RunProgressMetric("Ошибок", formatNumber(failedCount), tone = if (failedCount > 0) "danger" else "default"),
+                        RunProgressMetric("Предупреждений", formatNumber(warningCount), tone = if (warningCount > 0) "warning" else "default"),
+                    ),
+                )
+
+                if (latestEvents.isNotEmpty()) {
+                    Div({ classes("human-log", "mt-3") }) {
+                        latestEvents.forEach { event ->
+                            Div({ classes(*eventEntryCssClass(event.severity).split(" ").filter { it.isNotBlank() }.toTypedArray()) }) {
+                                val parts = buildList {
+                                    formatDateTime(event.timestamp).takeIf { it != "-" }?.let(::add)
+                                    event.sourceName?.takeIf { it.isNotBlank() }?.let(::add)
+                                    event.message?.takeIf { it.isNotBlank() }?.let(::add)
+                                }
+                                Text(parts.joinToString(" · ").ifBlank { event.eventType })
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CreateModulePanel(
+    state: ModuleEditorPageState,
+    onModuleCodeChange: (String) -> Unit,
+    onTitleChange: (String) -> Unit,
+    onDescriptionChange: (String) -> Unit,
+    onTagsChange: (String) -> Unit,
+    onHiddenFromUiChange: (Boolean) -> Unit,
+    onConfigTextChange: (String) -> Unit,
+    onRestoreTemplate: () -> Unit,
+    onCancel: () -> Unit,
+    onCreate: () -> Unit,
+) {
+    val draft = state.createModuleDraft
+    val actionBusy = state.actionInProgress != null
+    Div({ classes("panel", "mb-4") }) {
+        Div({ classes("d-flex", "flex-wrap", "align-items-center", "justify-content-between", "gap-3", "mb-3") }) {
+            Div {
+                Div({ classes("panel-title", "mb-1") }) { Text("Новый модуль") }
+                Div({ classes("text-secondary", "small") }) {
+                    Text("Создай DB-модуль и сразу открой его в Compose editor.")
+                }
+            }
+            Div({ classes("d-flex", "flex-wrap", "gap-2") }) {
+                Button(attrs = {
+                    classes("btn", "btn-outline-secondary")
+                    attr("type", "button")
+                    if (actionBusy) {
+                        disabled()
+                    }
+                    onClick { onRestoreTemplate() }
+                }) { Text("Восстановить шаблон") }
+                Button(attrs = {
+                    classes("btn", "btn-outline-secondary")
+                    attr("type", "button")
+                    if (actionBusy) {
+                        disabled()
+                    }
+                    onClick { onCancel() }
+                }) { Text("Отмена") }
+                Button(attrs = {
+                    classes("btn", "btn-primary")
+                    attr("type", "button")
+                    if (actionBusy) {
+                        disabled()
+                    }
+                    onClick { onCreate() }
+                }) { Text("Создать модуль") }
+            }
+        }
+
+        Div({ classes("row", "g-4") }) {
+            Div({ classes("col-12", "col-xl-4") }) {
+                Div({ classes("module-metadata-card") }) {
+                    Div({ classes("module-metadata-form-title") }) { Text("Параметры модуля") }
+                    Div({ classes("module-metadata-form") }) {
+                        MetadataTextField(
+                            label = "Код модуля",
+                            value = draft.moduleCode,
+                            helpText = "Уникальный идентификатор модуля. Используется в URL и в каталоге.",
+                            onCommit = onModuleCodeChange,
+                        )
+                        MetadataTextField(
+                            label = "Название",
+                            value = draft.title,
+                            helpText = "Отображаемое имя модуля.",
+                            onCommit = onTitleChange,
+                        )
+                        MetadataTextareaField(
+                            label = "Описание",
+                            value = draft.description,
+                            rowsCount = 3,
+                            helpText = "Кратко опиши назначение модуля.",
+                            onCommit = onDescriptionChange,
+                        )
+                        MetadataTextField(
+                            label = "Теги",
+                            value = draft.tagsText,
+                            helpText = "Через запятую. Пустые значения будут отброшены.",
+                            onCommit = onTagsChange,
+                        )
+                        MetadataCheckboxField(
+                            label = "Скрыть модуль в обычном каталоге UI",
+                            checked = draft.hiddenFromUi,
+                            helpText = "Если модуль скрыт, после создания каталог останется в режиме includeHidden.",
+                            onCommit = onHiddenFromUiChange,
+                        )
+                    }
+                }
+            }
+            Div({ classes("col-12", "col-xl-8") }) {
+                Div({ classes("panel") }) {
+                    Div({ classes("d-flex", "justify-content-between", "align-items-center", "gap-3", "mb-3") }) {
+                        Div {
+                            Div({ classes("panel-title", "mb-1") }) { Text("Стартовый application.yml") }
+                            Div({ classes("text-secondary", "small") }) {
+                                Text("Базовый шаблон уже валиден по структуре и подходит для дальнейшего редактирования.")
+                            }
+                        }
+                    }
+                    MonacoEditorPane(
+                        instanceKey = "module-create-config",
+                        language = "yaml",
+                        value = draft.configText,
+                        onValueChange = onConfigTextChange,
+                    )
                 }
             }
         }
@@ -382,7 +872,7 @@ private fun ValidationAlert(session: ModuleEditorSessionResponse) {
         "INVALID" -> "alert alert-danger"
         else -> "alert alert-warning"
     }
-    Div({ classes(alertClass, "mb-3") }) {
+    Div({ classes(*alertClass.split(" ").filter { it.isNotBlank() }.toTypedArray(), "mb-3") }) {
         Div({ classes("fw-semibold", "mb-2") }) {
             Text("Проблемы валидации модуля")
         }
@@ -409,6 +899,69 @@ private fun ValidationAlert(session: ModuleEditorSessionResponse) {
 }
 
 @Composable
+private fun CredentialsPanel(
+    module: ModuleDetailsResponse,
+    uploadInProgress: Boolean,
+    selectedFileName: String?,
+    uploadMessage: String?,
+    uploadMessageLevel: String,
+    onFileSelected: (File?) -> Unit,
+    onUpload: () -> Unit,
+) {
+    val status = module.credentialsStatus
+    val warningClass = when {
+        !module.requiresCredentials -> "alert alert-light mt-3 mb-0"
+        module.credentialsReady -> "alert alert-success mt-3 mb-0"
+        else -> "alert alert-warning mt-3 mb-0"
+    }
+
+    Div({ classes("panel", "mb-4") }) {
+        Div({ classes("d-flex", "flex-wrap", "align-items-center", "justify-content-between", "gap-3") }) {
+            Div {
+                Div({ classes("panel-title", "mb-1") }) { Text("credential.properties") }
+                Div({ classes("text-secondary", "small") }) {
+                    Text(buildCredentialsStatusText(status))
+                }
+            }
+            Div({ classes("d-flex", "flex-wrap", "align-items-center", "gap-2") }) {
+                Input(type = org.jetbrains.compose.web.attributes.InputType.File, attrs = {
+                    classes("form-control")
+                    attr("accept", ".properties,text/plain")
+                    onChange { event ->
+                        val input = event.target as? HTMLInputElement
+                        onFileSelected(input?.files?.item(0))
+                    }
+                })
+                Button(attrs = {
+                    classes("btn", "btn-outline-dark")
+                    attr("type", "button")
+                    if (uploadInProgress || selectedFileName.isNullOrBlank()) {
+                        disabled()
+                    }
+                    onClick { onUpload() }
+                }) {
+                    Text(if (uploadInProgress) "Загрузка..." else "Загрузить файл")
+                }
+            }
+        }
+
+        if (!selectedFileName.isNullOrBlank()) {
+            Div({ classes("text-secondary", "small", "mt-2") }) {
+                Text("Выбран файл: $selectedFileName")
+            }
+        }
+
+        if (!uploadMessage.isNullOrBlank()) {
+            AlertBanner(uploadMessage, uploadMessageLevel)
+        }
+
+        Div({ classes(*warningClass.split(" ").filter { it.isNotBlank() }.toTypedArray()) }) {
+            Text(buildCredentialsWarningText(module))
+        }
+    }
+}
+
+@Composable
 private fun TabNavigation(
     activeTab: ModuleEditorTab,
     onTabSelect: (ModuleEditorTab) -> Unit,
@@ -417,7 +970,10 @@ private fun TabNavigation(
         ModuleEditorTab.entries.forEach { tab ->
             Li({ classes("nav-item") }) {
                 Button(attrs = {
-                    classes("nav-link", if (activeTab == tab) "active" else "")
+                    classes("nav-link")
+                    if (activeTab == tab) {
+                        classes("active")
+                    }
                     attr("type", "button")
                     onClick { onTabSelect(tab) }
                 }) {
@@ -434,9 +990,12 @@ private fun SqlPreview(
     selectedSqlPath: String?,
     onSelectSql: (String) -> Unit,
     onSqlChange: (String, String) -> Unit,
+    onCreateSql: () -> Unit,
+    onRenameSql: () -> Unit,
+    onDeleteSql: () -> Unit,
 ) {
-    val session = requireNotNull(state.session)
-    val selectedSql = session.module.sqlFiles.firstOrNull { it.path == selectedSqlPath } ?: session.module.sqlFiles.firstOrNull()
+    val sqlFiles = buildDraftSqlFiles(state)
+    val selectedSql = sqlFiles.firstOrNull { it.path == selectedSqlPath } ?: sqlFiles.firstOrNull()
     val selectedSqlContent = selectedSql?.let { sqlFile ->
         state.sqlContentsDraft[sqlFile.path] ?: sqlFile.content
     } ?: "-- SQL-ресурс не выбран"
@@ -446,16 +1005,44 @@ private fun SqlPreview(
                 Div({ classes("sql-catalog-toolbar") }) {
                     Div {
                         Div({ classes("sql-catalog-title") }) { Text("Каталог SQL-ресурсов") }
-                        Div({ classes("sql-catalog-note") }) { Text("SQL-ресурсы уже открываются в Monaco. Сохранение в backend будет подключено следующим этапом.") }
+                        Div({ classes("sql-catalog-note") }) { Text("Создание, переименование и удаление SQL выполняется здесь. Изменения сохраняются основным действием редактора.") }
+                    }
+                    Div({ classes("d-flex", "flex-wrap", "gap-2") }) {
+                        Button(attrs = {
+                            classes("btn", "btn-outline-primary", "btn-sm")
+                            attr("type", "button")
+                            onClick { onCreateSql() }
+                        }) { Text("Создать SQL") }
+                        Button(attrs = {
+                            classes("btn", "btn-outline-secondary", "btn-sm")
+                            attr("type", "button")
+                            if (selectedSql == null) {
+                                disabled()
+                            }
+                            onClick { onRenameSql() }
+                        }) { Text("Переименовать") }
+                        Button(attrs = {
+                            classes("btn", "btn-outline-danger", "btn-sm")
+                            attr("type", "button")
+                            if (selectedSql == null) {
+                                disabled()
+                            }
+                            onClick { onDeleteSql() }
+                        }) { Text("Удалить") }
                     }
                 }
                 Div({ classes("sql-catalog-list") }) {
-                    session.module.sqlFiles.forEach { sqlFile ->
+                    if (sqlFiles.isEmpty()) {
+                        Div({ classes("text-secondary", "small") }) {
+                            Text("SQL-ресурсы пока не созданы.")
+                        }
+                    }
+                    sqlFiles.forEach { sqlFile ->
                         Button(attrs = {
-                            classes(
-                                "sql-catalog-item",
-                                if (selectedSql?.path == sqlFile.path) "active" else "",
-                            )
+                            classes("sql-catalog-item")
+                            if (selectedSql?.path == sqlFile.path) {
+                                classes("active")
+                            }
                             attr("type", "button")
                             onClick { onSelectSql(sqlFile.path) }
                         }) {
@@ -475,11 +1062,15 @@ private fun SqlPreview(
                         Text(selectedSql?.path ?: "-")
                     }
                     Div({ classes("sql-catalog-resource-usage") }) {
-                        Span({ classes("sql-resource-usage-badge") }) {
-                            Text("Monaco")
-                        }
-                        Span({ classes("sql-resource-usage-badge", "sql-resource-usage-badge-muted") }) {
-                            Text("Локальное редактирование")
+                        buildSqlUsageBadges(state, selectedSql?.path).forEach { badge ->
+                            Span({
+                                classes("sql-resource-usage-badge")
+                                if (badge.muted) {
+                                    classes("sql-resource-usage-badge-muted")
+                                }
+                            }) {
+                                Text(badge.label)
+                            }
                         }
                     }
                 }
@@ -503,37 +1094,81 @@ private fun ConfigPreview(
     configText: String,
     onConfigChange: (String) -> Unit,
 ) {
-    Div({ classes("panel") }) {
-        Div({ classes("config-form-note", "text-secondary", "small", "mb-3") }) {
-            Text("Редактор application.yml уже работает через Monaco. Изменения пока живут локально в Compose-shell.")
-        }
-        MonacoEditorPane(
-            instanceKey = "module-editor-config",
-            language = "yaml",
-            value = configText,
-            onValueChange = onConfigChange,
-        )
-    }
+    MonacoEditorPane(
+        instanceKey = "module-editor-config",
+        language = "yaml",
+        value = configText,
+        onValueChange = onConfigChange,
+    )
 }
 
 @Composable
-private fun MetadataPreview(session: ModuleEditorSessionResponse) {
+private fun MetadataForm(
+    route: ModuleEditorRouteState,
+    state: ModuleEditorPageState,
+    session: ModuleEditorSessionResponse,
+    onTitleChange: (String) -> Unit,
+    onDescriptionChange: (String) -> Unit,
+    onTagsChange: (List<String>) -> Unit,
+    onHiddenFromUiChange: (Boolean) -> Unit,
+) {
     val module = session.module
+    val metadataDraft = state.metadataDraft
+    val metadataChanged = metadataDraft.title != module.title ||
+        metadataDraft.description != (module.description ?: "") ||
+        metadataDraft.tags != module.tags ||
+        metadataDraft.hiddenFromUi != module.hiddenFromUi
     Div({ classes("panel", "module-metadata") }) {
+        if (metadataChanged) {
+            AlertBanner(
+                "Метаданные изменены локально. Чтобы сохранить их, используй основное действие сохранения редактора.",
+                "warning",
+            )
+        }
         Div({ classes("module-metadata-grid") }) {
             PreviewCard("Основное") {
-                MetadataRow("Код модуля", module.id)
-                MetadataRow("Название", module.title)
-                MetadataRow("Описание", module.description ?: "-")
-                MetadataRow("Теги", module.tags.joinToString(", ").ifBlank { "-" })
-                MetadataRow("Скрыт из UI", if (module.hiddenFromUi) "Да" else "Нет")
+                MetadataReadOnlyRow("Код модуля", module.id)
+                MetadataTextField(
+                    label = "Название",
+                    value = metadataDraft.title,
+                    helpText = "Отображаемое название модуля в каталоге.",
+                    onCommit = onTitleChange,
+                )
+                MetadataTextareaField(
+                    label = "Описание",
+                    value = metadataDraft.description,
+                    helpText = "Короткое описание, которое видно в каталоге модулей.",
+                    rowsCount = 4,
+                    onCommit = onDescriptionChange,
+                )
+                MetadataTextField(
+                    label = "Теги",
+                    value = metadataDraft.tags.joinToString(", "),
+                    helpText = "Список тегов через запятую.",
+                ) { rawValue ->
+                    onTagsChange(
+                        rawValue.split(',')
+                            .map { it.trim() }
+                            .filter { it.isNotEmpty() },
+                    )
+                }
+                MetadataCheckboxField(
+                    label = "Скрыть модуль из общего каталога UI",
+                    checked = metadataDraft.hiddenFromUi,
+                    helpText = if (route.storage == "database") {
+                        "Полезно для DB-модулей, которые должны быть доступны только по прямому сценарию."
+                    } else {
+                        "Скрытый файловый модуль не показывается в основном каталоге."
+                    },
+                    onCommit = onHiddenFromUiChange,
+                )
             }
             PreviewCard("DB lifecycle") {
-                MetadataRow("Источник", translateSourceKind(session.sourceKind))
-                MetadataRow("Текущая ревизия", session.currentRevisionId ?: "-")
-                MetadataRow("Личный черновик", session.workingCopyId ?: "-")
-                MetadataRow("Статус черновика", session.workingCopyStatus ?: "-")
-                MetadataRow("Базовая ревизия", session.baseRevisionId ?: "-")
+                MetadataReadOnlyRow("Источник", translateSourceKind(session.sourceKind))
+                MetadataReadOnlyRow("Текущая ревизия", session.currentRevisionId ?: "-")
+                MetadataReadOnlyRow("Личный черновик", session.workingCopyId ?: "-")
+                MetadataReadOnlyRow("Статус черновика", session.workingCopyStatus ?: "-")
+                MetadataReadOnlyRow("Базовая ревизия", session.baseRevisionId ?: "-")
             }
         }
     }
@@ -553,7 +1188,7 @@ private fun PreviewCard(
 }
 
 @Composable
-private fun MetadataRow(
+private fun MetadataReadOnlyRow(
     label: String,
     value: String,
 ) {
@@ -564,14 +1199,90 @@ private fun MetadataRow(
 }
 
 @Composable
+private fun MetadataTextField(
+    label: String,
+    value: String,
+    helpText: String = "",
+    onCommit: (String) -> Unit,
+) {
+    var draft by remember(value) { mutableStateOf(value) }
+    Label(attrs = { classes("module-metadata-row") }) {
+        Div({ classes("module-metadata-label") }) { Text(label) }
+        Div({ classes("module-metadata-value") }) {
+            if (helpText.isNotBlank()) {
+                Div({ classes("config-form-help", "mb-1") }) { Text(helpText) }
+            }
+            Input(type = org.jetbrains.compose.web.attributes.InputType.Text, attrs = {
+                classes("form-control")
+                value(draft)
+                onInput { draft = it.value }
+                onChange { if (draft != value) onCommit(draft) }
+            })
+        }
+    }
+}
+
+@Composable
+private fun MetadataTextareaField(
+    label: String,
+    value: String,
+    rowsCount: Int,
+    helpText: String = "",
+    onCommit: (String) -> Unit,
+) {
+    var draft by remember(value) { mutableStateOf(value) }
+    Label(attrs = { classes("module-metadata-row") }) {
+        Div({ classes("module-metadata-label") }) { Text(label) }
+        Div({ classes("module-metadata-value") }) {
+            if (helpText.isNotBlank()) {
+                Div({ classes("config-form-help", "mb-1") }) { Text(helpText) }
+            }
+            TextArea(value = draft, attrs = {
+                classes("form-control")
+                rows(rowsCount)
+                onInput { draft = it.value }
+                onChange { if (draft != value) onCommit(draft) }
+            })
+        }
+    }
+}
+
+@Composable
+private fun MetadataCheckboxField(
+    label: String,
+    checked: Boolean,
+    helpText: String = "",
+    onCommit: (Boolean) -> Unit,
+) {
+    Div({ classes("module-metadata-row") }) {
+        Div({ classes("module-metadata-label") }) { Text("Видимость") }
+        Div({ classes("module-metadata-value") }) {
+            Label(attrs = { classes("config-form-check") }) {
+                Input(type = org.jetbrains.compose.web.attributes.InputType.Checkbox, attrs = {
+                    classes("form-check-input")
+                    if (checked) {
+                        attr("checked", "checked")
+                    }
+                    onClick { onCommit(!checked) }
+                })
+                Span({ classes("form-check-label") }) { Text(label) }
+            }
+            if (helpText.isNotBlank()) {
+                Div({ classes("config-form-help", "mt-1") }) { Text(helpText) }
+            }
+        }
+    }
+}
+
+@Composable
 private fun EditorActionButton(
     label: String,
     enabled: Boolean,
-    primary: Boolean = false,
+    style: EditorActionStyle = EditorActionStyle.SecondaryOutline,
     onClick: () -> Unit,
 ) {
     Button(attrs = {
-        classes("btn", if (primary) "btn-success" else "btn-outline-secondary")
+        classes("btn", style.cssClass)
         if (!enabled) {
             disabled()
         }
@@ -584,15 +1295,42 @@ private fun EditorActionButton(
     }
 }
 
+private enum class EditorActionStyle(
+    val cssClass: String,
+) {
+    PrimarySolid("btn-primary"),
+    Success("btn-success"),
+    PrimaryOutline("btn-outline-primary"),
+    SecondaryOutline("btn-outline-secondary"),
+    DangerOutline("btn-outline-danger"),
+}
+
 private fun buildCatalogStatus(
     state: ModuleEditorPageState,
     storage: String,
 ): String {
-    val totalModules = state.modules.size
     return if (storage == "database") {
-        "Compose-shell каталога БД. Модулей: $totalModules."
+        val diagnostics = state.databaseCatalog?.diagnostics
+        buildString {
+            append("Каталог модулей из базы данных.")
+            diagnostics?.let {
+                append(" Всего: ${it.totalModules}.")
+                append(" Исправных: ${it.validModules}, с предупреждениями: ${it.warningModules}, с ошибками: ${it.invalidModules}.")
+                append(" Замечаний: ${it.totalIssues}.")
+            }
+        }
     } else {
-        "Compose-shell файлового каталога. Модулей: $totalModules."
+        val filesCatalog = state.filesCatalog
+        val appsRootStatus = filesCatalog?.appsRootStatus
+        val diagnostics = filesCatalog?.diagnostics
+        buildString {
+            append(appsRootStatus?.message ?: "Состояние каталога файловых модулей пока недоступно.")
+            diagnostics?.let {
+                append(" Всего модулей: ${it.totalModules}.")
+                append(" Исправных: ${it.validModules}, с предупреждениями: ${it.warningModules}, с ошибками: ${it.invalidModules}.")
+                append(" Замечаний: ${it.totalIssues}.")
+            }
+        }
     }
 }
 
@@ -603,6 +1341,53 @@ private fun buildRunsHref(
     val includeHiddenPart = if (route.includeHidden) "&includeHidden=true" else ""
     return "/compose-runs?storage=${route.storage}&module=${moduleId.orEmpty()}$includeHiddenPart"
 }
+
+private fun buildEditorWebSocketUrl(): String {
+    val protocol = if (window.location.protocol == "https:") "wss" else "ws"
+    return "$protocol://${window.location.host}/ws"
+}
+
+private fun buildDraftSqlFiles(state: ModuleEditorPageState): List<ModuleFileContent> {
+    val session = state.session ?: return emptyList()
+    val persistedSqlFiles = session.module.sqlFiles.associateBy { it.path }
+    return state.sqlContentsDraft.entries.sortedBy { it.key }.map { (path, content) ->
+        val persisted = persistedSqlFiles[path]
+        ModuleFileContent(
+            label = persisted?.label ?: defaultSqlLabel(path),
+            path = path,
+            content = content,
+            exists = persisted?.exists ?: true,
+        )
+    }
+}
+
+private fun buildSqlUsageBadges(
+    state: ModuleEditorPageState,
+    path: String?,
+): List<SqlUsageBadge> {
+    if (path.isNullOrBlank()) {
+        return listOf(SqlUsageBadge("Сведения об использовании пока недоступны.", true))
+    }
+    val formState = state.configFormState ?: return listOf(SqlUsageBadge("Не используется", true))
+    val usages = buildList {
+        if (formState.commonSqlFile == path) {
+            add("SQL по умолчанию")
+        }
+        formState.sources.forEach { source ->
+            if (source.sqlFile == path) {
+                add("Источник: ${source.name}")
+            }
+        }
+    }
+    return if (usages.isEmpty()) {
+        listOf(SqlUsageBadge("Не используется", true))
+    } else {
+        usages.map { SqlUsageBadge(it, false) }
+    }
+}
+
+private fun defaultSqlLabel(path: String): String =
+    path.replace('\\', '/').substringAfterLast('/')
 
 private fun buildDraftStatusText(
     route: ModuleEditorRouteState,
@@ -616,6 +1401,54 @@ private fun buildDraftStatusText(
     } else {
         "Изменений нет."
     }
+
+private fun buildCredentialsStatusText(status: CredentialsStatusResponse): String {
+    val sourceLabel = when {
+        status.uploaded -> "загружен через UI"
+        status.mode.equals("FILE", ignoreCase = true) -> "файл по умолчанию"
+        else -> "файл не задан"
+    }
+    val availability = if (status.fileAvailable) "доступен" else "не найден"
+    return "$sourceLabel: ${status.displayName} ($availability)"
+}
+
+private fun buildCredentialsWarningText(module: ModuleDetailsResponse): String {
+    return when {
+        !module.requiresCredentials -> {
+            "У этого модуля нет обязательных placeholders \${...}. credential.properties нужен только для модулей и SQL-источников, где параметры вынесены во внешний файл."
+        }
+        module.credentialsReady -> {
+            "Для модуля все обязательные placeholders \${...} сейчас разрешаются. При необходимости credential.properties можно заменить загрузкой через UI."
+        }
+        module.credentialsStatus.fileAvailable -> {
+            val missingKeysText = module.missingCredentialKeys
+                .takeIf { it.isNotEmpty() }
+                ?.joinToString(", ", prefix = " Не хватает значений: ", postfix = ".")
+                .orEmpty()
+            "Для модуля найден credential.properties, но обязательные placeholders разрешены не полностью.$missingKeysText Также проверяются переменные окружения и JVM system properties."
+        }
+        else -> {
+            val missingKeysText = module.missingCredentialKeys
+                .takeIf { it.isNotEmpty() }
+                ?.joinToString(", ", prefix = " Не хватает значений: ", postfix = ".")
+                .orEmpty()
+            "В конфиге модуля найдены placeholders \${...}, но подходящие значения сейчас не найдены.$missingKeysText Сначала ищется ui.defaultCredentialsFile, затем gradle/credential.properties в проекте, затем ~/.gradle/credential.properties. Если значений нет, загрузи файл через UI или задай их через env/JVM."
+        }
+    }
+}
+
+private suspend fun uploadCredentialsFile(
+    httpClient: ComposeHttpClient,
+    file: File,
+): CredentialsStatusResponse {
+    val formData = FormData()
+    formData.append("file", file, file.name)
+    return httpClient.postFormData(
+        path = "/api/credentials/upload",
+        formData = formData,
+        deserializer = CredentialsStatusResponse.serializer(),
+    )
+}
 
 private fun translateSourceKind(sourceKind: String?): String =
     when (sourceKind?.uppercase()) {
@@ -638,3 +1471,8 @@ private fun translateValidationStatus(validationStatus: String): String =
         "WARNING" -> "Есть предупреждения"
         else -> "Есть ошибки"
     }
+
+private data class SqlUsageBadge(
+    val label: String,
+    val muted: Boolean,
+)

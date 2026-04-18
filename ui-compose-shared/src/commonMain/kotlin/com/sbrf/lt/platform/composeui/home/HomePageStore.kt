@@ -1,6 +1,13 @@
 package com.sbrf.lt.platform.composeui.home
 
 import com.sbrf.lt.platform.composeui.model.ModuleStoreMode
+import com.sbrf.lt.platform.composeui.model.RuntimeModeUpdateResponse
+
+interface HomePageApi {
+    suspend fun loadHomePageData(): HomePageData
+
+    suspend fun updateRuntimeMode(mode: ModuleStoreMode): RuntimeModeUpdateResponse
+}
 
 class HomePageStore(
     private val api: HomePageApi,

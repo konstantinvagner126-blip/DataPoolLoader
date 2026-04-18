@@ -18,7 +18,7 @@ group = "com.sbrf.lt.datapool"
 version = "1.0.0"
 
 subprojects {
-    if (path == ":ui-compose-web") {
+    if (path == ":ui-compose-web" || path == ":ui-compose-shared" || path == ":ui-compose-desktop") {
         return@subprojects
     }
 

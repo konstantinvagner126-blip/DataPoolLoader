@@ -77,6 +77,22 @@ enum class ModuleEditorTab(
     META("Метаданные"),
 }
 
+data class ModuleMetadataDraft(
+    val title: String = "",
+    val description: String = "",
+    val tags: List<String> = emptyList(),
+    val hiddenFromUi: Boolean = false,
+)
+
+data class CreateModuleDraft(
+    val moduleCode: String = "",
+    val title: String = "",
+    val description: String = "",
+    val tagsText: String = "",
+    val hiddenFromUi: Boolean = true,
+    val configText: String = defaultCreateModuleConfigTemplate(),
+)
+
 data class ModuleEditorPageState(
     val loading: Boolean = true,
     val errorMessage: String? = null,
@@ -90,6 +106,9 @@ data class ModuleEditorPageState(
     val selectedSqlPath: String? = null,
     val configTextDraft: String = "",
     val sqlContentsDraft: Map<String, String> = emptyMap(),
+    val metadataDraft: ModuleMetadataDraft = ModuleMetadataDraft(),
+    val createModuleDialogOpen: Boolean = false,
+    val createModuleDraft: CreateModuleDraft = CreateModuleDraft(),
     val configFormState: ConfigFormStateDto? = null,
     val configFormLoading: Boolean = false,
     val configFormError: String? = null,
@@ -102,7 +121,12 @@ data class ModuleEditorPageState(
         get() {
             val module = session?.module ?: return false
             val persistedSql = module.sqlFiles.associate { it.path to it.content }
-            return configTextDraft != module.configText || sqlContentsDraft != persistedSql
+            return configTextDraft != module.configText ||
+                sqlContentsDraft != persistedSql ||
+                metadataDraft.title != module.title ||
+                metadataDraft.description != (module.description ?: "") ||
+                metadataDraft.tags != module.tags ||
+                metadataDraft.hiddenFromUi != module.hiddenFromUi
         }
 
     val configFormNeedsSync: Boolean

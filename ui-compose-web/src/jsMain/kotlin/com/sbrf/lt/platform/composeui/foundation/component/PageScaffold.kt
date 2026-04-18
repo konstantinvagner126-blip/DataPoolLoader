@@ -15,10 +15,20 @@ fun PageScaffold(
     subtitle: String,
     content: @Composable () -> Unit,
     heroArt: (@Composable () -> Unit)? = null,
+    heroClassNames: List<String> = emptyList(),
+    heroCopyClassNames: List<String> = emptyList(),
+    heroHeader: (@Composable () -> Unit)? = null,
 ) {
     Div({ classes("container-fluid", "py-4", "compose-home-root") }) {
-        Div({ classes("hero-card", "mb-4") }) {
-            Div {
+        Div({ classes("hero-card", "mb-4", *heroClassNames.toTypedArray()) }) {
+            Div({
+                if (heroCopyClassNames.isNotEmpty()) {
+                    classes(*heroCopyClassNames.toTypedArray())
+                }
+            }) {
+                if (heroHeader != null) {
+                    heroHeader()
+                }
                 Div({ classes("eyebrow") }) { Text(eyebrow) }
                 H1({ classes("display-6", "mb-1") }) { Text(title) }
                 P({ classes("text-secondary", "mb-0") }) { Text(subtitle) }

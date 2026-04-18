@@ -4,32 +4,6 @@ import com.sbrf.lt.platform.composeui.foundation.http.ComposeHttpClient
 import com.sbrf.lt.platform.composeui.model.DatabaseModulesCatalogResponse
 import com.sbrf.lt.platform.composeui.model.FilesModulesCatalogResponse
 
-interface ModuleEditorApi {
-    suspend fun loadFilesCatalog(): FilesModulesCatalogResponse
-
-    suspend fun loadDatabaseCatalog(includeHidden: Boolean): DatabaseModulesCatalogResponse
-
-    suspend fun loadFilesSession(moduleId: String): ModuleEditorSessionResponse
-
-    suspend fun loadDatabaseSession(moduleId: String): ModuleEditorSessionResponse
-
-    suspend fun saveFilesModule(moduleId: String, request: SaveModuleRequestDto): SaveResultResponseDto
-
-    suspend fun saveDatabaseWorkingCopy(moduleId: String, request: SaveModuleRequestDto): SaveResultResponseDto
-
-    suspend fun discardDatabaseWorkingCopy(moduleId: String): SaveResultResponseDto
-
-    suspend fun publishDatabaseWorkingCopy(moduleId: String): SaveResultResponseDto
-
-    suspend fun startFilesRun(request: StartRunRequestDto): UiRunSnapshotDto
-
-    suspend fun startDatabaseRun(moduleId: String): DatabaseRunStartResponseDto
-
-    suspend fun parseConfigForm(configText: String): ConfigFormStateDto
-
-    suspend fun applyConfigForm(configText: String, formState: ConfigFormStateDto): ConfigFormUpdateResponseDto
-}
-
 class ModuleEditorApiClient(
     private val httpClient: ComposeHttpClient = ComposeHttpClient(),
 ) : ModuleEditorApi {
@@ -77,6 +51,20 @@ class ModuleEditorApiClient(
             EmptyRequestDto(),
             EmptyRequestDto.serializer(),
             SaveResultResponseDto.serializer(),
+        )
+
+    override suspend fun createDatabaseModule(request: CreateDbModuleRequestDto): CreateDbModuleResponseDto =
+        httpClient.postJson(
+            "/api/db/modules",
+            request,
+            CreateDbModuleRequestDto.serializer(),
+            CreateDbModuleResponseDto.serializer(),
+        )
+
+    override suspend fun deleteDatabaseModule(moduleId: String): DeleteModuleResponseDto =
+        httpClient.delete(
+            path = "/api/db/modules/$moduleId",
+            deserializer = DeleteModuleResponseDto.serializer(),
         )
 
     override suspend fun startFilesRun(request: StartRunRequestDto): UiRunSnapshotDto =

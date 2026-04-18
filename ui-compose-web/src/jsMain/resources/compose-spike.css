@@ -23,3 +23,51 @@ body {
 .compose-home-root .home-card[aria-disabled="true"] {
   user-select: none;
 }
+
+.compose-home-root .module-editor-header-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.compose-home-root .module-editor-toolbar {
+  align-items: stretch;
+  gap: 0.7rem;
+  width: 100%;
+}
+
+.compose-home-root .module-editor-toolbar-row {
+  gap: 0.7rem;
+  justify-content: flex-start;
+}
+
+.compose-home-root .module-editor-toolbar-group {
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.75rem 0.85rem;
+}
+
+.compose-home-root .module-editor-toolbar-group .btn {
+  min-width: 8.5rem;
+  min-height: 2.55rem;
+  padding-inline: 0.85rem;
+  font-size: 0.92rem;
+}
+
+.compose-home-root .module-editor-toolbar-group-primary .btn,
+.compose-home-root .module-editor-toolbar-group-draft .btn {
+  min-width: 9rem;
+}
+
+.compose-home-root .module-editor-toolbar-group-secondary .btn,
+.compose-home-root .module-editor-toolbar-group-admin .btn {
+  min-width: 8.25rem;
+}
+
+.compose-home-root .sql-credentials-summary {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #5c7087;
+}

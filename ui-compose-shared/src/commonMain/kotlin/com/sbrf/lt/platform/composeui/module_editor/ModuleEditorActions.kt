@@ -18,6 +18,32 @@ data class SaveResultResponseDto(
 )
 
 @Serializable
+data class CreateDbModuleRequestDto(
+    val moduleCode: String,
+    val title: String,
+    val description: String? = null,
+    val tags: List<String> = emptyList(),
+    val configText: String = "",
+    val hiddenFromUi: Boolean = true,
+)
+
+@Serializable
+data class CreateDbModuleResponseDto(
+    val message: String,
+    val moduleId: String,
+    val moduleCode: String,
+    val revisionId: String? = null,
+    val workingCopyId: String? = null,
+)
+
+@Serializable
+data class DeleteModuleResponseDto(
+    val message: String,
+    val moduleCode: String,
+    val deletedBy: String? = null,
+)
+
+@Serializable
 data class EmptyRequestDto(
     val placeholder: String? = null,
 )

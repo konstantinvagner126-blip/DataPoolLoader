@@ -33,6 +33,7 @@ fun ModuleEditorSettingsForm(
     onRefreshFromConfig: () -> Unit,
     onApplyFormState: (ConfigFormStateDto) -> Unit,
 ) {
+    val configFormError = state.configFormError
     if (state.configFormLoading && state.configFormState == null) {
         LoadingStateCard(
             title = "Настройки модуля",
@@ -59,8 +60,8 @@ fun ModuleEditorSettingsForm(
                 }
             },
         ) {
-            if (!state.configFormError.isNullOrBlank()) {
-                AlertBanner(state.configFormError, "warning")
+            if (!configFormError.isNullOrBlank()) {
+                AlertBanner(configFormError, "warning")
             }
             P({ classes("text-secondary", "mb-0") }) {
                 Text("Сейчас визуальная форма недоступна. Исправь YAML или пересобери форму повторно.")
@@ -95,8 +96,8 @@ fun ModuleEditorSettingsForm(
             }
         },
     ) {
-        if (!state.configFormError.isNullOrBlank()) {
-            AlertBanner(state.configFormError, "warning")
+        if (!configFormError.isNullOrBlank()) {
+            AlertBanner(configFormError, "warning")
         }
         if (state.configFormNeedsSync) {
             AlertBanner(

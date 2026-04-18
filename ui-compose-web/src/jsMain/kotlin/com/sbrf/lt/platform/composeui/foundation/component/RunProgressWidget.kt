@@ -70,13 +70,13 @@ fun RunProgressWidget(
             }
             Div({ classes("run-progress-status-wrap") }) {
                 Span({
-                    classes(
-                        "run-progress-indicator",
-                        if (running) "run-progress-indicator-running" else "",
-                    )
+                    classes("run-progress-indicator")
+                    if (running) {
+                        classes("run-progress-indicator-running")
+                    }
                     attr("aria-hidden", "true")
                 })
-                Span({ classes(statusClassName) }) {
+                Span({ classes(*statusClassName.split(" ").filter { it.isNotBlank() }.toTypedArray()) }) {
                     Text(statusLabel)
                 }
             }

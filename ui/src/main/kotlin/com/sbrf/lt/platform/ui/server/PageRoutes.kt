@@ -44,6 +44,16 @@ internal fun Route.registerPageRoutes(context: UiServerContext) {
         val suffix = if (query.isBlank()) "" else "&$query"
         call.respondRedirect("/static/compose-spike/index.html?screen=module-editor$suffix", permanent = false)
     }
+    get("/compose-sync") {
+        val query = call.request.queryParameters.formUrlEncode()
+        val suffix = if (query.isBlank()) "" else "&$query"
+        call.respondRedirect("/static/compose-spike/index.html?screen=module-sync$suffix", permanent = false)
+    }
+    get("/compose-sql-console") {
+        val query = call.request.queryParameters.formUrlEncode()
+        val suffix = if (query.isBlank()) "" else "&$query"
+        call.respondRedirect("/static/compose-spike/index.html?screen=sql-console$suffix", permanent = false)
+    }
     get("/module-runs") {
         when (call.request.queryParameters["storage"]?.lowercase()) {
             "files" -> {
