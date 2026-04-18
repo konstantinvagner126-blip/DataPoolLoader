@@ -18,6 +18,7 @@ import com.sbrf.lt.platform.composeui.foundation.component.SectionCard
 import com.sbrf.lt.platform.composeui.foundation.component.buildRunProgressStages
 import com.sbrf.lt.platform.composeui.foundation.dom.classes
 import com.sbrf.lt.platform.composeui.foundation.format.formatDateTime
+import com.sbrf.lt.platform.composeui.foundation.format.formatDuration
 import com.sbrf.lt.platform.composeui.foundation.format.formatNumber
 import com.sbrf.lt.platform.composeui.foundation.http.ComposeHttpClient
 import com.sbrf.lt.platform.composeui.foundation.updates.PollingEffect
@@ -61,6 +62,7 @@ import com.sbrf.lt.platform.composeui.module_runs.buildCompactProgressEntries
 import com.sbrf.lt.platform.composeui.module_runs.detectActiveSourceName
 import com.sbrf.lt.platform.composeui.module_runs.detectRunStageKey
 import com.sbrf.lt.platform.composeui.module_runs.eventEntryCssClass
+import com.sbrf.lt.platform.composeui.module_runs.parseStructuredRunSummary
 import com.sbrf.lt.platform.composeui.module_runs.runStatusCssClass
 import com.sbrf.lt.platform.composeui.module_runs.translateRunStatus
 import com.sbrf.lt.platform.composeui.module_runs.translateStage
@@ -878,6 +880,7 @@ private fun EditorRunOverviewPanel(
 
             else -> {
                 val details = requireNotNull(state.selectedRunDetails)
+                val structuredSummary = details.summaryJson?.let(::parseStructuredRunSummary)
                 val currentStageKey = detectRunStageKey(details.run, details.events)
                 val successCount = details.run.successfulSourceCount
                     ?: details.sourceResults.count { it.status.equals("SUCCESS", ignoreCase = true) }
@@ -904,6 +907,28 @@ private fun EditorRunOverviewPanel(
                         if (!activeSourceName.isNullOrBlank()) {
                             add(RunProgressMetric("Активный источник", activeSourceName, tone = "primary"))
                         }
+                        add(
+                            RunProgressMetric(
+                                "Длительность",
+                                formatDuration(
+                                    details.run.startedAt,
+                                    details.run.finishedAt,
+                                    running = runIsActive,
+                                ),
+                            ),
+                        )
+                        structuredSummary?.parallelism?.let {
+                            add(RunProgressMetric("Параллелизм", formatNumber(it)))
+                        }
+                        structuredSummary?.fetchSize?.let {
+                            add(RunProgressMetric("Fetch size", formatNumber(it)))
+                        }
+                        add(
+                            RunProgressMetric(
+                                "Query timeout",
+                                formatEditorTimeoutSeconds(structuredSummary?.queryTimeoutSec),
+                            ),
+                        )
                         add(RunProgressMetric("Строк в merged", formatNumber(details.run.mergedRowCount)))
                         add(RunProgressMetric("Успешных источников", formatNumber(successCount), tone = "success"))
                         add(RunProgressMetric("Ошибок", formatNumber(failedCount), tone = if (failedCount > 0) "danger" else "default"))
@@ -928,6 +953,12 @@ private fun EditorRunOverviewPanel(
         }
     }
 }
+
+private fun formatEditorTimeoutSeconds(value: Int?): String =
+    when (value) {
+        null -> "Не задан"
+        else -> "${value}с"
+    }
 
 @Composable
 private fun CreateModulePanel(

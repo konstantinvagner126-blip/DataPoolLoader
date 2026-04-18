@@ -5,11 +5,20 @@ package com.sbrf.lt.platform.ui.model
  */
 data class ModuleCatalogItemResponse(
     val id: String,
-    val title: String,
-    val description: String? = null,
-    val tags: List<String> = emptyList(),
-    val hiddenFromUi: Boolean = false,
+    val descriptor: ModuleMetadataDescriptorResponse,
     val validationStatus: String = "VALID",
     val validationIssues: List<ModuleValidationIssueResponse> = emptyList(),
     val hasActiveRun: Boolean = false,
-)
+) {
+    val title: String
+        get() = descriptor.title
+
+    val description: String?
+        get() = descriptor.description
+
+    val tags: List<String>
+        get() = descriptor.tags
+
+    val hiddenFromUi: Boolean
+        get() = descriptor.hiddenFromUi
+}

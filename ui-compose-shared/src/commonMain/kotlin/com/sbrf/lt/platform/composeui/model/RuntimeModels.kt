@@ -52,13 +52,22 @@ data class ModuleCatalogDiagnostics(
 @Serializable
 data class ModuleCatalogItem(
     val id: String,
-    val title: String,
-    val description: String? = null,
-    val tags: List<String> = emptyList(),
-    val hiddenFromUi: Boolean = false,
+    val descriptor: ModuleMetadataDescriptor,
     val validationStatus: String = "VALID",
     val hasActiveRun: Boolean = false,
-)
+) {
+    val title: String
+        get() = descriptor.title
+
+    val description: String?
+        get() = descriptor.description
+
+    val tags: List<String>
+        get() = descriptor.tags
+
+    val hiddenFromUi: Boolean
+        get() = descriptor.hiddenFromUi
+}
 
 @Serializable
 data class AppsRootStatus(

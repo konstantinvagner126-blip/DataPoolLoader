@@ -1098,7 +1098,9 @@ class ServerTest {
                 ) = com.sbrf.lt.platform.ui.module.DatabaseEditableModule(
                     module = ModuleDetailsResponse(
                         id = moduleCode,
-                        title = "DB Demo",
+                        descriptor = com.sbrf.lt.platform.ui.model.ModuleMetadataDescriptorResponse(
+                            title = "DB Demo",
+                        ),
                         configPath = "db:$moduleCode",
                         configText = "app:\n  sources: []",
                         sqlFiles = emptyList(),
@@ -1577,9 +1579,11 @@ class ServerTest {
                 listOf(
                     ModuleCatalogItemResponse(
                         id = "db-demo",
-                        title = "DB Demo",
-                        description = "Модуль из БД",
-                        tags = listOf("database"),
+                        descriptor = com.sbrf.lt.platform.ui.model.ModuleMetadataDescriptorResponse(
+                            title = "DB Demo",
+                            description = "Модуль из БД",
+                            tags = listOf("database"),
+                        ),
                     )
                 )
         }
@@ -2375,7 +2379,9 @@ class ServerTest {
                 return DatabaseEditableModule(
                     module = ModuleDetailsResponse(
                         id = "db-demo",
-                        title = "DB Demo",
+                        descriptor = com.sbrf.lt.platform.ui.model.ModuleMetadataDescriptorResponse(
+                            title = "DB Demo",
+                        ),
                         configPath = "db:db-demo",
                         configText = "app:\n  mergeMode: plain\n",
                         sqlFiles = listOf(
@@ -3075,6 +3081,9 @@ class ServerTest {
               commonSqlFile: classpath:sql/common.sql
               sources:
                 - name: db2
+                  jdbcUrl: jdbc:postgresql://localhost:5432/source
+                  username: source_user
+                  password: source_password
                   sqlFile: classpath:sql/db2.sql
             """.trimIndent(),
         )

@@ -74,70 +74,15 @@
 - runtime-mode control без перезапуска UI;
 - route-guard для `modules / db-modules / db-sync`;
 - отдельный screen обслуживания запусков и output-retention уже работает в `DB`-режиме через общий runtime-aware backend.
+- экран `История и результаты` тоже стал runtime-aware:
+  - загружает `runtimeContext`;
+  - не пытается грузить DB-историю вслепую при fallback;
+  - показывает явное warning-сообщение о недоступности БД и активном fallback-режиме.
+- SQL-консоль тоже читает `runtimeContext` и показывает явный warning при fallback `DATABASE -> FILES`, вместо немой работы без контекста.
 
 Что осталось:
 
 - при необходимости расширить live DB-context на остальные экраны.
-
-## P2
-
-### 17. Расширенный summary по длительностям
-
-Статус:
-
-- частично реализовано
-
-Цель:
-
-- улучшить наблюдаемость запуска.
-
-Что уже сделано:
-
-- на экране `История и результаты` показывается:
-  - общая длительность запуска;
-  - длительность `merge`;
-  - длительность `target`;
-  - длительность по каждому source.
-
-Что нужно сделать:
-
-- фактический timeout и runtime-параметры запуска;
-- при необходимости добавить те же длительности и в compact summary editor-экрана.
-
-### 18. Metadata модулей
-
-Статус:
-
-- частично реализовано
-
-Что уже сделано:
-
-- metadata читается из `ui-module.yml` и переносится в DB;
-- metadata редактируется в UI для `FILES` и `DB`;
-- storage-слой выровнен по `title / description / tags / hiddenFromUi`;
-- editor и catalog уже работают поверх единой модели metadata для `FILES` и `DB`.
-
-Что осталось:
-
-- формализовать descriptor как отдельный устойчивый контракт;
-- при необходимости выделить descriptor в отдельный backend-contract вне editor/session DTO.
-
-### 19. Валидация модулей при старте UI
-
-Статус:
-
-- частично реализовано
-
-Что уже сделано:
-
-- единый `ModuleValidationService` в `core`;
-- каталог модулей отдает агрегированную диагностику;
-- `FILES` и `DB` используют единые правила live-валидации;
-- editor показывает validation-state и пользовательские сообщения по текущему модулю.
-
-Что осталось:
-
-- при необходимости расширить общую валидацию дополнительными бизнес-правилами конфигурации.
 
 ## P3
 
@@ -166,6 +111,9 @@
 Что уже сделано:
 
 - `Server.kt` декомпозирован на `UiServerContext` и route-группы.
+- `DatabaseModuleStore` начал распиливаться на отдельные support-компоненты:
+  - [DatabaseModuleStoreSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/DatabaseModuleStoreSupport.kt)
+  - [DatabaseModuleStoreLifecycleSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/DatabaseModuleStoreLifecycleSupport.kt)
 
 Что осталось:
 
@@ -179,7 +127,6 @@
 ## Рекомендуемый порядок выполнения
 
 1. Добить `P0.0` по онлайн-прогрессу.
-2. Добавить расширенный summary по длительностям.
-3. Закрыть остатки по metadata и validation contracts.
-4. Продолжить рефакторинг крупных классов.
-5. Вернуться к `multi-statement SQL` как к отдельному большому этапу.
+2. При необходимости закрыть остатки `P1.9` по runtime-aware DB-экранам.
+3. Продолжить рефакторинг крупных классов.
+4. Вернуться к `multi-statement SQL` как к отдельному большому этапу.

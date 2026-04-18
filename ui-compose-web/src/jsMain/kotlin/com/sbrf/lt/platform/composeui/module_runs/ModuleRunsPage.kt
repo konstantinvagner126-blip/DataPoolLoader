@@ -21,6 +21,7 @@ import com.sbrf.lt.platform.composeui.foundation.format.formatDateTime
 import com.sbrf.lt.platform.composeui.foundation.format.formatDuration
 import com.sbrf.lt.platform.composeui.foundation.format.formatNumber
 import com.sbrf.lt.platform.composeui.foundation.format.statusTone
+import com.sbrf.lt.platform.composeui.model.ModuleStoreMode
 import com.sbrf.lt.platform.composeui.foundation.updates.PollingEffect
 import com.sbrf.lt.platform.composeui.foundation.updates.WebSocketEffect
 import kotlinx.browser.window
@@ -67,6 +68,7 @@ fun ComposeModuleRunsPage(
     val session = state.session
     val history = state.history
     val details = state.selectedRunDetails
+    val runtimeContext = state.runtimeContext
     val structuredSummary = details?.summaryJson?.let(::parseStructuredRunSummary)
     val filteredRuns = filterRuns(history?.runs.orEmpty(), state.historyFilter, state.searchQuery)
     val hasRunningRun = history?.runs?.any { it.status.equals("RUNNING", ignoreCase = true) } == true
@@ -144,6 +146,15 @@ fun ComposeModuleRunsPage(
             }
         },
         content = {
+            runtimeContext?.takeIf { it.requestedMode != it.effectiveMode }?.let { fallbackContext ->
+                val requestedLabel = if (fallbackContext.requestedMode == ModuleStoreMode.DATABASE) "База данных" else "Файлы"
+                val effectiveLabel = if (fallbackContext.effectiveMode == ModuleStoreMode.DATABASE) "База данных" else "Файлы"
+                AlertBanner(
+                    "Запрошен режим «$requestedLabel», но сейчас активен «$effectiveLabel». ${fallbackContext.fallbackReason ?: ""}".trim(),
+                    "warning",
+                )
+            }
+
             if (state.errorMessage != null) {
                 AlertBanner(state.errorMessage ?: "", "warning")
             }
@@ -430,12 +441,17 @@ fun ComposeModuleRunsPage(
                                         P({ classes("text-secondary", "mb-0") }) { Text("Итоги запуска еще не сформированы.") }
                                     } else {
                                         SummaryRow("Режим объединения", structuredSummary.mergeMode ?: "-")
+                                        SummaryRow("Параллелизм", formatNumber(structuredSummary.parallelism))
+                                        SummaryRow("Fetch size", formatNumber(structuredSummary.fetchSize))
+                                        SummaryRow("Query timeout", formatTimeoutSeconds(structuredSummary.queryTimeoutSec))
+                                        SummaryRow("Лог прогресса", formatRowsInterval(structuredSummary.progressLogEveryRows))
                                         SummaryRow("Файл merged", structuredSummary.mergedFile ?: "-")
                                         SummaryRow("Старт", formatDateTime(structuredSummary.startedAt))
                                         SummaryRow("Завершение", formatDateTime(structuredSummary.finishedAt))
                                         SummaryRow("Длительность", formatDuration(structuredSummary.startedAt, structuredSummary.finishedAt))
                                         SummaryRow("Строк в merged", formatNumber(structuredSummary.mergedRowCount))
                                         SummaryRow("Макс. строк merged", formatNumber(structuredSummary.maxMergedRows))
+                                        SummaryRow("Target включен", formatBooleanFlag(structuredSummary.targetEnabled))
                                         SummaryRow("Статус target", translateRunStatus(structuredSummary.targetStatus))
                                         SummaryRow("Таблица target", structuredSummary.targetTable ?: "-")
                                         SummaryRow("Загружено", formatNumber(structuredSummary.targetRowCount))
@@ -724,6 +740,25 @@ private fun isStageStartEvent(event: ModuleRunEventResponse): Boolean =
 private fun isStageFinishedEvent(event: ModuleRunEventResponse): Boolean =
     event.eventType.uppercase().contains("FINISHED") ||
         event.eventType.uppercase().contains("FAILED")
+
+private fun formatTimeoutSeconds(value: Int?): String =
+    when (value) {
+        null -> "Не задан"
+        else -> "${value}с"
+    }
+
+private fun formatRowsInterval(value: Long?): String =
+    when (value) {
+        null -> "-"
+        else -> "${formatNumber(value)} строк"
+    }
+
+private fun formatBooleanFlag(value: Boolean?): String =
+    when (value) {
+        true -> "Да"
+        false -> "Нет"
+        null -> "-"
+    }
 
 @Composable
 private fun SummaryMetricBadge(

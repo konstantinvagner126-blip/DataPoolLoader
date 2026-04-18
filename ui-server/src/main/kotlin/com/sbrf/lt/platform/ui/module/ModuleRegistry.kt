@@ -8,6 +8,7 @@ import com.sbrf.lt.platform.ui.model.ModuleDetailsResponse
 import com.sbrf.lt.platform.ui.model.ModuleFileContent
 import com.sbrf.lt.platform.ui.model.ModuleValidationIssueResponse
 import com.sbrf.lt.platform.ui.model.SaveModuleRequest
+import com.sbrf.lt.platform.ui.model.toMetadataDescriptorResponse
 import com.fasterxml.jackson.databind.JsonNode
 import com.sbrf.lt.datapool.config.sql.SqlFileReferenceExtractor
 import com.sbrf.lt.datapool.module.validation.ModuleValidationIssue
@@ -96,10 +97,7 @@ class ModuleRegistry(
         val sqlFiles = loadManagedSqlFiles(module, configText)
         return ModuleDetailsResponse(
             id = module.id,
-            title = module.title,
-            description = module.description,
-            tags = module.tags,
-            hiddenFromUi = module.hiddenFromUi,
+            descriptor = module.toMetadataDescriptorResponse(),
             validationStatus = module.validationStatus,
             validationIssues = module.validationIssues,
             configPath = module.configFile.toString(),

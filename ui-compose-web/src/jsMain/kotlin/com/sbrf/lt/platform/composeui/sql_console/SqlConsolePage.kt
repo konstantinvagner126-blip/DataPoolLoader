@@ -16,6 +16,7 @@ import com.sbrf.lt.platform.composeui.foundation.dom.classes
 import com.sbrf.lt.platform.composeui.foundation.http.ComposeHttpClient
 import com.sbrf.lt.platform.composeui.foundation.updates.PollingEffect
 import com.sbrf.lt.platform.composeui.model.CredentialsStatusResponse
+import com.sbrf.lt.platform.composeui.model.ModuleStoreMode
 import com.sbrf.lt.platform.composeui.sql_console.buildConnectionCheckStatusText
 import com.sbrf.lt.platform.composeui.sql_console.buildConsoleInfoText
 import com.sbrf.lt.platform.composeui.sql_console.buildCredentialsStatusText
@@ -79,6 +80,7 @@ fun ComposeSqlConsolePage(
     val statementAnalysis = analyzeSqlStatement(state.draftSql)
     val isRunning = currentExecution?.status.equals("RUNNING", ignoreCase = true)
     val runButtonClass = buildRunButtonClass(statementAnalysis, state.strictSafetyEnabled)
+    val runtimeContext = state.runtimeContext
     val connectionStatusBySource = state.connectionCheck?.sourceResults?.associateBy { it.sourceName }.orEmpty()
     val activeExportShard = currentResult
         ?.takeIf { it.statementType == "RESULT_SET" }
@@ -164,6 +166,9 @@ fun ComposeSqlConsolePage(
             }
             if (state.successMessage != null) {
                 AlertBanner(state.successMessage ?: "", "success")
+            }
+            runtimeContext?.takeIf { it.requestedMode != it.effectiveMode }?.let { fallbackContext ->
+                AlertBanner(buildSqlConsoleFallbackWarning(fallbackContext), "warning")
             }
 
             if (state.loading && state.info == null) {
@@ -532,6 +537,13 @@ fun ComposeSqlConsolePage(
             }
         },
     )
+}
+
+private fun buildSqlConsoleFallbackWarning(runtimeContext: com.sbrf.lt.platform.composeui.model.RuntimeContext): String {
+    val requestedLabel = if (runtimeContext.requestedMode == ModuleStoreMode.DATABASE) "База данных" else "Файлы"
+    val effectiveLabel = if (runtimeContext.effectiveMode == ModuleStoreMode.DATABASE) "База данных" else "Файлы"
+    val reason = runtimeContext.fallbackReason?.takeIf { it.isNotBlank() }?.let { " $it" }.orEmpty()
+    return "Запрошен режим «$requestedLabel», но сейчас активен «$effectiveLabel». SQL-консоль доступна, однако экраны модулей работают по текущему runtime-context.$reason"
 }
 
 @Composable

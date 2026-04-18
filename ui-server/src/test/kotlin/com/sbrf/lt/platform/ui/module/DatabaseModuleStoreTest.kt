@@ -32,8 +32,14 @@ class DatabaseModuleStoreTest {
                     app:
                       sources:
                         - name: db1
+                          jdbcUrl: jdbc:postgresql://localhost:5432/source
+                          username: source_user
+                          password: source_password
                           sqlFile: common
                         - name: db1
+                          jdbcUrl: jdbc:postgresql://localhost:5432/source
+                          username: source_user
+                          password: source_password
                           sqlFile: common
                 """.trimIndent(),
             ),

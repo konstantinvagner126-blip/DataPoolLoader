@@ -4,11 +4,21 @@ class SqlConsoleStore(
     private val api: SqlConsoleApi,
 ) {
     suspend fun load(): SqlConsolePageState {
+        val runtimeContextResult = runCatching { api.loadRuntimeContext() }
+        val runtimeContext = runtimeContextResult.getOrNull()
+        if (runtimeContext == null) {
+            return SqlConsolePageState(
+                loading = false,
+                errorMessage = runtimeContextResult.exceptionOrNull()?.message ?: "Не удалось загрузить runtime context SQL-консоли.",
+            )
+        }
+
         val infoResult = runCatching { api.loadInfo() }
         val info = infoResult.getOrNull()
         if (info == null) {
             return SqlConsolePageState(
                 loading = false,
+                runtimeContext = runtimeContext,
                 errorMessage = infoResult.exceptionOrNull()?.message ?: "Не удалось загрузить SQL-консоль.",
             )
         }
@@ -22,6 +32,7 @@ class SqlConsoleStore(
             .ifEmpty { info.sourceNames }
         return SqlConsolePageState(
             loading = false,
+            runtimeContext = runtimeContext,
             info = info,
             draftSql = persistedState.draftSql.ifBlank { "select 1 as check_value" },
             recentQueries = persistedState.recentQueries,

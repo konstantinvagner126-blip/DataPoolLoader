@@ -1,6 +1,10 @@
 package com.sbrf.lt.platform.composeui.sql_console
 
+import com.sbrf.lt.platform.composeui.model.RuntimeContext
+
 interface SqlConsoleApi {
+    suspend fun loadRuntimeContext(): RuntimeContext
+
     suspend fun loadInfo(): SqlConsoleInfo
 
     suspend fun loadState(): SqlConsoleStateSnapshot
@@ -17,4 +21,3 @@ interface SqlConsoleApi {
 
     suspend fun cancelExecution(executionId: String): SqlConsoleExecutionResponse
 }
-

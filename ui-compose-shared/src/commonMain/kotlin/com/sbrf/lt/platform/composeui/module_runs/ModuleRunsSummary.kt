@@ -17,11 +17,16 @@ private val summaryJsonCodec = Json {
 
 data class StructuredRunSummary(
     val mergeMode: String? = null,
+    val parallelism: Int? = null,
+    val fetchSize: Int? = null,
+    val queryTimeoutSec: Int? = null,
+    val progressLogEveryRows: Long? = null,
     val mergedFile: String? = null,
     val mergedRowCount: Long? = null,
     val maxMergedRows: Long? = null,
     val startedAt: String? = null,
     val finishedAt: String? = null,
+    val targetEnabled: Boolean? = null,
     val targetStatus: String? = null,
     val targetTable: String? = null,
     val targetRowCount: Long? = null,
@@ -74,11 +79,16 @@ fun parseStructuredRunSummary(summaryJson: String?): StructuredRunSummary? {
         }
         StructuredRunSummary(
             mergeMode = root.string("mergeMode"),
+            parallelism = root.int("parallelism"),
+            fetchSize = root.int("fetchSize"),
+            queryTimeoutSec = root.int("queryTimeoutSec"),
+            progressLogEveryRows = root.long("progressLogEveryRows"),
             mergedFile = root.string("mergedFile"),
             mergedRowCount = root.long("mergedRowCount"),
             maxMergedRows = root.long("maxMergedRows"),
             startedAt = root.string("startedAt"),
             finishedAt = root.string("finishedAt"),
+            targetEnabled = root.boolean("targetEnabled"),
             targetStatus = targetLoad?.string("status"),
             targetTable = targetLoad?.string("table"),
             targetRowCount = targetLoad?.long("rowCount"),
@@ -103,5 +113,11 @@ private fun JsonObject.string(key: String): String? =
 private fun JsonObject.long(key: String): Long? =
     (this[key] as? JsonPrimitive)?.longOrNull
 
+private fun JsonObject.int(key: String): Int? =
+    (this[key] as? JsonPrimitive)?.contentOrNull?.toIntOrNull()
+
 private fun JsonObject.double(key: String): Double? =
     (this[key] as? JsonPrimitive)?.doubleOrNull
+
+private fun JsonObject.boolean(key: String): Boolean? =
+    (this[key] as? JsonPrimitive)?.contentOrNull?.toBooleanStrictOrNull()

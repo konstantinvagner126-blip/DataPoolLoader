@@ -1,6 +1,7 @@
 package com.sbrf.lt.platform.composeui.sql_console
 
 import com.sbrf.lt.platform.composeui.foundation.http.ComposeHttpClient
+import com.sbrf.lt.platform.composeui.model.RuntimeContext
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.nullable
@@ -9,6 +10,9 @@ import kotlinx.serialization.builtins.serializer
 class SqlConsoleApiClient(
     private val httpClient: ComposeHttpClient = ComposeHttpClient(),
 ) : SqlConsoleApi {
+    override suspend fun loadRuntimeContext(): RuntimeContext =
+        httpClient.get("/api/ui/runtime-context", RuntimeContext.serializer())
+
     override suspend fun loadInfo(): SqlConsoleInfo =
         httpClient.get("/api/sql-console/info", SqlConsoleInfo.serializer())
 
@@ -58,4 +62,3 @@ class SqlConsoleApiClient(
             deserializer = SqlConsoleExecutionResponse.serializer(),
         )
 }
-

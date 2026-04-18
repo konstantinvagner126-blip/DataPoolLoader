@@ -8,14 +8,19 @@ import com.sbrf.lt.datapool.module.validation.ModuleValidationResult
  */
 fun ModuleDescriptor.toCatalogItemResponse(): ModuleCatalogItemResponse = ModuleCatalogItemResponse(
     id = id,
-    title = title,
-    description = description,
-    tags = tags,
-    hiddenFromUi = hiddenFromUi,
+    descriptor = toMetadataDescriptorResponse(),
     validationStatus = validationStatus,
     validationIssues = validationIssues,
     hasActiveRun = false,
 )
+
+fun ModuleDescriptor.toMetadataDescriptorResponse(): ModuleMetadataDescriptorResponse =
+    ModuleMetadataDescriptorResponse(
+        title = title,
+        description = description,
+        tags = tags,
+        hiddenFromUi = hiddenFromUi,
+    )
 
 /**
  * Преобразует результат валидации модуля в упрощенный набор UI-ошибок.

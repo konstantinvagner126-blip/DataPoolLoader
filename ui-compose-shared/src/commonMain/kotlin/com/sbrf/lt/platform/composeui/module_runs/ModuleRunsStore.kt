@@ -1,5 +1,7 @@
 package com.sbrf.lt.platform.composeui.module_runs
 
+import com.sbrf.lt.platform.composeui.model.ModuleStoreMode
+
 class ModuleRunsStore(
     private val api: ModuleRunsApi,
 ) {
@@ -8,6 +10,16 @@ class ModuleRunsStore(
         historyLimit: Int = 20,
     ): ModuleRunsPageState {
         return runCatching {
+            val runtimeContext = api.loadRuntimeContext()
+            if (route.storage == "database" && runtimeContext.effectiveMode != ModuleStoreMode.DATABASE) {
+                return ModuleRunsPageState(
+                    loading = false,
+                    errorMessage = runtimeContext.fallbackReason
+                        ?: "Режим базы данных сейчас недоступен.",
+                    runtimeContext = runtimeContext,
+                    historyLimit = historyLimit,
+                )
+            }
             val session = api.loadSession(route.storage, route.moduleId)
             val history = api.loadHistory(route.storage, route.moduleId, historyLimit)
             val selectedRunId = resolveSelectedRunId(history, null)
@@ -15,6 +27,7 @@ class ModuleRunsStore(
             ModuleRunsPageState(
                 loading = false,
                 errorMessage = null,
+                runtimeContext = runtimeContext,
                 session = session,
                 history = history,
                 selectedRunId = selectedRunId,
@@ -40,6 +53,7 @@ class ModuleRunsStore(
             current.copy(
                 loading = false,
                 errorMessage = null,
+                runtimeContext = current.runtimeContext,
                 selectedRunId = runId,
                 selectedRunDetails = details,
             )
@@ -63,6 +77,7 @@ class ModuleRunsStore(
             current.copy(
                 loading = false,
                 errorMessage = null,
+                runtimeContext = current.runtimeContext,
                 history = history,
                 selectedRunId = selectedRunId,
                 selectedRunDetails = details,

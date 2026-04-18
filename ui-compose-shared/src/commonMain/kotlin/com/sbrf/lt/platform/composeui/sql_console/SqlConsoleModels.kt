@@ -1,5 +1,6 @@
 package com.sbrf.lt.platform.composeui.sql_console
 
+import com.sbrf.lt.platform.composeui.model.RuntimeContext
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -102,6 +103,7 @@ data class SqlConsolePageState(
     val errorMessage: String? = null,
     val successMessage: String? = null,
     val actionInProgress: String? = null,
+    val runtimeContext: RuntimeContext? = null,
     val info: SqlConsoleInfo? = null,
     val connectionCheck: SqlConsoleConnectionCheckResponse? = null,
     val draftSql: String = "select 1 as check_value",
@@ -115,4 +117,3 @@ data class SqlConsolePageState(
     val currentExecutionId: String? = null,
     val currentExecution: SqlConsoleExecutionResponse? = null,
 )
-

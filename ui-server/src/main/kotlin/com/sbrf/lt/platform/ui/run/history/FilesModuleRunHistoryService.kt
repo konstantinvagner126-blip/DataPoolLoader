@@ -22,7 +22,7 @@ class FilesModuleRunHistoryService(
         return ModuleRunPageSessionResponse(
             storageMode = "FILES",
             moduleId = module.id,
-            moduleTitle = module.title,
+            moduleTitle = module.descriptor.title,
             moduleMeta = "${module.configPath} · режим хранения: Файлы",
         )
     }

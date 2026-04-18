@@ -24,7 +24,7 @@ class DatabaseModuleRunHistoryService(
         return ModuleRunPageSessionResponse(
             storageMode = "DATABASE",
             moduleId = session.module.id,
-            moduleTitle = session.module.title,
+            moduleTitle = session.module.descriptor.title,
             moduleMeta = "${session.module.configPath} · режим хранения: База данных",
         )
     }

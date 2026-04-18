@@ -1,5 +1,6 @@
 package com.sbrf.lt.platform.composeui.module_runs
 
+import com.sbrf.lt.platform.composeui.model.RuntimeContext
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -107,6 +108,7 @@ data class ModuleRunsRouteState(
 data class ModuleRunsPageState(
     val loading: Boolean = true,
     val errorMessage: String? = null,
+    val runtimeContext: RuntimeContext? = null,
     val session: ModuleRunPageSessionResponse? = null,
     val history: ModuleRunHistoryResponse? = null,
     val selectedRunId: String? = null,

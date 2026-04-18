@@ -210,6 +210,72 @@
 
 - `2026-04-19`
 
+## P2
+
+### 17. Расширенный summary по длительностям
+
+Статус:
+
+- реализовано
+
+Ключевой результат:
+
+- на экране `История и результаты` показываются:
+  - общая длительность запуска;
+  - длительность `merge`;
+  - длительность `target`;
+  - длительность по каждому source;
+- в structured summary выведены runtime-параметры запуска:
+  - `parallelism`;
+  - `fetchSize`;
+  - `queryTimeout`;
+  - `progressLogEveryRows`;
+  - `target enabled`;
+- compact summary editor-экрана тоже показывает длительность и ключевые runtime-параметры последнего или активного запуска.
+
+Основные даты:
+
+- `2026-04-19`
+
+### 18. Metadata модулей
+
+Статус:
+
+- реализовано
+
+Ключевой результат:
+
+- metadata читается из `ui-module.yml` и переносится в DB;
+- metadata редактируется в UI для `FILES` и `DB`;
+- общий server/shared контракт вынесен в отдельный `descriptor`, который используется и в catalog, и в editor/session DTO;
+- storage-слой и UI выровнены вокруг единой модели `title / description / tags / hiddenFromUi` без дублирования контрактов.
+
+Основные даты:
+
+- `2026-04-19`
+
+### 19. Валидация модулей при старте UI
+
+Статус:
+
+- реализовано
+
+Ключевой результат:
+
+- единый `ModuleValidationService` в `core` используется и для `FILES`, и для `DB`;
+- каталог модулей отдает агрегированную диагностику;
+- editor показывает validation-state и пользовательские сообщения по текущему модулю;
+- live-валидация теперь покрывает не только синтаксис и missing SQL, но и базовые business-rules конфигурации:
+  - обязательный хотя бы один source;
+  - непустые `name / jdbcUrl / username / password` у источников;
+  - наличие SQL через `commonSql/commonSqlFile` или `source.sql/sqlFile`;
+  - положительные `parallelism / fetchSize / queryTimeoutSec / progressLogEveryRows / maxMergedRows`;
+  - обязательные поля `target`, если `target.enabled = true`.
+
+Основные даты:
+
+- `2026-04-19`
+
 ### 6. Экспорт результатов SQL-консоли
 
 Статус:

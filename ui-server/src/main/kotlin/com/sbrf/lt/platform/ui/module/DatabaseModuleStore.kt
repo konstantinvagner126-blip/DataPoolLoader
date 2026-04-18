@@ -1,9 +1,7 @@
 package com.sbrf.lt.platform.ui.module
 
-import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import com.sbrf.lt.datapool.config.sql.SqlFileReferenceExtractor
 import com.sbrf.lt.datapool.db.registry.DatabaseConnectionProvider
 import com.sbrf.lt.datapool.db.registry.DriverManagerDatabaseConnectionProvider
 import com.sbrf.lt.datapool.db.registry.sql.ModuleRegistrySql
@@ -11,17 +9,11 @@ import com.sbrf.lt.datapool.db.registry.sql.normalizeRegistrySchemaName
 import com.sbrf.lt.datapool.module.validation.ModuleValidationService
 import com.sbrf.lt.platform.ui.config.UiModuleStorePostgresConfig
 import com.sbrf.lt.platform.ui.config.schemaName
-import com.sbrf.lt.platform.ui.model.CredentialsStatusResponse
 import com.sbrf.lt.platform.ui.model.ModuleCatalogItemResponse
-import com.sbrf.lt.platform.ui.model.ModuleDetailsResponse
 import com.sbrf.lt.platform.ui.model.ModuleFileContent
-import com.sbrf.lt.platform.ui.model.ModuleValidationIssueResponse
 import com.sbrf.lt.platform.ui.model.SaveModuleRequest
-import com.sbrf.lt.platform.ui.model.toResponse
-import com.sbrf.lt.platform.ui.model.toStatusValue
 import java.sql.Connection
 import java.sql.ResultSet
-import java.security.MessageDigest
 import java.util.UUID
 
 open class DatabaseModuleStore(
@@ -30,10 +22,9 @@ open class DatabaseModuleStore(
     private val objectMapper: ObjectMapper = jacksonObjectMapper(),
     private val validationService: ModuleValidationService = ModuleValidationService(),
 ) {
-    private val tagsType = object : TypeReference<List<String>>() {}
-    private val issuesType = object : TypeReference<List<ModuleValidationIssueResponse>>() {}
-    private val sqlFilesType = object : TypeReference<List<ModuleFileContent>>() {}
     private val revisionWriter = DatabaseModuleRevisionWriter(objectMapper, validationService)
+    private val support = DatabaseModuleStoreSupport(objectMapper, validationService)
+    private val lifecycleSupport = DatabaseModuleStoreLifecycleSupport(support, revisionWriter)
 
     open fun listModules(includeHidden: Boolean = false): List<ModuleCatalogItemResponse> {
         val normalizedSchema = normalizeRegistrySchemaName(schema)
@@ -45,16 +36,7 @@ open class DatabaseModuleStore(
                     while (resultSet.next()) {
                         val configText = resultSet.getString("snapshot_yaml")
                         val sqlFiles = loadRevisionSqlAssets(connection, normalizedSchema, resultSet.getString("current_revision_id"))
-                        val validation = validateModule(configText, sqlFiles)
-                        modules += ModuleCatalogItemResponse(
-                            id = resultSet.getString("module_code"),
-                            title = resultSet.getString("title"),
-                            description = resultSet.getString("description"),
-                            tags = readJsonList(resultSet.getString("tags_json"), tagsType),
-                            hiddenFromUi = resultSet.getBoolean("hidden_from_ui"),
-                            validationStatus = validation.toStatusValue(),
-                            validationIssues = validation.toResponse(),
-                        )
+                        modules += support.catalogItem(resultSet, configText, sqlFiles)
                     }
                     return modules
                 }
@@ -81,36 +63,13 @@ open class DatabaseModuleStore(
                 }
             }
             val sqlFiles = if (row.sourceKind == "WORKING_COPY") {
-                row.workingCopyJson?.let { readWorkingCopySqlFiles(it) } ?: emptyList()
+                row.workingCopyJson?.let { support.readWorkingCopySqlFiles(it) } ?: emptyList()
             } else {
                 loadRevisionSqlAssets(connection, normalizedSchema, row.currentRevisionId)
             }
-            val workingCopySnapshot = row.workingCopyJson?.let(::readWorkingCopySnapshot)
-            val validation = validateModule(row.configText, sqlFiles)
 
             return DatabaseEditableModule(
-                module = ModuleDetailsResponse(
-                    id = row.moduleCode,
-                    title = workingCopySnapshot?.title ?: row.title,
-                    description = workingCopySnapshot?.description ?: row.description,
-                    tags = workingCopySnapshot?.tags ?: row.tags,
-                    hiddenFromUi = workingCopySnapshot?.hiddenFromUi ?: row.hiddenFromUi,
-                    validationStatus = validation.toStatusValue(),
-                    validationIssues = validation.toResponse(),
-                    configPath = "db:${row.moduleCode}",
-                    configText = row.configText,
-                    sqlFiles = sqlFiles,
-                    requiresCredentials = false,
-                    credentialsStatus = CredentialsStatusResponse(
-                        mode = "NONE",
-                        displayName = "Файл не задан",
-                        fileAvailable = false,
-                        uploaded = false,
-                    ),
-                    requiredCredentialKeys = emptyList(),
-                    missingCredentialKeys = emptyList(),
-                    credentialsReady = true,
-                ),
+                module = support.moduleDetails(row, sqlFiles),
                 sourceKind = row.sourceKind,
                 currentRevisionId = row.currentRevisionId,
                 workingCopyId = row.workingCopyId,
@@ -133,7 +92,7 @@ open class DatabaseModuleStore(
             connection.autoCommit = false
             try {
                 val module = loadModuleForSave(connection, normalizedSchema, moduleCode, actorId, actorSource)
-                upsertWorkingCopy(
+                lifecycleSupport.upsertWorkingCopy(
                     connection = connection,
                     normalizedSchema = normalizedSchema,
                     module = module,
@@ -179,7 +138,13 @@ open class DatabaseModuleStore(
             val previousAutoCommit = connection.autoCommit
             connection.autoCommit = false
             try {
-                val moduleInfo = loadModuleForPublish(connection, normalizedSchema, moduleCode, actorId, actorSource)
+                val moduleInfo = lifecycleSupport.loadModuleForPublish(
+                    connection,
+                    normalizedSchema,
+                    moduleCode,
+                    actorId,
+                    actorSource,
+                )
                 require(moduleInfo.hasWorkingCopy) {
                     "Нет личного черновика для публикации. Сначала сохраните изменения."
                 }
@@ -219,9 +184,15 @@ open class DatabaseModuleStore(
                     sqlAssetIds = sqlAssetIds,
                 )
 
-                updateModuleCurrentRevision(connection, normalizedSchema, moduleInfo.moduleId, newRevisionId)
+                lifecycleSupport.updateModuleCurrentRevision(connection, normalizedSchema, moduleInfo.moduleId, newRevisionId)
 
-                deleteWorkingCopyAfterPublish(connection, normalizedSchema, moduleInfo.moduleId, actorId, actorSource)
+                lifecycleSupport.deleteWorkingCopyAfterPublish(
+                    connection,
+                    normalizedSchema,
+                    moduleInfo.moduleId,
+                    actorId,
+                    actorSource,
+                )
 
                 connection.commit()
                 return PublishResult(
@@ -255,7 +226,7 @@ open class DatabaseModuleStore(
                 val revisionId = UUID.randomUUID().toString()
                 val workingCopyId = UUID.randomUUID().toString()
 
-                insertNewModule(
+                lifecycleSupport.insertNewModule(
                     connection = connection,
                     normalizedSchema = normalizedSchema,
                     moduleId = moduleId,
@@ -288,9 +259,9 @@ open class DatabaseModuleStore(
                     sqlAssetIds = sqlAssetIds,
                 )
 
-                updateModuleCurrentRevision(connection, normalizedSchema, moduleId, revisionId)
+                lifecycleSupport.updateModuleCurrentRevision(connection, normalizedSchema, moduleId, revisionId)
 
-                insertInitialWorkingCopy(
+                lifecycleSupport.insertInitialWorkingCopy(
                     connection = connection,
                     normalizedSchema = normalizedSchema,
                     workingCopyId = workingCopyId,
@@ -327,15 +298,15 @@ open class DatabaseModuleStore(
             val previousAutoCommit = connection.autoCommit
             connection.autoCommit = false
             try {
-                val moduleInfo = loadModuleForDelete(connection, normalizedSchema, moduleCode)
+                val moduleInfo = lifecycleSupport.loadModuleForDelete(connection, normalizedSchema, moduleCode)
 
                 require(!moduleInfo.hasActiveRun) {
                     "Нельзя удалить модуль с активными запусками. Сначала остановите запуск."
                 }
 
-                deleteWorkingCopyForModule(connection, normalizedSchema, moduleInfo.moduleId)
+                lifecycleSupport.deleteWorkingCopyForModule(connection, normalizedSchema, moduleInfo.moduleId)
 
-                deleteModuleCascade(connection, normalizedSchema, moduleInfo.moduleId)
+                lifecycleSupport.deleteModuleCascade(connection, normalizedSchema, moduleInfo.moduleId)
 
                 connection.commit()
                 return DeleteModuleResult(
@@ -359,108 +330,7 @@ open class DatabaseModuleStore(
         actorId: String,
         actorSource: String,
     ): DatabaseModuleForSave {
-        connection.prepareStatement(ModuleRegistrySql.moduleForSave(normalizedSchema)).use { statement ->
-            statement.setString(1, actorId)
-            statement.setString(2, actorSource)
-            statement.setString(3, moduleCode)
-            statement.executeQuery().use { resultSet ->
-                if (!resultSet.next()) {
-                    error("DB-модуль '$moduleCode' не найден.")
-                }
-                return DatabaseModuleForSave(
-                    moduleId = resultSet.getString("module_id"),
-                    currentRevisionId = resultSet.getString("current_revision_id"),
-                    workingCopyId = resultSet.getString("working_copy_id"),
-                    workingCopyStatus = resultSet.getString("working_copy_status"),
-                )
-            }
-        }
-    }
-
-    private fun upsertWorkingCopy(
-        connection: Connection,
-        normalizedSchema: String,
-        module: DatabaseModuleForSave,
-        actorId: String,
-        actorSource: String,
-        actorDisplayName: String?,
-        request: SaveModuleRequest,
-    ) {
-        val snapshotJson = buildWorkingCopyJson(request)
-        connection.prepareStatement(ModuleRegistrySql.upsertWorkingCopy(normalizedSchema)).use { statement ->
-            statement.setString(1, module.workingCopyId ?: UUID.randomUUID().toString())
-            statement.setString(2, module.moduleId)
-            statement.setString(3, actorId)
-            statement.setString(4, actorSource)
-            statement.setString(5, actorDisplayName)
-            statement.setString(6, module.currentRevisionId)
-            statement.setString(7, snapshotJson)
-            statement.setString(8, request.configText)
-            statement.setString(9, contentHash(request))
-            statement.executeUpdate()
-        }
-    }
-
-    private fun buildWorkingCopyJson(request: SaveModuleRequest): String {
-        return buildSnapshotJson(
-            configText = request.configText,
-            sqlFileContents = request.sqlFiles,
-            title = request.title,
-            description = request.description,
-            tags = request.tags,
-            hiddenFromUi = request.hiddenFromUi,
-        )
-    }
-
-    private fun buildSnapshotJson(
-        configText: String,
-        sqlFileContents: Map<String, String>,
-        title: String,
-        description: String?,
-        tags: List<String>,
-        hiddenFromUi: Boolean,
-    ): String {
-        val sqlLabels = SqlFileReferenceExtractor.labelsByPathOrEmpty(configText, objectMapper)
-        val sqlFiles = sqlFileContents.entries
-            .sortedBy { it.key }
-            .map { (path, content) ->
-                ModuleFileContent(
-                    label = sqlLabels[path] ?: path,
-                    path = path,
-                    content = content,
-                    exists = true,
-                )
-            }
-        val root = objectMapper.createObjectNode()
-        root.put("configText", configText)
-        root.put("title", title)
-        root.put("description", description)
-        root.putPOJO("tags", tags)
-        root.put("hiddenFromUi", hiddenFromUi)
-        root.set<com.fasterxml.jackson.databind.JsonNode>("sqlFiles", objectMapper.valueToTree(sqlFiles))
-        return objectMapper.writeValueAsString(root)
-    }
-
-    private fun contentHash(request: SaveModuleRequest): String {
-        val input = buildString {
-            append(request.configText)
-            append('\u0000')
-            append(request.title)
-            append('\u0000')
-            append(request.description.orEmpty())
-            append('\u0000')
-            append(request.tags.joinToString("|"))
-            append('\u0000')
-            append(request.hiddenFromUi)
-            request.sqlFiles.toSortedMap().forEach { (path, content) ->
-                append('\n')
-                append(path)
-                append('\u0000')
-                append(content)
-            }
-        }
-        val digest = MessageDigest.getInstance("SHA-256").digest(input.toByteArray(Charsets.UTF_8))
-        return digest.joinToString("") { "%02x".format(it) }
+        return lifecycleSupport.loadModuleForSave(connection, normalizedSchema, moduleCode, actorId, actorSource)
     }
 
     private fun loadRevisionSqlAssets(
@@ -486,193 +356,15 @@ open class DatabaseModuleStore(
     }
 
     private fun readWorkingCopySqlFiles(workingCopyJson: String): List<ModuleFileContent> {
-        val snapshot = readWorkingCopySnapshot(workingCopyJson)
-        return relabelSqlFiles(snapshot.configText, snapshot.sqlFiles)
+        return support.readWorkingCopySqlFiles(workingCopyJson)
     }
 
     private fun readSqlFileContents(workingCopyJson: String?): Map<String, String> {
-        if (workingCopyJson.isNullOrBlank()) return emptyMap()
-        return readWorkingCopySqlFiles(workingCopyJson).associate { it.path to it.content }
-    }
-
-    private fun loadModuleForPublish(
-        connection: Connection,
-        normalizedSchema: String,
-        moduleCode: String,
-        actorId: String,
-        actorSource: String,
-    ): ModuleForPublish {
-        connection.prepareStatement(ModuleRegistrySql.moduleForPublish(normalizedSchema)).use { stmt ->
-            stmt.setString(1, actorId)
-            stmt.setString(2, actorSource)
-            stmt.setString(3, moduleCode)
-            stmt.executeQuery().use { rs ->
-                if (!rs.next()) error("DB-модуль '$moduleCode' не найден.")
-                return ModuleForPublish(
-                    moduleId = rs.getString("module_id"),
-                    currentRevisionId = rs.getString("current_revision_id"),
-                    maxRevisionNo = rs.getLong("max_revision_no"),
-                    hasWorkingCopy = rs.getString("working_copy_id") != null,
-                    baseRevisionId = rs.getString("base_revision_id"),
-                    workingCopyStatus = rs.getString("working_copy_status"),
-                    workingCopyJson = rs.getString("working_copy_json"),
-                    workingCopyYaml = rs.getString("working_copy_yaml"),
-                    contentHash = rs.getString("content_hash"),
-                )
-            }
-        }
-    }
-
-    private fun updateModuleCurrentRevision(
-        connection: Connection,
-        normalizedSchema: String,
-        moduleId: String,
-        revisionId: String,
-    ) {
-        connection.prepareStatement(ModuleRegistrySql.updateCurrentRevision(normalizedSchema)).use { stmt ->
-            stmt.setString(1, revisionId)
-            stmt.setString(2, moduleId)
-            stmt.executeUpdate()
-        }
-    }
-
-    private fun deleteWorkingCopyAfterPublish(
-        connection: Connection,
-        normalizedSchema: String,
-        moduleId: String,
-        actorId: String,
-        actorSource: String,
-    ) {
-        connection.prepareStatement(ModuleRegistrySql.deleteWorkingCopyAfterPublish(normalizedSchema)).use { stmt ->
-            stmt.setString(1, actorId)
-            stmt.setString(2, actorSource)
-            stmt.setString(3, moduleId)
-            stmt.executeUpdate()
-        }
-    }
-
-    private fun loadModuleForDelete(
-        connection: Connection,
-        normalizedSchema: String,
-        moduleCode: String,
-    ): ModuleForDelete {
-        val moduleId: String
-        connection.prepareStatement("select module_id::text as module_id from $normalizedSchema.module where module_code = ?").use { stmt ->
-            stmt.setString(1, moduleCode)
-            stmt.executeQuery().use { rs ->
-                if (!rs.next()) error("DB-модуль '$moduleCode' не найден.")
-                moduleId = rs.getString("module_id")
-            }
-        }
-
-        var hasActiveRun = false
-        connection.prepareStatement(ModuleRegistrySql.checkActiveRun(normalizedSchema)).use { stmt ->
-            stmt.setString(1, moduleCode)
-            stmt.executeQuery().use { rs ->
-                if (rs.next()) {
-                    hasActiveRun = rs.getInt("active_runs") > 0
-                }
-            }
-        }
-
-        return ModuleForDelete(moduleId = moduleId, hasActiveRun = hasActiveRun)
-    }
-
-    private fun insertNewModule(
-        connection: Connection,
-        normalizedSchema: String,
-        moduleId: String,
-        moduleCode: String,
-        originKind: String,
-    ) {
-        connection.prepareStatement(ModuleRegistrySql.insertModule(normalizedSchema)).use { stmt ->
-            stmt.setString(1, moduleId)
-            stmt.setString(2, moduleCode)
-            stmt.setString(3, originKind)
-            stmt.executeUpdate()
-        }
-    }
-
-    private fun insertInitialWorkingCopy(
-        connection: Connection,
-        normalizedSchema: String,
-        workingCopyId: String,
-        moduleId: String,
-        revisionId: String,
-        actorId: String,
-        actorSource: String,
-        actorDisplayName: String?,
-        request: CreateModuleRequest,
-    ) {
-        val snapshotJson = buildSnapshotJson(
-            configText = request.configText,
-            sqlFileContents = request.sqlFiles,
-            title = request.title,
-            description = request.description,
-            tags = request.tags,
-            hiddenFromUi = request.hiddenFromUi,
-        )
-
-        connection.prepareStatement(ModuleRegistrySql.upsertWorkingCopy(normalizedSchema)).use { stmt ->
-            stmt.setString(1, workingCopyId)
-            stmt.setString(2, moduleId)
-            stmt.setString(3, actorId)
-            stmt.setString(4, actorSource)
-            stmt.setString(5, actorDisplayName)
-            stmt.setString(6, revisionId)
-            stmt.setString(7, snapshotJson)
-            stmt.setString(8, request.configText)
-            stmt.setString(9, revisionWriter.contentHashForCreate(request))
-            stmt.executeUpdate()
-        }
-    }
-
-    private fun deleteWorkingCopyForModule(
-        connection: Connection,
-        normalizedSchema: String,
-        moduleId: String,
-    ) {
-        connection.prepareStatement(ModuleRegistrySql.deleteWorkingCopyForModule(normalizedSchema)).use { stmt ->
-            stmt.setString(1, moduleId)
-            stmt.executeUpdate()
-        }
-    }
-
-    private fun deleteModuleCascade(
-        connection: Connection,
-        normalizedSchema: String,
-        moduleId: String,
-    ) {
-        connection.prepareStatement(ModuleRegistrySql.deleteModule(normalizedSchema)).use { stmt ->
-            stmt.setString(1, moduleId)
-            stmt.executeUpdate()
-        }
+        return support.readSqlFileContents(workingCopyJson)
     }
 
     private fun ResultSet.toEditableModuleRow(): DatabaseEditableModuleRow =
-        DatabaseEditableModuleRow(
-            moduleCode = getString("module_code"),
-            title = getString("title"),
-            description = getString("description"),
-            tags = readJsonList(getString("tags_json"), tagsType),
-            hiddenFromUi = getBoolean("hidden_from_ui"),
-            validationStatus = getString("validation_status"),
-            validationIssues = readJsonList(getString("validation_issues_json"), issuesType),
-            configText = getString("config_text"),
-            sourceKind = getString("source_kind"),
-            currentRevisionId = getString("current_revision_id"),
-            workingCopyId = getString("working_copy_id"),
-            workingCopyStatus = getString("working_copy_status"),
-            baseRevisionId = getString("base_revision_id"),
-            workingCopyJson = getString("working_copy_json"),
-        )
-
-    private fun <T> readJsonList(json: String?, type: TypeReference<List<T>>): List<T> {
-        if (json.isNullOrBlank()) {
-            return emptyList()
-        }
-        return objectMapper.readValue(json, type)
-    }
+        support.editableModuleRow(this)
 
     companion object {
         fun fromConfig(config: UiModuleStorePostgresConfig): DatabaseModuleStore =
@@ -685,30 +377,4 @@ open class DatabaseModuleStore(
                 schema = config.schemaName(),
             )
     }
-
-    private fun relabelSqlFiles(configText: String, sqlFiles: List<ModuleFileContent>): List<ModuleFileContent> {
-        if (sqlFiles.isEmpty()) {
-            return sqlFiles
-        }
-        val labelsByPath = SqlFileReferenceExtractor.labelsByPathOrEmpty(configText, objectMapper)
-        return sqlFiles.map { file ->
-            val expectedLabel = labelsByPath[file.path]
-            if (expectedLabel != null && (file.label.isBlank() || file.label == file.path)) {
-                file.copy(label = expectedLabel)
-            } else {
-                file
-            }
-        }
-    }
-
-    private fun readWorkingCopySnapshot(workingCopyJson: String): WorkingCopySnapshot =
-        objectMapper.readValue(workingCopyJson, WorkingCopySnapshot::class.java)
-
-    private fun validateModule(
-        configText: String,
-        sqlFiles: List<ModuleFileContent>,
-    ) = validationService.validate(
-        configText = configText,
-        sqlReferenceExists = { entry -> sqlFiles.any { it.path == entry.path } },
-    )
 }

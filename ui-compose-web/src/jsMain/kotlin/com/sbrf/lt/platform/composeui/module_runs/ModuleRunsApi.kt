@@ -1,10 +1,14 @@
 package com.sbrf.lt.platform.composeui.module_runs
 
 import com.sbrf.lt.platform.composeui.foundation.http.ComposeHttpClient
+import com.sbrf.lt.platform.composeui.model.RuntimeContext
 
 class ModuleRunsApiClient(
     private val httpClient: ComposeHttpClient = ComposeHttpClient(),
 ) : ModuleRunsApi {
+    override suspend fun loadRuntimeContext(): RuntimeContext =
+        httpClient.get("/api/ui/runtime-context", RuntimeContext.serializer())
+
     override suspend fun loadSession(storage: String, moduleId: String): ModuleRunPageSessionResponse =
         httpClient.get("/api/module-runs/$storage/$moduleId", ModuleRunPageSessionResponse.serializer())
 
