@@ -93,6 +93,12 @@ data class ModuleRunDetailsResponse(
     val artifacts: List<ModuleRunArtifactResponse> = emptyList(),
 )
 
+data class CompactProgressEntry(
+    val timestamp: String? = null,
+    val message: String,
+    val severity: String,
+)
+
 data class ModuleRunsRouteState(
     val storage: String,
     val moduleId: String,

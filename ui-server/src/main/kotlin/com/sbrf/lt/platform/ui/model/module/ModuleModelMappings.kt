@@ -14,6 +14,7 @@ fun ModuleDescriptor.toCatalogItemResponse(): ModuleCatalogItemResponse = Module
     hiddenFromUi = hiddenFromUi,
     validationStatus = validationStatus,
     validationIssues = validationIssues,
+    hasActiveRun = false,
 )
 
 /**

@@ -108,8 +108,7 @@ fun ComposeModuleSyncPage(
 
                 SyncActionsPanel(
                     state = state,
-                    onModuleCodeChange = { state = store.updateSyncOneModuleCode(state, it) },
-                    onToggleSyncOneInput = { state = store.toggleSyncOneInput(state) },
+                    onToggleSelectiveSync = { state = store.toggleSelectiveSync(state) },
                     onSyncAll = {
                         if (!window.confirm("Синхронизировать все файловые модули в базу данных?")) {
                             return@SyncActionsPanel
@@ -119,34 +118,58 @@ fun ComposeModuleSyncPage(
                             state = store.syncAll(state)
                         }
                     },
-                    onSyncOne = {
+                    onSyncSelected = {
                         scope.launch {
-                            state = store.beginAction(state, "sync-one")
-                            state = store.syncOne(state)
+                            state = store.beginAction(state, "sync-selected")
+                            state = store.syncSelected(state)
                         }
                     },
                 )
 
                 Div({ classes("row", "g-4", "mt-1") }) {
                     Div({ classes("col-12", "col-lg-4") }) {
-                        SyncRunsHistoryPanel(
-                            state = state,
-                            onLimitChange = { limit ->
-                                scope.launch {
-                                    state = store.startLoading(store.updateHistoryLimit(state, limit))
-                                    state = store.load(
-                                        historyLimit = limit,
-                                        preferredRunId = state.selectedRunId,
-                                        syncOneModuleCode = state.syncOneModuleCode,
+                        if (state.selectiveSyncVisible) {
+                            SelectiveModulesPanel(
+                                state = state,
+                                onSearchQueryChange = { state = store.updateModuleSearchQuery(state, it) },
+                                onToggleModule = { moduleCode -> state = store.toggleModuleSelection(state, moduleCode) },
+                                onSelectAll = {
+                                    state = store.selectAllModules(
+                                        state,
+                                        filterSelectableModules(state).map { it.id },
                                     )
-                                }
-                            },
-                            onSelectRun = { syncRunId ->
-                                scope.launch {
-                                    state = store.selectRun(state, syncRunId)
-                                }
-                            },
-                        )
+                                },
+                                onClearSelection = { state = store.clearSelectedModules(state) },
+                                onSyncSelected = {
+                                    scope.launch {
+                                        state = store.beginAction(state, "sync-selected")
+                                        state = store.syncSelected(state)
+                                    }
+                                },
+                            )
+                        } else {
+                            SyncRunsHistoryPanel(
+                                state = state,
+                                onLimitChange = { limit ->
+                                    scope.launch {
+                                        val nextState = store.updateHistoryLimit(state, limit)
+                                        state = store.startLoading(nextState)
+                                        state = store.load(
+                                            historyLimit = limit,
+                                            preferredRunId = nextState.selectedRunId,
+                                            selectiveSyncVisible = nextState.selectiveSyncVisible,
+                                            selectedModuleCodes = nextState.selectedModuleCodes,
+                                            moduleSearchQuery = nextState.moduleSearchQuery,
+                                        )
+                                    }
+                                },
+                                onSelectRun = { syncRunId ->
+                                    scope.launch {
+                                        state = store.selectRun(state, syncRunId)
+                                    }
+                                },
+                            )
+                        }
                     }
                     Div({ classes("col-12", "col-lg-8") }) {
                         SyncRunDetailsPanel(state)
@@ -184,18 +207,17 @@ private fun RuntimeAlert(state: ModuleSyncPageState) {
 @Composable
 private fun SyncActionsPanel(
     state: ModuleSyncPageState,
-    onModuleCodeChange: (String) -> Unit,
-    onToggleSyncOneInput: () -> Unit,
+    onToggleSelectiveSync: () -> Unit,
     onSyncAll: () -> Unit,
-    onSyncOne: () -> Unit,
+    onSyncSelected: () -> Unit,
 ) {
     val runtimeContext = state.runtimeContext
     val syncState = state.syncState
     val databaseModeActive = runtimeContext?.effectiveMode == ModuleStoreMode.DATABASE
     val maintenanceMode = syncState?.maintenanceMode == true
-    val activeSingleSync = activeSingleSyncFor(state.syncOneModuleCode, syncState)
-    val canSyncAll = databaseModeActive && !maintenanceMode && state.actionInProgress == null && activeSingleSync == null
-    val canSyncOne = databaseModeActive && !maintenanceMode && state.actionInProgress == null
+    val hasSelection = state.selectedModuleCodes.isNotEmpty()
+    val canSyncAll = databaseModeActive && !maintenanceMode && state.actionInProgress == null
+    val canSyncSelected = databaseModeActive && !maintenanceMode && state.actionInProgress == null && hasSelection
 
     Div({ classes("module-sync-toolbar", "mb-4") }) {
         Div({ classes("module-sync-toolbar-row") }) {
@@ -213,50 +235,32 @@ private fun SyncActionsPanel(
                 }
             }
             Div({ classes("module-editor-toolbar-group", "module-editor-toolbar-group-secondary") }) {
-                Div({ classes("module-editor-toolbar-group-label") }) { Text("Точечный импорт") }
+                Div({ classes("module-editor-toolbar-group-label") }) { Text("Выборочная синхронизация") }
                 Button(attrs = {
                     classes("btn", "btn-outline-primary")
                     attr("type", "button")
-                    if (!canSyncOne) {
+                    if (!databaseModeActive || maintenanceMode || state.actionInProgress != null) {
                         disabled()
                     }
-                    onClick { onToggleSyncOneInput() }
+                    onClick { onToggleSelectiveSync() }
                 }) {
-                    Text(if (state.syncOneInputVisible) "Скрыть форму одного модуля" else "Синхронизировать один модуль")
+                    Text(if (state.selectiveSyncVisible) "Скрыть список модулей" else "Выбрать модули")
                 }
-            }
-        }
-    }
-
-    if (state.syncOneInputVisible) {
-        Div({ classes("mb-3") }) {
-            Label(attrs = { classes("form-label", "small", "text-secondary") }) {
-                Text("Код модуля для синхронизации:")
-            }
-            Div({ classes("input-group") }) {
-                Input(type = org.jetbrains.compose.web.attributes.InputType.Text, attrs = {
-                    classes("form-control")
-                    value(state.syncOneModuleCode)
-                    attr("placeholder", "например: local-manual-test")
-                    onInput { onModuleCodeChange(it.value) }
-                })
                 Button(attrs = {
                     classes("btn", "btn-primary")
                     attr("type", "button")
-                    if (!canSyncOne || activeSingleSync != null) {
+                    if (!canSyncSelected) {
                         disabled()
                     }
-                    onClick { onSyncOne() }
+                    onClick { onSyncSelected() }
                 }) {
-                    Text(if (state.actionInProgress == "sync-one") "Синхронизация..." else "Синхронизировать")
-                }
-            }
-            Div({ classes("small", "text-secondary", "mt-2") }) {
-                Text("Используй точечный импорт, когда нужно пересобрать только один DB-модуль без массовой синхронизации всего каталога.")
-            }
-            if (activeSingleSync != null) {
-                Div({ classes("small", "text-secondary", "mt-2") }) {
-                    Text(describeActiveSingleSync(activeSingleSync))
+                    Text(
+                        when {
+                            state.actionInProgress == "sync-selected" -> "Синхронизация..."
+                            state.selectedModuleCodes.size <= 1 -> "Синхронизировать выбранный"
+                            else -> "Синхронизировать выбранные"
+                        },
+                    )
                 }
             }
         }
@@ -265,13 +269,7 @@ private fun SyncActionsPanel(
 
 @Composable
 private fun SyncOverviewPanel(state: ModuleSyncPageState) {
-    val runtimeContext = state.runtimeContext
     val syncState = state.syncState
-    val runtimeLabel = when (runtimeContext?.effectiveMode) {
-        ModuleStoreMode.DATABASE -> "База данных"
-        ModuleStoreMode.FILES -> "Файлы"
-        else -> "Не определен"
-    }
     val syncLabel = when {
         syncState?.maintenanceMode == true -> "Массовая синхронизация"
         !syncState?.activeSingleSyncs.isNullOrEmpty() -> "Точечный импорт"
@@ -285,19 +283,9 @@ private fun SyncOverviewPanel(state: ModuleSyncPageState) {
 
     Div({ classes("sync-overview-grid", "mb-4") }) {
         SyncOverviewCard(
-            label = "Активный runtime",
-            value = runtimeLabel,
-            note = runtimeContext?.fallbackReason ?: "Текущий экран работает только в режиме базы данных.",
-        )
-        SyncOverviewCard(
             label = "Состояние импорта",
             value = syncLabel,
             note = syncNote,
-        )
-        SyncOverviewCard(
-            label = "История на экране",
-            value = "${state.runs.size} запусков",
-            note = "Лимит списка: ${state.historyLimit}. Выбранный запуск: ${state.selectedRunId ?: "нет"}.",
         )
     }
 }
@@ -312,6 +300,124 @@ private fun SyncOverviewCard(
         Div({ classes("sync-overview-label") }) { Text(label) }
         Div({ classes("sync-overview-value") }) { Text(value) }
         Div({ classes("sync-overview-note") }) { Text(note) }
+    }
+}
+
+@Composable
+private fun SelectiveModulesPanel(
+    state: ModuleSyncPageState,
+    onSearchQueryChange: (String) -> Unit,
+    onToggleModule: (String) -> Unit,
+    onSelectAll: () -> Unit,
+    onClearSelection: () -> Unit,
+    onSyncSelected: () -> Unit,
+) {
+    val filteredModules = filterSelectableModules(state)
+    val activeSingleSyncCodes = state.syncState?.activeSingleSyncs
+        ?.mapNotNull { it.moduleCode }
+        ?.toSet()
+        .orEmpty()
+
+    Div({ classes("panel", "h-100") }) {
+        Div({ classes("run-history-toolbar") }) {
+            Div({ classes("panel-title", "mb-0") }) { Text("Выборочная синхронизация") }
+            Input(type = org.jetbrains.compose.web.attributes.InputType.Search, attrs = {
+                classes("run-history-search-input")
+                value(state.moduleSearchQuery)
+                attr("placeholder", "Поиск по коду или названию...")
+                onInput { onSearchQueryChange(it.value) }
+            })
+        }
+
+        Div({ classes("module-sync-selection-toolbar", "mt-3") }) {
+            Button(attrs = {
+                classes("btn", "btn-outline-secondary", "btn-sm")
+                attr("type", "button")
+                if (filteredModules.isEmpty()) {
+                    disabled()
+                }
+                onClick { onSelectAll() }
+            }) { Text("Выбрать все") }
+            Button(attrs = {
+                classes("btn", "btn-outline-secondary", "btn-sm")
+                attr("type", "button")
+                if (state.selectedModuleCodes.isEmpty()) {
+                    disabled()
+                }
+                onClick { onClearSelection() }
+            }) { Text("Снять все") }
+            Button(attrs = {
+                classes("btn", "btn-primary", "btn-sm")
+                attr("type", "button")
+                if (state.selectedModuleCodes.isEmpty() || state.actionInProgress != null) {
+                    disabled()
+                }
+                onClick { onSyncSelected() }
+            }) {
+                Text(
+                    when {
+                        state.actionInProgress == "sync-selected" -> "Синхронизация..."
+                        state.selectedModuleCodes.size <= 1 -> "Синхронизировать выбранный"
+                        else -> "Синхронизировать ${state.selectedModuleCodes.size} модуля"
+                    },
+                )
+            }
+        }
+
+        Div({ classes("small", "text-secondary", "mt-3", "mb-2") }) {
+            Text("Отметь файловые модули, которые нужно импортировать в базу данных.")
+        }
+
+        when {
+            state.runtimeContext?.effectiveMode != ModuleStoreMode.DATABASE -> {
+                EmptyStateCard("Выборочная синхронизация", "Список модулей станет доступен после переключения в режим «База данных».")
+            }
+            filteredModules.isEmpty() -> {
+                EmptyStateCard("Выборочная синхронизация", "Подходящих файловых модулей не найдено.")
+            }
+            else -> {
+                Div({ classes("module-sync-module-list") }) {
+                    filteredModules.forEach { module ->
+                        val isSelected = module.id in state.selectedModuleCodes
+                        val isRunning = module.id in activeSingleSyncCodes
+                        Label(attrs = {
+                            classes("module-sync-module-card")
+                            if (isSelected) {
+                                classes("module-sync-module-card-selected")
+                            }
+                        }) {
+                            Input(type = org.jetbrains.compose.web.attributes.InputType.Checkbox, attrs = {
+                                if (isSelected) {
+                                    attr("checked", "checked")
+                                }
+                                onChange { onToggleModule(module.id) }
+                            })
+                            Div({ classes("module-sync-module-card-copy") }) {
+                                Div({ classes("module-sync-module-card-head") }) {
+                                    Span({ classes("module-sync-module-card-title") }) {
+                                        Text(module.title.ifBlank { module.id })
+                                    }
+                                    if (isRunning) {
+                                        Span({ classes("badge", "text-bg-info") }) {
+                                            Text("Идет импорт")
+                                        }
+                                    }
+                                }
+                                Div({ classes("module-sync-module-card-code") }) {
+                                    Text(module.id)
+                                }
+                                val description = module.description
+                                if (!description.isNullOrBlank()) {
+                                    Div({ classes("module-sync-module-card-description") }) {
+                                        Text(description)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -521,6 +627,18 @@ private fun describeActiveSingleSync(sync: ActiveModuleSyncRunResponse): String 
     }
 }
 
+private fun filterSelectableModules(state: ModuleSyncPageState) =
+    state.availableFileModules
+        .sortedWith(compareBy<com.sbrf.lt.platform.composeui.model.ModuleCatalogItem> { it.title.ifBlank { it.id } }.thenBy { it.id })
+        .filter { module ->
+            val query = state.moduleSearchQuery.trim()
+            val description = module.description
+            query.isBlank() ||
+                module.id.contains(query, ignoreCase = true) ||
+                module.title.contains(query, ignoreCase = true) ||
+                (!description.isNullOrBlank() && description.contains(query, ignoreCase = true))
+        }
+
 private fun syncRunMeta(run: ModuleSyncRunSummaryResponse): String {
     val actor = run.startedByActorDisplayName ?: run.startedByActorId
     val finishedAt = run.finishedAt?.let(::formatInstant) ?: "Запуск еще выполняется"
@@ -556,3 +674,6 @@ private fun formatInstant(value: String): String {
     }
     return date.toLocaleString("ru-RU") as String
 }
+
+private fun formatInstant(value: String?): String =
+    value?.let(::formatInstant) ?: "—"

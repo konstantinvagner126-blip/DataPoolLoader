@@ -1,6 +1,8 @@
-title: Local Manual Big Test
-description: Ручной локальный сценарий для проверки выгрузки и загрузки на большом объеме данных.
+---
+title: "Local Manual 1 Minute Test"
+description: "Ручной локальный сценарий для проверки выгрузки и загрузки с длительностью около минуты."
 tags:
-  - local
-  - manual
-  - big-data
+- "local"
+- "manual"
+- "big-data"
+- "minute-test"

@@ -23,6 +23,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import java.nio.file.Files
+import java.time.Instant
 import kotlin.test.assertFalse
 
 class RunManagerTest {
@@ -117,6 +118,84 @@ class RunManagerTest {
         assertEquals(ExecutionStatus.FAILED, restored.status)
         assertFalse(restored.errorMessage.isNullOrBlank())
         assertNotNull(restored.finishedAt)
+    }
+
+    @Test
+    fun `files output retention preview and cleanup respect safeguard`() {
+        val storageDir = createTempDirectory("ui-output-retention-state-")
+        val outputRoot = createTempDirectory("ui-output-retention-out-")
+        val now = Instant.now()
+        val protectedDir = outputRoot.resolve("protected-run").apply {
+            Files.createDirectories(this)
+            resolve("merged.csv").writeText("id\n1\n")
+        }
+        val deletableDirOne = outputRoot.resolve("deletable-run-1").apply {
+            Files.createDirectories(this)
+            resolve("merged.csv").writeText("id\n1\n")
+        }
+        val deletableDirTwo = outputRoot.resolve("deletable-run-2").apply {
+            Files.createDirectories(this)
+            resolve("merged.csv").writeText("id\n1\n")
+        }
+
+        RunStateStore(storageDir).save(
+            PersistedRunState(
+                history = buildList {
+                    repeat(20) { index ->
+                        add(
+                            com.sbrf.lt.platform.ui.model.UiRunSnapshot(
+                                id = "keep-$index",
+                                moduleId = "files-alpha",
+                                moduleTitle = "Files Alpha",
+                                status = ExecutionStatus.SUCCESS,
+                                startedAt = now.minusSeconds((31L + index) * 86_400),
+                                finishedAt = now.minusSeconds((31L + index) * 86_400).plusSeconds(60),
+                                outputDir = if (index == 0) protectedDir.toString() else outputRoot.resolve("keep-$index").toString(),
+                            ),
+                        )
+                    }
+                    add(
+                        com.sbrf.lt.platform.ui.model.UiRunSnapshot(
+                            id = "delete-1",
+                            moduleId = "files-alpha",
+                            moduleTitle = "Files Alpha",
+                            status = ExecutionStatus.SUCCESS,
+                            startedAt = now.minusSeconds(70L * 86_400),
+                            finishedAt = now.minusSeconds(70L * 86_400).plusSeconds(60),
+                            outputDir = deletableDirOne.toString(),
+                        ),
+                    )
+                    add(
+                        com.sbrf.lt.platform.ui.model.UiRunSnapshot(
+                            id = "delete-2",
+                            moduleId = "files-alpha",
+                            moduleTitle = "Files Alpha",
+                            status = ExecutionStatus.SUCCESS,
+                            startedAt = now.minusSeconds(71L * 86_400),
+                            finishedAt = now.minusSeconds(71L * 86_400).plusSeconds(60),
+                            outputDir = deletableDirTwo.toString(),
+                        ),
+                    )
+                },
+            ),
+        )
+
+        val runManager = RunManager(
+            uiConfig = UiAppConfig(storageDir = storageDir.toString()),
+        )
+        val service = FilesOutputRetentionService(runManager, retentionDays = 30, keepMinRunsPerModule = 20)
+
+        val preview = service.previewCleanup()
+        val cleanup = service.executeCleanup()
+
+        assertEquals(2, preview.totalRunsAffected)
+        assertEquals(2, preview.totalOutputDirsToDelete)
+        assertTrue(preview.totalBytesToFree > 0)
+
+        assertEquals(2, cleanup.totalOutputDirsDeleted)
+        assertFalse(Files.exists(deletableDirOne))
+        assertFalse(Files.exists(deletableDirTwo))
+        assertTrue(Files.exists(protectedDir))
     }
 
     @Test
@@ -428,6 +507,56 @@ class RunManagerTest {
         }
 
         assertEquals("Файл credential.properties пуст.", error.message)
+    }
+
+    @Test
+    fun `cleanup preview and execution remove only old files runs beyond safeguard`() {
+        val storageDir = createTempDirectory("datapool-ui-storage-")
+        val now = Instant.parse("2026-04-19T12:00:00Z")
+        val history = buildList {
+            repeat(35) { index ->
+                add(
+                    com.sbrf.lt.platform.ui.model.UiRunSnapshot(
+                        id = "run-$index",
+                        moduleId = "alpha",
+                        moduleTitle = "Alpha",
+                        status = ExecutionStatus.SUCCESS,
+                        startedAt = now.minusSeconds(index.toLong() * 86_400),
+                        finishedAt = now.minusSeconds(index.toLong() * 86_400).plusSeconds(60),
+                        events = List(2) { eventIndex -> mapOf("type" to "Event$eventIndex") },
+                    ),
+                )
+            }
+        }
+        RunStateStore(storageDir).save(PersistedRunState(history = history))
+
+        val runManager = RunManager(
+            uiConfig = UiAppConfig(storageDir = storageDir.toString()),
+        )
+
+        val preview = runManager.previewHistoryCleanup(
+            cutoffTimestamp = now.minusSeconds(30L * 86_400),
+            retentionDays = 30,
+            keepMinRunsPerModule = 30,
+            disableSafeguard = false,
+        )
+
+        assertEquals("FILES", preview.storageMode)
+        assertEquals(1, preview.totalModulesAffected)
+        assertEquals(4, preview.totalRunsToDelete)
+        assertEquals(8, preview.totalEventsToDelete)
+        assertEquals("alpha", preview.modules.single().moduleCode)
+
+        val result = runManager.executeHistoryCleanup(
+            cutoffTimestamp = now.minusSeconds(30L * 86_400),
+            retentionDays = 30,
+            keepMinRunsPerModule = 30,
+            disableSafeguard = false,
+        )
+
+        assertEquals(4, result.totalRunsDeleted)
+        assertEquals(31, runManager.currentState().history.size)
+        assertEquals("run-0", runManager.currentState().history.first().id)
     }
 
     private fun waitForCompletion(runManager: RunManager) {

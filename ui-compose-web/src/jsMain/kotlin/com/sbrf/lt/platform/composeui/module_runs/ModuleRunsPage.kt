@@ -40,6 +40,7 @@ import org.jetbrains.compose.web.dom.Option
 import org.jetbrains.compose.web.dom.P
 import org.jetbrains.compose.web.dom.Pre
 import org.jetbrains.compose.web.dom.Select
+import org.jetbrains.compose.web.dom.Span
 import org.jetbrains.compose.web.dom.Text
 
 private val technicalDiagnosticsJson = Json {
@@ -71,6 +72,22 @@ fun ComposeModuleRunsPage(
 
     PollingEffect(
         enabled = route.storage == "database" && !state.loading && hasRunningRun,
+        intervalMs = 3000,
+        onTick = {
+            if (liveRefreshInProgress) {
+                return@PollingEffect
+            }
+            liveRefreshInProgress = true
+            try {
+                state = store.reloadHistory(state, route)
+            } finally {
+                liveRefreshInProgress = false
+            }
+        },
+    )
+
+    PollingEffect(
+        enabled = route.storage == "files" && !state.loading && hasRunningRun,
         intervalMs = 3000,
         onTick = {
             if (liveRefreshInProgress) {
@@ -295,7 +312,11 @@ fun ComposeModuleRunsPage(
                                             }
                                         }
                                         Div({ classes("run-summary-metrics") }) {
-                                            SummaryMetricBadge("Статус", translateRunStatus(details.run.status))
+                                            SummaryMetricBadge(
+                                                label = "Статус",
+                                                value = translateRunStatus(details.run.status),
+                                                running = details.run.status.equals("RUNNING", ignoreCase = true),
+                                            )
                                             SummaryMetricBadge("Источник запуска", translateLaunchSource(details.run.launchSourceKind))
                                             SummaryMetricBadge("Target", translateRunStatus(details.run.targetStatus))
                                         }
@@ -307,6 +328,7 @@ fun ComposeModuleRunsPage(
                                         statusClassName = runStatusCssClass(details.run.status),
                                         running = details.run.status.equals("RUNNING", ignoreCase = true),
                                         stages = buildRunProgressStages(currentStageKey, details.run.status),
+                                        showStatus = false,
                                         metrics = listOf(
                                             RunProgressMetric(
                                                 label = "Строк в merged",
@@ -357,7 +379,6 @@ fun ComposeModuleRunsPage(
                                         }
                                     }
                                     Div({ classes("run-summary-list", "mt-3") }) {
-                                    SummaryRow("Статус", translateRunStatus(details.run.status))
                                     SummaryRow("Запрошен", formatDateTime(details.run.requestedAt ?: details.run.startedAt))
                                     SummaryRow("Старт", formatDateTime(details.run.startedAt))
                                     SummaryRow("Завершение", formatDateTime(details.run.finishedAt))
@@ -648,10 +669,26 @@ fun ComposeModuleRunsPage(
 private fun SummaryMetricBadge(
     label: String,
     value: String,
+    running: Boolean = false,
 ) {
     Div({ classes("run-summary-metric") }) {
         Div({ classes("run-summary-metric-label") }) { Text(label) }
-        Div({ classes("run-summary-metric-value") }) { Text(value) }
+        Div({ classes("run-summary-metric-value-wrap") }) {
+            Div({ classes("run-summary-metric-value") }) { Text(value) }
+            if (running) {
+                Div({
+                    classes("run-progress-spinner-arrows", "run-summary-spinner-arrows")
+                    attr("aria-hidden", "true")
+                }) {
+                    Span({ classes("run-progress-spinner-arrow", "run-progress-spinner-arrow-forward") }) {
+                        Text("↻")
+                    }
+                    Span({ classes("run-progress-spinner-arrow", "run-progress-spinner-arrow-backward") }) {
+                        Text("↺")
+                    }
+                }
+            }
+        }
     }
 }
 

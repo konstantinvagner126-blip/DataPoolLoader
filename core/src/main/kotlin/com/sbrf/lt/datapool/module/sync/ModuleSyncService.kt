@@ -224,6 +224,138 @@ open class ModuleSyncService(
         )
     }
 
+    open fun syncSelectedFromFiles(
+        moduleCodes: List<String>,
+        appsRoot: Path,
+        actorId: String,
+        actorSource: String,
+        actorDisplayName: String?,
+    ): SyncRunResult {
+        val normalizedModuleCodes = moduleCodes
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .distinct()
+        require(normalizedModuleCodes.isNotEmpty()) {
+            "Список модулей для выборочной синхронизации пуст."
+        }
+
+        val syncRunId = UUID.randomUUID().toString()
+        val startedAt = Instant.now()
+        val normalizedSchema = normalizeRegistrySchemaName(schema)
+        val items = mutableListOf<SyncItemResult>()
+        val moduleCodesSummary = summarizeSelectedModuleCodes(normalizedModuleCodes)
+
+        connectionProvider.getConnection().use { lockConnection ->
+            val globalLockKey = advisoryLockKey("module-sync:global")
+            if (!tryAcquireSharedAdvisoryLock(lockConnection, globalLockKey)) {
+                val activeFullSync = loadRunningFullSync(lockConnection, normalizedSchema)
+                return syncSelectedLockRejected(
+                    syncRunId = syncRunId,
+                    moduleCodesSummary = moduleCodesSummary,
+                    startedAt = startedAt,
+                    message = "Работа пока невозможна: идет массовый импорт модулей в БД.",
+                    activeSync = activeFullSync,
+                )
+            }
+
+            try {
+                insertRunningSyncRun(
+                    normalizedSchema = normalizedSchema,
+                    syncRunId = syncRunId,
+                    scope = "SELECTED",
+                    moduleCode = moduleCodesSummary,
+                    startedAt = startedAt,
+                    actorId = actorId,
+                    actorSource = actorSource,
+                    actorDisplayName = actorDisplayName,
+                )
+
+                normalizedModuleCodes.forEach { moduleCode ->
+                    val moduleLockKey = advisoryLockKey("module-sync:module:$moduleCode")
+                    if (!tryAcquireExclusiveAdvisoryLock(lockConnection, moduleLockKey)) {
+                        val activeSingleSync = loadRunningSingleSync(lockConnection, normalizedSchema, moduleCode)
+                        items += SyncItemResult(
+                            moduleCode = moduleCode,
+                            action = "SKIPPED",
+                            status = "WARNING",
+                            detectedHash = "",
+                            errorMessage = "Модуль '$moduleCode' уже импортируется другим пользователем.",
+                            details = syncDetails(
+                                reason = "module_sync_active",
+                                filesystemFingerprint = ModuleSyncFileFingerprint(),
+                                extra = linkedMapOf<String, Any?>(
+                                    "activeSyncRunId" to activeSingleSync?.syncRunId,
+                                    "activeSyncScope" to activeSingleSync?.scope,
+                                    "activeSyncModuleCode" to activeSingleSync?.moduleCode,
+                                    "activeSyncStartedAt" to activeSingleSync?.startedAt?.toString(),
+                                    "activeSyncStartedByActorId" to activeSingleSync?.startedByActorId,
+                                    "activeSyncStartedByActorDisplayName" to activeSingleSync?.startedByActorDisplayName,
+                                ),
+                            ),
+                        )
+                        return@forEach
+                    }
+
+                    try {
+                        items += syncSingleModule(
+                            normalizedSchema = normalizedSchema,
+                            moduleCode = moduleCode,
+                            appsRoot = appsRoot,
+                            actorId = actorId,
+                            actorSource = actorSource,
+                            actorDisplayName = actorDisplayName,
+                        )
+                    } catch (e: Exception) {
+                        items += failedSyncItem(
+                            moduleCode = moduleCode,
+                            exception = e,
+                        )
+                    } finally {
+                        releaseExclusiveAdvisoryLock(lockConnection, moduleLockKey)
+                    }
+                }
+            } finally {
+                releaseSharedAdvisoryLock(lockConnection, globalLockKey)
+            }
+        }
+
+        val finishedAt = Instant.now()
+        val status = when {
+            items.all { it.status == "SUCCESS" } -> "SUCCESS"
+            items.any { it.status == "FAILED" || it.status == "WARNING" } -> "PARTIAL_SUCCESS"
+            else -> "SUCCESS"
+        }
+
+        completeSyncRun(
+            normalizedSchema = normalizedSchema,
+            syncRunId = syncRunId,
+            scope = "SELECTED",
+            moduleCode = moduleCodesSummary,
+            startedAt = startedAt,
+            finishedAt = finishedAt,
+            status = status,
+            actorId = actorId,
+            actorSource = actorSource,
+            actorDisplayName = actorDisplayName,
+            items = items,
+        )
+
+        return SyncRunResult(
+            syncRunId = syncRunId,
+            scope = "SELECTED",
+            moduleCode = moduleCodesSummary,
+            status = status,
+            startedAt = startedAt,
+            finishedAt = finishedAt,
+            items = items,
+            totalProcessed = items.size,
+            totalCreated = items.count { it.action == "CREATED" },
+            totalUpdated = items.count { it.action == "UPDATED" },
+            totalSkipped = items.count { it.action.startsWith("SKIPPED") },
+            totalFailed = items.count { it.status == "FAILED" },
+        )
+    }
+
     open fun syncAllFromFiles(
         appsRoot: Path,
         actorId: String,
@@ -383,7 +515,7 @@ open class ModuleSyncService(
         moduleCode: String,
     ): ActiveModuleSyncRun? =
         loadRunningSingleSyncs(connection, normalizedSchema)
-            .firstOrNull { it.moduleCode == moduleCode }
+            .firstOrNull { activeSyncContainsModule(it, moduleCode) }
 
     private fun loadRunningSingleSyncs(
         connection: Connection,
@@ -399,7 +531,7 @@ open class ModuleSyncService(
                 started_by_actor_source,
                 started_by_actor_display_name
             from $normalizedSchema.module_sync_run
-            where scope = 'ONE'
+            where scope in ('ONE', 'SELECTED')
               and status = 'RUNNING'
               and finished_at is null
             order by started_at desc
@@ -435,17 +567,24 @@ open class ModuleSyncService(
         val activeSyncs = mutableListOf<ActiveModuleSyncRun>()
         val staleSyncRunIds = mutableListOf<String>()
         runningSingleSyncs.forEach { sync ->
-            val moduleCode = sync.moduleCode
-            if (moduleCode.isNullOrBlank()) {
+            val moduleCodes = parseActiveSyncModuleCodes(sync)
+            if (moduleCodes.isEmpty()) {
                 staleSyncRunIds += sync.syncRunId
                 return@forEach
             }
-            val moduleLockKey = advisoryLockKey("module-sync:module:$moduleCode")
-            if (tryAcquireExclusiveAdvisoryLock(connection, moduleLockKey)) {
-                releaseExclusiveAdvisoryLock(connection, moduleLockKey)
-                staleSyncRunIds += sync.syncRunId
-            } else {
+            val hasBusyModule = moduleCodes.any { moduleCode ->
+                val moduleLockKey = advisoryLockKey("module-sync:module:$moduleCode")
+                if (tryAcquireExclusiveAdvisoryLock(connection, moduleLockKey)) {
+                    releaseExclusiveAdvisoryLock(connection, moduleLockKey)
+                    false
+                } else {
+                    true
+                }
+            }
+            if (hasBusyModule) {
                 activeSyncs += sync
+            } else {
+                staleSyncRunIds += sync.syncRunId
             }
         }
         if (staleSyncRunIds.isNotEmpty()) {
@@ -520,6 +659,36 @@ open class ModuleSyncService(
         )
     }
 
+    private fun syncSelectedLockRejected(
+        syncRunId: String,
+        moduleCodesSummary: String,
+        startedAt: Instant,
+        message: String,
+        activeSync: ActiveModuleSyncRun? = null,
+    ): SyncRunResult {
+        val finishedAt = Instant.now()
+        return SyncRunResult(
+            syncRunId = syncRunId,
+            scope = "SELECTED",
+            moduleCode = moduleCodesSummary,
+            status = "FAILED",
+            startedAt = startedAt,
+            finishedAt = finishedAt,
+            items = emptyList(),
+            totalProcessed = 0,
+            totalCreated = 0,
+            totalUpdated = 0,
+            totalSkipped = 0,
+            totalFailed = 0,
+            errorMessage = buildString {
+                append(message)
+                activeSync?.let {
+                    append(" Активный запуск: ${it.syncRunId}.")
+                }
+            },
+        )
+    }
+
     private fun tryAcquireExclusiveAdvisoryLock(connection: Connection, lockKey: Long): Boolean =
         queryAdvisoryLock(connection, "select pg_try_advisory_lock(?) as acquired", lockKey)
 
@@ -551,6 +720,19 @@ open class ModuleSyncService(
         }
         return result
     }
+
+    private fun summarizeSelectedModuleCodes(moduleCodes: List<String>): String =
+        moduleCodes.joinToString(",")
+
+    private fun parseActiveSyncModuleCodes(sync: ActiveModuleSyncRun): List<String> =
+        sync.moduleCode
+            ?.split(',')
+            ?.map { it.trim().trimEnd('…') }
+            ?.filter { it.isNotBlank() }
+            .orEmpty()
+
+    private fun activeSyncContainsModule(sync: ActiveModuleSyncRun, moduleCode: String): Boolean =
+        parseActiveSyncModuleCodes(sync).any { it == moduleCode }
 
     private fun syncSingleModule(
         normalizedSchema: String,

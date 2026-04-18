@@ -11,4 +11,5 @@ data class ModuleCatalogItemResponse(
     val hiddenFromUi: Boolean = false,
     val validationStatus: String = "VALID",
     val validationIssues: List<ModuleValidationIssueResponse> = emptyList(),
+    val hasActiveRun: Boolean = false,
 )

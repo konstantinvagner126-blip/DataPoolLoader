@@ -7,6 +7,9 @@ class ModuleEditorStore(
     fun clearSuccessMessage(current: ModuleEditorPageState): ModuleEditorPageState =
         current.copy(successMessage = null)
 
+    fun clearErrorMessage(current: ModuleEditorPageState): ModuleEditorPageState =
+        current.copy(errorMessage = null)
+
     suspend fun load(route: ModuleEditorRouteState): ModuleEditorPageState {
         return runCatching {
             if (route.storage == "database") {
@@ -97,6 +100,34 @@ class ModuleEditorStore(
             )
         }
     }
+
+    suspend fun refreshCatalog(
+        current: ModuleEditorPageState,
+        route: ModuleEditorRouteState,
+    ): ModuleEditorPageState =
+        runCatching {
+            if (route.storage == "database") {
+                val catalog = api.loadDatabaseCatalog(route.includeHidden)
+                val selectedModuleId = current.selectedModuleId
+                    ?.takeIf { moduleId -> catalog.modules.any { it.id == moduleId } }
+                    ?: catalog.modules.firstOrNull()?.id
+                current.copy(
+                    loading = false,
+                    databaseCatalog = catalog,
+                    selectedModuleId = selectedModuleId,
+                )
+            } else {
+                val catalog = api.loadFilesCatalog()
+                val selectedModuleId = current.selectedModuleId
+                    ?.takeIf { moduleId -> catalog.modules.any { it.id == moduleId } }
+                    ?: catalog.modules.firstOrNull()?.id
+                current.copy(
+                    loading = false,
+                    filesCatalog = catalog,
+                    selectedModuleId = selectedModuleId,
+                )
+            }
+        }.getOrElse { current }
 
     fun selectTab(
         current: ModuleEditorPageState,
@@ -391,7 +422,7 @@ class ModuleEditorStore(
             current.copy(
                 actionInProgress = null,
                 errorMessage = null,
-                successMessage = "Запуск файлового модуля '$moduleId' начат.",
+                successMessage = null,
             )
         }.getOrElse { error ->
             current.copy(
@@ -404,11 +435,11 @@ class ModuleEditorStore(
     suspend fun runDatabaseModule(current: ModuleEditorPageState): ModuleEditorPageState {
         val moduleId = current.selectedModuleId ?: return current
         return runCatching {
-            val response = api.startDatabaseRun(moduleId)
+            api.startDatabaseRun(moduleId)
             current.copy(
                 actionInProgress = null,
                 errorMessage = null,
-                successMessage = response.message,
+                successMessage = null,
             )
         }.getOrElse { error ->
             current.copy(

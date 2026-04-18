@@ -102,6 +102,50 @@ http://localhost:8080
 ./gradlew :apps:dc-sms-offer:run
 ```
 
+## Launcher-скрипты
+
+Для локального старта UI без ручного выбора Gradle-task:
+
+```bash
+./scripts/run-ui-server.sh
+```
+
+Для старта desktop-прототипа:
+
+```bash
+./scripts/run-ui-compose-desktop.sh
+```
+
+Оба скрипта запускаются из корня проекта и сами переходят в нужный каталог.
+
+## Запуск из IDEA
+
+Рекомендуемые конфигурации:
+
+1. `UI Server Full`
+   Используй как основной запуск проекта. Это Gradle-конфиг, который пересобирает `ui-compose-web`, синхронизирует web asset-ы и потом поднимает `ui-server`.
+
+2. `UI Server`
+   Используй для быстрого JVM-debug server-части, когда web bundle уже собран и ты не менял `ui-compose-web`.
+
+3. `UI Compose Desktop`
+   Запуск desktop-прототипа.
+
+Если менялся `ui-compose-web`, для корректного старта web UI нужен именно `UI Server Full`.
+
+## Quick Start для UI
+
+Обычный рабочий цикл:
+
+1. Запусти `UI Server Full` из IDEA или `./scripts/run-ui-server.sh`.
+2. Открой `http://localhost:8080`.
+3. Проверь нужный экран:
+   - `/modules`
+   - `/db-modules`
+   - `/db-sync`
+   - `/sql-console`
+4. После правок в `ui-compose-web` перезапускай именно полный старт, чтобы bundle пересобрался.
+
 ## Как запускать app-модули
 
 Точка входа app-модулей:
@@ -186,6 +230,26 @@ TARGET_JDBC_URL=jdbc:postgresql://localhost:5432/target_db
 TARGET_USERNAME=loader
 TARGET_DB_PASSWORD=target_secret
 ```
+
+## Что делать после добавления нового модуля
+
+Минимальный чек-лист:
+
+1. Создай каталог модуля в `apps/<module-name>`.
+2. Добавь:
+   - `build.gradle.kts`
+   - `src/main/resources/application.yml`
+   - SQL-ресурсы в `src/main/resources/sql`
+   - `ui-module.yml`
+3. Если модуль работает с placeholder-ами, проверь, что ключи есть в `credential.properties`.
+4. Запусти `UI Server Full`.
+5. Убедись, что модуль появился в:
+   - `/modules` для файлового режима;
+   - `/db-sync` как кандидат на импорт в DB registry.
+6. Сделай пробный запуск из UI и проверь:
+   - `Ход выполнения`
+   - `История и результаты`
+   - итоговый `summary.json`
 
 ## Формат `application.yml`
 

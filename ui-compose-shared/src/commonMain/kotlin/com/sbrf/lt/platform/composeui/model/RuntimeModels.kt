@@ -57,6 +57,7 @@ data class ModuleCatalogItem(
     val tags: List<String> = emptyList(),
     val hiddenFromUi: Boolean = false,
     val validationStatus: String = "VALID",
+    val hasActiveRun: Boolean = false,
 )
 
 @Serializable

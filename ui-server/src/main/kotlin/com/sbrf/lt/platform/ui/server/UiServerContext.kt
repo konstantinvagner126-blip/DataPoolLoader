@@ -20,7 +20,11 @@ import com.sbrf.lt.platform.ui.module.backend.FilesModuleBackend
 import com.sbrf.lt.platform.ui.module.backend.ModuleActor
 import com.sbrf.lt.platform.ui.run.DatabaseModuleExecutionSource
 import com.sbrf.lt.platform.ui.run.DatabaseModuleRunService
+import com.sbrf.lt.platform.ui.run.DatabaseOutputRetentionService
+import com.sbrf.lt.platform.ui.run.DatabaseRunHistoryCleanupService
 import com.sbrf.lt.platform.ui.run.DatabaseRunStore
+import com.sbrf.lt.platform.ui.run.FilesOutputRetentionService
+import com.sbrf.lt.platform.ui.run.FilesRunHistoryCleanupService
 import com.sbrf.lt.platform.ui.run.RunManager
 import com.sbrf.lt.platform.ui.run.UiCredentialsService
 import com.sbrf.lt.platform.ui.run.history.DatabaseModuleRunHistoryService
@@ -54,6 +58,8 @@ internal class UiServerContext(
     internal val uiConfigPersistenceService: UiConfigPersistenceService,
     private val moduleSyncService: ModuleSyncService?,
     private val databaseModuleRunService: DatabaseModuleRunService?,
+    private val databaseRunHistoryCleanupService: DatabaseRunHistoryCleanupService?,
+    private val databaseOutputRetentionService: DatabaseOutputRetentionService?,
     private val filesModuleRunHistoryService: ModuleRunHistoryService,
     private val databaseModuleRunHistoryService: ModuleRunHistoryService?,
 ) {
@@ -102,6 +108,32 @@ internal class UiServerContext(
                 credentialsProvider = credentialsService,
             )
         }
+
+    fun currentDatabaseRunHistoryCleanupService(): DatabaseRunHistoryCleanupService? =
+        databaseRunHistoryCleanupService ?: currentDatabasePostgresConfig()?.let { postgres ->
+            DatabaseRunHistoryCleanupService(
+                runStore = DatabaseRunStore.fromConfig(postgres),
+            )
+        }
+
+    fun currentDatabaseOutputRetentionService(): DatabaseOutputRetentionService? =
+        databaseOutputRetentionService ?: currentDatabasePostgresConfig()?.let { postgres ->
+            DatabaseOutputRetentionService(
+                runStore = DatabaseRunStore.fromConfig(postgres),
+                retentionDays = currentRuntimeUiConfig().outputRetention.retentionDays,
+                keepMinRunsPerModule = currentRuntimeUiConfig().outputRetention.keepMinRunsPerModule,
+            )
+        }
+
+    fun currentFilesRunHistoryCleanupService(): FilesRunHistoryCleanupService =
+        FilesRunHistoryCleanupService(runManager)
+
+    fun currentFilesOutputRetentionService(): FilesOutputRetentionService =
+        FilesOutputRetentionService(
+            runManager = runManager,
+            retentionDays = currentRuntimeUiConfig().outputRetention.retentionDays,
+            keepMinRunsPerModule = currentRuntimeUiConfig().outputRetention.keepMinRunsPerModule,
+        )
 
     fun currentDatabaseModuleRunHistoryService(): ModuleRunHistoryService? =
         databaseModuleRunHistoryService ?: run {

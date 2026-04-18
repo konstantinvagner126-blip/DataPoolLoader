@@ -145,6 +145,14 @@ fun ComposeHomePage(
                             )
                         }
                     }
+
+                    SimpleCard(
+                        label = "Сервис",
+                        title = "Очистка истории запусков",
+                        text = "Preview и controlled cleanup истории запусков в текущем режиме без смешения с output-retention.",
+                        action = "Открыть очистку истории",
+                        href = "/run-history-cleanup",
+                    )
                 }
             }
 

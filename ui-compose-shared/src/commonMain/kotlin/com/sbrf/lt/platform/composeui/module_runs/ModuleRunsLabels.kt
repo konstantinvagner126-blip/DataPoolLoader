@@ -90,6 +90,81 @@ fun detectRunStageKey(
     return if (normalizedStatus == "FAILED") "finish" else "prepare"
 }
 
+fun detectActiveSourceName(
+    run: ModuleRunSummaryResponse,
+    sourceResults: List<ModuleRunSourceResultResponse>,
+    events: List<ModuleRunEventResponse>,
+): String? {
+    if (!run.status.equals("RUNNING", ignoreCase = true)) {
+        return null
+    }
+    sourceResults.firstOrNull { it.status.equals("RUNNING", ignoreCase = true) }
+        ?.sourceName
+        ?.takeIf { it.isNotBlank() }
+        ?.let { return it }
+    return events
+        .asReversed()
+        .firstOrNull { event ->
+            event.sourceName != null &&
+                (event.eventType.equals("SOURCE_PROGRESS", ignoreCase = true) ||
+                    event.eventType.equals("SOURCE_STARTED", ignoreCase = true))
+        }
+        ?.sourceName
+        ?.takeIf { it.isNotBlank() }
+}
+
+fun isCompactProgressEvent(event: ModuleRunEventResponse): Boolean =
+    when (event.eventType.uppercase()) {
+        "RUN_CREATED",
+        "RUN_STARTED",
+        "SOURCE_STARTED",
+        "MERGE_STARTED",
+        "TARGET_STARTED",
+        "RUNSTARTEDEVENT",
+        "SOURCEEXPORTSTARTEDEVENT",
+        "MERGESTARTEDEVENT",
+        "TARGETIMPORTSTARTEDEVENT",
+        "OUTPUTCLEANUPEVENT" -> false
+        else -> true
+    }
+
+fun buildCompactProgressEntries(
+    details: ModuleRunDetailsResponse,
+    limit: Int = 5,
+): List<CompactProgressEntry> {
+    val eventEntries = details.events
+        .filter(::isCompactProgressEvent)
+        .asReversed()
+        .map { event ->
+            CompactProgressEntry(
+                timestamp = event.timestamp,
+                message = event.message?.takeIf { it.isNotBlank() } ?: event.eventType,
+                severity = event.severity,
+            )
+        }
+
+    val syntheticProgressEntries = details.sourceResults
+        .filter { details.run.status.equals("RUNNING", ignoreCase = true) }
+        .filter { it.status.equals("RUNNING", ignoreCase = true) }
+        .filter { (it.exportedRowCount ?: 0L) > 0L }
+        .sortedWith(
+            compareByDescending<ModuleRunSourceResultResponse> { it.exportedRowCount ?: 0L }
+                .thenBy { it.sortOrder },
+        )
+        .map { source ->
+            CompactProgressEntry(
+                message = "Источник ${source.sourceName}: выгружено ${source.exportedRowCount ?: 0L} строк.",
+                severity = "INFO",
+            )
+        }
+        .filterNot { synthetic ->
+            eventEntries.any { event -> event.message == synthetic.message }
+        }
+
+    return (syntheticProgressEntries + eventEntries)
+        .take(limit)
+}
+
 private fun mapStageToKey(stage: String?): String? =
     when (stage?.uppercase()) {
         "PREPARE" -> "prepare"

@@ -13,6 +13,7 @@ fun translateSyncScope(scope: String): String =
     when (scope.uppercase()) {
         "ALL" -> "Все модули"
         "ONE" -> "Один модуль"
+        "SELECTED" -> "Выбранные модули"
         else -> scope
     }
 
@@ -30,6 +31,8 @@ fun translateSyncAction(action: String): String =
 fun syncRunTitle(run: ModuleSyncRunSummaryResponse): String =
     if (run.scope.equals("ONE", ignoreCase = true) && !run.moduleCode.isNullOrBlank()) {
         "Модуль ${run.moduleCode}"
+    } else if (run.scope.equals("SELECTED", ignoreCase = true)) {
+        "Выбранные модули"
     } else {
         translateSyncScope(run.scope)
     }
@@ -42,5 +45,10 @@ fun activeSingleSyncFor(
     if (normalized.isBlank() || syncState == null) {
         return null
     }
-    return syncState.activeSingleSyncs.firstOrNull { it.moduleCode == normalized }
+    return syncState.activeSingleSyncs.firstOrNull { sync ->
+        sync.moduleCode
+            ?.split(',')
+            ?.map { it.trim() }
+            ?.any { it == normalized } == true
+    }
 }

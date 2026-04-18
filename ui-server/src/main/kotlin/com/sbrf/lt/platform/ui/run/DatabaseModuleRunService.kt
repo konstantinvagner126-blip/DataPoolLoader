@@ -117,6 +117,12 @@ open class DatabaseModuleRunService(
     open fun loadRunDetails(moduleCode: String, runId: String): DatabaseModuleRunDetailsResponse =
         runStore.loadRunDetails(moduleCode, runId)
 
+    open fun activeModuleCodes(): Set<String> =
+        buildSet {
+            addAll(runStore.activeModuleCodes())
+            addAll(activeRunIdsByModule.keys)
+        }
+
     private fun validateCredentialsBeforeRun(configText: String) {
         val requirement = analyzeCredentialRequirements(configText, credentialsProvider.currentProperties())
         if (!requirement.requiresCredentials) {
@@ -157,6 +163,26 @@ open class DatabaseModuleRunService(
                     context.sourceStates.getOrPut(event.sourceName) { DatabaseRunSourceState() }.status = "RUNNING"
                     runStore.markSourceStarted(context.runId, event.sourceName, event.timestamp)
                     appendEvent(context, "SOURCE", "SOURCE_STARTED", "INFO", event.sourceName, "Начата выгрузка источника ${event.sourceName}.", event)
+                }
+                is com.sbrf.lt.datapool.app.SourceExportProgressEvent -> {
+                    val sourceState = context.sourceStates.getOrPut(event.sourceName) { DatabaseRunSourceState() }
+                    sourceState.status = "RUNNING"
+                    sourceState.exportedRowCount = event.rowCount
+                    runStore.updateSourceProgress(
+                        runId = context.runId,
+                        sourceName = event.sourceName,
+                        timestamp = event.timestamp,
+                        exportedRowCount = event.rowCount,
+                    )
+                    appendEvent(
+                        context = context,
+                        stage = "SOURCE",
+                        eventType = "SOURCE_PROGRESS",
+                        severity = "INFO",
+                        sourceName = event.sourceName,
+                        message = "Источник ${event.sourceName}: выгружено ${event.rowCount} строк.",
+                        event = event,
+                    )
                 }
                 is com.sbrf.lt.datapool.app.SourceExportFinishedEvent -> {
                     val sourceState = context.sourceStates.getOrPut(event.sourceName) { DatabaseRunSourceState() }

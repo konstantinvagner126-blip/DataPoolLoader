@@ -1,6 +1,7 @@
 package com.sbrf.lt.platform.composeui.module_sync
 
 import com.sbrf.lt.platform.composeui.model.RuntimeContext
+import com.sbrf.lt.platform.composeui.model.ModuleCatalogItem
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 
@@ -69,6 +70,11 @@ data class SyncOneModuleRequestDto(
 )
 
 @Serializable
+data class SyncSelectedModulesRequestDto(
+    val moduleCodes: List<String>,
+)
+
+@Serializable
 data class SyncRunResultResponse(
     val syncRunId: String,
     val scope: String,
@@ -91,10 +97,12 @@ data class ModuleSyncPageState(
     val actionInProgress: String? = null,
     val runtimeContext: RuntimeContext? = null,
     val syncState: ModuleSyncStateResponse? = null,
+    val availableFileModules: List<ModuleCatalogItem> = emptyList(),
     val runs: List<ModuleSyncRunSummaryResponse> = emptyList(),
     val selectedRunId: String? = null,
     val selectedRunDetails: ModuleSyncRunDetailsResponse? = null,
     val historyLimit: Int = 20,
-    val syncOneModuleCode: String = "",
-    val syncOneInputVisible: Boolean = false,
+    val selectiveSyncVisible: Boolean = false,
+    val selectedModuleCodes: Set<String> = emptySet(),
+    val moduleSearchQuery: String = "",
 )

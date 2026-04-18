@@ -57,6 +57,8 @@ import com.sbrf.lt.platform.composeui.module_runs.ModuleRunsApiClient
 import com.sbrf.lt.platform.composeui.module_runs.ModuleRunsPageState
 import com.sbrf.lt.platform.composeui.module_runs.ModuleRunsRouteState
 import com.sbrf.lt.platform.composeui.module_runs.ModuleRunsStore
+import com.sbrf.lt.platform.composeui.module_runs.buildCompactProgressEntries
+import com.sbrf.lt.platform.composeui.module_runs.detectActiveSourceName
 import com.sbrf.lt.platform.composeui.module_runs.detectRunStageKey
 import com.sbrf.lt.platform.composeui.module_runs.eventEntryCssClass
 import com.sbrf.lt.platform.composeui.module_runs.runStatusCssClass
@@ -115,11 +117,15 @@ fun ComposeModuleEditorPage(
             runPanelState = if (runPanelState.history == null) {
                 runsStore.load(route = routeState, historyLimit = runPanelState.historyLimit)
             } else {
-                runsStore.reloadHistory(current = runPanelState, route = routeState)
+                runsStore.reloadHistory(current = runPanelState, route = routeState, preferActiveRun = true)
             }
         } finally {
             runPanelRefreshInProgress = false
         }
+    }
+
+    suspend fun refreshModuleCatalog() {
+        state = store.refreshCatalog(state, currentRoute)
     }
 
     LaunchedEffect(currentRoute.storage, currentRoute.moduleId, currentRoute.includeHidden, currentRoute.openCreateDialog) {
@@ -181,10 +187,41 @@ fun ComposeModuleEditorPage(
                 runPanelState = runsStore.reloadHistory(
                     current = runPanelState,
                     route = ModuleRunsRouteState(currentRoute.storage, moduleId),
+                    preferActiveRun = true,
                 )
             } finally {
                 runPanelRefreshInProgress = false
             }
+        },
+    )
+
+    PollingEffect(
+        enabled = currentRoute.storage == "files" && !selectedModuleId.isNullOrBlank() && !runPanelState.loading && hasRunningRun,
+        intervalMs = 3000,
+        onTick = {
+            val moduleId = selectedModuleId ?: return@PollingEffect
+            if (runPanelRefreshInProgress) {
+                return@PollingEffect
+            }
+            runPanelRefreshInProgress = true
+            try {
+                runPanelState = runsStore.reloadHistory(
+                    current = runPanelState,
+                    route = ModuleRunsRouteState(currentRoute.storage, moduleId),
+                    preferActiveRun = true,
+                )
+                refreshModuleCatalog()
+            } finally {
+                runPanelRefreshInProgress = false
+            }
+        },
+    )
+
+    PollingEffect(
+        enabled = currentRoute.storage == "database" && !state.loading && state.modules.isNotEmpty(),
+        intervalMs = 3000,
+        onTick = {
+            refreshModuleCatalog()
         },
     )
 
@@ -201,7 +238,9 @@ fun ComposeModuleEditorPage(
                 runPanelState = runsStore.reloadHistory(
                     current = runPanelState,
                     route = ModuleRunsRouteState(currentRoute.storage, moduleId),
+                    preferActiveRun = true,
                 )
+                refreshModuleCatalog()
             } finally {
                 runPanelRefreshInProgress = false
             }
@@ -210,6 +249,13 @@ fun ComposeModuleEditorPage(
             runPanelState = runPanelState.copy(errorMessage = message)
         },
     )
+
+    if (state.errorMessage != null) {
+        EditorErrorMessageBox(
+            message = state.errorMessage ?: "",
+            onDismiss = { state = store.clearErrorMessage(state) },
+        )
+    }
 
     PageScaffold(
         eyebrow = if (currentRoute.storage == "database") "Режим базы данных" else "DataPool Loader",
@@ -235,9 +281,6 @@ fun ComposeModuleEditorPage(
             }
         },
         content = {
-            if (state.errorMessage != null) {
-                AlertBanner(state.errorMessage ?: "", "warning")
-            }
             if (state.successMessage != null) {
                 AlertBanner(state.successMessage ?: "", "success")
             }
@@ -296,10 +339,10 @@ fun ComposeModuleEditorPage(
                                         }
                                         attr("type", "button")
                                         onClick {
-                                            scope.launch {
-                                                state = store.startLoading(state)
-                                                currentRoute = currentRoute.copy(
-                                                    moduleId = module.id,
+                                        scope.launch {
+                                            state = store.startLoading(state)
+                                            currentRoute = currentRoute.copy(
+                                                moduleId = module.id,
                                                     openCreateDialog = false,
                                                 )
                                                 state = store.selectModule(state, currentRoute, module.id)
@@ -322,6 +365,9 @@ fun ComposeModuleEditorPage(
                                                 classes("module-validation-badge", validationBadgeClass(module.validationStatus))
                                             }) {
                                                 Text(translateValidationStatus(module.validationStatus))
+                                            }
+                                            if (module.hasActiveRun) {
+                                                ModuleRunningBadge()
                                             }
                                             if (module.hiddenFromUi) {
                                                 Span({ classes("module-validation-badge", "module-validation-badge-warning") }) {
@@ -404,6 +450,7 @@ fun ComposeModuleEditorPage(
                                     } else {
                                         store.runFilesModule(state)
                                     }
+                                    refreshModuleCatalog()
                                     state.selectedModuleId?.let { moduleId ->
                                         refreshEditorRunPanel(moduleId)
                                     }
@@ -466,7 +513,6 @@ fun ComposeModuleEditorPage(
                             EditorRunOverviewPanel(
                                 route = currentRoute,
                                 state = runPanelState,
-                                moduleId = currentModuleId,
                             )
                         }
 
@@ -597,6 +643,50 @@ fun ComposeModuleEditorPage(
 }
 
 @Composable
+private fun ModuleRunningBadge() {
+    Span({ classes("module-running-badge") }) {
+        Span({
+            classes("module-running-badge-spinner")
+            attr("aria-hidden", "true")
+        })
+        Span({
+            classes("module-running-badge-arrows")
+            attr("aria-hidden", "true")
+        }) {
+            Span({ classes("module-running-badge-arrow", "module-running-badge-arrow-forward") }) {
+                Text("↻")
+            }
+            Span({ classes("module-running-badge-arrow", "module-running-badge-arrow-backward") }) {
+                Text("↺")
+            }
+        }
+        Text("Выполняется")
+    }
+}
+
+@Composable
+private fun EditorErrorMessageBox(
+    message: String,
+    onDismiss: () -> Unit,
+) {
+    Div({ classes("editor-message-box") }) {
+        Div({ classes("editor-message-box-head") }) {
+            Div({ classes("editor-message-box-title") }) { Text("Операция не выполнена") }
+            Button(attrs = {
+                classes("btn", "btn-outline-secondary", "btn-sm")
+                attr("type", "button")
+                onClick { onDismiss() }
+            }) {
+                Text("Закрыть")
+            }
+        }
+        Div({ classes("editor-message-box-text") }) {
+            Text(message)
+        }
+    }
+}
+
+@Composable
 private fun DatabaseModeAlert(
     route: ModuleEditorRouteState,
     state: ModuleEditorPageState,
@@ -703,16 +793,29 @@ private fun EditorShellHeader(
                             Div({ classes("module-editor-toolbar-group-label") }) { Text("Редактор") }
                             EditorActionButton("Отменить изменения", state.hasDraftChanges && !actionBusy, EditorActionStyle.DangerOutline, onReload)
                         }
-                    }
-                    Div({ classes("module-editor-toolbar-row") }) {
                         Div({ classes("module-editor-toolbar-group", "module-editor-toolbar-group-admin") }) {
-                            Div({ classes("module-editor-toolbar-group-label") }) { Text("Администрирование") }
-                            EditorActionButton("Новый модуль", capabilities.createModule && !actionBusy, EditorActionStyle.PrimaryOutline, onOpenCreateModule)
-                            EditorActionButton("Удалить модуль", capabilities.deleteModule && !actionBusy && state.selectedModuleId != null, EditorActionStyle.DangerOutline, onDeleteModule)
-                            A(attrs = {
-                                classes("btn", "btn-outline-secondary")
-                                href("/db-sync")
-                            }) { Text("Импорт из файлов") }
+                            Div({ classes("module-editor-toolbar-group-label") }) { Text("Модули из базы данных") }
+                            EditorIconActionButton(
+                                icon = "+",
+                                title = "Новый модуль",
+                                enabled = capabilities.createModule && !actionBusy,
+                                style = EditorActionStyle.PrimaryOutline,
+                                onClick = onOpenCreateModule,
+                            )
+                            EditorIconActionButton(
+                                icon = "−",
+                                title = "Удалить модуль",
+                                enabled = capabilities.deleteModule && !actionBusy && state.selectedModuleId != null,
+                                style = EditorActionStyle.DangerOutline,
+                                onClick = onDeleteModule,
+                            )
+                            EditorIconActionButton(
+                                icon = "⇅",
+                                title = "Импорт из файлов",
+                                enabled = true,
+                                style = EditorActionStyle.SecondaryOutline,
+                                onClick = { window.location.href = "/db-sync" },
+                            )
                         }
                     }
                 }
@@ -750,17 +853,10 @@ private fun EditorShellHeader(
 private fun EditorRunOverviewPanel(
     route: ModuleEditorRouteState,
     state: ModuleRunsPageState,
-    moduleId: String,
 ) {
     SectionCard(
         title = "Ход выполнения",
         subtitle = "Компактный live-блок по текущему или последнему запуску. Полные детали остаются на отдельном экране.",
-        actions = {
-            A(attrs = {
-                classes("btn", "btn-outline-secondary")
-                href(buildRunsHref(route, moduleId))
-            }) { Text("История и результаты") }
-        },
     ) {
         val history = state.history
         if (state.errorMessage != null) {
@@ -788,34 +884,42 @@ private fun EditorRunOverviewPanel(
                 val failedCount = details.run.failedSourceCount
                     ?: details.sourceResults.count { it.status.equals("FAILED", ignoreCase = true) }
                 val warningCount = details.sourceResults.count { it.status.equals("SUCCESS_WITH_WARNINGS", ignoreCase = true) }
-                val latestEvents = details.events.takeLast(4).reversed()
+                val latestEntries = buildCompactProgressEntries(details)
                 val runIsActive = details.run.status.equals("RUNNING", ignoreCase = true)
+                val activeSourceName = detectActiveSourceName(details.run, details.sourceResults, details.events)
+                val subtitleParts = buildList {
+                    add(translateStage(currentStageKey))
+                    activeSourceName?.let { add("Источник: $it") }
+                    add(formatDateTime(details.run.requestedAt ?: details.run.startedAt))
+                }
 
                 RunProgressWidget(
                     title = if (runIsActive) "Текущий запуск" else "Последний запуск",
-                    subtitle = "${translateStage(currentStageKey)} · ${formatDateTime(details.run.requestedAt ?: details.run.startedAt)}",
+                    subtitle = subtitleParts.joinToString(" · "),
                     statusLabel = translateRunStatus(details.run.status),
                     statusClassName = runStatusCssClass(details.run.status),
                     running = runIsActive,
                     stages = buildRunProgressStages(currentStageKey, details.run.status),
-                    metrics = listOf(
-                        RunProgressMetric("Строк в merged", formatNumber(details.run.mergedRowCount)),
-                        RunProgressMetric("Успешных источников", formatNumber(successCount), tone = "success"),
-                        RunProgressMetric("Ошибок", formatNumber(failedCount), tone = if (failedCount > 0) "danger" else "default"),
-                        RunProgressMetric("Предупреждений", formatNumber(warningCount), tone = if (warningCount > 0) "warning" else "default"),
-                    ),
+                    metrics = buildList {
+                        if (!activeSourceName.isNullOrBlank()) {
+                            add(RunProgressMetric("Активный источник", activeSourceName, tone = "primary"))
+                        }
+                        add(RunProgressMetric("Строк в merged", formatNumber(details.run.mergedRowCount)))
+                        add(RunProgressMetric("Успешных источников", formatNumber(successCount), tone = "success"))
+                        add(RunProgressMetric("Ошибок", formatNumber(failedCount), tone = if (failedCount > 0) "danger" else "default"))
+                        add(RunProgressMetric("Предупреждений", formatNumber(warningCount), tone = if (warningCount > 0) "warning" else "default"))
+                    },
                 )
 
-                if (latestEvents.isNotEmpty()) {
+                if (latestEntries.isNotEmpty()) {
                     Div({ classes("human-log", "mt-3") }) {
-                        latestEvents.forEach { event ->
-                            Div({ classes(*eventEntryCssClass(event.severity).split(" ").filter { it.isNotBlank() }.toTypedArray()) }) {
+                        latestEntries.forEach { entry ->
+                            Div({ classes(*eventEntryCssClass(entry.severity).split(" ").filter { it.isNotBlank() }.toTypedArray()) }) {
                                 val parts = buildList {
-                                    formatDateTime(event.timestamp).takeIf { it != "-" }?.let(::add)
-                                    event.sourceName?.takeIf { it.isNotBlank() }?.let(::add)
-                                    event.message?.takeIf { it.isNotBlank() }?.let(::add)
+                                    formatDateTime(entry.timestamp).takeIf { it != "-" }?.let(::add)
+                                    entry.message.takeIf { it.isNotBlank() }?.let(::add)
                                 }
-                                Text(parts.joinToString(" · ").ifBlank { event.eventType })
+                                Text(parts.joinToString(" · ").ifBlank { "-" })
                             }
                         }
                     }
@@ -1406,6 +1510,30 @@ private fun EditorActionButton(
         }
     }) {
         Text(label)
+    }
+}
+
+@Composable
+private fun EditorIconActionButton(
+    icon: String,
+    title: String,
+    enabled: Boolean,
+    style: EditorActionStyle = EditorActionStyle.SecondaryOutline,
+    onClick: () -> Unit,
+) {
+    Button(attrs = {
+        classes("btn", "module-editor-icon-btn", style.cssClass)
+        attr("type", "button")
+        attr("title", title)
+        attr("aria-label", title)
+        if (!enabled) {
+            disabled()
+        }
+        if (enabled) {
+            onClick { onClick() }
+        }
+    }) {
+        Text(icon)
     }
 }
 

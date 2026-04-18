@@ -61,6 +61,7 @@ fun RunProgressWidget(
     running: Boolean,
     stages: List<RunProgressStage>,
     metrics: List<RunProgressMetric>,
+    showStatus: Boolean = true,
 ) {
     Div({ classes("run-progress-widget") }) {
         Div({ classes("run-progress-widget-head") }) {
@@ -68,29 +69,31 @@ fun RunProgressWidget(
                 Div({ classes("run-progress-title") }) { Text(title) }
                 Div({ classes("run-progress-subtitle") }) { Text(subtitle) }
             }
-            Div({ classes("run-progress-status-wrap") }) {
-                Span({
-                    classes("run-progress-indicator")
-                    if (running) {
-                        classes("run-progress-indicator-running")
-                    }
-                    attr("aria-hidden", "true")
-                })
-                if (running) {
-                    Div({
-                        classes("run-progress-spinner-arrows")
+            if (showStatus) {
+                Div({ classes("run-progress-status-wrap") }) {
+                    Span({
+                        classes("run-progress-indicator")
+                        if (running) {
+                            classes("run-progress-indicator-running")
+                        }
                         attr("aria-hidden", "true")
-                    }) {
-                        Span({ classes("run-progress-spinner-arrow", "run-progress-spinner-arrow-forward") }) {
-                            Text("↻")
-                        }
-                        Span({ classes("run-progress-spinner-arrow", "run-progress-spinner-arrow-backward") }) {
-                            Text("↺")
+                    })
+                    if (running) {
+                        Div({
+                            classes("run-progress-spinner-arrows")
+                            attr("aria-hidden", "true")
+                        }) {
+                            Span({ classes("run-progress-spinner-arrow", "run-progress-spinner-arrow-forward") }) {
+                                Text("↻")
+                            }
+                            Span({ classes("run-progress-spinner-arrow", "run-progress-spinner-arrow-backward") }) {
+                                Text("↺")
+                            }
                         }
                     }
-                }
-                Span({ classes(*statusClassName.split(" ").filter { it.isNotBlank() }.toTypedArray()) }) {
-                    Text(statusLabel)
+                    Span({ classes(*statusClassName.split(" ").filter { it.isNotBlank() }.toTypedArray()) }) {
+                        Text(statusLabel)
+                    }
                 }
             }
         }

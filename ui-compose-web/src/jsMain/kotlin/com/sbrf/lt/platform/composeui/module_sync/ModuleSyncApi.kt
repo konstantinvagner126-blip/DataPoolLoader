@@ -1,6 +1,7 @@
 package com.sbrf.lt.platform.composeui.module_sync
 
 import com.sbrf.lt.platform.composeui.foundation.http.ComposeHttpClient
+import com.sbrf.lt.platform.composeui.model.FilesModulesCatalogResponse
 import com.sbrf.lt.platform.composeui.model.RuntimeContext
 
 class ModuleSyncApiClient(
@@ -18,6 +19,9 @@ class ModuleSyncApiClient(
     override suspend fun loadSyncRunDetails(syncRunId: String): ModuleSyncRunDetailsResponse =
         httpClient.get("/api/db/sync/runs/$syncRunId", ModuleSyncRunDetailsResponse.serializer())
 
+    override suspend fun loadFilesModulesCatalog(): FilesModulesCatalogResponse =
+        httpClient.get("/api/modules/catalog", FilesModulesCatalogResponse.serializer())
+
     override suspend fun syncAll(): SyncRunResultResponse =
         httpClient.postJson(
             path = "/api/db/sync/all",
@@ -31,6 +35,14 @@ class ModuleSyncApiClient(
             path = "/api/db/sync/one",
             payload = SyncOneModuleRequestDto(moduleCode),
             serializer = SyncOneModuleRequestDto.serializer(),
+            deserializer = SyncRunResultResponse.serializer(),
+        )
+
+    override suspend fun syncSelected(moduleCodes: List<String>): SyncRunResultResponse =
+        httpClient.postJson(
+            path = "/api/db/sync/selected",
+            payload = SyncSelectedModulesRequestDto(moduleCodes),
+            serializer = SyncSelectedModulesRequestDto.serializer(),
             deserializer = SyncRunResultResponse.serializer(),
         )
 }

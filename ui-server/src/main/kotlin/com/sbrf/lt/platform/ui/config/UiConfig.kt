@@ -20,11 +20,17 @@ data class UiAppConfig(
     val appsRoot: String? = null,
     val storageDir: String? = null,
     val moduleStore: UiModuleStoreConfig = UiModuleStoreConfig(),
+    val outputRetention: UiOutputRetentionConfig = UiOutputRetentionConfig(),
     val showTechnicalDiagnostics: Boolean = true,
     val showRawSummaryJson: Boolean = false,
     val defaultCredentialsFile: String? = null,
     val sqlConsole: SqlConsoleConfig = SqlConsoleConfig(),
     @JsonIgnore val configBaseDir: String? = null,
+)
+
+data class UiOutputRetentionConfig(
+    val retentionDays: Int = 14,
+    val keepMinRunsPerModule: Int = 20,
 )
 
 data class UiModuleStoreConfig(

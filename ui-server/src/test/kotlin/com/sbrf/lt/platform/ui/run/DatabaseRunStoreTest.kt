@@ -52,6 +52,7 @@ class DatabaseRunStoreTest {
 
         store.createRun(context, startedAt = startedAt, outputDir = "/tmp/output")
         store.markSourceStarted(context.runId, "db1", startedAt)
+        store.updateSourceProgress(context.runId, "db1", startedAt, 5)
         store.markSourceFinished(context.runId, "db1", "SUCCESS", finishedAt, 10, null)
         store.markSourceSkipped(context.runId, "db1", finishedAt, "schema mismatch")
         store.finishRun(

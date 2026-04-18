@@ -1,26 +1,67 @@
 package com.sbrf.lt.platform.ui.server
 
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.sbrf.lt.platform.ui.model.CreateDbModuleRequest
 import com.sbrf.lt.platform.ui.model.DatabaseModulesCatalogResponse
 import com.sbrf.lt.platform.ui.model.DatabaseRunStartRequest
 import com.sbrf.lt.platform.ui.model.SaveModuleRequest
 import com.sbrf.lt.platform.ui.model.SaveResultResponse
+import com.sbrf.lt.platform.ui.model.DatabaseRunHistoryCleanupRequest
 import com.sbrf.lt.platform.ui.model.SyncOneModuleRequest
+import com.sbrf.lt.platform.ui.model.SyncSelectedModulesRequest
 import com.sbrf.lt.platform.ui.model.toDiagnosticsResponse
 import io.ktor.server.application.call
 import io.ktor.server.request.receive
+import io.ktor.server.request.receiveText
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.delete
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
+import org.slf4j.LoggerFactory
 
 /**
  * API DB-режима: каталог модулей, личный черновик, запуск и import-flow.
  */
-internal fun Route.registerDatabaseRoutes(context: UiServerContext) {
+internal fun Route.registerDatabaseRoutes(
+    context: UiServerContext,
+    mapper: ObjectMapper,
+) {
+    val logger = LoggerFactory.getLogger("DatabaseRoutes")
     get("/api/db/sync/state") {
         call.respond(context.readSyncStateSafely())
+    }
+
+    get("/api/db/run-history/cleanup/preview") {
+        val runtimeContext = context.currentRuntimeContext()
+        context.requireDatabaseMaintenanceIsInactive()
+        context.requireDatabaseMode(runtimeContext)
+        val cleanupService = requireNotNull(context.currentDatabaseRunHistoryCleanupService()) {
+            "Сервис cleanup истории запусков для режима базы данных не настроен."
+        }
+        val disableSafeguard = context.includeHiddenQueryParam(call.request.queryParameters["disableSafeguard"])
+        call.respond(cleanupService.previewCleanup(disableSafeguard = disableSafeguard))
+    }
+
+    post("/api/db/run-history/cleanup") {
+        val runtimeContext = context.currentRuntimeContext()
+        context.requireDatabaseMaintenanceIsInactive()
+        context.requireDatabaseMode(runtimeContext)
+        val cleanupService = requireNotNull(context.currentDatabaseRunHistoryCleanupService()) {
+            "Сервис cleanup истории запусков для режима базы данных не настроен."
+        }
+        val payload = call.receiveText()
+        val request = try {
+            if (payload.isBlank()) {
+                DatabaseRunHistoryCleanupRequest()
+            } else {
+                mapper.readValue(payload, DatabaseRunHistoryCleanupRequest::class.java)
+            }
+        } catch (error: Exception) {
+            logger.warn("Некорректный payload для /api/db/run-history/cleanup: {}", payload.take(4_000), error)
+            throw IllegalArgumentException("Некорректные данные для cleanup истории запусков.")
+        }
+        call.respond(cleanupService.executeCleanup(disableSafeguard = request.disableSafeguard))
     }
 
     get("/api/db/sync/runs") {
@@ -51,7 +92,15 @@ internal fun Route.registerDatabaseRoutes(context: UiServerContext) {
         val store = context.currentDatabaseModuleStore()
         val includeHidden = context.includeHiddenQueryParam(call.request.queryParameters["includeHidden"])
         val modules = if (runtimeContext.effectiveMode == com.sbrf.lt.platform.ui.config.UiModuleStoreMode.DATABASE && store != null) {
-            context.currentDatabaseModuleBackend()?.listModules(includeHidden = includeHidden).orEmpty()
+            val activeModuleCodes = runCatching {
+                context.currentDatabaseModuleRunService()?.activeModuleCodes().orEmpty()
+            }.getOrDefault(emptySet())
+            context.currentDatabaseModuleBackend()
+                ?.listModules(includeHidden = includeHidden)
+                ?.map { module ->
+                    module.copy(hasActiveRun = module.id in activeModuleCodes)
+                }
+                .orEmpty()
         } else {
             emptyList()
         }
@@ -246,6 +295,29 @@ internal fun Route.registerDatabaseRoutes(context: UiServerContext) {
         val request = call.receive<SyncOneModuleRequest>()
         val result = syncService.syncOneFromFiles(
             moduleCode = request.moduleCode,
+            appsRoot = context.currentAppsRootOrFail(),
+            actorId = context.requireDatabaseActorId(runtimeContext),
+            actorSource = runtimeContext.actor.actorSource ?: "OS_LOGIN",
+            actorDisplayName = runtimeContext.actor.actorDisplayName,
+        )
+        call.respond(result)
+    }
+
+    post("/api/db/sync/selected") {
+        val runtimeContext = context.currentRuntimeContext()
+        context.requireDatabaseMode(runtimeContext)
+        val syncService = requireNotNull(context.currentModuleSyncService()) {
+            "Сервис импорта модулей в базу данных не настроен."
+        }
+        val payload = call.receiveText()
+        val request = try {
+            mapper.readValue(payload, SyncSelectedModulesRequest::class.java)
+        } catch (error: Exception) {
+            logger.warn("Некорректный payload для /api/db/sync/selected: {}", payload.take(4_000), error)
+            throw IllegalArgumentException("Некорректные данные для выборочной синхронизации.")
+        }
+        val result = syncService.syncSelectedFromFiles(
+            moduleCodes = request.moduleCodes,
             appsRoot = context.currentAppsRootOrFail(),
             actorId = context.requireDatabaseActorId(runtimeContext),
             actorSource = runtimeContext.actor.actorSource ?: "OS_LOGIN",

@@ -58,6 +58,12 @@ internal fun Route.registerPageRoutes(context: UiServerContext) {
             permanent = false,
         )
     }
+    get("/compose-run-history-cleanup") {
+        call.respondRedirect(
+            composeBundleLocation(linkedMapOf("screen" to listOf("run-history-cleanup"))),
+            permanent = false,
+        )
+    }
     get("/compose-sql-console") {
         call.respondRedirect(
             composeBundleLocation(linkedMapOf("screen" to listOf("sql-console"))),
@@ -130,6 +136,12 @@ internal fun Route.registerPageRoutes(context: UiServerContext) {
         }
         call.respondRedirect(
             composeBundleLocation(linkedMapOf("screen" to listOf("module-sync"))),
+            permanent = false,
+        )
+    }
+    get("/run-history-cleanup") {
+        call.respondRedirect(
+            composeBundleLocation(linkedMapOf("screen" to listOf("run-history-cleanup"))),
             permanent = false,
         )
     }

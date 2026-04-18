@@ -22,6 +22,7 @@ import com.sbrf.lt.datapool.module.sync.ModuleSyncRunSummary
 import com.sbrf.lt.datapool.module.sync.ModuleSyncService
 import com.sbrf.lt.datapool.module.sync.ModuleSyncState
 import com.sbrf.lt.datapool.module.sync.SyncItemResult
+import com.sbrf.lt.datapool.module.sync.SyncRunResult
 import com.sbrf.lt.datapool.db.PostgresSourceExporter
 import com.sbrf.lt.platform.ui.config.UiAppConfig
 import com.sbrf.lt.platform.ui.config.UiActorIdentity
@@ -51,8 +52,12 @@ import com.sbrf.lt.platform.ui.module.ModuleRegistry
 import com.sbrf.lt.platform.ui.module.backend.DatabaseModuleBackend
 import com.sbrf.lt.platform.ui.run.DatabaseModuleExecutionSource
 import com.sbrf.lt.platform.ui.run.DatabaseModuleRunService
+import com.sbrf.lt.platform.ui.run.DatabaseOutputRetentionService
+import com.sbrf.lt.platform.ui.run.DatabaseRunHistoryCleanupService
 import com.sbrf.lt.platform.ui.run.DatabaseRunStore
+import com.sbrf.lt.platform.ui.run.PersistedRunState
 import com.sbrf.lt.platform.ui.run.RunManager
+import com.sbrf.lt.platform.ui.run.RunStateStore
 import com.sbrf.lt.platform.ui.run.UiCredentialsService
 import com.sbrf.lt.platform.ui.run.UiCredentialsProvider
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleQueryManager
@@ -83,6 +88,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import java.nio.file.Files
+import java.nio.file.Path
 import java.lang.reflect.Proxy
 import java.sql.Connection
 import java.sql.PreparedStatement
@@ -1815,6 +1821,457 @@ class ServerTest {
         assertEquals(HttpStatusCode.OK, detailsResponse.status)
         assertTrue(detailsResponse.bodyAsText().contains("\"items\":["))
         assertTrue(detailsResponse.bodyAsText().contains("\"moduleCode\":\"db-demo\""))
+    }
+
+    @Test
+    fun `db sync selected endpoint starts sync for chosen file modules`() = testApplication {
+        val uiConfig = UiAppConfig(
+            moduleStore = UiModuleStoreConfig(
+                mode = UiModuleStoreMode.DATABASE,
+                postgres = UiModuleStorePostgresConfig(
+                    jdbcUrl = "jdbc:postgresql://localhost:5432/modules",
+                    username = "registry_user",
+                    password = "registry_pwd",
+                ),
+            ),
+            appsRoot = Files.createTempDirectory("ui-db-sync-selected-apps-").toString(),
+            storageDir = Files.createTempDirectory("ui-db-sync-selected-state-").toString(),
+            sqlConsole = SqlConsoleConfig(),
+        )
+        val runtimeContextService = UiRuntimeContextService(
+            actorResolver = object : UiActorResolver() {
+                override fun resolveAutomaticActor(): UiActorIdentity =
+                    UiActorIdentity("kwdev", UiActorSource.OS_LOGIN)
+            },
+            connectionChecker = object : UiDatabaseConnectionChecker() {
+                override fun check(config: UiModuleStorePostgresConfig): UiDatabaseConnectionStatus =
+                    UiDatabaseConnectionStatus(
+                        configured = true,
+                        available = true,
+                        schema = config.schemaName(),
+                        message = "Подключение к базе данных доступно.",
+                    )
+            },
+            schemaMigrator = object : UiDatabaseSchemaMigrator() {
+                override fun migrate(config: UiModuleStorePostgresConfig) = Unit
+            },
+        )
+        val moduleSyncService = object : ModuleSyncService(
+            connectionProvider = DatabaseConnectionProvider { error("connection must not be requested") },
+            moduleRegistryImporter = object : ModuleRegistryImporter {
+                override fun createModule(
+                    moduleCode: String,
+                    actorId: String,
+                    actorSource: String,
+                    actorDisplayName: String?,
+                    originKind: String,
+                    draft: RegistryModuleDraft,
+                ): RegistryModuleCreationResult = error("createModule must not be requested")
+            },
+        ) {
+            override fun syncSelectedFromFiles(
+                moduleCodes: List<String>,
+                appsRoot: Path,
+                actorId: String,
+                actorSource: String,
+                actorDisplayName: String?,
+            ): SyncRunResult {
+                assertEquals(listOf("alpha", "beta"), moduleCodes)
+                assertEquals("kwdev", actorId)
+                assertEquals("OS_LOGIN", actorSource)
+                return SyncRunResult(
+                    syncRunId = "12121212-3434-5656-7878-909090909090",
+                    scope = "SELECTED",
+                    status = "SUCCESS",
+                    startedAt = Instant.parse("2026-04-17T11:00:00Z"),
+                    finishedAt = Instant.parse("2026-04-17T11:01:00Z"),
+                    items = listOf(
+                        SyncItemResult(moduleCode = "alpha", action = "CREATED", status = "SUCCESS", detectedHash = "hash-a"),
+                        SyncItemResult(moduleCode = "beta", action = "CREATED", status = "SUCCESS", detectedHash = "hash-b"),
+                    ),
+                    totalProcessed = 2,
+                    totalCreated = 2,
+                    totalUpdated = 0,
+                    totalSkipped = 0,
+                    totalFailed = 0,
+                )
+            }
+        }
+        application {
+            uiModule(
+                uiConfig = uiConfig,
+                runtimeContextService = runtimeContextService,
+                moduleSyncService = moduleSyncService,
+            )
+        }
+
+        val response = client.post("/api/db/sync/selected") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"moduleCodes":["alpha","beta"]}""")
+        }
+
+        assertEquals(HttpStatusCode.OK, response.status)
+        assertTrue(response.bodyAsText().contains("\"scope\":\"SELECTED\""))
+        assertTrue(response.bodyAsText().contains("\"totalProcessed\":2"))
+    }
+
+    @Test
+    fun `db run history cleanup endpoints return preview and execute cleanup`() = testApplication {
+        val uiConfig = UiAppConfig(
+            moduleStore = UiModuleStoreConfig(
+                mode = UiModuleStoreMode.DATABASE,
+                postgres = UiModuleStorePostgresConfig(
+                    jdbcUrl = "jdbc:postgresql://localhost:5432/modules",
+                    username = "registry_user",
+                    password = "registry_pwd",
+                ),
+            ),
+            storageDir = Files.createTempDirectory("ui-db-run-cleanup-state-").toString(),
+            sqlConsole = SqlConsoleConfig(),
+        )
+        val runtimeContextService = UiRuntimeContextService(
+            actorResolver = object : UiActorResolver() {
+                override fun resolveAutomaticActor(): UiActorIdentity =
+                    UiActorIdentity("kwdev", UiActorSource.OS_LOGIN)
+            },
+            connectionChecker = object : UiDatabaseConnectionChecker() {
+                override fun check(config: UiModuleStorePostgresConfig): UiDatabaseConnectionStatus =
+                    UiDatabaseConnectionStatus(
+                        configured = true,
+                        available = true,
+                        schema = config.schemaName(),
+                        message = "Подключение к базе данных доступно.",
+                    )
+            },
+            schemaMigrator = object : UiDatabaseSchemaMigrator() {
+                override fun migrate(config: UiModuleStorePostgresConfig) = Unit
+            },
+        )
+        val cleanupService = object : DatabaseRunHistoryCleanupService(
+            runStore = DatabaseRunStore(
+                connectionProvider = DatabaseConnectionProvider { error("connection must not be requested") },
+            ),
+        ) {
+            override fun previewCleanup(disableSafeguard: Boolean) =
+                com.sbrf.lt.platform.ui.model.DatabaseRunHistoryCleanupPreviewResponse(
+                    safeguardEnabled = !disableSafeguard,
+                    retentionDays = 30,
+                    keepMinRunsPerModule = 30,
+                    cutoffTimestamp = Instant.parse("2026-03-20T00:00:00Z"),
+                    totalModulesAffected = 2,
+                    totalRunsToDelete = 12,
+                    totalSourceResultsToDelete = 48,
+                    totalEventsToDelete = 96,
+                    totalArtifactsToDelete = 24,
+                    totalOrphanExecutionSnapshotsToDelete = 3,
+                    modules = listOf(
+                        com.sbrf.lt.platform.ui.model.DatabaseRunHistoryCleanupModuleResponse(
+                            moduleCode = "alpha",
+                            totalRunsToDelete = 7,
+                            oldestRequestedAt = Instant.parse("2026-01-01T00:00:00Z"),
+                            newestRequestedAt = Instant.parse("2026-02-01T00:00:00Z"),
+                        ),
+                    ),
+                )
+
+            override fun executeCleanup(disableSafeguard: Boolean) =
+                com.sbrf.lt.platform.ui.model.DatabaseRunHistoryCleanupResultResponse(
+                    safeguardEnabled = !disableSafeguard,
+                    retentionDays = 30,
+                    keepMinRunsPerModule = 30,
+                    cutoffTimestamp = Instant.parse("2026-03-20T00:00:00Z"),
+                    finishedAt = Instant.parse("2026-04-19T12:00:00Z"),
+                    totalModulesAffected = 2,
+                    totalRunsDeleted = 12,
+                    totalSourceResultsDeleted = 48,
+                    totalEventsDeleted = 96,
+                    totalArtifactsDeleted = 24,
+                    totalOrphanExecutionSnapshotsDeleted = 3,
+                    modules = listOf(
+                        com.sbrf.lt.platform.ui.model.DatabaseRunHistoryCleanupModuleResponse(
+                            moduleCode = "alpha",
+                            totalRunsToDelete = 7,
+                        ),
+                    ),
+                )
+        }
+        application {
+            uiModule(
+                uiConfig = uiConfig,
+                runtimeContextService = runtimeContextService,
+                databaseRunHistoryCleanupService = cleanupService,
+            )
+        }
+
+        val previewResponse = client.get("/api/db/run-history/cleanup/preview?disableSafeguard=true")
+        val cleanupResponse = client.post("/api/db/run-history/cleanup") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"disableSafeguard":true}""")
+        }
+        val commonPreviewResponse = client.get("/api/run-history/cleanup/preview?disableSafeguard=true")
+        val commonCleanupResponse = client.post("/api/run-history/cleanup") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"disableSafeguard":true}""")
+        }
+
+        assertEquals(HttpStatusCode.OK, previewResponse.status)
+        assertTrue(previewResponse.bodyAsText().contains("\"totalRunsToDelete\":12"))
+        assertTrue(previewResponse.bodyAsText().contains("\"moduleCode\":\"alpha\""))
+        assertTrue(previewResponse.bodyAsText().contains("\"safeguardEnabled\":false"))
+
+        assertEquals(HttpStatusCode.OK, cleanupResponse.status)
+        assertTrue(cleanupResponse.bodyAsText().contains("\"totalRunsDeleted\":12"))
+        assertTrue(cleanupResponse.bodyAsText().contains("\"totalOrphanExecutionSnapshotsDeleted\":3"))
+
+        assertEquals(HttpStatusCode.OK, commonPreviewResponse.status)
+        assertTrue(commonPreviewResponse.bodyAsText().contains("\"storageMode\":\"DATABASE\""))
+        assertTrue(commonPreviewResponse.bodyAsText().contains("\"totalRunsToDelete\":12"))
+
+        assertEquals(HttpStatusCode.OK, commonCleanupResponse.status)
+        assertTrue(commonCleanupResponse.bodyAsText().contains("\"storageMode\":\"DATABASE\""))
+        assertTrue(commonCleanupResponse.bodyAsText().contains("\"totalRunsDeleted\":12"))
+    }
+
+    @Test
+    fun `common run history cleanup endpoints work in files mode`() = testApplication {
+        val storageDir = Files.createTempDirectory("ui-files-run-cleanup-state-")
+        val now = Instant.now()
+        RunStateStore(storageDir).save(
+            PersistedRunState(
+                history = buildList {
+                    repeat(32) { index ->
+                        add(
+                            com.sbrf.lt.platform.ui.model.UiRunSnapshot(
+                                id = "run-$index",
+                                moduleId = "files-alpha",
+                                moduleTitle = "Files Alpha",
+                                status = com.sbrf.lt.datapool.model.ExecutionStatus.SUCCESS,
+                                startedAt = now.minusSeconds((40L + index) * 86_400),
+                                finishedAt = now.minusSeconds((40L + index) * 86_400).plusSeconds(60),
+                                events = listOf(mapOf("type" to "SourceExportProgressEvent")),
+                            ),
+                        )
+                    }
+                },
+            ),
+        )
+        val uiConfig = UiAppConfig(
+            moduleStore = UiModuleStoreConfig(mode = UiModuleStoreMode.FILES),
+            storageDir = storageDir.toString(),
+            sqlConsole = SqlConsoleConfig(),
+        )
+        application {
+            uiModule(
+                uiConfig = uiConfig,
+                runManager = RunManager(uiConfig = uiConfig),
+            )
+        }
+
+        val previewResponse = client.get("/api/run-history/cleanup/preview")
+        val cleanupResponse = client.post("/api/run-history/cleanup") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"disableSafeguard":false}""")
+        }
+
+        assertEquals(HttpStatusCode.OK, previewResponse.status)
+        assertTrue(previewResponse.bodyAsText().contains("\"storageMode\":\"FILES\""))
+        assertTrue(previewResponse.bodyAsText().contains("\"totalRunsToDelete\":2"))
+
+        assertEquals(HttpStatusCode.OK, cleanupResponse.status)
+        assertTrue(cleanupResponse.bodyAsText().contains("\"storageMode\":\"FILES\""))
+        assertTrue(cleanupResponse.bodyAsText().contains("\"totalRunsDeleted\":2"))
+    }
+
+    @Test
+    fun `common output retention endpoints work in database mode`() = testApplication {
+        val uiConfig = UiAppConfig(
+            moduleStore = UiModuleStoreConfig(
+                mode = UiModuleStoreMode.DATABASE,
+                postgres = UiModuleStorePostgresConfig(
+                    jdbcUrl = "jdbc:postgresql://localhost:5432/modules",
+                    username = "registry_user",
+                    password = "registry_pwd",
+                ),
+            ),
+            storageDir = Files.createTempDirectory("ui-db-output-retention-state-").toString(),
+            sqlConsole = SqlConsoleConfig(),
+        )
+        val runtimeContextService = UiRuntimeContextService(
+            actorResolver = object : UiActorResolver() {
+                override fun resolveAutomaticActor(): UiActorIdentity =
+                    UiActorIdentity("kwdev", UiActorSource.OS_LOGIN)
+            },
+            connectionChecker = object : UiDatabaseConnectionChecker() {
+                override fun check(config: UiModuleStorePostgresConfig): UiDatabaseConnectionStatus =
+                    UiDatabaseConnectionStatus(
+                        configured = true,
+                        available = true,
+                        schema = config.schemaName(),
+                        message = "Подключение к базе данных доступно.",
+                    )
+            },
+            schemaMigrator = object : UiDatabaseSchemaMigrator() {
+                override fun migrate(config: UiModuleStorePostgresConfig) = Unit
+            },
+        )
+        val retentionService = object : DatabaseOutputRetentionService(
+            runStore = DatabaseRunStore(
+                connectionProvider = DatabaseConnectionProvider { error("connection must not be requested") },
+            ),
+        ) {
+            override fun previewCleanup(disableSafeguard: Boolean) =
+                com.sbrf.lt.platform.ui.model.output.OutputRetentionPreviewResponse(
+                    storageMode = "DATABASE",
+                    safeguardEnabled = !disableSafeguard,
+                    retentionDays = 14,
+                    keepMinRunsPerModule = 20,
+                    cutoffTimestamp = Instant.parse("2026-04-01T00:00:00Z"),
+                    totalModulesAffected = 1,
+                    totalRunsAffected = 3,
+                    totalOutputDirsToDelete = 2,
+                    totalMissingOutputDirs = 1,
+                    totalBytesToFree = 1024L * 1024L,
+                    modules = listOf(
+                        com.sbrf.lt.platform.ui.model.output.OutputRetentionModuleResponse(
+                            moduleCode = "alpha",
+                            totalRunsAffected = 3,
+                            totalOutputDirsToDelete = 2,
+                            totalBytesToFree = 1024L * 1024L,
+                            oldestRequestedAt = Instant.parse("2026-03-01T00:00:00Z"),
+                            newestRequestedAt = Instant.parse("2026-03-10T00:00:00Z"),
+                        ),
+                    ),
+                )
+
+            override fun executeCleanup(disableSafeguard: Boolean) =
+                com.sbrf.lt.platform.ui.model.output.OutputRetentionResultResponse(
+                    storageMode = "DATABASE",
+                    safeguardEnabled = !disableSafeguard,
+                    retentionDays = 14,
+                    keepMinRunsPerModule = 20,
+                    cutoffTimestamp = Instant.parse("2026-04-01T00:00:00Z"),
+                    finishedAt = Instant.parse("2026-04-19T12:00:00Z"),
+                    totalModulesAffected = 1,
+                    totalRunsAffected = 3,
+                    totalOutputDirsDeleted = 2,
+                    totalMissingOutputDirs = 1,
+                    totalBytesFreed = 1024L * 1024L,
+                    modules = listOf(
+                        com.sbrf.lt.platform.ui.model.output.OutputRetentionModuleResponse(
+                            moduleCode = "alpha",
+                            totalRunsAffected = 3,
+                            totalOutputDirsToDelete = 2,
+                            totalBytesToFree = 1024L * 1024L,
+                        ),
+                    ),
+                )
+        }
+        application {
+            uiModule(
+                uiConfig = uiConfig,
+                runtimeContextService = runtimeContextService,
+                databaseOutputRetentionService = retentionService,
+            )
+        }
+
+        val previewResponse = client.get("/api/output-retention/preview?disableSafeguard=true")
+        val cleanupResponse = client.post("/api/output-retention") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"disableSafeguard":true}""")
+        }
+
+        assertEquals(HttpStatusCode.OK, previewResponse.status)
+        assertTrue(previewResponse.bodyAsText().contains("\"storageMode\":\"DATABASE\""))
+        assertTrue(previewResponse.bodyAsText().contains("\"totalOutputDirsToDelete\":2"))
+        assertTrue(previewResponse.bodyAsText().contains("\"totalBytesToFree\":1048576"))
+
+        assertEquals(HttpStatusCode.OK, cleanupResponse.status)
+        assertTrue(cleanupResponse.bodyAsText().contains("\"storageMode\":\"DATABASE\""))
+        assertTrue(cleanupResponse.bodyAsText().contains("\"totalOutputDirsDeleted\":2"))
+        assertTrue(cleanupResponse.bodyAsText().contains("\"totalBytesFreed\":1048576"))
+    }
+
+    @Test
+    fun `common output retention endpoints work in files mode`() = testApplication {
+        val storageDir = Files.createTempDirectory("ui-files-output-retention-state-")
+        val outputRoot = Files.createTempDirectory("ui-files-output-retention-out-")
+        val now = Instant.now()
+        val firstDir = outputRoot.resolve("run-1").apply {
+            Files.createDirectories(this)
+            resolve("merged.csv").writeText("id\n1\n")
+        }
+        val secondDir = outputRoot.resolve("run-2").apply {
+            Files.createDirectories(this)
+            resolve("merged.csv").writeText("id\n2\n")
+        }
+        RunStateStore(storageDir).save(
+            PersistedRunState(
+                history = buildList {
+                    repeat(20) { index ->
+                        add(
+                            com.sbrf.lt.platform.ui.model.UiRunSnapshot(
+                                id = "keep-$index",
+                                moduleId = "files-alpha",
+                                moduleTitle = "Files Alpha",
+                                status = com.sbrf.lt.datapool.model.ExecutionStatus.SUCCESS,
+                                startedAt = now.minusSeconds((31L + index) * 86_400),
+                                finishedAt = now.minusSeconds((31L + index) * 86_400).plusSeconds(60),
+                                outputDir = outputRoot.resolve("keep-$index").toString(),
+                            ),
+                        )
+                    }
+                    add(
+                        com.sbrf.lt.platform.ui.model.UiRunSnapshot(
+                            id = "delete-1",
+                            moduleId = "files-alpha",
+                            moduleTitle = "Files Alpha",
+                            status = com.sbrf.lt.datapool.model.ExecutionStatus.SUCCESS,
+                            startedAt = now.minusSeconds(80L * 86_400),
+                            finishedAt = now.minusSeconds(80L * 86_400).plusSeconds(60),
+                            outputDir = firstDir.toString(),
+                        ),
+                    )
+                    add(
+                        com.sbrf.lt.platform.ui.model.UiRunSnapshot(
+                            id = "delete-2",
+                            moduleId = "files-alpha",
+                            moduleTitle = "Files Alpha",
+                            status = com.sbrf.lt.datapool.model.ExecutionStatus.SUCCESS,
+                            startedAt = now.minusSeconds(81L * 86_400),
+                            finishedAt = now.minusSeconds(81L * 86_400).plusSeconds(60),
+                            outputDir = secondDir.toString(),
+                        ),
+                    )
+                },
+            ),
+        )
+        val uiConfig = UiAppConfig(
+            moduleStore = UiModuleStoreConfig(mode = UiModuleStoreMode.FILES),
+            storageDir = storageDir.toString(),
+            sqlConsole = SqlConsoleConfig(),
+        )
+        application {
+            uiModule(
+                uiConfig = uiConfig,
+                runManager = RunManager(uiConfig = uiConfig),
+            )
+        }
+
+        val previewResponse = client.get("/api/output-retention/preview")
+        val cleanupResponse = client.post("/api/output-retention") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"disableSafeguard":false}""")
+        }
+
+        assertEquals(HttpStatusCode.OK, previewResponse.status)
+        assertTrue(previewResponse.bodyAsText().contains("\"storageMode\":\"FILES\""))
+        assertTrue(previewResponse.bodyAsText().contains("\"totalOutputDirsToDelete\":2"))
+
+        assertEquals(HttpStatusCode.OK, cleanupResponse.status)
+        assertTrue(cleanupResponse.bodyAsText().contains("\"storageMode\":\"FILES\""))
+        assertTrue(cleanupResponse.bodyAsText().contains("\"totalOutputDirsDeleted\":2"))
+        assertFalse(Files.exists(firstDir))
+        assertFalse(Files.exists(secondDir))
     }
 
     @Test

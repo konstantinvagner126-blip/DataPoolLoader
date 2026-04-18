@@ -1,0 +1,8 @@
+---
+title: "Local Manual 3 Minute Test"
+description: "Ручной локальный сценарий для проверки длительной выгрузки и загрузки с длительностью около трех минут."
+tags:
+- "local"
+- "manual"
+- "big-data"
+- "3min-test"

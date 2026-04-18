@@ -11,6 +11,9 @@ import com.sbrf.lt.platform.ui.config.storageDirPath
 import com.sbrf.lt.platform.ui.model.CredentialsStatusResponse
 import com.sbrf.lt.platform.ui.model.ModuleDescriptor
 import com.sbrf.lt.platform.ui.model.ModuleDetailsResponse
+import com.sbrf.lt.platform.ui.model.RunHistoryCleanupModuleResponse
+import com.sbrf.lt.platform.ui.model.RunHistoryCleanupPreviewResponse
+import com.sbrf.lt.platform.ui.model.RunHistoryCleanupResultResponse
 import com.sbrf.lt.platform.ui.model.StartRunRequest
 import com.sbrf.lt.platform.ui.model.UiSettingsResponse
 import com.sbrf.lt.platform.ui.model.UiRunSnapshot
@@ -225,6 +228,63 @@ class RunManager(
     }
 
     @Synchronized
+    fun previewHistoryCleanup(
+        cutoffTimestamp: Instant,
+        retentionDays: Int,
+        keepMinRunsPerModule: Int,
+        disableSafeguard: Boolean,
+    ): RunHistoryCleanupPreviewResponse {
+        val preview = buildHistoryCleanupPreview(
+            cutoffTimestamp = cutoffTimestamp,
+            retentionDays = retentionDays,
+            keepMinRunsPerModule = keepMinRunsPerModule,
+            disableSafeguard = disableSafeguard,
+        )
+        return RunHistoryCleanupPreviewResponse(
+            storageMode = "FILES",
+            safeguardEnabled = !disableSafeguard,
+            retentionDays = retentionDays,
+            keepMinRunsPerModule = keepMinRunsPerModule,
+            cutoffTimestamp = cutoffTimestamp,
+            totalModulesAffected = preview.modules.size,
+            totalRunsToDelete = preview.runIds.size,
+            totalEventsToDelete = preview.totalEventsToDelete,
+            modules = preview.modules,
+        )
+    }
+
+    @Synchronized
+    fun executeHistoryCleanup(
+        cutoffTimestamp: Instant,
+        retentionDays: Int,
+        keepMinRunsPerModule: Int,
+        disableSafeguard: Boolean,
+    ): RunHistoryCleanupResultResponse {
+        val preview = buildHistoryCleanupPreview(
+            cutoffTimestamp = cutoffTimestamp,
+            retentionDays = retentionDays,
+            keepMinRunsPerModule = keepMinRunsPerModule,
+            disableSafeguard = disableSafeguard,
+        )
+        if (preview.runIds.isNotEmpty()) {
+            snapshots.removeAll { snapshot -> snapshot.id in preview.runIds }
+            publishState()
+        }
+        return RunHistoryCleanupResultResponse(
+            storageMode = "FILES",
+            safeguardEnabled = !disableSafeguard,
+            retentionDays = retentionDays,
+            keepMinRunsPerModule = keepMinRunsPerModule,
+            cutoffTimestamp = cutoffTimestamp,
+            finishedAt = Instant.now(),
+            totalModulesAffected = preview.modules.size,
+            totalRunsDeleted = preview.runIds.size,
+            totalEventsDeleted = preview.totalEventsToDelete,
+            modules = preview.modules,
+        )
+    }
+
+    @Synchronized
     private fun persistState() {
         stateStore.save(
             PersistedRunState(
@@ -242,4 +302,62 @@ class RunManager(
         result["type"] = javaClass.simpleName
         return result
     }
+
+    private fun buildHistoryCleanupPreview(
+        cutoffTimestamp: Instant,
+        retentionDays: Int,
+        keepMinRunsPerModule: Int,
+        disableSafeguard: Boolean,
+    ): FilesHistoryCleanupPreview {
+        val deletableByModule = snapshots
+            .sortedByDescending { it.startedAt }
+            .groupBy { it.moduleId }
+            .mapNotNull { (moduleId, moduleSnapshots) ->
+                val runsToDelete = moduleSnapshots.filterIndexed { index, snapshot ->
+                    val olderThanCutoff = snapshot.startedAt.isBefore(cutoffTimestamp)
+                    val canDeleteBySafeguard = disableSafeguard || index >= keepMinRunsPerModule
+                    snapshot.status != ExecutionStatus.RUNNING &&
+                        olderThanCutoff &&
+                        canDeleteBySafeguard
+                }
+                if (runsToDelete.isEmpty()) {
+                    null
+                } else {
+                    FilesHistoryCleanupModulePreview(
+                        moduleCode = moduleId,
+                        runIds = runsToDelete.map { it.id },
+                        totalEventsToDelete = runsToDelete.sumOf { it.events.size },
+                        summary = RunHistoryCleanupModuleResponse(
+                            moduleCode = moduleId,
+                            totalRunsToDelete = runsToDelete.size,
+                            oldestRequestedAt = runsToDelete.minOfOrNull { it.startedAt },
+                            newestRequestedAt = runsToDelete.maxOfOrNull { it.startedAt },
+                        ),
+                    )
+                }
+            }
+
+        return FilesHistoryCleanupPreview(
+            retentionDays = retentionDays,
+            keepMinRunsPerModule = keepMinRunsPerModule,
+            runIds = deletableByModule.flatMapTo(linkedSetOf()) { it.runIds },
+            totalEventsToDelete = deletableByModule.sumOf { it.totalEventsToDelete },
+            modules = deletableByModule.map { it.summary }.sortedBy { it.moduleCode },
+        )
+    }
+
+    private data class FilesHistoryCleanupPreview(
+        val retentionDays: Int,
+        val keepMinRunsPerModule: Int,
+        val runIds: Set<String>,
+        val totalEventsToDelete: Int,
+        val modules: List<RunHistoryCleanupModuleResponse>,
+    )
+
+    private data class FilesHistoryCleanupModulePreview(
+        val moduleCode: String,
+        val runIds: List<String>,
+        val totalEventsToDelete: Int,
+        val summary: RunHistoryCleanupModuleResponse,
+    )
 }

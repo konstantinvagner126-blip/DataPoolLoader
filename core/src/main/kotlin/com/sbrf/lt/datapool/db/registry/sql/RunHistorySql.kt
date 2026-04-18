@@ -4,6 +4,36 @@ package com.sbrf.lt.datapool.db.registry.sql
  * SQL-запросы для DB run-history (`module_run*`).
  */
 object RunHistorySql {
+    private fun cleanupCandidateRunsCte(schema: String): String =
+        """
+        with ranked_runs as (
+            select
+                mr.run_id,
+                mr.module_id,
+                m.module_code,
+                mr.requested_at,
+                mr.output_dir,
+                row_number() over (
+                    partition by mr.module_id
+                    order by mr.requested_at desc, mr.run_id desc
+                ) as recency_rank
+            from $schema.module_run mr
+            join $schema.module m on m.module_id = mr.module_id
+            where mr.status <> 'RUNNING'
+        ),
+        candidate_runs as (
+            select
+                run_id,
+                module_id,
+                module_code,
+                requested_at,
+                output_dir
+            from ranked_runs
+            where requested_at < ?::timestamptz
+              and (?::boolean or recency_rank > ?)
+        )
+        """.trimIndent()
+
     fun hasActiveRun(schema: String): String =
         """
         select count(*) as active_runs
@@ -21,6 +51,14 @@ object RunHistorySql {
         where m.module_code = ?
           and mr.status = 'RUNNING'
         order by mr.requested_at desc
+        """.trimIndent()
+
+    fun listActiveModuleCodes(schema: String): String =
+        """
+        select distinct m.module_code
+        from $schema.module_run mr
+        join $schema.module m on m.module_id = mr.module_id
+        where mr.status = 'RUNNING'
         """.trimIndent()
 
     fun insertRun(schema: String): String =
@@ -113,6 +151,16 @@ object RunHistorySql {
         """
         update $schema.module_run_source_result
         set status = 'RUNNING',
+            started_at = coalesce(started_at, ?::timestamptz)
+        where run_id = ?::uuid
+          and source_name = ?
+        """.trimIndent()
+
+    fun updateSourceProgress(schema: String): String =
+        """
+        update $schema.module_run_source_result
+        set status = 'RUNNING',
+            exported_row_count = ?,
             started_at = coalesce(started_at, ?::timestamptz)
         where run_id = ?::uuid
           and source_name = ?
@@ -371,5 +419,96 @@ object RunHistorySql {
         from $schema.module_run_artifact
         where run_id = ?::uuid
         order by artifact_kind asc, artifact_key asc
+        """.trimIndent()
+
+    fun listCleanupModules(schema: String): String =
+        """
+        ${cleanupCandidateRunsCte(schema)}
+        select
+            module_code,
+            count(*) as total_runs_to_delete,
+            min(requested_at) as oldest_requested_at,
+            max(requested_at) as newest_requested_at
+        from candidate_runs
+        group by module_code
+        order by total_runs_to_delete desc, module_code asc
+        """.trimIndent()
+
+    fun countCleanupRuns(schema: String): String =
+        """
+        ${cleanupCandidateRunsCte(schema)}
+        select count(*) as total_runs_to_delete
+        from candidate_runs
+        """.trimIndent()
+
+    fun countCleanupSourceResults(schema: String): String =
+        """
+        ${cleanupCandidateRunsCte(schema)}
+        select count(*) as total_source_results_to_delete
+        from $schema.module_run_source_result rs
+        where rs.run_id in (select run_id from candidate_runs)
+        """.trimIndent()
+
+    fun countCleanupEvents(schema: String): String =
+        """
+        ${cleanupCandidateRunsCte(schema)}
+        select count(*) as total_events_to_delete
+        from $schema.module_run_event re
+        where re.run_id in (select run_id from candidate_runs)
+        """.trimIndent()
+
+    fun countCleanupArtifacts(schema: String): String =
+        """
+        ${cleanupCandidateRunsCte(schema)}
+        select count(*) as total_artifacts_to_delete
+        from $schema.module_run_artifact ra
+        where ra.run_id in (select run_id from candidate_runs)
+        """.trimIndent()
+
+    fun countCleanupOrphanExecutionSnapshots(schema: String): String =
+        """
+        ${cleanupCandidateRunsCte(schema)}
+        select count(*) as total_orphan_execution_snapshots_to_delete
+        from $schema.execution_snapshot es
+        where es.created_at < ?::timestamptz
+          and not exists (
+            select 1
+            from $schema.module_run mr
+            where mr.module_id = es.module_id
+              and mr.execution_snapshot_id = es.execution_snapshot_id
+              and mr.run_id not in (select run_id from candidate_runs)
+        )
+        """.trimIndent()
+
+    fun listCleanupOutputRetentionCandidates(schema: String): String =
+        """
+        ${cleanupCandidateRunsCte(schema)}
+        select
+            module_code,
+            requested_at,
+            output_dir
+        from candidate_runs
+        where output_dir is not null
+          and btrim(output_dir) <> ''
+        order by requested_at desc, module_code asc
+        """.trimIndent()
+
+    fun deleteCleanupRuns(schema: String): String =
+        """
+        ${cleanupCandidateRunsCte(schema)}
+        delete from $schema.module_run mr
+        where mr.run_id in (select run_id from candidate_runs)
+        """.trimIndent()
+
+    fun deleteCleanupOrphanExecutionSnapshots(schema: String): String =
+        """
+        delete from $schema.execution_snapshot es
+        where es.created_at < ?::timestamptz
+          and not exists (
+            select 1
+            from $schema.module_run mr
+            where mr.module_id = es.module_id
+              and mr.execution_snapshot_id = es.execution_snapshot_id
+        )
         """.trimIndent()
 }

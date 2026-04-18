@@ -43,6 +43,8 @@ import com.sbrf.lt.platform.ui.module.backend.FilesModuleBackend
 import com.sbrf.lt.platform.ui.module.backend.ModuleActor
 import com.sbrf.lt.platform.ui.run.DatabaseModuleExecutionSource
 import com.sbrf.lt.platform.ui.run.DatabaseModuleRunService
+import com.sbrf.lt.platform.ui.run.DatabaseOutputRetentionService
+import com.sbrf.lt.platform.ui.run.DatabaseRunHistoryCleanupService
 import com.sbrf.lt.platform.ui.run.DatabaseRunStore
 import com.sbrf.lt.platform.ui.run.RunManager
 import com.sbrf.lt.platform.ui.run.UiCredentialsService
@@ -207,6 +209,8 @@ fun Application.uiModule(
     uiConfigPersistenceService: UiConfigPersistenceService = UiConfigPersistenceService(),
     moduleSyncService: ModuleSyncService? = null,
     databaseModuleRunService: DatabaseModuleRunService? = null,
+    databaseRunHistoryCleanupService: DatabaseRunHistoryCleanupService? = null,
+    databaseOutputRetentionService: DatabaseOutputRetentionService? = null,
     filesModuleRunHistoryService: ModuleRunHistoryService = FilesModuleRunHistoryService(moduleRegistry, runManager),
     databaseModuleRunHistoryService: ModuleRunHistoryService? = null,
 ) {
@@ -253,6 +257,8 @@ fun Application.uiModule(
         uiConfigPersistenceService = uiConfigPersistenceService,
         moduleSyncService = moduleSyncService,
         databaseModuleRunService = databaseModuleRunService,
+        databaseRunHistoryCleanupService = databaseRunHistoryCleanupService,
+        databaseOutputRetentionService = databaseOutputRetentionService,
         filesModuleRunHistoryService = filesModuleRunHistoryService,
         databaseModuleRunHistoryService = databaseModuleRunHistoryService,
     )
@@ -260,7 +266,7 @@ fun Application.uiModule(
     routing {
         registerPageRoutes(serverContext)
         registerModuleRunRoutes(serverContext)
-        registerDatabaseRoutes(serverContext)
+        registerDatabaseRoutes(serverContext, mapper)
         registerCommonRoutes(serverContext, mapper)
         registerSqlConsoleRoutes(serverContext)
     }

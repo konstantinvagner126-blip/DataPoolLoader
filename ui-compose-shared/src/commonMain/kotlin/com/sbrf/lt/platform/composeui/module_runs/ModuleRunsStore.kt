@@ -54,10 +54,11 @@ class ModuleRunsStore(
     suspend fun reloadHistory(
         current: ModuleRunsPageState,
         route: ModuleRunsRouteState,
+        preferActiveRun: Boolean = false,
     ): ModuleRunsPageState {
         return runCatching {
             val history = api.loadHistory(route.storage, route.moduleId, current.historyLimit)
-            val selectedRunId = resolveSelectedRunId(history, current.selectedRunId)
+            val selectedRunId = resolveSelectedRunId(history, current.selectedRunId, preferActiveRun)
             val details = selectedRunId?.let { api.loadRunDetails(route.storage, route.moduleId, it) }
             current.copy(
                 loading = false,
@@ -103,8 +104,10 @@ class ModuleRunsStore(
     private fun resolveSelectedRunId(
         history: ModuleRunHistoryResponse,
         currentSelectedRunId: String?,
+        preferActiveRun: Boolean = false,
     ): String? =
         when {
+            preferActiveRun && !history.activeRunId.isNullOrBlank() -> history.activeRunId
             currentSelectedRunId != null && history.runs.any { it.runId == currentSelectedRunId } -> currentSelectedRunId
             !history.activeRunId.isNullOrBlank() -> history.activeRunId
             else -> history.runs.firstOrNull()?.runId
