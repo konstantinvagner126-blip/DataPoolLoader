@@ -2,14 +2,20 @@ package com.sbrf.lt.platform.ui.run
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.sbrf.lt.datapool.app.ApplicationRunResult
+import com.sbrf.lt.datapool.app.ApplicationRunner
 import com.sbrf.lt.datapool.app.ExecutionEvent
+import com.sbrf.lt.datapool.app.ExecutionListener
 import com.sbrf.lt.datapool.model.ExecutionStatus
+import com.sbrf.lt.platform.ui.model.StartRunRequest
 import com.sbrf.lt.platform.ui.model.ModuleDescriptor
 import java.nio.file.Files
+import java.nio.file.Path
 import java.time.Instant
 
 internal class RunManagerExecutionSupport(
     private val objectMapper: ObjectMapper,
+    private val applicationRunner: ApplicationRunner,
+    private val moduleExecutionSource: ModuleExecutionSource,
 ) {
     fun createSnapshot(module: ModuleDescriptor): MutableRunSnapshot =
         MutableRunSnapshot(
@@ -51,6 +57,35 @@ internal class RunManagerExecutionSupport(
         snapshot.status = ExecutionStatus.FAILED
         snapshot.finishedAt = Instant.now()
         snapshot.errorMessage = ex.message ?: "Неизвестная ошибка"
+    }
+
+    fun executeRun(
+        module: ModuleDescriptor,
+        request: StartRunRequest,
+        snapshot: MutableRunSnapshot,
+        materializeCredentialsFile: (Path) -> Path?,
+        publishState: () -> Unit,
+    ) {
+        runCatching {
+            snapshot.status = ExecutionStatus.RUNNING
+            publishState()
+            val runtimeSnapshot = moduleExecutionSource.prepareExecution(module, request)
+            val tempDir = Files.createTempDirectory("datapool-ui-run-${module.id}-")
+            val credentialsPath = materializeCredentialsFile(tempDir)
+            val result = applicationRunner.run(
+                snapshot = runtimeSnapshot,
+                credentialsPath = credentialsPath,
+                executionListener = ExecutionListener { event ->
+                    applyEvent(snapshot, event)
+                    publishState()
+                },
+            )
+            finalizeSuccess(snapshot, result)
+            publishState()
+        }.onFailure { ex ->
+            finalizeFailure(snapshot, ex)
+            publishState()
+        }
     }
 
     private fun ExecutionEvent.toUiEventMap(): Map<String, Any?> {

@@ -1,9 +1,6 @@
 package com.sbrf.lt.platform.ui.run
 
-import com.sbrf.lt.datapool.app.ApplicationRunResult
 import com.sbrf.lt.datapool.app.ApplicationRunner
-import com.sbrf.lt.datapool.app.ExecutionEvent
-import com.sbrf.lt.datapool.app.ExecutionListener
 import com.sbrf.lt.datapool.model.ExecutionStatus
 import com.sbrf.lt.platform.ui.config.UiAppConfig
 import com.sbrf.lt.platform.ui.config.UiConfigLoader
@@ -18,7 +15,6 @@ import com.sbrf.lt.platform.ui.model.UiStateResponse
 import com.sbrf.lt.platform.ui.module.ModuleRegistry
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
-import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Instant
 import java.util.concurrent.Executors
@@ -35,8 +31,9 @@ class RunManager(
     private val snapshots = mutableListOf<MutableRunSnapshot>()
     private val updatesFlow = MutableSharedFlow<UiStateResponse>(replay = 1, extraBufferCapacity = 32)
     private val mapper = com.sbrf.lt.datapool.config.ConfigLoader().objectMapper()
-    private val historySupport = RunManagerHistorySupport(stateStore, mapper)
-    private val executionSupport = RunManagerExecutionSupport(mapper)
+    private val persistenceSupport = RunManagerPersistenceSupport(stateStore)
+    private val historyCleanupSupport = RunManagerHistoryCleanupSupport(stateStore, mapper)
+    private val executionSupport = RunManagerExecutionSupport(mapper, applicationRunner, moduleExecutionSource)
     private val stateSupport = RunManagerStateSupport(moduleRegistry, uiConfig)
 
     init {
@@ -76,36 +73,16 @@ class RunManager(
         publishState()
 
         executor.submit {
-            runCatching {
-                snapshot.status = ExecutionStatus.RUNNING
-                publishState()
-                val runResult = runModule(module, request, snapshot)
-                finalizeSuccess(snapshot, runResult)
-            }.onFailure { ex ->
-                finalizeFailure(snapshot, ex)
-            }
+            executionSupport.executeRun(
+                module = module,
+                request = request,
+                snapshot = snapshot,
+                materializeCredentialsFile = ::materializeCredentialsFile,
+                publishState = ::publishState,
+            )
         }
 
         return snapshot.toUi()
-    }
-
-    private fun runModule(
-        module: com.sbrf.lt.platform.ui.model.ModuleDescriptor,
-        request: StartRunRequest,
-        snapshot: MutableRunSnapshot,
-    ): ApplicationRunResult {
-        snapshot.status = ExecutionStatus.RUNNING
-        publishState()
-        val runtimeSnapshot = moduleExecutionSource.prepareExecution(module, request)
-        val tempDir = Files.createTempDirectory("datapool-ui-run-${module.id}-")
-        val credentialsPath = materializeCredentialsFile(tempDir)
-        return applicationRunner.run(
-            snapshot = runtimeSnapshot,
-            credentialsPath = credentialsPath,
-            executionListener = ExecutionListener { event ->
-                handleEvent(snapshot, event)
-            },
-        )
     }
 
     @Synchronized
@@ -123,24 +100,6 @@ class RunManager(
     override fun currentProperties(): Map<String, String> = credentialsService.currentProperties()
 
     @Synchronized
-    private fun handleEvent(snapshot: MutableRunSnapshot, event: ExecutionEvent) {
-        executionSupport.applyEvent(snapshot, event)
-        publishState()
-    }
-
-    @Synchronized
-    private fun finalizeSuccess(snapshot: MutableRunSnapshot, result: ApplicationRunResult) {
-        executionSupport.finalizeSuccess(snapshot, result)
-        publishState()
-    }
-
-    @Synchronized
-    private fun finalizeFailure(snapshot: MutableRunSnapshot, ex: Throwable) {
-        executionSupport.finalizeFailure(snapshot, ex)
-        publishState()
-    }
-
-    @Synchronized
     private fun publishState() {
         persistState()
         updatesFlow.tryEmit(currentState())
@@ -149,7 +108,7 @@ class RunManager(
     @Synchronized
     private fun restorePersistedState() {
         snapshots.clear()
-        snapshots.addAll(historySupport.restoreSnapshots())
+        snapshots.addAll(persistenceSupport.restoreSnapshots())
     }
 
     @Synchronized
@@ -159,7 +118,7 @@ class RunManager(
         keepMinRunsPerModule: Int,
         disableSafeguard: Boolean,
     ): RunHistoryCleanupPreviewResponse =
-        historySupport.previewHistoryCleanup(
+        historyCleanupSupport.previewHistoryCleanup(
             snapshots = snapshots,
             cutoffTimestamp = cutoffTimestamp,
             retentionDays = retentionDays,
@@ -174,7 +133,7 @@ class RunManager(
         keepMinRunsPerModule: Int,
         disableSafeguard: Boolean,
     ): RunHistoryCleanupResultResponse {
-        val result = historySupport.executeHistoryCleanup(
+        val result = historyCleanupSupport.executeHistoryCleanup(
             snapshots = snapshots,
             cutoffTimestamp = cutoffTimestamp,
             retentionDays = retentionDays,
@@ -189,6 +148,6 @@ class RunManager(
 
     @Synchronized
     private fun persistState() {
-        historySupport.persistSnapshots(snapshots)
+        persistenceSupport.persistSnapshots(snapshots)
     }
 }

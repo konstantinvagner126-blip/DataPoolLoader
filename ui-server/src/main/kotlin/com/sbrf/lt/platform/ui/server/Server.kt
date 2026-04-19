@@ -57,6 +57,7 @@ import com.sbrf.lt.datapool.db.registry.DriverManagerDatabaseConnectionProvider
 import com.sbrf.lt.datapool.module.sync.ModuleSyncService
 import com.sbrf.lt.datapool.module.sync.ModuleSyncState
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleExportService
+import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleAsyncQueryOperations
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleQueryManager
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleStateService
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleStateStore
@@ -205,7 +206,7 @@ fun Application.uiModule(
     runManager: RunManager = RunManager(moduleRegistry = moduleRegistry, uiConfig = uiConfig, credentialsService = credentialsService),
     configFormService: ConfigFormService = ConfigFormService(),
     sqlConsoleService: SqlConsoleOperations = SqlConsoleService(runtimeUiConfig.sqlConsole),
-    sqlConsoleQueryManager: SqlConsoleQueryManager = SqlConsoleQueryManager(sqlConsoleService),
+    sqlConsoleQueryManager: SqlConsoleAsyncQueryOperations = SqlConsoleQueryManager(sqlConsoleService),
     sqlConsoleExportService: SqlConsoleExportService = SqlConsoleExportService(),
     sqlConsoleStateService: SqlConsoleStateService = SqlConsoleStateService(SqlConsoleStateStore(uiConfig.storageDirPath())),
     uiConfigPersistenceService: UiConfigPersistenceService = UiConfigPersistenceService(),

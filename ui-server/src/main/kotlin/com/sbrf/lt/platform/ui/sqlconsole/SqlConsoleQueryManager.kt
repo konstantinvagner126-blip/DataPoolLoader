@@ -1,6 +1,5 @@
 package com.sbrf.lt.platform.ui.sqlconsole
 
-import com.sbrf.lt.datapool.sqlconsole.SqlConsoleExecutionCancelledException
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleExecutionControl
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleOperations
 import java.nio.file.Path
@@ -19,15 +18,16 @@ enum class SqlConsoleExecutionStatus {
 class SqlConsoleQueryManager(
     private val sqlConsoleService: SqlConsoleOperations,
     private val executor: ExecutorService = Executors.newSingleThreadExecutor(),
-) {
+) : SqlConsoleAsyncQueryOperations {
     private val lock = Any()
     private var activeExecution: ActiveExecution? = null
+    private val executionSupport = SqlConsoleQueryExecutionSupport(sqlConsoleService)
 
-    fun startQuery(
+    override fun startQuery(
         sql: String,
         credentialsPath: Path?,
-        selectedSourceNames: List<String> = emptyList(),
-        cleanupDir: Path? = null,
+        selectedSourceNames: List<String>,
+        cleanupDir: Path?,
     ): SqlConsoleExecutionSnapshot {
         val execution = synchronized(lock) {
             require(activeExecution?.snapshot?.status != SqlConsoleExecutionStatus.RUNNING) {
@@ -44,34 +44,13 @@ class SqlConsoleQueryManager(
         }
 
         executor.submit {
-            val finalSnapshot = try {
-                execution.snapshot.copy(
-                    status = SqlConsoleExecutionStatus.SUCCESS,
-                    finishedAt = Instant.now(),
-                    result = sqlConsoleService.executeQuery(
-                        rawSql = sql,
-                        credentialsPath = credentialsPath,
-                        selectedSourceNames = selectedSourceNames,
-                        executionControl = execution.control,
-                    ),
-                )
-            } catch (ex: SqlConsoleExecutionCancelledException) {
-                execution.snapshot.copy(
-                    status = SqlConsoleExecutionStatus.CANCELLED,
-                    finishedAt = Instant.now(),
-                    cancelRequested = true,
-                    errorMessage = ex.message ?: "Запрос отменен пользователем.",
-                )
-            } catch (ex: Exception) {
-                val cancelled = execution.control.isCancelled()
-                execution.snapshot.copy(
-                    status = if (cancelled) SqlConsoleExecutionStatus.CANCELLED else SqlConsoleExecutionStatus.FAILED,
-                    finishedAt = Instant.now(),
-                    cancelRequested = cancelled || execution.snapshot.cancelRequested,
-                    errorMessage = ex.message ?: "Не удалось выполнить запрос.",
-                )
-            }
-            cleanupDir?.toFile()?.deleteRecursively()
+            val finalSnapshot = executionSupport.execute(
+                execution = execution,
+                sql = sql,
+                credentialsPath = credentialsPath,
+                selectedSourceNames = selectedSourceNames,
+                cleanupDir = cleanupDir,
+            )
             synchronized(lock) {
                 if (activeExecution?.snapshot?.id == execution.snapshot.id) {
                     activeExecution = execution.copy(snapshot = finalSnapshot)
@@ -82,11 +61,11 @@ class SqlConsoleQueryManager(
         return execution.snapshot
     }
 
-    fun currentSnapshot(): SqlConsoleExecutionSnapshot? = synchronized(lock) {
+    override fun currentSnapshot(): SqlConsoleExecutionSnapshot? = synchronized(lock) {
         activeExecution?.snapshot
     }
 
-    fun snapshot(executionId: String): SqlConsoleExecutionSnapshot {
+    override fun snapshot(executionId: String): SqlConsoleExecutionSnapshot {
         return synchronized(lock) {
             val execution = activeExecution
             require(execution != null && execution.snapshot.id == executionId) {
@@ -96,7 +75,7 @@ class SqlConsoleQueryManager(
         }
     }
 
-    fun cancel(executionId: String): SqlConsoleExecutionSnapshot {
+    override fun cancel(executionId: String): SqlConsoleExecutionSnapshot {
         val execution = synchronized(lock) {
             val current = activeExecution
             require(current != null && current.snapshot.id == executionId) {
@@ -112,5 +91,4 @@ class SqlConsoleQueryManager(
         }
         return execution.snapshot
     }
-
 }

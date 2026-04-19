@@ -32,8 +32,8 @@ import com.sbrf.lt.platform.ui.run.FilesRunHistoryCleanupService
 import com.sbrf.lt.platform.ui.run.UiCredentialsService
 import com.sbrf.lt.platform.ui.run.history.DatabaseModuleRunHistoryService
 import com.sbrf.lt.platform.ui.run.history.ModuleRunHistoryService
+import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleAsyncQueryOperations
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleExportService
-import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleQueryManager
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleStateService
 import com.sbrf.lt.platform.ui.sync.DatabaseModuleSyncImporter
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleOperations
@@ -56,7 +56,7 @@ internal class UiServerContext(
     private val filesRunHistoryMaintenance: FilesRunHistoryMaintenanceOperations,
     internal val configFormService: ConfigFormService,
     internal val sqlConsoleService: SqlConsoleOperations,
-    internal val sqlConsoleQueryManager: SqlConsoleQueryManager,
+    internal val sqlConsoleQueryManager: SqlConsoleAsyncQueryOperations,
     internal val sqlConsoleExportService: SqlConsoleExportService,
     internal val sqlConsoleStateService: SqlConsoleStateService,
     internal val uiConfigPersistenceService: UiConfigPersistenceService,

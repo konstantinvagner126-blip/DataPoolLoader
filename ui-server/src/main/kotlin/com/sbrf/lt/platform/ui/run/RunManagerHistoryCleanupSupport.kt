@@ -8,40 +8,10 @@ import com.sbrf.lt.platform.ui.model.RunHistoryCleanupPreviewResponse
 import com.sbrf.lt.platform.ui.model.RunHistoryCleanupResultResponse
 import java.time.Instant
 
-internal class RunManagerHistorySupport(
+internal class RunManagerHistoryCleanupSupport(
     private val stateStore: RunStateStore,
     private val objectMapper: ObjectMapper,
 ) {
-    fun restoreSnapshots(): List<MutableRunSnapshot> {
-        val persisted = stateStore.load()
-        return persisted.history.map { snapshot ->
-            MutableRunSnapshot(
-                id = snapshot.id,
-                moduleId = snapshot.moduleId,
-                moduleTitle = snapshot.moduleTitle,
-                status = snapshot.status,
-                startedAt = snapshot.startedAt,
-                finishedAt = snapshot.finishedAt,
-                outputDir = snapshot.outputDir,
-                mergedRowCount = snapshot.mergedRowCount,
-                summaryJson = snapshot.summaryJson,
-                errorMessage = snapshot.errorMessage,
-                sourceProgress = snapshot.sourceProgress.toMutableMap(),
-                events = snapshot.events.toMutableList(),
-            )
-        }
-    }
-
-    fun persistSnapshots(snapshots: List<MutableRunSnapshot>) {
-        stateStore.save(
-            PersistedRunState(
-                history = snapshots
-                    .sortedByDescending { it.startedAt }
-                    .map { it.toUi() },
-            ),
-        )
-    }
-
     fun previewHistoryCleanup(
         snapshots: List<MutableRunSnapshot>,
         cutoffTimestamp: Instant,
@@ -148,8 +118,6 @@ internal class RunManagerHistorySupport(
             }
 
         return FilesHistoryCleanupPreview(
-            retentionDays = retentionDays,
-            keepMinRunsPerModule = keepMinRunsPerModule,
             runIds = deletableByModule.flatMapTo(linkedSetOf()) { it.runIds },
             totalEventsToDelete = deletableByModule.sumOf { it.totalEventsToDelete },
             modules = deletableByModule.map { it.summary }.sortedBy { it.moduleCode },
@@ -164,13 +132,14 @@ internal class RunManagerHistorySupport(
         if (currentSize <= 0L || runIdsToDelete.isEmpty()) {
             return 0L
         }
-        val projectedState = PersistedRunState(
-            history = snapshots
-                .filterNot { it.id in runIdsToDelete }
-                .sortedByDescending { it.startedAt }
-                .map { it.toUi() },
-        )
-        val projectedBytes = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(projectedState).size.toLong()
+        val projectedBytes = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(
+            PersistedRunState(
+                history = snapshots
+                    .filterNot { it.id in runIdsToDelete }
+                    .sortedByDescending { it.startedAt }
+                    .map { it.toUi() },
+            ),
+        ).size.toLong()
         return (currentSize - projectedBytes).coerceAtLeast(0L)
     }
 
@@ -211,8 +180,6 @@ internal data class HistoryCleanupExecutionResult(
 )
 
 private data class FilesHistoryCleanupPreview(
-    val retentionDays: Int,
-    val keepMinRunsPerModule: Int,
     val runIds: Set<String>,
     val totalEventsToDelete: Int,
     val modules: List<RunHistoryCleanupModuleResponse>,
