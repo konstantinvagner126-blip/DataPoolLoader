@@ -1,7 +1,6 @@
 package com.sbrf.lt.platform.ui.server
 
 import com.sbrf.lt.platform.ui.config.UiModuleStoreMode
-import io.ktor.http.formUrlEncode
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.call
 import io.ktor.server.response.respondRedirect
@@ -33,32 +32,6 @@ internal suspend fun UiServerContext.requirePageModeOrRedirect(
     return false
 }
 
-internal fun ApplicationCall.composeQueryParameters(
-    vararg fixedParams: Pair<String, String>,
-    forwardedParams: List<String> = emptyList(),
-): LinkedHashMap<String, List<String>> =
-    linkedMapOf<String, List<String>>().also { params ->
-        fixedParams.forEach { (key, value) ->
-            params[key] = listOf(value)
-        }
-        forwardedParams.forEach { name ->
-            request.queryParameters[name]?.let { params[name] = listOf(it) }
-        }
-    }
-
-internal fun composeBundleLocation(
-    queryParameters: Map<String, List<String>> = emptyMap(),
-): String {
-    val query = queryParameters
-        .flatMap { (key, values) -> values.map { key to it } }
-        .formUrlEncode()
-    return if (query.isBlank()) {
-        "/static/compose-app/index.html"
-    } else {
-        "/static/compose-app/index.html?$query"
-    }
-}
-
 internal fun Route.registerComposeRedirect(
     path: String,
     vararg fixedParams: Pair<String, String>,
@@ -88,6 +61,3 @@ internal fun Route.registerModeGuardedComposeRedirect(
         )
     }
 }
-
-internal fun io.ktor.http.Parameters.toQueryParametersMap(): Map<String, List<String>> =
-    names().associateWith { name -> getAll(name).orEmpty() }
