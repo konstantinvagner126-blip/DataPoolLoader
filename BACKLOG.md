@@ -63,6 +63,12 @@
   - [UiServerPlugins.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/UiServerPlugins.kt)
   - [UiServerRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/UiServerRoutes.kt);
 - [Server.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/Server.kt) стал ближе к composition root, а не к transport-свалке.
+- сборка `UiServerContextDependencies` больше не живет прямо в `uiModule`:
+  - [UiServerModuleDependenciesFactory.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/UiServerModuleDependenciesFactory.kt)
+  - [Server.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/Server.kt) теперь не держит вручную graph assembly для `UiServerContext`;
+- `uiModule` больше не устанавливает Ktor plugins/routes напрямую:
+  - [UiServerApplicationSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/UiServerApplicationSupport.kt)
+  - [Server.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/Server.kt) теперь только собирает `UiServerContext` и делегирует transport-installation;
 - DB route layer больше не держится на одном смешанном support-файле:
   - cleanup flow разрезан на payload/action слои:
     - [DatabaseCleanupRoutePayloadSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseCleanupRoutePayloadSupport.kt)

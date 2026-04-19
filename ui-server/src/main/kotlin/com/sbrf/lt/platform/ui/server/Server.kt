@@ -6,8 +6,6 @@ import com.sbrf.lt.platform.ui.config.UiConfigPersistenceService
 import com.sbrf.lt.platform.ui.config.UiRuntimeConfigResolver
 import com.sbrf.lt.platform.ui.config.UiRuntimeContext
 import com.sbrf.lt.platform.ui.config.UiRuntimeContextService
-import com.sbrf.lt.platform.ui.config.appsRootPath
-import com.sbrf.lt.platform.ui.config.storageDirPath
 import com.sbrf.lt.platform.ui.module.ConfigFormService
 import com.sbrf.lt.platform.ui.module.DatabaseModuleRegistryOperations
 import com.sbrf.lt.platform.ui.module.ModuleRegistry
@@ -27,50 +25,36 @@ import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleExportService
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleOperations
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleStateService
 import io.ktor.server.application.Application
-import io.ktor.server.application.install
-import io.ktor.server.http.content.staticResources
-import io.ktor.server.response.respondRedirect
-import io.ktor.server.response.respondText
-import io.ktor.server.routing.get
-import io.ktor.server.routing.routing
-import org.slf4j.LoggerFactory
 
 fun Application.uiModule(
     uiConfig: UiAppConfig = UiConfigLoader().load(),
-    uiConfigLoader: UiConfigLoader = object : UiConfigLoader() {
-        override fun load(): UiAppConfig = uiConfig
-    },
-    credentialsService: UiCredentialsService = UiCredentialsService(
-        uiConfigProvider = { runCatching { uiConfigLoader.load() }.getOrDefault(uiConfig) },
-    ),
-    runtimeConfigResolver: UiRuntimeConfigResolver = UiRuntimeConfigResolver(credentialsService),
-    runtimeContextService: UiRuntimeContextService = UiRuntimeContextService(),
-    runtimeUiConfig: UiAppConfig = runtimeConfigResolver.resolve(uiConfig),
-    runtimeContext: UiRuntimeContext = runtimeContextService.resolve(runtimeUiConfig),
-    moduleRegistry: ModuleRegistry = defaultModuleRegistry(uiConfig),
-    filesModuleBackend: FilesModuleBackend = defaultFilesModuleBackend(moduleRegistry),
+    uiConfigLoader: UiConfigLoader? = null,
+    credentialsService: UiCredentialsService? = null,
+    runtimeConfigResolver: UiRuntimeConfigResolver? = null,
+    runtimeContextService: UiRuntimeContextService? = null,
+    runtimeUiConfig: UiAppConfig? = null,
+    runtimeContext: UiRuntimeContext? = null,
+    moduleRegistry: ModuleRegistry? = null,
+    filesModuleBackend: FilesModuleBackend? = null,
     databaseModuleStore: DatabaseModuleRegistryOperations? = null,
     databaseModuleBackend: DatabaseModuleBackend? = null,
-    runManager: RunManager = defaultRunManager(moduleRegistry, uiConfig, credentialsService),
-    configFormService: ConfigFormService = ConfigFormService(),
-    sqlConsoleService: SqlConsoleOperations = defaultSqlConsoleService(runtimeUiConfig),
-    sqlConsoleQueryManager: SqlConsoleAsyncQueryOperations = defaultSqlConsoleQueryManager(sqlConsoleService),
-    sqlConsoleExportService: SqlConsoleExportService = SqlConsoleExportService(),
-    sqlConsoleStateService: SqlConsoleStateService = defaultSqlConsoleStateService(uiConfig),
-    uiConfigPersistenceService: UiConfigPersistenceService = UiConfigPersistenceService(),
+    runManager: RunManager? = null,
+    configFormService: ConfigFormService? = null,
+    sqlConsoleService: SqlConsoleOperations? = null,
+    sqlConsoleQueryManager: SqlConsoleAsyncQueryOperations? = null,
+    sqlConsoleExportService: SqlConsoleExportService? = null,
+    sqlConsoleStateService: SqlConsoleStateService? = null,
+    uiConfigPersistenceService: UiConfigPersistenceService? = null,
     moduleSyncService: ModuleSyncService? = null,
     databaseModuleRunService: DatabaseModuleRunOperations? = null,
-    databaseModuleActiveRunRegistry: DatabaseModuleActiveRunRegistry = DatabaseModuleActiveRunRegistry(),
+    databaseModuleActiveRunRegistry: DatabaseModuleActiveRunRegistry? = null,
     databaseRunHistoryCleanupService: DatabaseRunHistoryCleanupService? = null,
     databaseOutputRetentionService: DatabaseOutputRetentionService? = null,
-    filesModuleRunHistoryService: ModuleRunHistoryService = defaultFilesRunHistoryService(moduleRegistry, runManager),
+    filesModuleRunHistoryService: ModuleRunHistoryService? = null,
     databaseModuleRunHistoryService: ModuleRunHistoryService? = null,
 ) {
-    val logger = defaultUiServerLogger()
-    val mapper = createUiServerObjectMapper()
-    installUiServerPlugins(logger)
     val serverContext = buildUiServerContext(
-        UiServerContextDependencies(
+        buildUiServerModuleContextDependencies(
             uiConfig = uiConfig,
             uiConfigLoader = uiConfigLoader,
             credentialsService = credentialsService,
@@ -78,6 +62,7 @@ fun Application.uiModule(
             runtimeContextService = runtimeContextService,
             runtimeUiConfig = runtimeUiConfig,
             runtimeContext = runtimeContext,
+            moduleRegistry = moduleRegistry,
             filesModuleBackend = filesModuleBackend,
             databaseModuleStore = databaseModuleStore,
             databaseModuleBackend = databaseModuleBackend,
@@ -97,8 +82,5 @@ fun Application.uiModule(
             databaseModuleRunHistoryService = databaseModuleRunHistoryService,
         ),
     )
-
-    routing {
-        registerUiRoutes(serverContext, mapper)
-    }
+    installUiServerApplication(serverContext)
 }

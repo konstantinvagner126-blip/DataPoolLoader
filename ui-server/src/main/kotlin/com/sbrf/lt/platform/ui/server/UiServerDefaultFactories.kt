@@ -3,6 +3,7 @@ package com.sbrf.lt.platform.ui.server
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleOperations
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleService
 import com.sbrf.lt.platform.ui.config.UiAppConfig
+import com.sbrf.lt.platform.ui.config.UiConfigLoader
 import com.sbrf.lt.platform.ui.config.appsRootPath
 import com.sbrf.lt.platform.ui.config.storageDirPath
 import com.sbrf.lt.platform.ui.module.ModuleRegistry
@@ -15,6 +16,19 @@ import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleQueryManager
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleStateService
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+
+internal fun defaultUiConfigLoader(uiConfig: UiAppConfig): UiConfigLoader =
+    object : UiConfigLoader() {
+        override fun load(): UiAppConfig = uiConfig
+    }
+
+internal fun defaultUiCredentialsService(
+    uiConfig: UiAppConfig,
+    uiConfigLoader: UiConfigLoader,
+): UiCredentialsService =
+    UiCredentialsService(
+        uiConfigProvider = { runCatching { uiConfigLoader.load() }.getOrDefault(uiConfig) },
+    )
 
 internal fun defaultModuleRegistry(uiConfig: UiAppConfig): ModuleRegistry =
     ModuleRegistry(appsRoot = uiConfig.appsRootPath())
