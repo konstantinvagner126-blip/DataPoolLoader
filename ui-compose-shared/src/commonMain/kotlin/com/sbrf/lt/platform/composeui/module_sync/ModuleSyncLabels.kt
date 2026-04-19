@@ -9,6 +9,15 @@ fun translateSyncStatus(status: String): String =
         else -> status
     }
 
+fun syncStatusTone(status: String): String =
+    when (status.uppercase()) {
+        "SUCCESS" -> "success"
+        "FAILED" -> "danger"
+        "RUNNING" -> "primary"
+        "PARTIAL_SUCCESS" -> "warning"
+        else -> "secondary"
+    }
+
 fun translateSyncScope(scope: String): String =
     when (scope.uppercase()) {
         "ALL" -> "Все модули"
@@ -26,6 +35,15 @@ fun translateSyncAction(action: String): String =
         "SKIPPED_CODE_CONFLICT" -> "Пропущен из-за конфликта кода"
         "FAILED" -> "Ошибка"
         else -> action
+    }
+
+fun syncActionTone(action: String): String =
+    when (action.uppercase()) {
+        "CREATED" -> "success"
+        "UPDATED" -> "primary"
+        "FAILED" -> "danger"
+        "SKIPPED", "SKIPPED_NO_CHANGES", "SKIPPED_CODE_CONFLICT" -> "secondary"
+        else -> "secondary"
     }
 
 fun syncRunTitle(run: ModuleSyncRunSummaryResponse): String =

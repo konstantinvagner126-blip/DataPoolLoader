@@ -494,6 +494,10 @@
   - generic run-display helper-ы вынесены из [ModuleRunsPageSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsPageSupport.kt) в нейтральный foundation-слой [RunPresentationSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/foundation/run/RunPresentationSupport.kt)
   - `ModuleRunsPageSupport.kt` больше не держит `formatStageDuration / formatTimeoutSeconds / formatRowsInterval / formatBooleanFlag / extractArtifactName`
   - [ModuleRunsPageSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsPageSections.kt) использует foundation run-support напрямую, а в feature support остались только route-specific и diagnostics-specific части.
+- module_sync badge cleanup:
+  - локальные `syncStatusBadgeClass(...)` и `syncActionBadgeClass(...)` удалены из [ModuleSyncPageSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncPageSupport.kt)
+  - shared `ModuleSyncLabels.kt` теперь держит `syncStatusTone(...)` и `syncActionTone(...)` рядом с `translate*` helper-ами
+  - [ModuleSyncPageSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncPageSections.kt) использует общий [StatusBadge](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/foundation/component/SectionCard.kt) вместо ручной сборки bootstrap badge-классов.
 - SQL store cleanup:
   - общее переключение `selectedSourceNames` вынесено в [SqlConsoleStateSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleStateSupport.kt)
   - `SqlConsoleStore` и `SqlConsoleObjectsStore` больше не держат одинаковые локальные реализации toggle-логики.

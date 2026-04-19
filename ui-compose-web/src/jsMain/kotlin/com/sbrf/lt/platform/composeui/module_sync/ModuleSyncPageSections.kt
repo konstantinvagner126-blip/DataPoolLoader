@@ -5,8 +5,8 @@ import com.sbrf.lt.platform.composeui.foundation.component.AlertBanner
 import com.sbrf.lt.platform.composeui.foundation.component.EmptyStateCard
 import com.sbrf.lt.platform.composeui.foundation.component.LoadingStateCard
 import com.sbrf.lt.platform.composeui.foundation.component.SectionCard
+import com.sbrf.lt.platform.composeui.foundation.component.StatusBadge
 import com.sbrf.lt.platform.composeui.foundation.dom.classes
-import com.sbrf.lt.platform.composeui.foundation.dom.classesFromString
 import com.sbrf.lt.platform.composeui.foundation.format.formatDateTime
 import com.sbrf.lt.platform.composeui.foundation.runtime.buildDatabaseModeUnavailableMessage
 import com.sbrf.lt.platform.composeui.model.ModuleStoreMode
@@ -332,12 +332,10 @@ internal fun SyncRunsHistoryPanel(
                         }) {
                             Div({ classes("run-history-head") }) {
                                 Span({ classes("run-history-title") }) { Text(syncRunTitle(run)) }
-                                Span({
-                                    classes("badge")
-                                    classesFromString(syncStatusBadgeClass(run.status))
-                                }) {
-                                    Text(translateSyncStatus(run.status))
-                                }
+                                StatusBadge(
+                                    text = translateSyncStatus(run.status),
+                                    tone = syncStatusTone(run.status),
+                                )
                             }
                             Div({ classes("run-history-meta") }) { Text(formatDateTime(run.startedAt)) }
                             Div({ classes("run-history-meta") }) {
@@ -410,18 +408,14 @@ internal fun SyncRunDetailsPanel(state: ModuleSyncPageState) {
                         Div({ classes("card-body", "py-3", "px-3") }) {
                             Div({ classes("d-flex", "flex-wrap", "align-items-center", "gap-2") }) {
                                 Code({ classes("fw-semibold") }) { Text(item.moduleCode) }
-                                Span({
-                                    classes("badge")
-                                    classesFromString(syncActionBadgeClass(item.action))
-                                }) {
-                                    Text(translateSyncAction(item.action))
-                                }
-                                Span({
-                                    classes("badge")
-                                    classesFromString(syncStatusBadgeClass(item.status))
-                                }) {
-                                    Text(translateSyncStatus(item.status))
-                                }
+                                StatusBadge(
+                                    text = translateSyncAction(item.action),
+                                    tone = syncActionTone(item.action),
+                                )
+                                StatusBadge(
+                                    text = translateSyncStatus(item.status),
+                                    tone = syncStatusTone(item.status),
+                                )
                                 if (!item.resultRevisionId.isNullOrBlank()) {
                                     Span({ classes("small", "text-secondary") }) { Text("Ревизия: ${item.resultRevisionId}") }
                                 }

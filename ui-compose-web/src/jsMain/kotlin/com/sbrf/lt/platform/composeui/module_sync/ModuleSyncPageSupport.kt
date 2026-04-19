@@ -50,23 +50,5 @@ internal fun syncRunMeta(run: ModuleSyncRunSummaryResponse): String {
     ).joinToString(" · ")
 }
 
-internal fun syncStatusBadgeClass(status: String): String =
-    when (status.uppercase()) {
-        "SUCCESS" -> "bg-success"
-        "FAILED" -> "bg-danger"
-        "RUNNING" -> "bg-primary"
-        "PARTIAL_SUCCESS" -> "bg-warning text-dark"
-        else -> "bg-secondary"
-    }
-
-internal fun syncActionBadgeClass(action: String): String =
-    when (action.uppercase()) {
-        "CREATED" -> "bg-success"
-        "UPDATED" -> "bg-primary"
-        "SKIPPED", "SKIPPED_NO_CHANGES", "SKIPPED_CODE_CONFLICT" -> "bg-secondary"
-        "FAILED" -> "bg-danger"
-        else -> "bg-secondary"
-    }
-
 internal fun actorLabel(displayName: String?, actorId: String?): String? =
     displayName ?: actorId
