@@ -89,19 +89,9 @@ fun ComposeSqlConsoleObjectsPage(
         heroCopyClassNames = listOf("sql-console-hero-copy"),
         heroHeader = {
             Div({ classes("hero-actions", "mb-3") }) {
-                A(attrs = {
-                    classes("btn", "btn-outline-secondary")
-                    href("/")
-                }) { Text("На главную") }
-                A(attrs = {
-                    classes("btn", "btn-outline-secondary")
-                    href("/sql-console")
-                }) { Text("SQL-консоль") }
-                Button(attrs = {
-                    classes("btn", "btn-dark")
-                    attr("type", "button")
-                    disabled()
-                }) { Text("Объекты БД") }
+                ObjectsNavActionButton("На главную", hrefValue = "/")
+                ObjectsNavActionButton("SQL-консоль", hrefValue = "/sql-console")
+                ObjectsNavActionButton("Объекты БД", active = true)
             }
         },
         content = {
@@ -326,6 +316,26 @@ fun ComposeSqlConsoleObjectsPage(
             }
         },
     )
+}
+
+@Composable
+private fun ObjectsNavActionButton(
+    label: String,
+    hrefValue: String? = null,
+    active: Boolean = false,
+) {
+    if (active) {
+        Button(attrs = {
+            classes("btn", "btn-dark")
+            attr("type", "button")
+            disabled()
+        }) { Text(label) }
+        return
+    }
+    A(attrs = {
+        classes("btn", "btn-outline-secondary")
+        href(hrefValue ?: "#")
+    }) { Text(label) }
 }
 
 @Composable

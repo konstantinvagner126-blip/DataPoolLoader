@@ -7,6 +7,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.sbrf.lt.platform.composeui.foundation.component.AlertBanner
 import com.sbrf.lt.platform.composeui.foundation.dom.classes
+import com.sbrf.lt.platform.composeui.foundation.dom.classesFromString
 import org.jetbrains.compose.web.attributes.rows
 import org.jetbrains.compose.web.attributes.type
 import org.jetbrains.compose.web.attributes.value
@@ -159,7 +160,7 @@ internal fun MetadataCheckboxField(
 ) {
     Div({ classes("module-metadata-row") }) {
         Div({ classes("module-metadata-label") }) { Text("Видимость") }
-        Div({ classes("module-metadata-value") }) {
+        MetadataValueBlock(helpText, helpClassName = "config-form-help mt-1") {
             Label(attrs = { classes("config-form-check") }) {
                 Input(type = org.jetbrains.compose.web.attributes.InputType.Checkbox, attrs = {
                     classes("form-check-input")
@@ -169,9 +170,6 @@ internal fun MetadataCheckboxField(
                     onClick { onCommit(!checked) }
                 })
                 Span({ classes("form-check-label") }) { Text(label) }
-            }
-            if (helpText.isNotBlank()) {
-                Div({ classes("config-form-help", "mt-1") }) { Text(helpText) }
             }
         }
     }
@@ -185,11 +183,22 @@ private fun MetadataEditableRow(
 ) {
     Label(attrs = { classes("module-metadata-row") }) {
         Div({ classes("module-metadata-label") }) { Text(label) }
-        Div({ classes("module-metadata-value") }) {
-            if (helpText.isNotBlank()) {
-                Div({ classes("config-form-help", "mb-1") }) { Text(helpText) }
-            }
+        MetadataValueBlock(helpText) {
             content()
         }
+    }
+}
+
+@Composable
+private fun MetadataValueBlock(
+    helpText: String = "",
+    helpClassName: String = "config-form-help mb-1",
+    content: @Composable () -> Unit,
+) {
+    Div({ classes("module-metadata-value") }) {
+        if (helpText.isNotBlank()) {
+            Div({ classesFromString(helpClassName) }) { Text(helpText) }
+        }
+        content()
     }
 }

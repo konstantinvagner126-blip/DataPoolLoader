@@ -522,6 +522,10 @@
   - `SqlConsoleResultSections.kt` больше не дублирует shard status badge markup между table/card presentation; общий локальный `ShardStatusBadge(...)` закрывает этот статусный фрагмент
   - `ModuleEditorMetadataSections.kt` больше не повторяет editable row-shell для text/textarea полей; общий локальный `MetadataEditableRow(...)` держит label/help/value layout в одном месте
   - `ModuleEditorWorkspaceSections.kt` больше не повторяет action-button markup в SQL catalog toolbar; общий локальный `SqlCatalogActionButton(...)` закрывает `Создать / Переименовать / Удалить`.
+- placeholder/nav/value-shell cleanup продолжен:
+  - `SqlConsoleResultSections.kt` больше не размазывает `sql-result-placeholder` markup по нескольким веткам; общий локальный `SqlResultPlaceholder(...)` закрывает этот экранный placeholder
+  - `SqlConsoleObjectsPage.kt` больше не повторяет hero navigation button markup; общий локальный `ObjectsNavActionButton(...)` закрывает `На главную / SQL-консоль / Объекты БД`
+  - `ModuleEditorMetadataSections.kt` больше не дублирует `module-metadata-value + helpText` shell между editable и checkbox полями; общий локальный `MetadataValueBlock(...)` закрывает этот value/help wrapper.
 - credentials upload helper cleanup:
   - duplicate `uploadCredentialsFile(...)` больше не живет параллельно в `module_editor` и `sql_console`
   - общий web-only helper вынесен в [CredentialsHttpSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/foundation/http/CredentialsHttpSupport.kt)
@@ -606,6 +610,15 @@
   - `SqlConsoleStore` и `SqlConsoleObjectsStore` больше не держат одинаковые локальные реализации toggle-логики.
 - legacy-терминология убирается и из test-layer:
   - тесты exporter/importer в `core` переименованы под актуальные классы `PostgresSourceExporter` и `PostgresTargetImporter`, без сохранения старых `PostgresExporter/PostgresImporter` имен.
+- sql_console result placeholder cleanup:
+  - повторяющиеся `sql-result-placeholder` ветки сведены к локальному `SqlResultPlaceholder(...)` в [SqlConsoleResultSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleResultSections.kt)
+  - секции результата больше не дублируют один и тот же empty/pending placeholder markup в нескольких местах.
+- module_editor metadata value-shell cleanup:
+  - общий layout `module-metadata-value + help text` сведен к локальному `MetadataValueBlock(...)` в [ModuleEditorMetadataSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorMetadataSections.kt)
+  - editable row и checkbox field больше не держат параллельные value-wrapper ветки с одинаковым help-text rendering.
+- sql_console objects hero nav cleanup:
+  - повторяющиеся hero navigation button-ы сведены к локальному `ObjectsNavActionButton(...)` в [SqlConsoleObjectsPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectsPage.kt)
+  - экран объектов БД больше не держит три отдельные `btn/anchor/button` ветки для одного и того же navigation pattern.
 
 Критерий завершения:
 

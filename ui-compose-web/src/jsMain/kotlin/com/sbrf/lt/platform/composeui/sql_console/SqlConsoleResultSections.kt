@@ -174,17 +174,13 @@ internal fun SelectResultPane(
     val readyResult = requireNotNull(result)
 
     if (readyResult.statementType != "RESULT_SET") {
-        Div({ classes("sql-result-placeholder") }) {
-            Text("Команда ${readyResult.statementKeyword} не возвращает табличные данные. Смотри вкладку «Статусы».")
-        }
+        SqlResultPlaceholder("Команда ${readyResult.statementKeyword} не возвращает табличные данные. Смотри вкладку «Статусы».")
         return
     }
 
     val successfulShards = readyResult.shardResults.filter { it.status.equals("SUCCESS", ignoreCase = true) && it.rows.isNotEmpty() }
     if (successfulShards.isEmpty()) {
-        Div({ classes("sql-result-placeholder") }) {
-            Text("Ни один source не вернул данные для отображения.")
-        }
+        SqlResultPlaceholder("Ни один source не вернул данные для отображения.")
         return
     }
 
@@ -374,9 +370,7 @@ private fun RenderExecutionResultPlaceholder(
     resultPendingLeadText: String? = null,
 ): Boolean {
     if (execution == null) {
-        Div({ classes("sql-result-placeholder") }) {
-            Text(emptyText)
-        }
+        SqlResultPlaceholder(emptyText)
         return true
     }
     if (result == null) {
@@ -389,11 +383,18 @@ private fun RenderExecutionResultPlaceholder(
                     Text(leadText)
                 }
             }
-            Div({ classes("sql-result-placeholder") }) {
-                Text(pendingText)
-            }
+            SqlResultPlaceholder(pendingText)
         }
         return true
     }
     return false
+}
+
+@Composable
+private fun SqlResultPlaceholder(
+    text: String,
+) {
+    Div({ classes("sql-result-placeholder") }) {
+        Text(text)
+    }
 }
