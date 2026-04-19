@@ -140,8 +140,14 @@
 - `sql-console-state.json` переведен в legacy migration-only формат;
 - рабочее состояние SQL-консоли разделено на:
   - `sql-console-workspace-state.json`
+  - `sql-console-library-state.json`
   - `sql-console-preferences-state.json`;
 - сервис SQL-консоли теперь собирает единый response из двух отдельных source-of-truth.
+- query history, favorites и favorite objects больше не смешаны с execution/UI preferences;
+- `sql-console-preferences-state.json` теперь хранит только `pageSize`, `strictSafetyEnabled`, `transactionMode`;
+- пользовательский query/object content вынесен в отдельный `sql-console-library-state.json` с миграцией:
+  - из legacy `sql-console-state.json`
+  - из старого расширенного `sql-console-preferences-state.json`.
 
 Критерий завершения:
 
@@ -152,7 +158,7 @@
 
 Статус:
 
-- не реализовано
+- частично реализовано
 
 Цель:
 
@@ -172,6 +178,28 @@
 - вынести action-panels и visual sections в отдельные компоненты;
 - уменьшить прямой объем page-файлов;
 - не тащить дополнительную логику обратно в page/store после декомпозиции.
+
+Что уже сделано:
+
+- начат реальный распил [SqlConsolePage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsolePage.kt);
+- крупные visual sections и helper-слои вынесены в:
+  - [SqlConsolePageSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsolePageSections.kt)
+  - [SqlConsolePageSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsolePageSupport.kt);
+- page-файл перестал держать почти всю SQL-console подсистему в одном месте;
+- package-level SQL helper-ы нормализованы и переиспользуются между SQL-console экранами.
+- начат реальный распил [ModuleEditorPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPage.kt);
+- editor visual sections и helper-слои вынесены в:
+  - [ModuleEditorPageSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPageSections.kt)
+  - [ModuleEditorPageSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPageSupport.kt);
+- начат реальный распил [ModuleEditorConfigForm.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorConfigForm.kt);
+- config-form sections и helper-слои вынесены в:
+  - [ModuleEditorConfigFormSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorConfigFormSections.kt)
+  - [ModuleEditorConfigFormSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorConfigFormSupport.kt);
+- начат реальный распил [ModuleRunsPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsPage.kt);
+- runs visual sections и helper-слои вынесены в:
+  - [ModuleRunsPageSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsPageSections.kt)
+  - [ModuleRunsPageSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsPageSupport.kt);
+- [ModuleRunsPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsPage.kt) сокращен до shell/wiring-слоя, а detail-pane вынесен в отдельные section-компоненты.
 
 Критерий завершения:
 

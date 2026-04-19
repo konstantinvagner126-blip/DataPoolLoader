@@ -64,12 +64,16 @@ internal fun PersistedSqlConsoleState.toWorkspaceState(): PersistedSqlConsoleWor
 
 internal fun PersistedSqlConsoleState.toPreferencesState(): PersistedSqlConsolePreferencesState =
     PersistedSqlConsolePreferencesState(
-        recentQueries = recentQueries,
-        favoriteQueries = favoriteQueries,
-        favoriteObjects = favoriteObjects,
         pageSize = pageSize,
         strictSafetyEnabled = strictSafetyEnabled,
         transactionMode = transactionMode,
+    ).normalized()
+
+internal fun PersistedSqlConsoleState.toLibraryState(): PersistedSqlConsoleLibraryState =
+    PersistedSqlConsoleLibraryState(
+        recentQueries = recentQueries,
+        favoriteQueries = favoriteQueries,
+        favoriteObjects = favoriteObjects,
     ).normalized()
 
 data class PersistedSqlConsoleFavoriteObject(

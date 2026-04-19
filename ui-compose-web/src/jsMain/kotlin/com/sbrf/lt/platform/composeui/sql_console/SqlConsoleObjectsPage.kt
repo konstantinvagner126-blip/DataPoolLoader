@@ -526,15 +526,6 @@ private fun buildCountSql(dbObject: SqlConsoleDatabaseObject): String {
     """.trimIndent()
 }
 
-private fun sqlQualifiedName(
-    schemaName: String,
-    objectName: String,
-): String = "${sqlIdentifier(schemaName)}.${sqlIdentifier(objectName)}"
-
-private fun sqlIdentifier(value: String): String = "\"${value.replace("\"", "\"\"")}\""
-
-private fun sqlLiteral(value: String): String = "'${value.replace("'", "''")}'"
-
 private fun com.sbrf.lt.platform.composeui.model.ModuleStoreMode.displayName(): String =
     when (this) {
         com.sbrf.lt.platform.composeui.model.ModuleStoreMode.FILES -> "Файлы"

@@ -7,14 +7,17 @@ import java.nio.file.Path
 
 class SqlConsoleStateService(
     private val workspaceStore: SqlConsoleWorkspaceStateStore,
+    private val libraryStore: SqlConsoleLibraryStateStore,
     private val preferencesStore: SqlConsolePreferencesStateStore,
 ) {
     private val lock = Any()
     private var workspaceState: PersistedSqlConsoleWorkspaceState = workspaceStore.load()
+    private var libraryState: PersistedSqlConsoleLibraryState = libraryStore.load()
     private var preferencesState: PersistedSqlConsolePreferencesState = preferencesStore.load()
 
     constructor(storageDir: Path) : this(
         workspaceStore = SqlConsoleWorkspaceStateStore(storageDir),
+        libraryStore = SqlConsoleLibraryStateStore(storageDir),
         preferencesStore = SqlConsolePreferencesStateStore(storageDir),
     )
 
@@ -27,7 +30,7 @@ class SqlConsoleStateService(
             draftSql = request.draftSql,
             selectedSourceNames = request.selectedSourceNames,
         ).normalized()
-        preferencesState = PersistedSqlConsolePreferencesState(
+        libraryState = PersistedSqlConsoleLibraryState(
             recentQueries = request.recentQueries,
             favoriteQueries = request.favoriteQueries,
             favoriteObjects = request.favoriteObjects.map {
@@ -39,20 +42,23 @@ class SqlConsoleStateService(
                     tableName = it.tableName,
                 )
             },
+        ).normalized()
+        preferencesState = PersistedSqlConsolePreferencesState(
             pageSize = request.pageSize,
             strictSafetyEnabled = request.strictSafetyEnabled,
             transactionMode = request.transactionMode,
         ).normalized()
         workspaceStore.save(workspaceState)
+        libraryStore.save(libraryState)
         preferencesStore.save(preferencesState)
         toResponse()
     }
 
     private fun toResponse(): SqlConsoleStateResponse = SqlConsoleStateResponse(
         draftSql = workspaceState.draftSql,
-        recentQueries = preferencesState.recentQueries,
-        favoriteQueries = preferencesState.favoriteQueries,
-        favoriteObjects = preferencesState.favoriteObjects.map {
+        recentQueries = libraryState.recentQueries,
+        favoriteQueries = libraryState.favoriteQueries,
+        favoriteObjects = libraryState.favoriteObjects.map {
             SqlConsoleFavoriteObjectResponse(
                 sourceName = it.sourceName,
                 schemaName = it.schemaName,

@@ -50,24 +50,18 @@ internal fun Route.registerSqlConsoleRoutes(context: UiServerContext) {
     }
 
     post("/api/sql-console/connections/check") {
-        val tempDir = kotlin.io.path.createTempDirectory("datapool-ui-sql-console-check-")
-        try {
-            val credentialsPath = context.filesRunService.materializeCredentialsFile(tempDir)
+        context.withSqlConsoleCredentialsPath("datapool-ui-sql-console-check-") { credentialsPath ->
             call.respond(
                 context.sqlConsoleService.checkConnections(credentialsPath = credentialsPath).toResponse(
                     configured = context.sqlConsoleService.info().configured,
                 ),
             )
-        } finally {
-            tempDir.toFile().deleteRecursively()
         }
     }
 
     post("/api/sql-console/objects/search") {
         val request = call.receive<SqlConsoleObjectSearchRequest>()
-        val tempDir = kotlin.io.path.createTempDirectory("datapool-ui-sql-console-objects-")
-        try {
-            val credentialsPath = context.filesRunService.materializeCredentialsFile(tempDir)
+        context.withSqlConsoleCredentialsPath("datapool-ui-sql-console-objects-") { credentialsPath ->
             call.respond(
                 context.sqlConsoleService.searchObjects(
                     rawQuery = request.query,
@@ -76,16 +70,12 @@ internal fun Route.registerSqlConsoleRoutes(context: UiServerContext) {
                     maxObjectsPerSource = request.maxObjectsPerSource,
                 ).toResponse(),
             )
-        } finally {
-            tempDir.toFile().deleteRecursively()
         }
     }
 
     post("/api/sql-console/query") {
         val request = call.receive<SqlConsoleQueryRequest>()
-        val tempDir = kotlin.io.path.createTempDirectory("datapool-ui-sql-console-")
-        try {
-            val credentialsPath = context.filesRunService.materializeCredentialsFile(tempDir)
+        context.withSqlConsoleCredentialsPath("datapool-ui-sql-console-") { credentialsPath ->
             call.respond(
                 context.sqlConsoleService.executeQuery(
                     rawSql = request.sql,
@@ -95,8 +85,6 @@ internal fun Route.registerSqlConsoleRoutes(context: UiServerContext) {
                     transactionMode = request.toTransactionMode(),
                 ).toResponse(),
             )
-        } finally {
-            tempDir.toFile().deleteRecursively()
         }
     }
 
@@ -131,26 +119,20 @@ internal fun Route.registerSqlConsoleRoutes(context: UiServerContext) {
 
     post("/api/sql-console/query/start") {
         val request = call.receive<SqlConsoleQueryRequest>()
-        val tempDir = kotlin.io.path.createTempDirectory("datapool-ui-sql-console-")
-        val credentialsPath = try {
-            context.filesRunService.materializeCredentialsFile(tempDir)
-        } catch (ex: Exception) {
-            tempDir.toFile().deleteRecursively()
-            throw ex
-        }
+        val executionPaths = context.createSqlConsoleExecutionPaths("datapool-ui-sql-console-")
         try {
             call.respond(
                 context.sqlConsoleQueryManager.startQuery(
                     sql = request.sql,
-                    credentialsPath = credentialsPath,
+                    credentialsPath = executionPaths.credentialsPath,
                     selectedSourceNames = request.selectedSourceNames,
                     executionPolicy = SqlConsoleExecutionPolicy.STOP_ON_FIRST_ERROR,
                     transactionMode = request.toTransactionMode(),
-                    cleanupDir = tempDir,
+                    cleanupDir = executionPaths.cleanupDir,
                 ).toStartResponse(),
             )
         } catch (ex: Exception) {
-            tempDir.toFile().deleteRecursively()
+            executionPaths.cleanupDir.toFile().deleteRecursively()
             throw ex
         }
     }
@@ -171,7 +153,3 @@ internal fun Route.registerSqlConsoleRoutes(context: UiServerContext) {
         call.respond(context.sqlConsoleQueryManager.rollback(requireNotNull(call.parameters["id"])).toResponse())
     }
 }
-
-private fun SqlConsoleQueryRequest.toTransactionMode(): SqlConsoleTransactionMode =
-    runCatching { SqlConsoleTransactionMode.valueOf(transactionMode.uppercase()) }
-        .getOrDefault(SqlConsoleTransactionMode.AUTO_COMMIT)
