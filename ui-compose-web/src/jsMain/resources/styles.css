@@ -2048,52 +2048,10 @@ body {
   min-width: 0;
 }
 
-.sql-ide-hotkeys {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.6rem;
-}
-
-.sql-ide-hotkey-chip {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.45rem 0.7rem;
-  border-radius: 999px;
-  background: rgba(19, 34, 56, 0.08);
-  color: #23364d;
-  font-size: 0.8rem;
-  font-weight: 700;
-}
-
 .sql-script-outline {
   display: flex;
   flex-direction: column;
   gap: 0.65rem;
-}
-
-.sql-current-statement-card {
-  padding: 0.85rem 0.95rem;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid rgba(19, 34, 56, 0.1);
-}
-
-.sql-current-statement-title {
-  font-size: 0.9rem;
-  font-weight: 800;
-  color: #132238;
-}
-
-.sql-current-statement-meta {
-  margin-top: 0.2rem;
-  font-size: 0.79rem;
-  color: #64748b;
-}
-
-.sql-current-statement-preview {
-  font-size: 0.82rem;
-  color: #334155;
-  word-break: break-word;
 }
 
 .sql-script-outline-item {

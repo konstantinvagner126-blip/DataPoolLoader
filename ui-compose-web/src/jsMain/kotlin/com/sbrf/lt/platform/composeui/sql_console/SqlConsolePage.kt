@@ -519,8 +519,6 @@ fun ComposeSqlConsolePage(
                         SqlEditorIdeBlock(
                             outlineItems = scriptOutline,
                             currentLine = editorCursorLine,
-                            currentItem = currentOutlineItem,
-                            selectedSourceCount = state.selectedSourceNames.size,
                             onJumpToLine = { lineNumber ->
                                 focusEditorLine(editorInstance, lineNumber)
                             },
@@ -995,48 +993,9 @@ private fun CommandGuardrail(
 private fun SqlEditorIdeBlock(
     outlineItems: List<SqlScriptOutlineItem>,
     currentLine: Int,
-    currentItem: SqlScriptOutlineItem?,
-    selectedSourceCount: Int,
     onJumpToLine: (Int) -> Unit,
 ) {
     Div({ classes("sql-query-library", "mb-3") }) {
-        Div({ classes("sql-query-library-block") }) {
-            Div({ classes("small", "text-secondary", "mb-1") }) { Text("Горячие клавиши") }
-            Div({ classes("sql-ide-hotkeys") }) {
-                Span({ classes("sql-ide-hotkey-chip") }) { Text("Cmd/Ctrl + Enter -> Запустить") }
-                Span({ classes("sql-ide-hotkey-chip") }) { Text("Shift + Alt + F -> Форматировать") }
-                Span({ classes("sql-ide-hotkey-chip") }) { Text("Esc -> Остановить") }
-            }
-        }
-        Div({ classes("sql-query-library-block") }) {
-            Div({ classes("small", "text-secondary", "mb-2") }) { Text("Текущий statement") }
-            if (currentItem == null) {
-                Div({ classes("sql-current-statement-card") }) {
-                    Div({ classes("small", "text-secondary") }) {
-                        Text("Поставь курсор внутрь statement-а, чтобы UI показал, что именно запустит action `Текущий`.")
-                    }
-                }
-            } else {
-                Div({ classes("sql-current-statement-card") }) {
-                    Div({ classes("d-flex", "justify-content-between", "align-items-start", "gap-3", "mb-2") }) {
-                        Div {
-                            Div({ classes("sql-current-statement-title") }) {
-                                Text("${currentItem.keyword} · строки ${currentItem.startLine}-${currentItem.endLine}")
-                            }
-                            Div({ classes("sql-current-statement-meta") }) {
-                                Text("Источников: $selectedSourceCount • Категория: ${statementCategoryText(currentItem)}")
-                            }
-                        }
-                        Div({ classes("d-flex", "flex-wrap", "gap-2") }) {
-                            StatementRiskBadge(currentItem)
-                        }
-                    }
-                    Div({ classes("sql-current-statement-preview") }) {
-                        Text(currentItem.preview)
-                    }
-                }
-            }
-        }
         Div({ classes("sql-query-library-block") }) {
             Div({ classes("d-flex", "justify-content-between", "align-items-center", "gap-3", "mb-2") }) {
                 Div({ classes("small", "text-secondary") }) { Text("Script outline") }
@@ -1092,14 +1051,6 @@ private fun StatementRiskBadge(item: SqlScriptOutlineItem) {
     }
     Span({ classes(*cssClass.split(" ").toTypedArray()) }) { Text(text) }
 }
-
-private fun statementCategoryText(item: SqlScriptOutlineItem): String =
-    when {
-        item.keyword == "SQL" -> "SQL"
-        item.dangerous -> "Опасно"
-        !item.readOnly -> "Меняет данные"
-        else -> "Read-only"
-    }
 
 @Composable
 private fun StatementSelectionBlock(

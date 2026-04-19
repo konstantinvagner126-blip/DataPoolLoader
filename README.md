@@ -11,6 +11,13 @@
 - SQL-консоль для ручной работы с настроенными источниками;
 - desktop-packaging UI через `jpackage`.
 
+## Архитектурные правила
+
+Перед архитектурно заметными изменениями нужно читать:
+
+- [ARCHITECTURE_RULES.md](/Users/kwdev/DataPoolLoader/ARCHITECTURE_RULES.md)
+- [PROJECT_ARCHITECTURE_REVIEW.md](/Users/kwdev/DataPoolLoader/PROJECT_ARCHITECTURE_REVIEW.md)
+
 ## Состав проекта
 
 - `core`  
@@ -767,6 +774,7 @@ Task:
 - `ui-server/src/jpackage/ui-application.example.yml`
 - `gradle/credential.properties`
 - `gradle/local-postgres-test.properties`
-- `PLAN.md`
-- `ROADMAP.md`
 - `BACKLOG.md`
+- `BACKLOG_HISTORY.md`
+- `ARCHITECTURE_RULES.md`
+- `PROJECT_ARCHITECTURE_REVIEW.md`

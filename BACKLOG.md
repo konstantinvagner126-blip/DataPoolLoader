@@ -1,163 +1,40 @@
 # DataPoolLoader Backlog
 
-Актуальный backlog содержит только незавершенные задачи.
+Текущий backlog сформирован после ревизии всех `.md`-документов проекта.
 
-Архив выполненных пунктов:
+Исторические планы, roadmap и черновики схлопнуты в этот backlog. В рабочем виде оставлены только:
 
+- архитектурные правила;
+- архитектурный review;
+- backlog и backlog history;
+- отдельные safety/reference документы SQL-консоли.
+
+Главный фокус ближайшего этапа:
+
+- хорошая архитектура;
+- надежность;
+- расширяемость;
+- снижение стоимости изменений;
+- cleanup legacy и structural debt.
+
+Связанные документы:
+
+- [ARCHITECTURE_RULES.md](/Users/kwdev/DataPoolLoader/ARCHITECTURE_RULES.md)
+- [PROJECT_ARCHITECTURE_REVIEW.md](/Users/kwdev/DataPoolLoader/PROJECT_ARCHITECTURE_REVIEW.md)
 - [BACKLOG_HISTORY.md](/Users/kwdev/DataPoolLoader/BACKLOG_HISTORY.md)
+- [SQL_CONSOLE_FAILURE_SCENARIOS.md](/Users/kwdev/DataPoolLoader/SQL_CONSOLE_FAILURE_SCENARIOS.md)
+- [SQL_CONSOLE_MONACO_AUTOCOMPLETE.md](/Users/kwdev/DataPoolLoader/SQL_CONSOLE_MONACO_AUTOCOMPLETE.md)
 
 ## Правила приоритизации
 
-- `P0` — ближайшие задачи с максимальной пользовательской ценностью.
-- `P1` — следующий обязательный слой после `P0`.
-- `P2` — среднесрочное развитие.
-- `P3` — техдолг и долгосрочные улучшения.
+- `P0` — архитектурные и операционные задачи, которые прямо влияют на надежность и maintainability.
+- `P1` — обязательный следующий слой после `P0`, без которого архитектурный порядок останется незавершенным.
+- `P2` — среднесрочное усиление качества и developer experience.
+- `P3` — отложенные продуктовые и UX-задачи, которые не должны обгонять архитектурную программу.
 
 ## P0
 
-### 0. Онлайн-прогресс выполнения запуска
-
-Статус:
-
-- частично реализовано
-
-Цель:
-
-- показывать пользователю живой прогресс выполнения запуска прямо во время работы, а не только после завершения выгрузки.
-
-Что уже сделано:
-
-- единый progress-widget со стадиями `Подготовка -> Источники -> Объединение -> Загрузка -> Завершение`;
-- анимированный индикатор активности для `RUNNING` в блоке `Ход выполнения`;
-- live-обновление:
-  - `FILES` через `WebSocket`;
-  - `DB` через polling активного запуска;
-- после нажатия `Запустить` compact-блок `Ход выполнения` сразу перечитывает историю и переключается на активный запуск;
-- для `DB` начали сохраняться `SOURCE_PROGRESS` события;
-- убраны стартовые success-alert сообщения о запуске;
-- на карточках модулей в каталоге появился индикатор активного выполнения;
-- в compact-блоке редактора появился явный `Активный источник`;
-- из compact-ленты убраны технические события типа `RUN_CREATED`.
-- частота live-refresh для `FILES` выровнена между editor и экраном `История и результаты`;
-- из compact-ленты убраны стартовые технические события `RUN_STARTED / SOURCE_STARTED / MERGE_STARTED / TARGET_STARTED`.
-- в compact-блоке live-лента теперь умеет синтезировать уже существующее сообщение прогресса вида `Источник X: выгружено N строк` из `sourceResults`, если event еще не успел попасть в ленту.
-- transient WebSocket-сбои в `FILES` больше не шумят пользовательскими warning-banner'ами:
-  - live-обновление по WebSocket остается;
-  - polling продолжает работать как тихий fallback на длинных сценариях.
-- `FILES` history/details теперь корректно проецирует live-события и source lifecycle из persisted state:
-  - numeric timestamp в event payload больше не теряется;
-  - `events` и `sourceResults` отдают корректные `startedAt / finishedAt / timestamp` еще во время активного запуска.
-- `FILES` target lifecycle в истории тоже стал промежуточно-честным:
-  - при включенном target во время активного запуска показывается `PENDING / RUNNING`, а не `NOT_ENABLED`;
-  - после завершения сохраняются `targetStatus / targetTableName / targetRowsLoaded`.
-- server contract покрыт тестами не только на finished-run, но и на active-run файлового запуска.
-- `DB` live history/details тоже закреплен server-regression тестом на active-run:
-  - `activeRunId` корректно поднимается в history;
-  - details для активного запуска отдают live `SOURCE_PROGRESS`, running source и running target lifecycle.
-
-Что осталось:
-
-- финально проверить на длинных сценариях `FILES` и `DB`, что compact-блок стабильно показывает живой прогресс без ручного refresh;
-- при необходимости дочистить только UX-подачу progress-сценария между `FILES` и `DB`, без нового backend-контракта.
-
-Критичное требование:
-
-- пользователь должен видеть, что запуск реально выполняется:
-  - анимированный индикатор активности;
-  - обновление стадий;
-  - появление live-сообщений о прогрессе выгрузки;
-  - обновление без ручного refresh страницы.
-
-### 1. SQL-консоль: индикатор активного сценария и тайминги по source
-
-Статус:
-
-- частично реализовано
-
-Цель:
-
-- во время выполнения SQL-сценария пользователь должен явно видеть, что сценарий еще работает;
-- после выполнения должно быть видно, сколько времени отработал каждый source/shard.
-
-Что уже сделано:
-
-- в status strip SQL-консоли появился явный running-state для активного async execution:
-  - анимированные стрелки;
-  - `Старт` и live `Прошло` без ручного refresh;
-- по каждому source/shard теперь сохраняются и отдаются:
-  - `startedAt`;
-  - `finishedAt`;
-  - `durationMillis`;
-- тайминги встроены в текущий async lifecycle SQL-консоли и показываются:
-  - в summary status strip;
-  - в таблице shard-результатов;
-  - в карточках shard-результатов;
-- политика выполнения зафиксирована:
-  - `STOP_ON_FIRST_ERROR` всегда;
-  - пользователь больше не может переключить `CONTINUE_ON_ERROR` из UI;
-  - server-side и persisted state тоже нормализуют policy обратно в `STOP_ON_FIRST_ERROR`.
-
-Что осталось:
-
-- проверить руками на длинном async-сценарии, что running-indicator и live elapsed time читаются достаточно хорошо;
-- при необходимости дополировать только визуальную подачу, без нового backend-контракта.
-
-Критичное требование:
-
-- пользователь должен безошибочно понимать:
-  - что сценарий сейчас выполняется;
-  - какие source уже завершились;
-  - сколько времени занял каждый source.
-
-### 2. SQL-консоль: автокоммит и ручной commit / rollback
-
-Статус:
-
-- частично реализовано
-
-Цель:
-
-- упростить transaction UX SQL-консоли до двух режимов:
-  - `Автокоммит` включен;
-  - `Автокоммит` выключен, и тогда весь скрипт на каждом shard выполняется как одна транзакция с последующим ручным `Коммит` или `Роллбек`.
-
-Что уже сделано:
-
-- transaction mode selector заменен на checkbox `Автокоммит`;
-- другие варианты transaction mode убраны из UI;
-- при выключенном `Автокоммите` async SQL execution теперь:
-  - выполняет скрипт на shard как одну транзакцию;
-  - после успешного завершения оставляет transaction session в состоянии `PENDING_COMMIT`;
-  - не дает стартовать следующему сценарию, пока не выполнен `Коммит` или `Роллбек`;
-- добавлены отдельные кнопки `Коммит` и `Роллбек` для текущей execution session;
-- execution snapshot и UI теперь показывают состояние transaction session:
-  - `NONE`;
-  - `PENDING_COMMIT`;
-  - `COMMITTED`;
-  - `ROLLED_BACK`.
-- lifecycle ручной транзакции выровнен:
-  - read-only сценарии больше не зависают в `PENDING_COMMIT`;
-  - если скрипт не содержит mutating statement-ов, transaction session закрывается автоматически;
-  - `PENDING_COMMIT` теперь остается только для сценариев, где в скрипте есть non-read-only statement.
-
-Что осталось:
-
-- прогнать руками реальный сценарий на живой БД:
-  - запуск с выключенным `Автокоммитом`;
-  - проверка состояния `PENDING_COMMIT`;
-  - `Коммит`;
-  - повторный сценарий с `Роллбек`;
-- при необходимости дополировать только визуальную подачу статуса и кнопок.
-
-Критичное требование:
-
-- пользователь должен однозначно видеть:
-  - включен ли автокоммит;
-  - находится ли сценарий в состоянии ожидания commit / rollback;
-  - что `Коммит` и `Роллбек` относятся ко всей текущей execution session, а не к отдельному statement.
-- ручное подтверждение должно требоваться только после сценария, который действительно менял данные в БД.
-
-### 3. SQL-консоль: аварийные сценарии и защита БД
+### 0. Архитектурная программа: вычистить `ui-server` как перегруженный boundary
 
 Статус:
 
@@ -165,95 +42,239 @@
 
 Цель:
 
-- исключить сценарии, в которых SQL-консоль может оставить висящую транзакцию, долгую блокировку или orphan `PENDING_COMMIT` после потери браузерной страницы.
-
-Документ:
-
-- [SQL_CONSOLE_FAILURE_SCENARIOS.md](/Users/kwdev/DataPoolLoader/SQL_CONSOLE_FAILURE_SCENARIOS.md)
-
-Что уже зафиксировано:
-
-- закрытие вкладки не останавливает server-side async execution;
-- при `Autocommit = off` mutating-сценарий сейчас может оставить открытую transaction session в `PENDING_COMMIT`, если пользователь исчез, а `ui-server` продолжает жить;
-- это признано unsafe-поведением и вынесено в отдельный safety-документ.
+- сделать `ui-server` тоньше, предсказуемее и дешевле в поддержке;
+- прекратить разрастание `composition root + routes + state orchestration` в один knowledge-heavy слой.
 
 Что нужно сделать:
 
-- ввести owner session и owner token для execution session;
-- добавить heartbeat из UI к серверу во время `RUNNING` и `PENDING_COMMIT`;
-- добавить lease timeout и hard TTL для ручной транзакции;
-- при потере владельца или истечении TTL делать automatic rollback;
-- не переводить manual-transaction сценарий в долгий `PENDING_COMMIT`, если владелец уже потерян;
-- закрепить это тестами на:
-  - tab close;
+- пересмотреть роли [UiServerContext.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/UiServerContext.kt) и [Server.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/Server.kt);
+- продолжить thinning route handlers:
+  - [CommonRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/CommonRoutes.kt)
+  - [DatabaseRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseRoutes.kt)
+  - [SqlConsoleRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/SqlConsoleRoutes.kt)
+- запретить новый orchestration-код в routes;
+- вынести или сократить knowledge-rich runtime branching там, где это возможно;
+- продолжить замещение concrete-связок контрактами и support-слоями.
+
+Критерий завершения:
+
+- `ui-server` снова выглядит как boundary/orchestration слой, а не как второй `core`;
+- новые сценарии не требуют разрастания routes и `UiServerContext`.
+
+### 1. Архитектурная программа: нормализовать error model
+
+Статус:
+
+- не реализовано
+
+Цель:
+
+- убрать грубую и нечестную модель ошибок;
+- разделить ошибки пользователя, конфликт состояния и внутренние сбои.
+
+Что нужно сделать:
+
+- убрать практику `Throwable -> 400` из [Server.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/Server.kt);
+- ввести минимум три класса ошибок:
+  - validation/business error;
+  - conflict/state error;
+  - internal error;
+- привести transport-слой к понятным и стабильным ответам;
+- убрать места, где UI не может понять, это ошибка сценария или баг сервера.
+
+Критерий завершения:
+
+- сервер перестает маскировать внутренние дефекты под пользовательские ошибки;
+- UI может по типу ответа различать, что именно произошло.
+
+### 2. Архитектурная программа: нормализовать state model
+
+Статус:
+
+- не реализовано
+
+Цель:
+
+- развести runtime state, persisted history, UI preferences и operational config;
+- сделать состояние проекта классифицированным и предсказуемым.
+
+Что нужно сделать:
+
+- провести ревизию persisted state моделей в `ui-server`;
+- зафиксировать для каждого значимого state:
+  - source of truth;
+  - recoverable state;
+  - cache;
+  - UI preference;
+  - operational history;
+- убрать смешение UI preferences и operational state;
+- запретить добавление новых глобальных mutable service без архитектурного justification;
+- отдельно разобрать:
+  - SQL console state;
+  - run state;
+  - cleanup/retention state;
+  - runtime mode/config state.
+
+Критерий завершения:
+
+- новые и существующие состояния можно классифицировать без двусмысленности;
+- у проекта появляется ясная карта источников истины.
+
+### 3. Архитектурная программа: разрезать giant UI files
+
+Статус:
+
+- не реализовано
+
+Цель:
+
+- снизить стоимость изменений во frontend;
+- превратить крупные Compose-экраны в набор feature-блоков.
+
+Первый приоритет:
+
+- [SqlConsolePage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsolePage.kt)
+- [ModuleEditorPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPage.kt)
+- [ModuleRunsPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsPage.kt)
+- [ModuleEditorConfigForm.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorConfigForm.kt)
+
+Что нужно сделать:
+
+- выделить shell pages;
+- вынести action-panels и visual sections в отдельные компоненты;
+- уменьшить прямой объем page-файлов;
+- не тащить дополнительную логику обратно в page/store после декомпозиции.
+
+Критерий завершения:
+
+- новые экраны не растут как монолиты;
+- текущие giant-файлы разбиты до состояния, когда их можно нормально ревьюить и менять локально.
+
+### 4. Архитектурная программа: разрезать `styles.css`
+
+Статус:
+
+- не реализовано
+
+Цель:
+
+- убрать giant CSS-file debt;
+- сделать стили обозримыми и локализованными по подсистемам.
+
+Что нужно сделать:
+
+- провести инвентаризацию текущего [styles.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles.css);
+- разделить стили минимум на логические группы:
+  - foundation/base;
+  - layout;
+  - module editor;
+  - module runs;
+  - sql console;
+  - home/landing;
+  - maintenance screens;
+- удалить мертвые и дублирующие классы;
+- запретить добавление новых крупных блоков в один общий CSS-файл без явной причины.
+
+Критерий завершения:
+
+- стили проекта разбиты по подсистемам;
+- giant CSS-файл больше не является точкой концентрации UI-долга.
+
+### 5. Архитектурная программа: провести cleanup legacy и мусора
+
+Статус:
+
+- не реализовано
+
+Цель:
+
+- убрать из проекта код, который остался от старых решений, больше не нужен или дублирует актуальную логику.
+
+Что нужно сделать:
+
+- провести тщательный анализ dead code / legacy branches / старых helper-слоев;
+- убрать мертвые компоненты, неиспользуемые модели, старые переходные адаптеры и дубли;
+- отдельно проверить:
+  - legacy куски в `ui-compose-web`;
+  - неиспользуемые CSS-классы;
+  - устаревшие persisted поля;
+  - старые route / API ветки;
+  - лишние support-слои, если они больше не дают ценности;
+- cleanup делать только после явного анализа, а не слепым удалением.
+
+Критерий завершения:
+
+- в проекте уменьшено число legacy-paths;
+- кодовая база чище, проще и с меньшим количеством “исторических хвостов”.
+
+### 6. Архитектурная программа: довести SQL-консоль как самостоятельную подсистему
+
+Статус:
+
+- частично реализовано
+
+Цель:
+
+- перестать относиться к SQL-консоли как к обычному экрану;
+- довести execution lifecycle, safety и архитектурные границы до устойчивого состояния.
+
+Что уже есть:
+
+- отдельные документы по failure scenarios и Monaco autocomplete;
+- async execution;
+- manual `Commit / Rollback`;
+- object browser;
+- IDE-like UX;
+- отдельные support/contract-слои в backend.
+
+Что нужно сделать:
+
+- добить safety long-running execution;
+- дочистить lifecycle pending commit / rollback;
+- продолжить cleanup giant UI/page/store слоя SQL-консоли;
+- закрепить SQL-консоль отдельными архитектурными и тестовыми инвариантами.
+
+Критерий завершения:
+
+- SQL-консоль рассматривается и поддерживается как самостоятельная подсистема, а не как “еще один экран”.
+
+### 7. SQL-консоль: safety hardening по аварийным сценариям
+
+Статус:
+
+- не реализовано
+
+Источник:
+
+- [SQL_CONSOLE_FAILURE_SCENARIOS.md](/Users/kwdev/DataPoolLoader/SQL_CONSOLE_FAILURE_SCENARIOS.md)
+
+Цель:
+
+- исключить orphan execution и висящие транзакции;
+- довести SQL-консоль до состояния, где безопасность БД обеспечивается server-side механизмами, а не надеждой на живую вкладку браузера.
+
+Что нужно сделать:
+
+- owner session и owner token для execution session;
+- heartbeat во время `RUNNING` и `PENDING_COMMIT`;
+- lease timeout и hard TTL;
+- automatic rollback при потере владельца;
+- системные статусы rollback по timeout/lost owner;
+- tests на:
+  - close tab;
   - refresh;
   - network loss;
   - duplicate tab;
   - server restart.
 
-Критичное требование:
+Критерий завершения:
 
-- безопасность БД важнее удобства UI;
-- если система не уверена, что пользователь жив и подтвердит `Commit`, она обязана выполнить `Rollback`.
-
-### 4. SQL-консоль: IDE-like UX
-
-Статус:
-
-- частично реализовано
-
-Цель:
-
-- приблизить SQL-консоль к привычному рабочему сценарию IDE, чтобы пользователь быстрее запускал скрипты, видел структуру script-а и меньше зависел от мыши.
-
-Что уже сделано:
-
-- появился отдельный search-first экран `Объекты БД` для поиска таблиц, индексов и представлений;
-- SQL-консоль уже показывает live running-state и тайминги по shard/source.
-- для Monaco editor добавлены горячие клавиши:
-  - `Cmd/Ctrl + Enter` для запуска;
-  - `Esc` для остановки активного сценария;
-- `Cmd/Ctrl + Shift + Enter` для запуска только текущего statement;
-- в editor-shell появился `script outline` по текущему SQL:
-  - список statement-ов;
-  - keyword;
-  - номер строки;
-  - короткий preview;
-- outline умеет переводить фокус редактора к нужной строке statement-а.
-- появился отдельный блок `Текущий statement`:
-  - показывает, что именно запустит action `Текущий`;
-  - линии, тип statement-а, число выбранных sources;
-  - risk-badge `Read-only / Меняет данные / Опасно`.
-- появился явный action `Текущий` для запуска statement под курсором, без запуска всего скрипта;
-- с экрана `Объекты БД` можно закреплять объекты в избранное;
-- избранные объекты сохраняются в persisted state SQL-консоли;
-- с экрана `Объекты БД` можно сразу открыть готовый SQL-шаблон в основной консоли:
-  - `SELECT *`;
-  - `COUNT(*)`;
-  - с автоподстановкой нужного source;
-- в основной SQL-консоли появился блок `Избранные объекты` с быстрыми действиями:
-  - вставка `schema.object` в редактор;
-  - вставка готовых шаблонов `SELECT * / COUNT(*)`;
-  - переход в экран `Объекты БД` с уже подставленным поиском и source;
-  - точный deep-link по `schema/object/type` с подсветкой exact match в выдаче;
-  - удаление из избранного.
-- появилось клиентское форматирование SQL:
-  - отдельная кнопка `Форматировать`;
-  - hotkey `Shift + Alt + F`.
-
-Что нужно сделать:
-
-- отдельно рассмотреть второй слой IDE-функций:
-  - дальнейшее развитие pinned object metadata, если понадобится более глубокая навигация по объектам.
-
-Критичное требование:
-
-- IDE-like улучшения не должны ломать текущий async lifecycle SQL-консоли;
-- весь слой должен быть полезным без нового server-side состояния и без тяжелых backend-операций.
+- manual transaction не может жить бесконтрольно;
+- при потере владельца система гарантированно уходит в безопасный rollback.
 
 ## P1
 
-### 9. Режим `database`: foundation
+### 9. Операционная надежность long-running операций
 
 Статус:
 
@@ -261,32 +282,27 @@
 
 Цель:
 
-- поддерживать полноценный режим работы UI с модулями из PostgreSQL без смешения с файловым режимом.
+- сделать длинные операции предсказуемыми, безопасными и наблюдаемыми.
 
-Что уже сделано:
+Что входит:
 
-- runtime context с fallback в `FILES`;
-- live-состояние import-flow для DB-страниц;
-- runtime-mode control без перезапуска UI;
-- route-guard для `modules / db-modules / db-sync`;
-- отдельный screen обслуживания запусков и output-retention уже работает в `DB`-режиме через общий runtime-aware backend.
-- экран `История и результаты` тоже стал runtime-aware:
-  - загружает `runtimeContext`;
-  - не пытается грузить DB-историю вслепую при fallback;
-  - показывает явное warning-сообщение о недоступности БД и активном fallback-режиме.
-  - при live-refresh перечитывает `runtimeContext`;
-  - при переходе `DATABASE -> FILES` очищает stale DB-историю и выбранный запуск, вместо показа устаревших данных.
-- SQL-консоль тоже читает `runtimeContext` и показывает явный warning при fallback `DATABASE -> FILES`, вместо немой работы без контекста.
-- DB editor тоже стал runtime-aware в live-refresh:
-  - при недоступности `DATABASE` больше не удерживает stale DB-catalog/session;
-  - перечитывает `runtimeContext` и очищает старое состояние editor, чтобы пользователь видел честный fallback-режим.
+- batch runs;
+- DB runs;
+- cleanup/retention;
+- SQL execution;
+- отмена;
+- закрытие вкладки;
+- рестарт `ui-server`;
+- orphan state и восстановление после сбоев.
 
-Что осталось:
+Что нужно сделать:
 
-- финально проверить руками live fallback-сценарий именно на экране DB editor;
-- при необходимости расширить live DB-context на прочие вспомогательные экраны, если такие еще всплывут.
+- выровнять lifecycle-модели между подсистемами;
+- убрать неочевидные pending-состояния;
+- закрепить политику rollback / cleanup / recovery;
+- усилить server-side и scenario-level тесты.
 
-### 10. SQL-консоль: Monaco hints и autocomplete для PostgreSQL
+### 10. Cleanup и укрощение толстых store-слоев
 
 Статус:
 
@@ -294,43 +310,152 @@
 
 Цель:
 
-- добавить в Monaco полезные подсказки по PostgreSQL-синтаксису и autocomplete по объектам БД без тяжелого LSP-стека и без загрузки всего каталога.
+- не допустить, чтобы `ui-compose-shared` превратился в mini-backend.
 
-Документ:
+Первый приоритет:
 
-- [SQL_CONSOLE_MONACO_AUTOCOMPLETE.md](/Users/kwdev/DataPoolLoader/SQL_CONSOLE_MONACO_AUTOCOMPLETE.md)
-
-Что уже зафиксировано:
-
-- текущий Monaco setup у нас дает только базовый editor layer;
-- PostgreSQL-specific completion providers сейчас не подключены;
-- полноценный IDE-уровень через SQL language server пока считается слишком тяжелым для первого этапа;
-- реалистичный путь:
-  - сначала local keyword/function/snippet hints;
-  - затем metadata-aware autocomplete по search-first API.
+- [ModuleEditorStore.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStore.kt)
+- store-слои SQL-консоли;
+- store-слои maintenance/run-history экранов.
 
 Что нужно сделать:
 
-- добавить completion provider для PostgreSQL keywords и functions;
-- добавить snippet completion для частых шаблонов;
-- добавить hover-подсказки для основных SQL-конструкций;
-- рассмотреть metadata-aware autocomplete по:
-  - schema;
-  - table/view;
-  - columns;
-  - favorites и recent object context;
-- сделать autocomplete bounded:
-  - debounce;
-  - prefix search;
-  - локальный cache;
-  - без загрузки полного списка объектов БД на старте.
+- отделить state management от тяжелой orchestration-логики;
+- не держать в одном store:
+  - загрузку;
+  - mutation lifecycle;
+  - runtime branching;
+  - UX-политику;
+  - error normalization.
 
-Критичное требование:
+### 12. Финализировать boundary модульного редактора и storage contracts
 
-- autocomplete не должен ломать async lifecycle SQL-консоли;
-- при недоступной БД редактор должен деградировать до локальных hints, а не ломаться полностью.
+Статус:
 
-## Рекомендуемый порядок выполнения
+- не реализовано
 
-1. Добить `P0.0` по онлайн-прогрессу.
-2. При необходимости закрыть остатки `P1.9` по runtime-aware DB-экранам.
+Цель:
+
+- дочистить архитектурные границы вокруг единого module editor;
+- убрать оставшиеся file/db-specific leakage из editor/store/service слоев.
+
+Что нужно сделать:
+
+- проверить, где editor еще знает слишком много о storage mode;
+- дочистить контракты around:
+  - module catalog;
+  - module editor store;
+  - SQL resource lifecycle;
+  - metadata / lifecycle / publish / working copy semantics;
+- убедиться, что `Module Editor` действительно остается единым экраном с разными storage adapters, а не двумя логиками в одном файле;
+- убрать устаревшие переходные решения, если они остались после реализации DB/files режима.
+
+Критерий завершения:
+
+- storage mode остается implementation detail для значимой части UI;
+- module editor и связанные backend contracts становятся чище и предсказуемее.
+
+### 11. Зафиксировать и поддерживать repo-level архитектурную дисциплину
+
+Статус:
+
+- частично реализовано
+
+Что уже есть:
+
+- [ARCHITECTURE_RULES.md](/Users/kwdev/DataPoolLoader/ARCHITECTURE_RULES.md)
+- [PROJECT_ARCHITECTURE_REVIEW.md](/Users/kwdev/DataPoolLoader/PROJECT_ARCHITECTURE_REVIEW.md)
+- [AGENTS.md](/Users/kwdev/DataPoolLoader/AGENTS.md)
+
+Что нужно сделать:
+
+- продолжать обновлять эти документы при изменении архитектурных инвариантов;
+- не допускать расхождения между кодом и repo-level правилами;
+- при заметных архитектурных изменениях обновлять документацию в том же change set.
+
+## P2
+
+### 16. Усилить тестовую стратегию под архитектурную программу
+
+Статус:
+
+- не реализовано
+
+Цель:
+
+- сделать архитектурный рефакторинг безопасным.
+
+Что нужно сделать:
+
+- добавить больше store-level tests;
+- усилить server contract tests;
+- добавить smoke-покрытие на критичные UI-сценарии;
+- отдельно страховать:
+  - SQL console lifecycle;
+  - run lifecycle;
+  - cleanup/retention;
+  - runtime fallback scenarios.
+
+### 17. Формализовать карту состояния проекта
+
+Статус:
+
+- не реализовано
+
+Цель:
+
+- иметь отдельный инженерный документ, в котором перечислены:
+  - все значимые persisted состояния;
+  - все runtime state;
+  - их source of truth;
+  - правила восстановления и очистки.
+
+Это нужно для дальнейшего рефакторинга и для предотвращения повторного смешения state-моделей.
+
+### 18. SQL-консоль: staged Monaco hints и autocomplete для PostgreSQL
+
+Статус:
+
+- не реализовано
+
+Источник:
+
+- [SQL_CONSOLE_MONACO_AUTOCOMPLETE.md](/Users/kwdev/DataPoolLoader/SQL_CONSOLE_MONACO_AUTOCOMPLETE.md)
+
+Цель:
+
+- развивать Monaco постепенно, без тяжелого IDE/LSP-стека и без ущерба для архитектуры SQL-консоли.
+
+Этапы:
+
+- уровень 1:
+  - local completion по keywords/functions/snippets;
+  - hover hints;
+- уровень 2:
+  - metadata-aware autocomplete по schema/table/view/index names;
+  - bounded search-first completion по объектам БД;
+  - exact object column lookup там, где это оправдано;
+- уровень 3:
+  - deeper language intelligence только при доказанной необходимости.
+
+Критерий завершения:
+
+- Monaco становится ощутимо полезнее;
+- autocomplete не ломает execution lifecycle и не тащит тяжелую stateful backend-механику.
+
+## P3
+
+### 20. Product и UX-задачи, не влияющие на архитектурную программу
+
+Статус:
+
+- отложено
+
+Сюда временно относятся все задачи, которые:
+
+- не повышают архитектурный порядок;
+- не улучшают надежность;
+- не уменьшают structural debt;
+- не помогают cleanup legacy.
+
+Они возвращаются в активный backlog только после завершения текущей архитектурной волны или при отдельном явном переприоритизировании.
