@@ -628,6 +628,7 @@
   border-radius: 18px;
   background: rgba(248, 251, 255, 0.9);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  padding: 1rem;
 }
 
 .summary-section-title {
@@ -636,10 +637,6 @@
   letter-spacing: 0.1em;
   color: #607289;
   font-weight: 700;
-}
-
-.summary-section-card {
-  padding: 1rem;
 }
 
 .summary-overview-table {

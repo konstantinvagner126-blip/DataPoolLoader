@@ -2285,6 +2285,70 @@ class ServerTest {
     }
 
     @Test
+    fun `db sync details returns 404 for unknown sync run`() = testApplication {
+        val uiConfig = UiAppConfig(
+            moduleStore = UiModuleStoreConfig(
+                mode = UiModuleStoreMode.DATABASE,
+                postgres = UiModuleStorePostgresConfig(
+                    jdbcUrl = "jdbc:postgresql://localhost:5432/modules",
+                    username = "registry_user",
+                    password = "registry_pwd",
+                    schema = "ui_registry",
+                ),
+            ),
+        )
+        val runtimeContextService = UiRuntimeContextService(
+            actorResolver = object : UiActorResolver() {
+                override fun resolveAutomaticActor(): UiActorIdentity =
+                    UiActorIdentity(
+                        actorId = "kwdev",
+                        actorSource = UiActorSource.OS_LOGIN,
+                        actorDisplayName = "kwdev",
+                    )
+            },
+            connectionChecker = object : UiDatabaseConnectionChecker() {
+                override fun check(config: UiModuleStorePostgresConfig): UiDatabaseConnectionStatus =
+                    UiDatabaseConnectionStatus(
+                        configured = true,
+                        available = true,
+                        schema = config.schema ?: "ui_registry",
+                        message = "Подключение к базе данных доступно.",
+                    )
+            },
+            schemaMigrator = object : UiDatabaseSchemaMigrator() {
+                override fun migrate(config: UiModuleStorePostgresConfig) = Unit
+            },
+        )
+        val moduleSyncService = object : ModuleSyncService(
+            connectionProvider = DatabaseConnectionProvider { error("connection must not be requested") },
+            moduleRegistryImporter = object : ModuleRegistryImporter {
+                override fun createModule(
+                    moduleCode: String,
+                    actorId: String,
+                    actorSource: String,
+                    actorDisplayName: String?,
+                    originKind: String,
+                    draft: RegistryModuleDraft,
+                ): RegistryModuleCreationResult = error("createModule must not be requested")
+            },
+        ) {
+            override fun loadSyncRunDetails(syncRunId: String): ModuleSyncRunDetails? = null
+        }
+        application {
+            uiModule(
+                uiConfig = uiConfig,
+                runtimeContextService = runtimeContextService,
+                moduleSyncService = moduleSyncService,
+            )
+        }
+
+        val detailsResponse = client.get("/api/db/sync/runs/missing-sync-run")
+
+        assertEquals(HttpStatusCode.NotFound, detailsResponse.status)
+        assertTrue(detailsResponse.bodyAsText().contains("История импорта 'missing-sync-run' не найдена."))
+    }
+
+    @Test
     fun `db sync selected endpoint starts sync for chosen file modules`() = testApplication {
         val uiConfig = UiAppConfig(
             moduleStore = UiModuleStoreConfig(
@@ -3402,6 +3466,34 @@ class ServerTest {
         }
         assertEquals(HttpStatusCode.BadRequest, invalidExportResponse.status)
         assertTrue(invalidExportResponse.bodyAsText().contains("shardName"))
+
+        val missingShardExportResponse = client.post("/api/sql-console/export/source-csv") {
+            contentType(ContentType.Application.Json)
+            setBody(
+                """
+                {
+                  "result": {
+                    "sql": "select 1",
+                    "statementType": "RESULT_SET",
+                    "statementKeyword": "SELECT",
+                    "maxRowsPerShard": 200,
+                    "shardResults": [
+                      {
+                        "shardName": "shard1",
+                        "status": "SUCCESS",
+                        "columns": ["id"],
+                        "rows": [{"id": "1"}],
+                        "truncated": false
+                      }
+                    ]
+                  },
+                  "shardName": "missing-shard"
+                }
+                """.trimIndent(),
+            )
+        }
+        assertEquals(HttpStatusCode.NotFound, missingShardExportResponse.status)
+        assertTrue(missingShardExportResponse.bodyAsText().contains("Результат для source 'missing-shard' не найден."))
 
         val emptyUploadResponse = client.post("/api/credentials/upload") {
             setBody(

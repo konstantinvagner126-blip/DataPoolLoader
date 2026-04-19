@@ -9,6 +9,7 @@ import com.sbrf.lt.platform.ui.model.SaveResultResponse
 import com.sbrf.lt.platform.ui.model.DatabaseRunHistoryCleanupRequest
 import com.sbrf.lt.platform.ui.model.SyncOneModuleRequest
 import com.sbrf.lt.platform.ui.model.SyncSelectedModulesRequest
+import com.sbrf.lt.platform.ui.sync.ModuleSyncRunNotFoundException
 import io.ktor.server.application.call
 import io.ktor.server.request.receive
 import io.ktor.server.request.receiveText
@@ -65,9 +66,7 @@ internal fun Route.registerDatabaseRoutes(
         val runtimeContext = context.requireDatabaseRuntimeContext()
         val syncService = context.requireDatabaseRouteSyncService(runtimeContext)
         val syncRunId = requireNotNull(call.parameters["syncRunId"])
-        val details = requireNotNull(syncService.loadSyncRunDetails(syncRunId)) {
-            "История импорта '$syncRunId' не найдена."
-        }
+        val details = syncService.loadSyncRunDetails(syncRunId) ?: throw ModuleSyncRunNotFoundException(syncRunId)
         call.respond(details)
     }
 

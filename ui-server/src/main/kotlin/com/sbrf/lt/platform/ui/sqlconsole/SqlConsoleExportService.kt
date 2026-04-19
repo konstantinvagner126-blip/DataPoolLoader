@@ -17,7 +17,7 @@ class SqlConsoleExportService {
             "CSV-экспорт доступен только для SELECT-результатов."
         }
         val shard = successfulShards(result).firstOrNull { it.shardName == shardName }
-            ?: error("Результат для source '$shardName' не найден.")
+            ?: throw SqlConsoleShardResultNotFoundException(shardName)
         return buildCsv(shard).toByteArray(StandardCharsets.UTF_8)
     }
 
