@@ -628,6 +628,15 @@
 - module_editor workspace action cleanup:
   - create-panel actions и SQL-catalog toolbar actions сведены к одному `WorkspaceActionButton(...)` в [ModuleEditorWorkspaceSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorWorkspaceSections.kt)
   - workspace слой больше не держит два разных helper-а для одного и того же button pattern с различием только в `btn-sm` и disabled-state.
+- module_editor metadata row-shell cleanup:
+  - общий row-shell для `read-only / editable / checkbox` строк сведен к `MetadataRowShell(...)` в [ModuleEditorMetadataSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorMetadataSections.kt)
+  - metadata section больше не держит три параллельные ветки `module-metadata-row + label` markup.
+- module_editor shell toolbar cleanup:
+  - общий wrapper `module-editor-toolbar/module-editor-toolbar-row` сведен к локальному `EditorToolbar(...)` в [ModuleEditorShellSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorShellSections.kt)
+  - DB/files toolbar-ветки больше не дублируют одинаковый shell вокруг toolbar groups.
+- sql_console objects panel/action cleanup:
+  - panel shell для `Текущий объект / Избранные объекты / Sources / Поиск объектов` сведен к локальному `SqlObjectPanel(...)` в [SqlConsoleObjectsPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectsPage.kt)
+  - object card action-button markup сведен к `SqlObjectActionButton(...)`, поэтому `favorite/select/count` actions больше не повторяют один и тот же `btn-sm` pattern вручную.
 
 Критерий завершения:
 

@@ -133,38 +133,34 @@ internal fun EditorShellHeader(
             }
 
             if (route.storage == "database") {
-                Div({ classes("module-editor-toolbar") }) {
-                    Div({ classes("module-editor-toolbar-row") }) {
-                        EditorToolbarGroup("Выполнение", "module-editor-toolbar-group-primary") {
-                            EditorActionButton("Запустить", capabilities.run && !actionBusy, EditorActionStyle.Success, onRun)
-                            RunsHistoryLinkButton(route, state.selectedModuleId)
-                        }
-                        EditorToolbarGroup("Личный черновик", "module-editor-toolbar-group-draft") {
-                            EditorActionButton(
-                                "Сохранить черновик",
-                                capabilities.saveWorkingCopy && state.hasDraftChanges && !actionBusy,
-                                EditorActionStyle.PrimarySolid,
-                                onSave,
-                            )
-                            EditorActionButton("Опубликовать", capabilities.publish && !actionBusy && !state.hasDraftChanges, EditorActionStyle.Success, onPublishWorkingCopy)
-                            EditorActionButton("Сбросить черновик", capabilities.discardWorkingCopy && !actionBusy, EditorActionStyle.DangerOutline, onDiscardWorkingCopy)
-                        }
-                        EditorToolbarGroup("Редактор", "module-editor-toolbar-group-secondary") {
-                            EditorActionButton("Отменить изменения", state.hasDraftChanges && !actionBusy, EditorActionStyle.DangerOutline, onReload)
-                        }
+                EditorToolbar {
+                    EditorToolbarGroup("Выполнение", "module-editor-toolbar-group-primary") {
+                        EditorActionButton("Запустить", capabilities.run && !actionBusy, EditorActionStyle.Success, onRun)
+                        RunsHistoryLinkButton(route, state.selectedModuleId)
+                    }
+                    EditorToolbarGroup("Личный черновик", "module-editor-toolbar-group-draft") {
+                        EditorActionButton(
+                            "Сохранить черновик",
+                            capabilities.saveWorkingCopy && state.hasDraftChanges && !actionBusy,
+                            EditorActionStyle.PrimarySolid,
+                            onSave,
+                        )
+                        EditorActionButton("Опубликовать", capabilities.publish && !actionBusy && !state.hasDraftChanges, EditorActionStyle.Success, onPublishWorkingCopy)
+                        EditorActionButton("Сбросить черновик", capabilities.discardWorkingCopy && !actionBusy, EditorActionStyle.DangerOutline, onDiscardWorkingCopy)
+                    }
+                    EditorToolbarGroup("Редактор", "module-editor-toolbar-group-secondary") {
+                        EditorActionButton("Отменить изменения", state.hasDraftChanges && !actionBusy, EditorActionStyle.DangerOutline, onReload)
                     }
                 }
             } else {
-                Div({ classes("module-editor-toolbar") }) {
-                    Div({ classes("module-editor-toolbar-row") }) {
-                        EditorToolbarGroup("Выполнение", "module-editor-toolbar-group-primary") {
-                            RunsHistoryLinkButton(route, state.selectedModuleId)
-                            EditorActionButton("Запустить", capabilities.run && !actionBusy, EditorActionStyle.PrimarySolid, onRun)
-                        }
-                        EditorToolbarGroup("Редактор", "module-editor-toolbar-group-secondary") {
-                            EditorActionButton("Отменить изменения", state.hasDraftChanges && !actionBusy, EditorActionStyle.DangerOutline, onReload)
-                            EditorActionButton("Сохранить", capabilities.save && state.hasDraftChanges && !actionBusy, EditorActionStyle.PrimarySolid, onSave)
-                        }
+                EditorToolbar {
+                    EditorToolbarGroup("Выполнение", "module-editor-toolbar-group-primary") {
+                        RunsHistoryLinkButton(route, state.selectedModuleId)
+                        EditorActionButton("Запустить", capabilities.run && !actionBusy, EditorActionStyle.PrimarySolid, onRun)
+                    }
+                    EditorToolbarGroup("Редактор", "module-editor-toolbar-group-secondary") {
+                        EditorActionButton("Отменить изменения", state.hasDraftChanges && !actionBusy, EditorActionStyle.DangerOutline, onReload)
+                        EditorActionButton("Сохранить", capabilities.save && state.hasDraftChanges && !actionBusy, EditorActionStyle.PrimarySolid, onSave)
                     }
                 }
             }
@@ -199,6 +195,17 @@ private fun EditorToolbarGroup(
     Div({ classes("module-editor-toolbar-group", *groupClasses) }) {
         Div({ classes("module-editor-toolbar-group-label") }) { Text(label) }
         content()
+    }
+}
+
+@Composable
+private fun EditorToolbar(
+    content: @Composable () -> Unit,
+) {
+    Div({ classes("module-editor-toolbar") }) {
+        Div({ classes("module-editor-toolbar-row") }) {
+            content()
+        }
     }
 }
 

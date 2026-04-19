@@ -123,8 +123,7 @@ fun ComposeSqlConsoleObjectsPage(
             }
 
             navigationTarget?.let { target ->
-                Div({ classes("sql-object-target-card", "mb-4") }) {
-                    Div({ classes("panel-title", "mb-2") }) { Text("Текущий объект") }
+                SqlObjectPanel(title = "Текущий объект", panelClasses = "sql-object-target-card mb-4") {
                     SqlObjectIdentityBlock(
                         name = target.qualifiedName(),
                         note = target.contextLabel(),
@@ -134,11 +133,11 @@ fun ComposeSqlConsoleObjectsPage(
             }
 
             if (state.favoriteObjects.isNotEmpty()) {
-                Div({ classes("panel", "mb-4") }) {
-                    Div({ classes("panel-title", "mb-2") }) { Text("Избранные объекты") }
-                    Div({ classes("small", "text-secondary", "mb-3") }) {
-                        Text("Эти объекты доступны для быстрой вставки в основной SQL-редактор.")
-                    }
+                SqlObjectPanel(
+                    title = "Избранные объекты",
+                    note = "Эти объекты доступны для быстрой вставки в основной SQL-редактор.",
+                    panelClasses = "panel mb-4",
+                ) {
                     Div({ classes("sql-favorite-objects-grid") }) {
                         state.favoriteObjects.forEach { favorite ->
                             Div({ classes("sql-favorite-object-card") }) {
@@ -157,11 +156,12 @@ fun ComposeSqlConsoleObjectsPage(
 
             Div({ classes("row", "g-4") }) {
                 Div({ classes("col-12", "col-xl-3") }) {
-                    Div({ classes("panel", "h-100") }) {
-                        Div({ classes("panel-title", "mb-2") }) { Text("Sources") }
-                        P({ classes("small", "text-secondary", "mb-3") }) {
-                            Text("Выбери, по каким источникам искать объекты БД.")
-                        }
+                    SqlObjectPanel(
+                        title = "Sources",
+                        note = "Выбери, по каким источникам искать объекты БД.",
+                        panelClasses = "panel h-100",
+                        useParagraphNote = true,
+                    ) {
                         state.info?.sourceNames?.forEach { sourceName ->
                             val selected = sourceName in state.selectedSourceNames
                             Label(attrs = {
@@ -184,11 +184,12 @@ fun ComposeSqlConsoleObjectsPage(
                     }
                 }
                 Div({ classes("col-12", "col-xl-9") }) {
-                    Div({ classes("panel", "mb-4") }) {
-                        Div({ classes("panel-title", "mb-2") }) { Text("Поиск объектов") }
-                        P({ classes("small", "text-secondary", "mb-3") }) {
-                            Text("Введи имя объекта или часть имени. Полный каталог схемы на старте не загружается.")
-                        }
+                    SqlObjectPanel(
+                        title = "Поиск объектов",
+                        note = "Введи имя объекта или часть имени. Полный каталог схемы на старте не загружается.",
+                        panelClasses = "panel mb-4",
+                        useParagraphNote = true,
+                    ) {
                         Div({ classes("sql-object-search-toolbar") }) {
                             Input(type = org.jetbrains.compose.web.attributes.InputType.Text, attrs = {
                                 classes("form-control", "sql-object-search-input")
@@ -339,6 +340,31 @@ private fun ObjectsNavActionButton(
 }
 
 @Composable
+private fun SqlObjectPanel(
+    title: String,
+    note: String? = null,
+    panelClasses: String = "panel",
+    useParagraphNote: Boolean = false,
+    content: @Composable () -> Unit,
+) {
+    Div({ classesFromString(panelClasses) }) {
+        Div({ classes("panel-title", "mb-2") }) { Text(title) }
+        if (!note.isNullOrBlank()) {
+            if (useParagraphNote) {
+                P({ classes("small", "text-secondary", "mb-3") }) {
+                    Text(note)
+                }
+            } else {
+                Div({ classes("small", "text-secondary", "mb-3") }) {
+                    Text(note)
+                }
+            }
+        }
+        content()
+    }
+}
+
+@Composable
 private fun SqlObjectOverviewCard(
     label: String,
     value: String,
@@ -374,31 +400,19 @@ private fun SqlConsoleObjectCard(
                 selectedNote = if (isSelectedObject) "Точное совпадение по deep-link" else null,
                 detailNote = dbObject.tableReferenceLabel(),
             )
-            Button(attrs = {
-                classes("btn", if (isFavorite) "btn-outline-danger" else "btn-outline-dark", "btn-sm")
-                attr("type", "button")
-                onClick { onToggleFavorite() }
-            }) {
-                Text(if (isFavorite) "Убрать" else "В избранное")
-            }
+            SqlObjectActionButton(
+                if (isFavorite) "Убрать" else "В избранное",
+                if (isFavorite) "btn-outline-danger" else "btn-outline-dark",
+            ) { onToggleFavorite() }
         }
 
         Div({ classes("sql-object-action-row") }) {
-            Button(attrs = {
-                classes("btn", "btn-dark", "btn-sm")
-                attr("type", "button")
-                onClick { onOpenSelect() }
-            }) {
-                Text(if (supportsRowPreview(dbObject)) "SELECT *" else "В SQL")
-            }
+            SqlObjectActionButton(
+                if (supportsRowPreview(dbObject)) "SELECT *" else "В SQL",
+                "btn-dark",
+            ) { onOpenSelect() }
             if (supportsRowPreview(dbObject)) {
-                Button(attrs = {
-                    classes("btn", "btn-outline-dark", "btn-sm")
-                    attr("type", "button")
-                    onClick { onOpenCount() }
-                }) {
-                    Text("COUNT(*)")
-                }
+                SqlObjectActionButton("COUNT(*)", "btn-outline-dark") { onOpenCount() }
             }
         }
 
@@ -434,6 +448,21 @@ private fun SqlConsoleObjectCard(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun SqlObjectActionButton(
+    label: String,
+    toneClass: String,
+    onClick: () -> Unit,
+) {
+    Button(attrs = {
+        classes("btn", toneClass, "btn-sm")
+        attr("type", "button")
+        onClick { onClick() }
+    }) {
+        Text(label)
     }
 }
 

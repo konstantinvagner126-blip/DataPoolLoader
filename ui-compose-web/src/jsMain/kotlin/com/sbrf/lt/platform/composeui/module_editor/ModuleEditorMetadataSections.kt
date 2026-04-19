@@ -108,8 +108,7 @@ internal fun MetadataReadOnlyRow(
     label: String,
     value: String,
 ) {
-    Div({ classes("module-metadata-row") }) {
-        Div({ classes("module-metadata-label") }) { Text(label) }
+    MetadataRowShell(label) {
         Div({ classes("module-metadata-value") }) { Text(value) }
     }
 }
@@ -158,8 +157,7 @@ internal fun MetadataCheckboxField(
     helpText: String = "",
     onCommit: (Boolean) -> Unit,
 ) {
-    Div({ classes("module-metadata-row") }) {
-        Div({ classes("module-metadata-label") }) { Text("Видимость") }
+    MetadataRowShell("Видимость") {
         MetadataValueBlock(helpText, helpClassName = "config-form-help mt-1") {
             Label(attrs = { classes("config-form-check") }) {
                 Input(type = org.jetbrains.compose.web.attributes.InputType.Checkbox, attrs = {
@@ -181,11 +179,29 @@ private fun MetadataEditableRow(
     helpText: String,
     content: @Composable () -> Unit,
 ) {
-    Label(attrs = { classes("module-metadata-row") }) {
-        Div({ classes("module-metadata-label") }) { Text(label) }
+    MetadataRowShell(label, useLabelTag = true) {
         MetadataValueBlock(helpText) {
             content()
         }
+    }
+}
+
+@Composable
+private fun MetadataRowShell(
+    label: String,
+    useLabelTag: Boolean = false,
+    content: @Composable () -> Unit,
+) {
+    if (useLabelTag) {
+        Label(attrs = { classes("module-metadata-row") }) {
+            Div({ classes("module-metadata-label") }) { Text(label) }
+            content()
+        }
+        return
+    }
+    Div({ classes("module-metadata-row") }) {
+        Div({ classes("module-metadata-label") }) { Text(label) }
+        content()
     }
 }
 
