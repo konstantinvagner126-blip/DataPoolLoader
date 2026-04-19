@@ -438,6 +438,13 @@
 - SQL-console helper cleanup: общие state/persistence helper-ы больше не дублируются между store-слоями:
   - вынесены в [SqlConsoleStateSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleStateSupport.kt)
   - `SqlConsoleStore` и `SqlConsoleObjectsStore` больше не держат параллельные реализации `matches`, state-update mapping и default draft logic.
+- runtime/UI helper cleanup:
+  - общая подпись режима хранения вынесена из `home`-пакета в [ModuleStoreModeLabels.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/model/ModuleStoreModeLabels.kt)
+  - runtime fallback warning и mode-mismatch predicate вынесены в [RuntimeContextUiSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/foundation/runtime/RuntimeContextUiSupport.kt)
+  - `SqlConsolePage`, `SqlConsoleObjectsPage`, `ModuleRunsPage` и `RunHistoryCleanupPage` больше не держат локальные дубли строковой сборки fallback-warning.
+- SQL store cleanup:
+  - общее переключение `selectedSourceNames` вынесено в [SqlConsoleStateSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleStateSupport.kt)
+  - `SqlConsoleStore` и `SqlConsoleObjectsStore` больше не держат одинаковые локальные реализации toggle-логики.
 - legacy-терминология убирается и из test-layer:
   - тесты exporter/importer в `core` переименованы под актуальные классы `PostgresSourceExporter` и `PostgresTargetImporter`, без сохранения старых `PostgresExporter/PostgresImporter` имен.
 

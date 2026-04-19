@@ -1,5 +1,6 @@
 package com.sbrf.lt.platform.composeui.run_history_cleanup
 
+import com.sbrf.lt.platform.composeui.foundation.runtime.buildRuntimeModeFallbackMessage
 import com.sbrf.lt.platform.composeui.model.ModuleStoreMode
 import com.sbrf.lt.platform.composeui.model.RuntimeContext
 
@@ -14,14 +15,10 @@ internal fun buildSubtitle(storageMode: ModuleStoreMode?): String =
     }
 
 internal fun buildFallbackWarning(runtimeContext: RuntimeContext): String =
-    buildString {
-        append("Выбран режим базы данных, но он сейчас недоступен.")
-        runtimeContext.fallbackReason?.takeIf { it.isNotBlank() }?.let { reason ->
-            append(" Причина: ")
-            append(reason)
-        }
-        append(" Экран показывает состояние выбранного режима, а операции для БД будут недоступны до восстановления подключения.")
-    }
+    buildRuntimeModeFallbackMessage(
+        runtimeContext,
+        suffix = "Экран показывает состояние выбранного режима, а операции для БД будут недоступны до восстановления подключения.",
+    )
 
 internal fun buildSafeguardLabel(storageMode: ModuleStoreMode?): String =
     when (storageMode) {

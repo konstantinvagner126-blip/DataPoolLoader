@@ -58,3 +58,14 @@ internal fun SqlConsoleFavoriteObject.matches(other: SqlConsoleFavoriteObject): 
         objectName == other.objectName &&
         objectType == other.objectType &&
         tableName == other.tableName
+
+internal fun toggleSelectedSourceNames(
+    current: List<String>,
+    sourceName: String,
+    enabled: Boolean,
+): List<String> =
+    if (enabled) {
+        (current + sourceName).distinct()
+    } else {
+        current.filterNot { it == sourceName }
+    }

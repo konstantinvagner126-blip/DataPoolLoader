@@ -13,6 +13,8 @@ import com.sbrf.lt.platform.composeui.foundation.component.LoadingStateCard
 import com.sbrf.lt.platform.composeui.foundation.component.PageScaffold
 import com.sbrf.lt.platform.composeui.foundation.component.SectionCard
 import com.sbrf.lt.platform.composeui.foundation.dom.classes
+import com.sbrf.lt.platform.composeui.foundation.runtime.buildRuntimeModeFallbackMessage
+import com.sbrf.lt.platform.composeui.foundation.runtime.hasModeFallback
 import com.sbrf.lt.platform.composeui.model.ModuleStoreMode
 import com.sbrf.lt.platform.composeui.foundation.updates.PollingEffect
 import com.sbrf.lt.platform.composeui.foundation.updates.WebSocketEffect
@@ -121,11 +123,9 @@ fun ComposeModuleRunsPage(
             }
         },
         content = {
-            runtimeContext?.takeIf { it.requestedMode != it.effectiveMode }?.let { fallbackContext ->
-                val requestedLabel = if (fallbackContext.requestedMode == ModuleStoreMode.DATABASE) "База данных" else "Файлы"
-                val effectiveLabel = if (fallbackContext.effectiveMode == ModuleStoreMode.DATABASE) "База данных" else "Файлы"
+            runtimeContext?.takeIf { it.hasModeFallback() }?.let { fallbackContext ->
                 AlertBanner(
-                    "Запрошен режим «$requestedLabel», но сейчас активен «$effectiveLabel». ${fallbackContext.fallbackReason ?: ""}".trim(),
+                    buildRuntimeModeFallbackMessage(fallbackContext),
                     "warning",
                 )
             }

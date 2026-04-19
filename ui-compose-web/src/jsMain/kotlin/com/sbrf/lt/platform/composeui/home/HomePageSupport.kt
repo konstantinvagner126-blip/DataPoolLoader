@@ -1,7 +1,7 @@
 package com.sbrf.lt.platform.composeui.home
 
-import com.sbrf.lt.platform.composeui.model.ModuleStoreMode
 import com.sbrf.lt.platform.composeui.model.RuntimeContext
+import com.sbrf.lt.platform.composeui.model.label
 
 internal fun buildModeStatusText(runtime: RuntimeContext?): String {
     if (runtime == null) {
@@ -14,7 +14,7 @@ internal fun buildModeStatusText(runtime: RuntimeContext?): String {
         "PostgreSQL недоступен"
     }
     if (runtime.requestedMode != runtime.effectiveMode) {
-        parts += "запрошен режим ${if (runtime.requestedMode == ModuleStoreMode.DATABASE) "«База данных»" else "«Файлы»"}"
+        parts += "запрошен режим «${runtime.requestedMode.label}»"
     }
     return parts.joinToString(" · ")
 }

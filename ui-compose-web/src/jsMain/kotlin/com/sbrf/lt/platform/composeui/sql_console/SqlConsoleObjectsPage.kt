@@ -12,6 +12,8 @@ import com.sbrf.lt.platform.composeui.foundation.component.EmptyStateCard
 import com.sbrf.lt.platform.composeui.foundation.component.LoadingStateCard
 import com.sbrf.lt.platform.composeui.foundation.component.PageScaffold
 import com.sbrf.lt.platform.composeui.foundation.dom.classes
+import com.sbrf.lt.platform.composeui.foundation.runtime.buildRuntimeModeFallbackMessage
+import com.sbrf.lt.platform.composeui.foundation.runtime.hasModeFallback
 import kotlinx.browser.window
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.web.attributes.disabled
@@ -104,9 +106,9 @@ fun ComposeSqlConsoleObjectsPage(
         content = {
             state.errorMessage?.let { AlertBanner(it, "warning") }
             state.successMessage?.let { AlertBanner(it, "success") }
-            runtimeContext?.takeIf { it.requestedMode != it.effectiveMode }?.let { fallbackContext ->
+            runtimeContext?.takeIf { it.hasModeFallback() }?.let { fallbackContext ->
                 AlertBanner(
-                    "Запрошен режим ${fallbackContext.requestedMode.displayName()}, но сейчас активен ${fallbackContext.effectiveMode.displayName()}. ${fallbackContext.fallbackReason.orEmpty()}".trim(),
+                    buildRuntimeModeFallbackMessage(fallbackContext),
                     "warning",
                 )
             }
@@ -525,9 +527,3 @@ private fun buildCountSql(dbObject: SqlConsoleDatabaseObject): String {
         from $qualifiedName;
     """.trimIndent()
 }
-
-private fun com.sbrf.lt.platform.composeui.model.ModuleStoreMode.displayName(): String =
-    when (this) {
-        com.sbrf.lt.platform.composeui.model.ModuleStoreMode.FILES -> "Файлы"
-        com.sbrf.lt.platform.composeui.model.ModuleStoreMode.DATABASE -> "База данных"
-    }

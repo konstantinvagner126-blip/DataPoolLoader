@@ -28,14 +28,14 @@ class SqlConsoleObjectsStore(
         current: SqlConsoleObjectsPageState,
         sourceName: String,
         enabled: Boolean,
-    ): SqlConsoleObjectsPageState {
-        val next = if (enabled) {
-            (current.selectedSourceNames + sourceName).distinct()
-        } else {
-            current.selectedSourceNames.filterNot { it == sourceName }
-        }
-        return current.copy(selectedSourceNames = next)
-    }
+    ): SqlConsoleObjectsPageState =
+        current.copy(
+            selectedSourceNames = toggleSelectedSourceNames(
+                current.selectedSourceNames,
+                sourceName,
+                enabled,
+            ),
+        )
 
     suspend fun toggleFavoriteObject(
         current: SqlConsoleObjectsPageState,

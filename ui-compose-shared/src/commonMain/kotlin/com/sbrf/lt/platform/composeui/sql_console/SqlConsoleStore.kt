@@ -22,14 +22,14 @@ class SqlConsoleStore(
         current: SqlConsolePageState,
         sourceName: String,
         enabled: Boolean,
-    ): SqlConsolePageState {
-        val next = if (enabled) {
-            (current.selectedSourceNames + sourceName).distinct()
-        } else {
-            current.selectedSourceNames.filterNot { it == sourceName }
-        }
-        return current.copy(selectedSourceNames = next)
-    }
+    ): SqlConsolePageState =
+        current.copy(
+            selectedSourceNames = toggleSelectedSourceNames(
+                current.selectedSourceNames,
+                sourceName,
+                enabled,
+            ),
+        )
 
     fun updatePageSize(
         current: SqlConsolePageState,
