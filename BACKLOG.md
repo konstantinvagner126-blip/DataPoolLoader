@@ -78,13 +78,29 @@
   - [SqlConsoleMetadataRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/SqlConsoleMetadataRouteSupport.kt)
   - [SqlConsoleExportRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/SqlConsoleExportRouteSupport.kt)
   - [SqlConsoleExecutionRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/SqlConsoleExecutionRouteSupport.kt);
+- [SqlConsoleRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/SqlConsoleRoutes.kt) теперь только агрегирует отдельные route groups:
+  - [SqlConsoleStateRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/SqlConsoleStateRoutes.kt)
+  - [SqlConsoleMetadataRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/SqlConsoleMetadataRoutes.kt)
+  - [SqlConsoleQueryRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/SqlConsoleQueryRoutes.kt)
+  - [SqlConsoleExportRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/SqlConsoleExportRoutes.kt)
+  - [SqlConsoleAsyncQueryRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/SqlConsoleAsyncQueryRoutes.kt);
 - `PageRoutes` больше не держит вручную повторяющийся redirect/static transport-код;
 - page-level routing support собран в [PageRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/PageRouteSupport.kt), где теперь живут:
   - compose redirect helpers;
   - mode-guarded redirects;
   - static text pages;
   - static resource proxy/migration для старых `compose-spike` URL;
+- [PageRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/PageRoutes.kt) теперь только агрегирует route groups:
+  - [PageComposeAliasRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/PageComposeAliasRoutes.kt)
+  - [PageScreenRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/PageScreenRoutes.kt)
+  - [PageStaticRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/PageStaticRoutes.kt);
 - `CommonRoutes`, `DatabaseRoutes` и `SqlConsoleRoutes` уже меньше знают о mode-specific maintenance flow, actor wiring, credentials/appsRoot orchestration и service resolution.
+- [CommonRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/CommonRoutes.kt) больше не смешивает runtime, files modules, files run, cleanup и websocket transport в одном файле;
+- общий files/runtime route layer разрезан на отдельные route groups:
+  - [CommonRuntimeRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/CommonRuntimeRoutes.kt)
+  - [CommonFilesModuleRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/CommonFilesModuleRoutes.kt)
+  - [CommonFilesRunRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/CommonFilesRunRoutes.kt)
+  - [CommonMaintenanceRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/CommonMaintenanceRoutes.kt);
 - общий route support больше не смешивает разные ответственности в одном файле:
   - maintenance flow вынесен в [CommonMaintenanceRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/CommonMaintenanceRouteSupport.kt)
   - config/module flow вынесен в [CommonConfigRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/CommonConfigRouteSupport.kt)
