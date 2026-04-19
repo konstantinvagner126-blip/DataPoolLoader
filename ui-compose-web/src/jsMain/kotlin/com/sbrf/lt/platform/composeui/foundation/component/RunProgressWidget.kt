@@ -2,6 +2,7 @@ package com.sbrf.lt.platform.composeui.foundation.component
 
 import androidx.compose.runtime.Composable
 import com.sbrf.lt.platform.composeui.foundation.dom.classes
+import com.sbrf.lt.platform.composeui.foundation.dom.classesFromString
 import org.jetbrains.compose.web.dom.Div
 import org.jetbrains.compose.web.dom.Span
 import org.jetbrains.compose.web.dom.Text
@@ -91,7 +92,7 @@ fun RunProgressWidget(
                             }
                         }
                     }
-                    Span({ classes(*statusClassName.split(" ").filter { it.isNotBlank() }.toTypedArray()) }) {
+                    Span({ classesFromString(statusClassName) }) {
                         Text(statusLabel)
                     }
                 }

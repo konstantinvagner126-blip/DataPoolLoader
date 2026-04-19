@@ -1,11 +1,12 @@
 package com.sbrf.lt.platform.composeui.module_sync
 
+import com.sbrf.lt.platform.composeui.foundation.format.formatDateTime
 import com.sbrf.lt.platform.composeui.model.ModuleCatalogItem
 
 internal fun buildMaintenanceMessage(syncState: ModuleSyncStateResponse): String {
     val active = syncState.activeFullSync
     val actor = active?.startedByActorDisplayName ?: active?.startedByActorId
-    val startedAt = active?.startedAt?.let(::formatInstant)
+    val startedAt = active?.startedAt?.let(::formatDateTime)
     return listOf(
         syncState.message,
         actor?.let { "Инициатор: $it." },
@@ -15,7 +16,7 @@ internal fun buildMaintenanceMessage(syncState: ModuleSyncStateResponse): String
 
 internal fun describeActiveSingleSync(sync: ActiveModuleSyncRunResponse): String {
     val actor = sync.startedByActorDisplayName ?: sync.startedByActorId
-    val startedAt = formatInstant(sync.startedAt)
+    val startedAt = formatDateTime(sync.startedAt)
     return buildString {
         append("Идет импорт модуля '${sync.moduleCode ?: "-"}'.")
         if (!actor.isNullOrBlank()) {
@@ -24,6 +25,9 @@ internal fun describeActiveSingleSync(sync: ActiveModuleSyncRunResponse): String
         append(" Запуск: $startedAt.")
     }
 }
+
+internal fun buildActiveSingleSyncSummary(syncs: List<ActiveModuleSyncRunResponse>): String =
+    syncs.joinToString(" ") { describeActiveSingleSync(it) }
 
 internal fun filterSelectableModules(state: ModuleSyncPageState): List<ModuleCatalogItem> =
     state.availableFileModules
@@ -39,7 +43,7 @@ internal fun filterSelectableModules(state: ModuleSyncPageState): List<ModuleCat
 
 internal fun syncRunMeta(run: ModuleSyncRunSummaryResponse): String {
     val actor = run.startedByActorDisplayName ?: run.startedByActorId
-    val finishedAt = run.finishedAt?.let(::formatInstant) ?: "Запуск еще выполняется"
+    val finishedAt = run.finishedAt?.let(::formatDateTime) ?: "Запуск еще выполняется"
     return listOfNotNull(
         actor?.let { "Инициатор: $it" },
         "Завершение: $finishedAt",
@@ -64,14 +68,5 @@ internal fun syncActionBadgeClass(action: String): String =
         else -> "bg-secondary"
     }
 
-internal fun formatInstant(value: String): String {
-    val date = js("new Date(value)")
-    val millis = date.getTime() as Double
-    if (millis.isNaN()) {
-        return value
-    }
-    return date.toLocaleString("ru-RU") as String
-}
-
 internal fun formatInstant(value: String?): String =
-    value?.let(::formatInstant) ?: "—"
+    formatDateTime(value)

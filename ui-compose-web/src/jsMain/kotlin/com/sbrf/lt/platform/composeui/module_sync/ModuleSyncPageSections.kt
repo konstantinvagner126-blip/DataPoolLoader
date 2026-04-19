@@ -6,6 +6,7 @@ import com.sbrf.lt.platform.composeui.foundation.component.EmptyStateCard
 import com.sbrf.lt.platform.composeui.foundation.component.LoadingStateCard
 import com.sbrf.lt.platform.composeui.foundation.component.SectionCard
 import com.sbrf.lt.platform.composeui.foundation.dom.classes
+import com.sbrf.lt.platform.composeui.foundation.dom.classesFromString
 import com.sbrf.lt.platform.composeui.foundation.runtime.buildDatabaseModeUnavailableMessage
 import com.sbrf.lt.platform.composeui.model.ModuleStoreMode
 import kotlinx.browser.window
@@ -47,7 +48,7 @@ internal fun RuntimeAlert(state: ModuleSyncPageState) {
 
         syncState?.activeSingleSyncs?.isNotEmpty() == true -> {
             AlertBanner(
-                syncState.activeSingleSyncs.joinToString(" ") { describeActiveSingleSync(it) },
+                buildActiveSingleSyncSummary(syncState.activeSingleSyncs),
                 "info",
             )
         }
@@ -127,7 +128,7 @@ internal fun SyncOverviewPanel(state: ModuleSyncPageState) {
     }
     val syncNote = when {
         syncState?.maintenanceMode == true -> buildMaintenanceMessage(syncState)
-        !syncState?.activeSingleSyncs.isNullOrEmpty() -> syncState.activeSingleSyncs.joinToString(" ") { describeActiveSingleSync(it) }
+        !syncState?.activeSingleSyncs.isNullOrEmpty() -> buildActiveSingleSyncSummary(syncState.activeSingleSyncs)
         else -> syncState?.message?.takeIf { it.isNotBlank() } ?: "Новых операций синхронизации сейчас нет."
     }
 
@@ -330,7 +331,10 @@ internal fun SyncRunsHistoryPanel(
                         }) {
                             Div({ classes("run-history-head") }) {
                                 Span({ classes("run-history-title") }) { Text(syncRunTitle(run)) }
-                                Span({ classes("badge", *syncStatusBadgeClass(run.status).split(" ").filter { it.isNotBlank() }.toTypedArray()) }) {
+                                Span({
+                                    classes("badge")
+                                    classesFromString(syncStatusBadgeClass(run.status))
+                                }) {
                                     Text(translateSyncStatus(run.status))
                                 }
                             }
@@ -405,10 +409,16 @@ internal fun SyncRunDetailsPanel(state: ModuleSyncPageState) {
                         Div({ classes("card-body", "py-3", "px-3") }) {
                             Div({ classes("d-flex", "flex-wrap", "align-items-center", "gap-2") }) {
                                 Code({ classes("fw-semibold") }) { Text(item.moduleCode) }
-                                Span({ classes("badge", *syncActionBadgeClass(item.action).split(" ").filter { it.isNotBlank() }.toTypedArray()) }) {
+                                Span({
+                                    classes("badge")
+                                    classesFromString(syncActionBadgeClass(item.action))
+                                }) {
                                     Text(translateSyncAction(item.action))
                                 }
-                                Span({ classes("badge", *syncStatusBadgeClass(item.status).split(" ").filter { it.isNotBlank() }.toTypedArray()) }) {
+                                Span({
+                                    classes("badge")
+                                    classesFromString(syncStatusBadgeClass(item.status))
+                                }) {
                                     Text(translateSyncStatus(item.status))
                                 }
                                 if (!item.resultRevisionId.isNullOrBlank()) {

@@ -447,6 +447,26 @@
   - `ModuleEditorShellSections` / `ModuleSyncPageSections` / `ModuleRunsPage` больше не держат локальные `fallbackReason ?: ...` ветки
   - `RuntimeModeSwitch`, `ModuleRunsPage`, `ModuleRunsPageSections` и `RunHistoryCleanupPageSections` больше не держат ручные `Файлы/База данных` label-ветки там, где уже есть общий `ModuleStoreMode.label`
   - одноразовые wrapper-функции `buildSqlConsoleFallbackWarning` и `buildFallbackWarning` удалены, экраны используют общий runtime fallback builder напрямую.
+- `module_sync` helper cleanup:
+  - локальный `formatInstant` переведен на общий [Formatters.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/foundation/format/Formatters.kt)
+  - повторяющаяся сборка summary по `activeSingleSyncs` вынесена в один helper вместо параллельных `joinToString { describeActiveSingleSync(...) }` в section-слое.
+- DOM helper cleanup:
+  - строковые CSS class-list больше не токенизируются вручную по экранным файлам через `split/filter/toTypedArray`
+  - общий helper добавлен в [Attrs.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/foundation/dom/Attrs.kt)
+  - на него переведены foundation и экранные участки:
+    - [SectionCard.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/foundation/component/SectionCard.kt)
+    - [RunProgressWidget.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/foundation/component/RunProgressWidget.kt)
+    - [ModuleSyncPageSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncPageSections.kt)
+    - [ModuleRunsPageSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsPageSections.kt)
+    - [ModuleEditorRunSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorRunSections.kt).
+- live-updates helper cleanup:
+  - общий builder WebSocket URL вынесен в [LiveUpdates.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/foundation/updates/LiveUpdates.kt)
+  - feature-specific wrappers удалены из:
+    - [ModuleEditorPageSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPageSupport.kt)
+    - [ModuleRunsPageSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsPageSupport.kt)
+  - экраны используют foundation helper напрямую:
+    - [ModuleEditorPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPage.kt)
+    - [ModuleRunsPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsPage.kt).
 - SQL store cleanup:
   - общее переключение `selectedSourceNames` вынесено в [SqlConsoleStateSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleStateSupport.kt)
   - `SqlConsoleStore` и `SqlConsoleObjectsStore` больше не держат одинаковые локальные реализации toggle-логики.

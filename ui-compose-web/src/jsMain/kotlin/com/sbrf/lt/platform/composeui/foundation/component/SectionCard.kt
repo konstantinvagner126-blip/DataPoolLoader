@@ -2,6 +2,7 @@ package com.sbrf.lt.platform.composeui.foundation.component
 
 import androidx.compose.runtime.Composable
 import com.sbrf.lt.platform.composeui.foundation.dom.classes
+import com.sbrf.lt.platform.composeui.foundation.dom.classesFromString
 import org.jetbrains.compose.web.dom.Button
 import org.jetbrains.compose.web.dom.Div
 import org.jetbrains.compose.web.dom.H2
@@ -81,7 +82,7 @@ private fun SpanBadge(
     className: String,
     text: String,
 ) {
-    org.jetbrains.compose.web.dom.Span({ classes(*className.split(" ").filter { it.isNotBlank() }.toTypedArray()) }) {
+    org.jetbrains.compose.web.dom.Span({ classesFromString(className) }) {
         Text(text)
     }
 }

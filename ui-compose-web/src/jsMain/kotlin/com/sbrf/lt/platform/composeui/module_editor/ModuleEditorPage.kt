@@ -23,6 +23,7 @@ import com.sbrf.lt.platform.composeui.foundation.format.formatNumber
 import com.sbrf.lt.platform.composeui.foundation.http.ComposeHttpClient
 import com.sbrf.lt.platform.composeui.foundation.updates.PollingEffect
 import com.sbrf.lt.platform.composeui.foundation.updates.WebSocketEffect
+import com.sbrf.lt.platform.composeui.foundation.updates.buildWebSocketUrl
 import com.sbrf.lt.platform.composeui.model.CredentialsStatusResponse
 import com.sbrf.lt.platform.composeui.module_editor.buildCatalogStatus
 import com.sbrf.lt.platform.composeui.module_editor.buildCredentialsStatusText
@@ -297,7 +298,7 @@ fun ComposeModuleEditorPage(
 
     WebSocketEffect(
         enabled = currentRoute.storage == "files" && !selectedModuleId.isNullOrBlank() && !runPanelState.loading,
-        url = buildEditorWebSocketUrl(),
+        url = buildWebSocketUrl(),
         onMessage = {
             val moduleId = selectedModuleId ?: return@WebSocketEffect
             if (runPanelRefreshInProgress) {

@@ -43,11 +43,6 @@ internal fun buildRunsHref(
     return "/module-runs?storage=${route.storage}&module=${moduleId.orEmpty()}$includeHiddenPart"
 }
 
-internal fun buildEditorWebSocketUrl(): String {
-    val protocol = if (window.location.protocol == "https:") "wss" else "ws"
-    return "$protocol://${window.location.host}/ws"
-}
-
 internal fun buildComposeEditorUrl(
     storage: String,
     moduleId: String?,

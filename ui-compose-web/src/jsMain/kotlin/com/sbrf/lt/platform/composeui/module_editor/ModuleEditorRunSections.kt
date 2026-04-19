@@ -11,6 +11,7 @@ import com.sbrf.lt.platform.composeui.foundation.component.RunProgressWidget
 import com.sbrf.lt.platform.composeui.foundation.component.SectionCard
 import com.sbrf.lt.platform.composeui.foundation.component.buildRunProgressStages
 import com.sbrf.lt.platform.composeui.foundation.dom.classes
+import com.sbrf.lt.platform.composeui.foundation.dom.classesFromString
 import com.sbrf.lt.platform.composeui.foundation.format.formatDateTime
 import com.sbrf.lt.platform.composeui.foundation.format.formatDuration
 import com.sbrf.lt.platform.composeui.foundation.format.formatNumber
@@ -126,7 +127,7 @@ internal fun EditorRunOverviewPanel(
                 if (latestEntries.isNotEmpty()) {
                     Div({ classes("human-log", "mt-3") }) {
                         latestEntries.forEach { entry ->
-                            Div({ classes(*eventEntryCssClass(entry.severity).split(" ").filter { it.isNotBlank() }.toTypedArray()) }) {
+                            Div({ classesFromString(eventEntryCssClass(entry.severity)) }) {
                                 val parts = buildList {
                                     formatDateTime(entry.timestamp).takeIf { it != "-" }?.let(::add)
                                     entry.message.takeIf { it.isNotBlank() }?.let(::add)
@@ -151,7 +152,10 @@ internal fun ValidationAlert(session: ModuleEditorSessionResponse) {
         "INVALID" -> "alert alert-danger"
         else -> "alert alert-warning"
     }
-    Div({ classes(*alertClass.split(" ").filter { it.isNotBlank() }.toTypedArray(), "mb-3") }) {
+    Div({
+        classes("mb-3")
+        classesFromString(alertClass)
+    }) {
         Div({ classes("fw-semibold", "mb-2") }) {
             Text("Проблемы валидации модуля")
         }
@@ -249,7 +253,7 @@ internal fun CredentialsPanel(
                 AlertBanner(uploadMessage, uploadMessageLevel)
             }
 
-            Div({ classes(*warningClass.split(" ").filter { it.isNotBlank() }.toTypedArray()) }) {
+            Div({ classesFromString(warningClass) }) {
                 Text(buildCredentialsWarningText(module))
             }
         }

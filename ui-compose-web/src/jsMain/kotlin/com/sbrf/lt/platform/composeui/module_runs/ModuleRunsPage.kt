@@ -16,10 +16,11 @@ import com.sbrf.lt.platform.composeui.foundation.dom.classes
 import com.sbrf.lt.platform.composeui.foundation.runtime.buildDatabaseModeUnavailableMessage
 import com.sbrf.lt.platform.composeui.foundation.runtime.buildRuntimeModeFallbackMessage
 import com.sbrf.lt.platform.composeui.foundation.runtime.hasModeFallback
-import com.sbrf.lt.platform.composeui.model.ModuleStoreMode
-import com.sbrf.lt.platform.composeui.model.label
+import com.sbrf.lt.platform.composeui.foundation.updates.buildWebSocketUrl
 import com.sbrf.lt.platform.composeui.foundation.updates.PollingEffect
 import com.sbrf.lt.platform.composeui.foundation.updates.WebSocketEffect
+import com.sbrf.lt.platform.composeui.model.ModuleStoreMode
+import com.sbrf.lt.platform.composeui.model.label
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.web.attributes.disabled
 import org.jetbrains.compose.web.attributes.href
@@ -89,7 +90,7 @@ fun ComposeModuleRunsPage(
 
     WebSocketEffect(
         enabled = route.storage == "files" && !state.loading,
-        url = buildRunsWebSocketUrl(),
+        url = buildWebSocketUrl(),
         onMessage = {
             if (liveRefreshInProgress) {
                 return@WebSocketEffect

@@ -8,6 +8,7 @@ import com.sbrf.lt.platform.composeui.foundation.component.SectionCard
 import com.sbrf.lt.platform.composeui.foundation.component.StatusBadge
 import com.sbrf.lt.platform.composeui.foundation.component.buildRunProgressStages
 import com.sbrf.lt.platform.composeui.foundation.dom.classes
+import com.sbrf.lt.platform.composeui.foundation.dom.classesFromString
 import com.sbrf.lt.platform.composeui.foundation.format.formatDateTime
 import com.sbrf.lt.platform.composeui.foundation.format.formatDuration
 import com.sbrf.lt.platform.composeui.foundation.format.formatNumber
@@ -386,7 +387,7 @@ private fun RunEventsSection(details: ModuleRunDetailsResponse) {
         } else {
             Div {
                 details.events.takeLast(60).forEach { event ->
-                    Div({ classes(*eventEntryCssClass(event.severity).split(" ").filter { it.isNotBlank() }.toTypedArray()) }) {
+                    Div({ classesFromString(eventEntryCssClass(event.severity)) }) {
                         Div({ classes("human-log-time") }) {
                             Text(
                                 listOfNotNull(

@@ -2,7 +2,6 @@ package com.sbrf.lt.platform.composeui.module_runs
 
 import com.sbrf.lt.platform.composeui.foundation.format.formatDuration
 import com.sbrf.lt.platform.composeui.foundation.format.formatNumber
-import kotlinx.browser.window
 import kotlinx.serialization.json.Json
 
 internal val technicalDiagnosticsJson = Json {
@@ -65,9 +64,4 @@ internal fun extractArtifactName(
     val normalized = filePath.replace("\\", "/")
     val candidate = normalized.substringAfterLast("/", "")
     return candidate.ifBlank { artifactKey.ifBlank { "-" } }
-}
-
-internal fun buildRunsWebSocketUrl(): String {
-    val protocol = if (window.location.protocol == "https:") "wss" else "ws"
-    return "$protocol://${window.location.host}/ws"
 }

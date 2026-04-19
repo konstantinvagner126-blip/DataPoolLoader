@@ -18,3 +18,9 @@ fun <T : Element> AttrsScope<T>.classes(
         this.classes(classNames)
     }
 }
+
+fun <T : Element> AttrsScope<T>.classesFromString(
+    names: String,
+) {
+    classes(*names.split(" ").filter { it.isNotBlank() }.toTypedArray())
+}

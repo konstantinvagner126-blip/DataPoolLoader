@@ -11,6 +11,13 @@ import org.w3c.dom.MessageEvent
 import org.w3c.dom.WebSocket
 import org.w3c.dom.events.Event
 
+fun buildWebSocketUrl(
+    path: String = "/ws",
+): String {
+    val protocol = if (window.location.protocol == "https:") "wss" else "ws"
+    return "$protocol://${window.location.host}$path"
+}
+
 /**
  * Периодически вызывает suspend-блок, пока эффект включен.
  */
