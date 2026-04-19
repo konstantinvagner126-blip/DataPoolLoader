@@ -9,7 +9,7 @@ import java.time.temporal.ChronoUnit
  * Сервис controlled cleanup истории DB-запусков.
  */
 open class DatabaseRunHistoryCleanupService(
-    private val runStore: DatabaseRunStore,
+    private val runStore: DatabaseRunMaintenanceStore,
     private val retentionDays: Int = 30,
     private val keepMinRunsPerModule: Int = 30,
 ) {

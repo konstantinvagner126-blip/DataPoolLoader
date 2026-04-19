@@ -21,12 +21,12 @@ open class DatabaseModuleStore(
     private val schema: String = UiModuleStorePostgresConfig.DEFAULT_SCHEMA,
     private val objectMapper: ObjectMapper = jacksonObjectMapper(),
     private val validationService: ModuleValidationService = ModuleValidationService(),
-) {
+) : DatabaseModuleRegistryOperations {
     private val revisionWriter = DatabaseModuleRevisionWriter(objectMapper, validationService)
     private val support = DatabaseModuleStoreSupport(objectMapper, validationService)
     private val lifecycleSupport = DatabaseModuleStoreLifecycleSupport(support, revisionWriter)
 
-    open fun listModules(includeHidden: Boolean = false): List<ModuleCatalogItemResponse> {
+    override fun listModules(includeHidden: Boolean): List<ModuleCatalogItemResponse> {
         val normalizedSchema = normalizeRegistrySchemaName(schema)
         connectionProvider.getConnection().use { connection ->
             connection.prepareStatement(ModuleRegistrySql.catalog(normalizedSchema)).use { statement ->
@@ -44,7 +44,7 @@ open class DatabaseModuleStore(
         }
     }
 
-    open fun loadModuleDetails(
+    override fun loadModuleDetails(
         moduleCode: String,
         actorId: String,
         actorSource: String,
@@ -79,7 +79,7 @@ open class DatabaseModuleStore(
         }
     }
 
-    open fun saveWorkingCopy(
+    override fun saveWorkingCopy(
         moduleCode: String,
         actorId: String,
         actorSource: String,
@@ -111,7 +111,7 @@ open class DatabaseModuleStore(
         }
     }
 
-    open fun discardWorkingCopy(
+    override fun discardWorkingCopy(
         moduleCode: String,
         actorId: String,
         actorSource: String,
@@ -127,7 +127,7 @@ open class DatabaseModuleStore(
         }
     }
 
-    open fun publishWorkingCopy(
+    override fun publishWorkingCopy(
         moduleCode: String,
         actorId: String,
         actorSource: String,
@@ -209,12 +209,12 @@ open class DatabaseModuleStore(
         }
     }
 
-    open fun createModule(
+    override fun createModule(
         moduleCode: String,
         actorId: String,
         actorSource: String,
         actorDisplayName: String?,
-        originKind: String = "CREATED_IN_UI",
+        originKind: String,
         request: CreateModuleRequest,
     ): CreateModuleResult {
         val normalizedSchema = normalizeRegistrySchemaName(schema)
@@ -289,7 +289,7 @@ open class DatabaseModuleStore(
         }
     }
 
-    open fun deleteModule(
+    override fun deleteModule(
         moduleCode: String,
         actorId: String,
     ): DeleteModuleResult {

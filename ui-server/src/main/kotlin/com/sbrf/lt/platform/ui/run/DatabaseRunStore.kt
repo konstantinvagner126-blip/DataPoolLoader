@@ -34,7 +34,7 @@ open class DatabaseRunStore(
     private val connectionProvider: DatabaseConnectionProvider,
     private val schema: String = UiModuleStorePostgresConfig.DEFAULT_SCHEMA,
     private val objectMapper: ObjectMapper = jacksonObjectMapper(),
-) {
+) : DatabaseRunExecutionStore, DatabaseRunQueryStore, DatabaseRunMaintenanceStore {
     private val objectMapperWithTime: ObjectMapper = objectMapper
         .copy()
         .registerModule(JavaTimeModule())
@@ -52,7 +52,7 @@ open class DatabaseRunStore(
             )
     }
 
-    open fun hasActiveRun(moduleCode: String): Boolean {
+    override fun hasActiveRun(moduleCode: String): Boolean {
         val normalizedSchema = normalizeRegistrySchemaName(schema)
         connectionProvider.getConnection().use { connection ->
             connection.prepareStatement(RunHistorySql.hasActiveRun(normalizedSchema)).use { stmt ->
@@ -64,7 +64,7 @@ open class DatabaseRunStore(
         }
     }
 
-    open fun activeRunIds(moduleCode: String): List<String> {
+    override fun activeRunIds(moduleCode: String): List<String> {
         val normalizedSchema = normalizeRegistrySchemaName(schema)
         connectionProvider.getConnection().use { connection ->
             connection.prepareStatement(RunHistorySql.listActiveRunIds(normalizedSchema)).use { stmt ->
@@ -80,7 +80,7 @@ open class DatabaseRunStore(
         }
     }
 
-    open fun activeModuleCodes(): Set<String> {
+    override fun activeModuleCodes(): Set<String> {
         val normalizedSchema = normalizeRegistrySchemaName(schema)
         connectionProvider.getConnection().use { connection ->
             connection.prepareStatement(RunHistorySql.listActiveModuleCodes(normalizedSchema)).use { stmt ->
@@ -95,7 +95,7 @@ open class DatabaseRunStore(
         }
     }
 
-    internal open fun createRun(
+    override fun createRun(
         context: DatabaseModuleRunContext,
         startedAt: Instant,
         outputDir: String,
@@ -143,7 +143,7 @@ open class DatabaseRunStore(
         }
     }
 
-    open fun markSourceStarted(runId: String, sourceName: String, startedAt: Instant) {
+    override fun markSourceStarted(runId: String, sourceName: String, startedAt: Instant) {
         val normalizedSchema = normalizeRegistrySchemaName(schema)
         connectionProvider.getConnection().use { connection ->
             connection.prepareStatement(RunHistorySql.updateSourceStarted(normalizedSchema)).use { stmt ->
@@ -155,7 +155,7 @@ open class DatabaseRunStore(
         }
     }
 
-    open fun updateSourceProgress(runId: String, sourceName: String, timestamp: Instant, exportedRowCount: Long) {
+    override fun updateSourceProgress(runId: String, sourceName: String, timestamp: Instant, exportedRowCount: Long) {
         val normalizedSchema = normalizeRegistrySchemaName(schema)
         connectionProvider.getConnection().use { connection ->
             connection.prepareStatement(RunHistorySql.updateSourceProgress(normalizedSchema)).use { stmt ->
@@ -168,7 +168,7 @@ open class DatabaseRunStore(
         }
     }
 
-    open fun markSourceFinished(
+    override fun markSourceFinished(
         runId: String,
         sourceName: String,
         status: String,
@@ -190,7 +190,7 @@ open class DatabaseRunStore(
         }
     }
 
-    open fun markSourceSkipped(runId: String, sourceName: String, finishedAt: Instant, message: String) {
+    override fun markSourceSkipped(runId: String, sourceName: String, finishedAt: Instant, message: String) {
         val normalizedSchema = normalizeRegistrySchemaName(schema)
         connectionProvider.getConnection().use { connection ->
             connection.prepareStatement(RunHistorySql.updateSourceMismatch(normalizedSchema)).use { stmt ->
@@ -203,7 +203,7 @@ open class DatabaseRunStore(
         }
     }
 
-    open fun updateSourceMergedRows(runId: String, sourceName: String, mergedRowCount: Long) {
+    override fun updateSourceMergedRows(runId: String, sourceName: String, mergedRowCount: Long) {
         val normalizedSchema = normalizeRegistrySchemaName(schema)
         connectionProvider.getConnection().use { connection ->
             connection.prepareStatement(RunHistorySql.updateSourceMergedRows(normalizedSchema)).use { stmt ->
@@ -215,7 +215,7 @@ open class DatabaseRunStore(
         }
     }
 
-    open fun updateMergedRowCount(runId: String, mergedRowCount: Long) {
+    override fun updateMergedRowCount(runId: String, mergedRowCount: Long) {
         val normalizedSchema = normalizeRegistrySchemaName(schema)
         connectionProvider.getConnection().use { connection ->
             connection.prepareStatement(RunHistorySql.updateMergedRowCount(normalizedSchema)).use { stmt ->
@@ -226,7 +226,7 @@ open class DatabaseRunStore(
         }
     }
 
-    open fun updateTargetStatus(runId: String, targetStatus: String, targetTableName: String?, targetRowsLoaded: Long?) {
+    override fun updateTargetStatus(runId: String, targetStatus: String, targetTableName: String?, targetRowsLoaded: Long?) {
         val normalizedSchema = normalizeRegistrySchemaName(schema)
         connectionProvider.getConnection().use { connection ->
             connection.prepareStatement(RunHistorySql.updateTargetStatus(normalizedSchema)).use { stmt ->
@@ -239,7 +239,7 @@ open class DatabaseRunStore(
         }
     }
 
-    open fun appendEvent(
+    override fun appendEvent(
         runId: String,
         seqNo: Int,
         stage: String,
@@ -266,7 +266,7 @@ open class DatabaseRunStore(
         }
     }
 
-    open fun upsertArtifact(
+    override fun upsertArtifact(
         runId: String,
         artifactKind: String,
         artifactKey: String,
@@ -291,7 +291,7 @@ open class DatabaseRunStore(
         }
     }
 
-    open fun markArtifactDeleted(runId: String, artifactKind: String, artifactKey: String) {
+    override fun markArtifactDeleted(runId: String, artifactKind: String, artifactKey: String) {
         val normalizedSchema = normalizeRegistrySchemaName(schema)
         connectionProvider.getConnection().use { connection ->
             connection.prepareStatement(RunHistorySql.markArtifactDeleted(normalizedSchema)).use { stmt ->
@@ -303,7 +303,7 @@ open class DatabaseRunStore(
         }
     }
 
-    open fun finishRun(
+    override fun finishRun(
         runId: String,
         finishedAt: Instant,
         status: String,
@@ -337,7 +337,7 @@ open class DatabaseRunStore(
         }
     }
 
-    open fun listRuns(moduleCode: String, limit: Int = 20): List<DatabaseModuleRunSummaryResponse> {
+    override fun listRuns(moduleCode: String, limit: Int): List<DatabaseModuleRunSummaryResponse> {
         val normalizedSchema = normalizeRegistrySchemaName(schema)
         connectionProvider.getConnection().use { connection ->
             connection.prepareStatement(RunHistorySql.listRuns(normalizedSchema)).use { stmt ->
@@ -373,7 +373,7 @@ open class DatabaseRunStore(
         }
     }
 
-    open fun loadRunDetails(moduleCode: String, runId: String): DatabaseModuleRunDetailsResponse {
+    override fun loadRunDetails(moduleCode: String, runId: String): DatabaseModuleRunDetailsResponse {
         val normalizedSchema = normalizeRegistrySchemaName(schema)
         connectionProvider.getConnection().use { connection ->
             val summary = connection.prepareStatement(RunHistorySql.loadRunDetails(normalizedSchema)).use { stmt ->
@@ -487,7 +487,7 @@ open class DatabaseRunStore(
         }
     }
 
-    open fun markRunFailed(
+    override fun markRunFailed(
         runId: String,
         finishedAt: Instant,
         errorMessage: String,
@@ -519,7 +519,7 @@ open class DatabaseRunStore(
         }
     }
 
-    open fun previewCleanup(
+    override fun previewCleanup(
         cutoffTimestamp: Instant,
         retentionDays: Int,
         keepMinRunsPerModule: Int,
@@ -557,7 +557,7 @@ open class DatabaseRunStore(
         }
     }
 
-    internal open fun listOutputRetentionCandidates(
+    override fun listOutputRetentionCandidates(
         cutoffTimestamp: Instant,
         keepMinRunsPerModule: Int,
         disableSafeguard: Boolean,
@@ -588,7 +588,7 @@ open class DatabaseRunStore(
         }
     }
 
-    internal open fun listCurrentOutputUsageCandidates(): List<OutputRetentionRunRef> {
+    override fun listCurrentOutputUsageCandidates(): List<OutputRetentionRunRef> {
         val normalizedSchema = normalizeRegistrySchemaName(schema)
         connectionProvider.getConnection().use { connection ->
             return connection.prepareStatement(
@@ -611,7 +611,7 @@ open class DatabaseRunStore(
         }
     }
 
-    open fun executeCleanup(
+    override fun executeCleanup(
         cutoffTimestamp: Instant,
         retentionDays: Int,
         keepMinRunsPerModule: Int,
@@ -877,5 +877,5 @@ open class DatabaseRunStore(
         return objectMapperWithTime.readValue(rawJson, Map::class.java) as? Map<String, Any?> ?: emptyMap()
     }
 
-    open fun fileSize(filePath: Path): Long? = Files.size(filePath)
+    override fun fileSize(filePath: Path): Long? = Files.size(filePath)
 }

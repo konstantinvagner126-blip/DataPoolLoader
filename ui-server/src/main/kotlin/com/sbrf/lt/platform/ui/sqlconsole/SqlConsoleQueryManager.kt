@@ -2,7 +2,7 @@ package com.sbrf.lt.platform.ui.sqlconsole
 
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleExecutionCancelledException
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleExecutionControl
-import com.sbrf.lt.datapool.sqlconsole.SqlConsoleService
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleOperations
 import java.nio.file.Path
 import java.time.Instant
 import java.util.UUID
@@ -17,7 +17,7 @@ enum class SqlConsoleExecutionStatus {
 }
 
 class SqlConsoleQueryManager(
-    private val sqlConsoleService: SqlConsoleService,
+    private val sqlConsoleService: SqlConsoleOperations,
     private val executor: ExecutorService = Executors.newSingleThreadExecutor(),
 ) {
     private val lock = Any()

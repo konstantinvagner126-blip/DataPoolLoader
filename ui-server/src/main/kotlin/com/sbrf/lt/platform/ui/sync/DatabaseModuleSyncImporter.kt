@@ -3,13 +3,13 @@ package com.sbrf.lt.platform.ui.sync
 import com.sbrf.lt.datapool.db.registry.model.RegistryModuleCreationResult
 import com.sbrf.lt.datapool.db.registry.model.RegistryModuleDraft
 import com.sbrf.lt.datapool.module.sync.ModuleRegistryImporter
-import com.sbrf.lt.platform.ui.module.DatabaseModuleStore
+import com.sbrf.lt.platform.ui.module.DatabaseModuleRegistryOperations
 
 /**
- * UI-адаптер, который использует `DatabaseModuleStore` как реализацию контракта импорта в registry.
+ * UI-адаптер, который использует DB-registry контракт как реализацию импорта в registry.
  */
 class DatabaseModuleSyncImporter(
-    private val databaseModuleStore: DatabaseModuleStore,
+    private val databaseModuleStore: DatabaseModuleRegistryOperations,
 ) : ModuleRegistryImporter {
     override fun createModule(
         moduleCode: String,

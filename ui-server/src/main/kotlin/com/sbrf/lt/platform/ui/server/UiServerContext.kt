@@ -14,11 +14,13 @@ import com.sbrf.lt.platform.ui.config.appsRootPath
 import com.sbrf.lt.platform.ui.config.isConfigured
 import com.sbrf.lt.platform.ui.config.schemaName
 import com.sbrf.lt.platform.ui.module.ConfigFormService
+import com.sbrf.lt.platform.ui.module.DatabaseModuleRegistryOperations
 import com.sbrf.lt.platform.ui.module.DatabaseModuleStore
 import com.sbrf.lt.platform.ui.module.backend.DatabaseModuleBackend
 import com.sbrf.lt.platform.ui.module.backend.FilesModuleBackend
 import com.sbrf.lt.platform.ui.module.backend.ModuleActor
 import com.sbrf.lt.platform.ui.run.DatabaseModuleExecutionSource
+import com.sbrf.lt.platform.ui.run.DatabaseModuleRunOperations
 import com.sbrf.lt.platform.ui.run.DatabaseModuleRunService
 import com.sbrf.lt.platform.ui.run.DatabaseOutputRetentionService
 import com.sbrf.lt.platform.ui.run.DatabaseRunHistoryCleanupService
@@ -33,7 +35,7 @@ import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleExportService
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleQueryManager
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleStateService
 import com.sbrf.lt.platform.ui.sync.DatabaseModuleSyncImporter
-import com.sbrf.lt.datapool.sqlconsole.SqlConsoleService
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleOperations
 
 /**
  * Общий runtime-контекст Ktor-сервера UI: dynamic config, доступ к сервисам и guard-методы.
@@ -47,17 +49,17 @@ internal class UiServerContext(
     private val runtimeUiConfig: UiAppConfig,
     private val runtimeContext: UiRuntimeContext,
     internal val filesModuleBackend: FilesModuleBackend,
-    private val databaseModuleStore: DatabaseModuleStore?,
+    private val databaseModuleStore: DatabaseModuleRegistryOperations?,
     private val databaseModuleBackend: DatabaseModuleBackend?,
     internal val runManager: RunManager,
     internal val configFormService: ConfigFormService,
-    internal val sqlConsoleService: SqlConsoleService,
+    internal val sqlConsoleService: SqlConsoleOperations,
     internal val sqlConsoleQueryManager: SqlConsoleQueryManager,
     internal val sqlConsoleExportService: SqlConsoleExportService,
     internal val sqlConsoleStateService: SqlConsoleStateService,
     internal val uiConfigPersistenceService: UiConfigPersistenceService,
     private val moduleSyncService: ModuleSyncService?,
-    private val databaseModuleRunService: DatabaseModuleRunService?,
+    private val databaseModuleRunService: DatabaseModuleRunOperations?,
     private val databaseRunHistoryCleanupService: DatabaseRunHistoryCleanupService?,
     private val databaseOutputRetentionService: DatabaseOutputRetentionService?,
     private val filesModuleRunHistoryService: ModuleRunHistoryService,
@@ -78,7 +80,7 @@ internal class UiServerContext(
     fun currentDatabasePostgresConfig() =
         currentRuntimeUiConfig().moduleStore.postgres.takeIf { it.isConfigured() }
 
-    fun currentDatabaseModuleStore(): DatabaseModuleStore? =
+    fun currentDatabaseModuleStore(): DatabaseModuleRegistryOperations? =
         databaseModuleStore ?: currentDatabasePostgresConfig()?.let { DatabaseModuleStore.fromConfig(it) }
 
     fun currentDatabaseModuleBackend(): DatabaseModuleBackend? =
@@ -98,13 +100,15 @@ internal class UiServerContext(
             )
         }
 
-    fun currentDatabaseModuleRunService(): DatabaseModuleRunService? =
+    fun currentDatabaseModuleRunService(): DatabaseModuleRunOperations? =
         databaseModuleRunService ?: currentDatabasePostgresConfig()?.let { postgres ->
             val store = currentDatabaseModuleStore() ?: DatabaseModuleStore.fromConfig(postgres)
+            val runStore = DatabaseRunStore.fromConfig(postgres)
             DatabaseModuleRunService(
                 databaseModuleStore = store,
                 executionSource = DatabaseModuleExecutionSource.fromConfig(postgres),
-                runStore = DatabaseRunStore.fromConfig(postgres),
+                runExecutionStore = runStore,
+                runQueryStore = runStore,
                 credentialsProvider = credentialsService,
             )
         }

@@ -8,7 +8,7 @@ import java.time.Instant
 import java.time.temporal.ChronoUnit
 
 open class DatabaseOutputRetentionService(
-    private val runStore: DatabaseRunStore,
+    private val runStore: DatabaseRunMaintenanceStore,
     private val retentionDays: Int = 14,
     private val keepMinRunsPerModule: Int = 20,
 ) {

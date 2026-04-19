@@ -11,7 +11,7 @@ import com.sbrf.lt.datapool.model.ExecutionStatus
 import com.sbrf.lt.platform.ui.model.DatabaseModuleRunDetailsResponse
 import com.sbrf.lt.platform.ui.model.DatabaseModuleRunsResponse
 import com.sbrf.lt.platform.ui.model.DatabaseRunStartResponse
-import com.sbrf.lt.platform.ui.module.DatabaseModuleStore
+import com.sbrf.lt.platform.ui.module.DatabaseModuleRegistryOperations
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
@@ -27,30 +27,31 @@ import kotlin.io.path.readText
  * Оркестрирует запуск DB-модуля и запись run-history в PostgreSQL registry.
  */
 open class DatabaseModuleRunService(
-    private val databaseModuleStore: DatabaseModuleStore,
+    private val databaseModuleStore: DatabaseModuleRegistryOperations,
     private val executionSource: DatabaseModuleExecutionSource,
-    private val runStore: DatabaseRunStore,
+    private val runExecutionStore: DatabaseRunExecutionStore,
+    private val runQueryStore: DatabaseRunQueryStore,
     private val applicationRunner: ApplicationRunner = ApplicationRunner(),
     private val credentialsProvider: UiCredentialsProvider,
     private val executor: ExecutorService = Executors.newCachedThreadPool(),
     private val objectMapper: ObjectMapper = jacksonObjectMapper()
         .registerModule(JavaTimeModule())
         .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS),
-) {
+) : DatabaseModuleRunOperations {
     private val logger = LoggerFactory.getLogger(javaClass)
 
     companion object {
         private val activeRunIdsByModule = ConcurrentHashMap<String, String>()
     }
 
-    open fun startRun(
+    override fun startRun(
         moduleCode: String,
         actorId: String,
         actorSource: String,
         actorDisplayName: String?,
     ): DatabaseRunStartResponse {
         recoverOrphanRuns(moduleCode)
-        require(!runStore.hasActiveRun(moduleCode)) {
+        require(!runExecutionStore.hasActiveRun(moduleCode)) {
             "Для модуля '$moduleCode' уже выполняется DB-запуск. Дождитесь его завершения."
         }
 
@@ -108,18 +109,18 @@ open class DatabaseModuleRunService(
         )
     }
 
-    open fun listRuns(moduleCode: String, limit: Int = 20): DatabaseModuleRunsResponse =
+    override fun listRuns(moduleCode: String, limit: Int): DatabaseModuleRunsResponse =
         DatabaseModuleRunsResponse(
             moduleCode = moduleCode,
-            runs = runStore.listRuns(moduleCode, limit),
+            runs = runQueryStore.listRuns(moduleCode, limit),
         )
 
-    open fun loadRunDetails(moduleCode: String, runId: String): DatabaseModuleRunDetailsResponse =
-        runStore.loadRunDetails(moduleCode, runId)
+    override fun loadRunDetails(moduleCode: String, runId: String): DatabaseModuleRunDetailsResponse =
+        runQueryStore.loadRunDetails(moduleCode, runId)
 
-    open fun activeModuleCodes(): Set<String> =
+    override fun activeModuleCodes(): Set<String> =
         buildSet {
-            addAll(runStore.activeModuleCodes())
+            addAll(runQueryStore.activeModuleCodes())
             addAll(activeRunIdsByModule.keys)
         }
 
@@ -140,10 +141,10 @@ open class DatabaseModuleRunService(
 
     private fun recoverOrphanRuns(moduleCode: String) {
         val localActiveRunId = activeRunIdsByModule[moduleCode]
-        runStore.activeRunIds(moduleCode)
+        runExecutionStore.activeRunIds(moduleCode)
             .filter { it != localActiveRunId }
             .forEach { runId ->
-                runStore.markRunFailed(
+                runExecutionStore.markRunFailed(
                     runId = runId,
                     finishedAt = Instant.now(),
                     errorMessage = "DB-запуск был прерван до завершения и восстановлен как FAILED при следующем старте UI.",
@@ -155,20 +156,20 @@ open class DatabaseModuleRunService(
         synchronized(context) {
             when (event) {
                 is com.sbrf.lt.datapool.app.RunStartedEvent -> {
-                    runStore.createRun(context, event.timestamp, event.outputDir)
+                    runExecutionStore.createRun(context, event.timestamp, event.outputDir)
                     context.runCreated = true
                     appendEvent(context, "PREPARE", "RUN_CREATED", "INFO", null, "DB-запуск создан.", event)
                 }
                 is com.sbrf.lt.datapool.app.SourceExportStartedEvent -> {
                     context.sourceStates.getOrPut(event.sourceName) { DatabaseRunSourceState() }.status = "RUNNING"
-                    runStore.markSourceStarted(context.runId, event.sourceName, event.timestamp)
+                    runExecutionStore.markSourceStarted(context.runId, event.sourceName, event.timestamp)
                     appendEvent(context, "SOURCE", "SOURCE_STARTED", "INFO", event.sourceName, "Начата выгрузка источника ${event.sourceName}.", event)
                 }
                 is com.sbrf.lt.datapool.app.SourceExportProgressEvent -> {
                     val sourceState = context.sourceStates.getOrPut(event.sourceName) { DatabaseRunSourceState() }
                     sourceState.status = "RUNNING"
                     sourceState.exportedRowCount = event.rowCount
-                    runStore.updateSourceProgress(
+                    runExecutionStore.updateSourceProgress(
                         runId = context.runId,
                         sourceName = event.sourceName,
                         timestamp = event.timestamp,
@@ -188,7 +189,7 @@ open class DatabaseModuleRunService(
                     val sourceState = context.sourceStates.getOrPut(event.sourceName) { DatabaseRunSourceState() }
                     sourceState.status = if (event.status == ExecutionStatus.SUCCESS) "SUCCESS" else "FAILED"
                     sourceState.exportedRowCount = event.rowCount
-                    runStore.markSourceFinished(
+                    runExecutionStore.markSourceFinished(
                         runId = context.runId,
                         sourceName = event.sourceName,
                         status = sourceState.status,
@@ -215,7 +216,7 @@ open class DatabaseModuleRunService(
                 }
                 is com.sbrf.lt.datapool.app.SourceSchemaMismatchEvent -> {
                     context.sourceStates.getOrPut(event.sourceName) { DatabaseRunSourceState() }.status = "SKIPPED"
-                    runStore.markSourceSkipped(
+                    runExecutionStore.markSourceSkipped(
                         runId = context.runId,
                         sourceName = event.sourceName,
                         finishedAt = event.timestamp,
@@ -235,17 +236,17 @@ open class DatabaseModuleRunService(
                     appendEvent(context, "MERGE", "MERGE_STARTED", "INFO", null, "Начато объединение результатов.", event)
                 }
                 is com.sbrf.lt.datapool.app.MergeFinishedEvent -> {
-                    runStore.updateMergedRowCount(context.runId, event.rowCount)
+                    runExecutionStore.updateMergedRowCount(context.runId, event.rowCount)
                     event.sourceCounts.forEach { (sourceName, mergedRowCount) ->
                         context.sourceStates.getOrPut(sourceName) { DatabaseRunSourceState(status = "SUCCESS") }.mergedRowCount = mergedRowCount
-                        runStore.updateSourceMergedRows(context.runId, sourceName, mergedRowCount)
+                        runExecutionStore.updateSourceMergedRows(context.runId, sourceName, mergedRowCount)
                     }
                     rememberArtifact(context, Path.of(event.outputFile), "MERGED_OUTPUT", "merged")
                     appendEvent(context, "MERGE", "MERGE_FINISHED", "SUCCESS", null, "Объединение завершено: ${event.rowCount} строк.", event)
                 }
                 is com.sbrf.lt.datapool.app.TargetImportStartedEvent -> {
                     context.targetStatus = "RUNNING"
-                    runStore.updateTargetStatus(context.runId, "RUNNING", event.table, null)
+                    runExecutionStore.updateTargetStatus(context.runId, "RUNNING", event.table, null)
                     appendEvent(context, "TARGET", "TARGET_STARTED", "INFO", null, "Начата загрузка в target ${event.table}.", event)
                 }
                 is com.sbrf.lt.datapool.app.TargetImportFinishedEvent -> {
@@ -255,7 +256,7 @@ open class DatabaseModuleRunService(
                         else -> "FAILED"
                     }
                     context.targetRowsLoaded = event.rowCount
-                    runStore.updateTargetStatus(context.runId, context.targetStatus, event.table, event.rowCount)
+                    runExecutionStore.updateTargetStatus(context.runId, context.targetStatus, event.table, event.rowCount)
                     appendEvent(
                         context = context,
                         stage = "TARGET",
@@ -285,7 +286,7 @@ open class DatabaseModuleRunService(
                         failedSourceCount > 0 || skippedSourceCount > 0 -> "SUCCESS_WITH_WARNINGS"
                         else -> "SUCCESS"
                     }
-                    runStore.finishRun(
+                    runExecutionStore.finishRun(
                         runId = context.runId,
                         finishedAt = event.timestamp,
                         status = finalStatus,
@@ -315,7 +316,7 @@ open class DatabaseModuleRunService(
                 }
                 is com.sbrf.lt.datapool.app.OutputCleanupEvent -> {
                     context.artifactRefsByFileName[event.fileName]?.let { ref ->
-                        runStore.markArtifactDeleted(context.runId, ref.artifactKind, ref.artifactKey)
+                        runExecutionStore.markArtifactDeleted(context.runId, ref.artifactKind, ref.artifactKey)
                     }
                 }
                 else -> Unit
@@ -325,8 +326,8 @@ open class DatabaseModuleRunService(
 
     private fun rememberArtifact(context: DatabaseModuleRunContext, path: Path, artifactKind: String, artifactKey: String) {
         val storageStatus = if (path.exists()) "PRESENT" else "MISSING"
-        val fileSize = if (path.exists()) runStore.fileSize(path) else null
-        runStore.upsertArtifact(
+        val fileSize = if (path.exists()) runExecutionStore.fileSize(path) else null
+        runExecutionStore.upsertArtifact(
             runId = context.runId,
             artifactKind = artifactKind,
             artifactKey = artifactKey,
@@ -355,7 +356,7 @@ open class DatabaseModuleRunService(
                 .mapKeys { it.key.toString() }
                 .toMutableMap()
             payload["type"] = event.javaClass.simpleName
-            runStore.appendEvent(
+            runExecutionStore.appendEvent(
                 runId = context.runId,
                 seqNo = context.nextSeqNo++,
                 stage = stage,
@@ -398,7 +399,7 @@ open class DatabaseModuleRunService(
             ?.takeIf { it.isNotEmpty() }
             ?: (exception::class.qualifiedName ?: "DB run failed")
         runCatching {
-            runStore.markRunFailed(
+            runExecutionStore.markRunFailed(
                 runId = context.runId,
                 finishedAt = Instant.now(),
                 errorMessage = errorMessage,

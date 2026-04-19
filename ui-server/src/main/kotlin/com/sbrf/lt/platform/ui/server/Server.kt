@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleOperations
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleService
 import com.sbrf.lt.platform.ui.config.UiAppConfig
 import com.sbrf.lt.platform.ui.config.UiConfigLoader
@@ -36,12 +37,13 @@ import com.sbrf.lt.platform.ui.model.toDiagnosticsResponse
 import com.sbrf.lt.platform.ui.model.toResponse
 import com.sbrf.lt.platform.ui.model.toStartResponse
 import com.sbrf.lt.platform.ui.module.ConfigFormService
-import com.sbrf.lt.platform.ui.module.DatabaseModuleStore
+import com.sbrf.lt.platform.ui.module.DatabaseModuleRegistryOperations
 import com.sbrf.lt.platform.ui.module.ModuleRegistry
 import com.sbrf.lt.platform.ui.module.backend.DatabaseModuleBackend
 import com.sbrf.lt.platform.ui.module.backend.FilesModuleBackend
 import com.sbrf.lt.platform.ui.module.backend.ModuleActor
 import com.sbrf.lt.platform.ui.run.DatabaseModuleExecutionSource
+import com.sbrf.lt.platform.ui.run.DatabaseModuleRunOperations
 import com.sbrf.lt.platform.ui.run.DatabaseModuleRunService
 import com.sbrf.lt.platform.ui.run.DatabaseOutputRetentionService
 import com.sbrf.lt.platform.ui.run.DatabaseRunHistoryCleanupService
@@ -198,17 +200,17 @@ fun Application.uiModule(
     runtimeContext: UiRuntimeContext = runtimeContextService.resolve(runtimeUiConfig),
     moduleRegistry: ModuleRegistry = ModuleRegistry(appsRoot = uiConfig.appsRootPath()),
     filesModuleBackend: FilesModuleBackend = FilesModuleBackend(moduleRegistry),
-    databaseModuleStore: DatabaseModuleStore? = null,
+    databaseModuleStore: DatabaseModuleRegistryOperations? = null,
     databaseModuleBackend: DatabaseModuleBackend? = null,
     runManager: RunManager = RunManager(moduleRegistry = moduleRegistry, uiConfig = uiConfig, credentialsService = credentialsService),
     configFormService: ConfigFormService = ConfigFormService(),
-    sqlConsoleService: SqlConsoleService = SqlConsoleService(runtimeUiConfig.sqlConsole),
+    sqlConsoleService: SqlConsoleOperations = SqlConsoleService(runtimeUiConfig.sqlConsole),
     sqlConsoleQueryManager: SqlConsoleQueryManager = SqlConsoleQueryManager(sqlConsoleService),
     sqlConsoleExportService: SqlConsoleExportService = SqlConsoleExportService(),
     sqlConsoleStateService: SqlConsoleStateService = SqlConsoleStateService(SqlConsoleStateStore(uiConfig.storageDirPath())),
     uiConfigPersistenceService: UiConfigPersistenceService = UiConfigPersistenceService(),
     moduleSyncService: ModuleSyncService? = null,
-    databaseModuleRunService: DatabaseModuleRunService? = null,
+    databaseModuleRunService: DatabaseModuleRunOperations? = null,
     databaseRunHistoryCleanupService: DatabaseRunHistoryCleanupService? = null,
     databaseOutputRetentionService: DatabaseOutputRetentionService? = null,
     filesModuleRunHistoryService: ModuleRunHistoryService = FilesModuleRunHistoryService(moduleRegistry, runManager),

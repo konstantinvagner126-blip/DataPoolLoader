@@ -114,6 +114,25 @@
 - `DatabaseModuleStore` начал распиливаться на отдельные support-компоненты:
   - [DatabaseModuleStoreSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/DatabaseModuleStoreSupport.kt)
   - [DatabaseModuleStoreLifecycleSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/DatabaseModuleStoreLifecycleSupport.kt)
+- для DB-registry добавлен интерфейсный boundary:
+  - [DatabaseModuleRegistryOperations.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/DatabaseModuleRegistryOperations.kt)
+  - `DatabaseModuleBackend`, `DatabaseModuleRunService`, `DatabaseModuleSyncImporter` и `UiServerContext` теперь зависят от контракта, а не от concrete `DatabaseModuleStore`
+- для DB-run service добавлен интерфейсный boundary:
+  - [DatabaseModuleRunOperations.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleRunOperations.kt)
+  - server-layer и `DatabaseModuleRunHistoryService` теперь зависят от контракта, а не от concrete `DatabaseModuleRunService`
+- `SqlConsoleService` начал распиливаться на отдельные support-компоненты:
+  - [SqlConsoleConfigSupport.kt](/Users/kwdev/DataPoolLoader/core/src/main/kotlin/com/sbrf/lt/datapool/sqlconsole/SqlConsoleConfigSupport.kt)
+  - [SqlConsoleJdbcSupport.kt](/Users/kwdev/DataPoolLoader/core/src/main/kotlin/com/sbrf/lt/datapool/sqlconsole/SqlConsoleJdbcSupport.kt)
+- для SQL-консоли добавлен сервисный интерфейс:
+  - [SqlConsoleOperations.kt](/Users/kwdev/DataPoolLoader/core/src/main/kotlin/com/sbrf/lt/datapool/sqlconsole/SqlConsoleOperations.kt)
+  - server-layer и query manager теперь зависят от контракта, а не от concrete `SqlConsoleService`
+- `ApplicationRunner` начал распиливаться на отдельные support-компоненты:
+  - [ApplicationRunnerSupport.kt](/Users/kwdev/DataPoolLoader/core/src/main/kotlin/com/sbrf/lt/datapool/app/ApplicationRunnerSupport.kt)
+- `DatabaseRunStore` начал делиться на узкие контракты:
+  - [DatabaseRunExecutionStore.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunExecutionStore.kt)
+  - [DatabaseRunQueryStore.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunQueryStore.kt)
+  - [DatabaseRunMaintenanceStore.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunMaintenanceStore.kt)
+  - `DatabaseModuleRunService`, cleanup и retention теперь зависят от узких контрактов, а не от одного concrete `DatabaseRunStore`
 
 Что осталось:
 

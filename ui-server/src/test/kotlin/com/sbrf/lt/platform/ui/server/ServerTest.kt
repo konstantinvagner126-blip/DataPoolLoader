@@ -1124,7 +1124,10 @@ class ServerTest {
             executionSource = DatabaseModuleExecutionSource(
                 connectionProvider = DatabaseConnectionProvider { error("connection must not be requested") },
             ),
-            runStore = DatabaseRunStore(
+            runExecutionStore = DatabaseRunStore(
+                connectionProvider = DatabaseConnectionProvider { error("connection must not be requested") },
+            ),
+            runQueryStore = DatabaseRunStore(
                 connectionProvider = DatabaseConnectionProvider { error("connection must not be requested") },
             ),
             credentialsProvider = object : UiCredentialsProvider {
@@ -2675,7 +2678,10 @@ class ServerTest {
             executionSource = DatabaseModuleExecutionSource(
                 connectionProvider = DatabaseConnectionProvider { error("connection must not be requested") },
             ),
-            runStore = DatabaseRunStore(
+            runExecutionStore = DatabaseRunStore(
+                connectionProvider = DatabaseConnectionProvider { error("connection must not be requested") },
+            ),
+            runQueryStore = DatabaseRunStore(
                 connectionProvider = DatabaseConnectionProvider { error("connection must not be requested") },
             ),
             credentialsProvider = object : UiCredentialsProvider {
@@ -2765,7 +2771,10 @@ class ServerTest {
             executionSource = DatabaseModuleExecutionSource(
                 connectionProvider = DatabaseConnectionProvider { error("connection must not be requested") },
             ),
-            runStore = DatabaseRunStore(
+            runExecutionStore = DatabaseRunStore(
+                connectionProvider = DatabaseConnectionProvider { error("connection must not be requested") },
+            ),
+            runQueryStore = DatabaseRunStore(
                 connectionProvider = DatabaseConnectionProvider { error("connection must not be requested") },
             ),
             credentialsProvider = object : UiCredentialsProvider {

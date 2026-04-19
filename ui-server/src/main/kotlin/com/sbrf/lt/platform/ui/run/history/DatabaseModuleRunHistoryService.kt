@@ -9,14 +9,14 @@ import com.sbrf.lt.platform.ui.model.ModuleRunSourceResultResponse
 import com.sbrf.lt.platform.ui.model.ModuleRunSummaryResponse
 import com.sbrf.lt.platform.ui.module.backend.DatabaseModuleBackend
 import com.sbrf.lt.platform.ui.module.backend.ModuleActor
-import com.sbrf.lt.platform.ui.run.DatabaseModuleRunService
+import com.sbrf.lt.platform.ui.run.DatabaseModuleRunOperations
 
 /**
  * DATABASE-реализация общего backend-контракта истории запусков.
  */
 class DatabaseModuleRunHistoryService(
     private val moduleBackend: DatabaseModuleBackend,
-    private val runService: DatabaseModuleRunService,
+    private val runService: DatabaseModuleRunOperations,
 ) : ModuleRunHistoryService {
     override fun loadSession(moduleId: String, actor: ModuleActor?): ModuleRunPageSessionResponse {
         requireNotNull(actor) { "Для DATABASE storage нужен actor." }

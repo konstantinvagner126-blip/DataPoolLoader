@@ -6,7 +6,7 @@ import java.time.Instant
 /**
  * Runtime-контекст одного DB-запуска, используемый для записи history/event-ов.
  */
-internal data class DatabaseModuleRunContext(
+data class DatabaseModuleRunContext(
     val runId: String,
     val runtimeSnapshot: RuntimeModuleSnapshot,
     val actorId: String,

@@ -7,7 +7,7 @@ import java.time.Instant
 import java.util.Comparator
 import kotlin.io.path.isDirectory
 
-internal data class OutputRetentionRunRef(
+data class OutputRetentionRunRef(
     val moduleCode: String,
     val requestedAt: Instant,
     val outputDir: String,

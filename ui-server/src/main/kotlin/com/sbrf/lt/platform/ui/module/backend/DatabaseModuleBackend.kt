@@ -3,13 +3,13 @@ package com.sbrf.lt.platform.ui.module.backend
 import com.sbrf.lt.platform.ui.model.ModuleEditorSessionResponse
 import com.sbrf.lt.platform.ui.model.ModuleLifecycleCapabilities
 import com.sbrf.lt.platform.ui.model.SaveModuleRequest
-import com.sbrf.lt.platform.ui.module.DatabaseModuleStore
+import com.sbrf.lt.platform.ui.module.DatabaseModuleRegistryOperations
 
 /**
  * DATABASE-реализация backend-контрактов редактора модуля.
  */
 class DatabaseModuleBackend(
-    private val databaseModuleStore: DatabaseModuleStore,
+    private val databaseModuleStore: DatabaseModuleRegistryOperations,
 ) : ModuleCatalogService, ModuleEditorStore, ModuleLifecycleService {
     override fun listModules(includeHidden: Boolean) = databaseModuleStore.listModules(includeHidden)
 
