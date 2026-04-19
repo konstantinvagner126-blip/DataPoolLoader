@@ -90,11 +90,9 @@
   - [SqlConsoleExportRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/SqlConsoleExportRoutes.kt)
   - [SqlConsoleAsyncQueryRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/SqlConsoleAsyncQueryRoutes.kt);
 - `PageRoutes` больше не держит вручную повторяющийся redirect/static transport-код;
-- page-level routing support собран в [PageRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/PageRouteSupport.kt), где теперь живут:
-  - compose redirect helpers;
-  - mode-guarded redirects;
-  - static text pages;
-  - static resource proxy/migration для старых `compose-spike` URL;
+- page-level routing support больше не смешивает redirect и static resource flow в одном файле:
+  - compose redirects и mode guards живут в [PageComposeRedirectSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/PageComposeRedirectSupport.kt)
+  - static text pages и static resource proxy/migration живут в [PageStaticResourceSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/PageStaticResourceSupport.kt);
 - [PageRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/PageRoutes.kt) теперь только агрегирует route groups:
   - [PageComposeAliasRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/PageComposeAliasRoutes.kt)
   - [PageScreenRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/PageScreenRoutes.kt)
@@ -110,7 +108,10 @@
   - maintenance flow вынесен в отдельные support-слои:
     - [CommonRunHistoryCleanupRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/CommonRunHistoryCleanupRouteSupport.kt)
     - [CommonOutputRetentionRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/CommonOutputRetentionRouteSupport.kt)
-  - config/module flow вынесен в [CommonConfigRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/CommonConfigRouteSupport.kt)
+  - config/module flow разрезан по отдельным support-слоям:
+    - [CommonRuntimeModeRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/CommonRuntimeModeRouteSupport.kt)
+    - [CommonFilesModuleRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/CommonFilesModuleRouteSupport.kt)
+    - [CommonConfigFormRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/CommonConfigFormRouteSupport.kt)
   - credentials upload вынесен в [CommonCredentialsRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/CommonCredentialsRouteSupport.kt);
 - [ModuleRunRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/ModuleRunRoutes.kt) больше не держит вручную path parsing и service resolution;
 - для экрана `История и результаты` появился отдельный support-слой:
@@ -118,7 +119,9 @@
 - startup/bootstrap слой `ui-server` вынесен из [Server.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/Server.kt) в [UiServerStartup.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/UiServerStartup.kt);
 - default factory wiring для `ModuleRegistry / RunManager / SqlConsole* / FilesRunHistoryService` теперь живет рядом со startup-слоем, а не в composition root;
 - [UiServerContext.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/UiServerContext.kt) перестал быть knowledge-rich объектом:
-  - dynamic DB/files service resolution вынесен в [UiServerDynamicServices.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/UiServerDynamicServices.kt)
+  - dynamic DB/files service resolution разрезан по mode-specific слоям:
+    - [UiServerDatabaseDynamicServices.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/UiServerDatabaseDynamicServices.kt)
+    - [UiServerFilesDynamicServices.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/UiServerFilesDynamicServices.kt)
   - runtime guards и mode-specific helpers вынесены в [UiServerRuntimeGuards.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/UiServerRuntimeGuards.kt)
   - runtime config/context access вынесен в [UiServerRuntimeAccess.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/UiServerRuntimeAccess.kt);
 - сам [UiServerContext.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/UiServerContext.kt) теперь ближе к carrier-объекту зависимостей, а не к смешанному service-locator/runtime-helper слою.
