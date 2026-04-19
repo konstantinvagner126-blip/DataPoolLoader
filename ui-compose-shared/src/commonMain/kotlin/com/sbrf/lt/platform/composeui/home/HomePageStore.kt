@@ -13,56 +13,16 @@ class HomePageStore(
     private val api: HomePageApi,
     private val modeAccessError: String?,
 ) {
-    suspend fun load(): HomePageState {
-        return runCatching {
-            api.loadHomePageData()
-        }.fold(
-            onSuccess = { data ->
-                HomePageState(
-                    loading = false,
-                    savingMode = false,
-                    errorMessage = null,
-                    modeAccessError = modeAccessError,
-                    homeData = data,
-                )
-            },
-            onFailure = { error ->
-                HomePageState(
-                    loading = false,
-                    savingMode = false,
-                    errorMessage = error.message ?: "Не удалось загрузить данные главного экрана.",
-                    modeAccessError = modeAccessError,
-                    homeData = null,
-                )
-            },
-        )
-    }
+    private val support = HomePageStoreSupport(api, modeAccessError)
+
+    suspend fun load(): HomePageState =
+        support.load()
 
     suspend fun updateMode(
         currentState: HomePageState,
         mode: ModuleStoreMode,
-    ): HomePageState {
-        return runCatching {
-            api.updateRuntimeMode(mode)
-            api.loadHomePageData()
-        }.fold(
-            onSuccess = { data ->
-                currentState.copy(
-                    loading = false,
-                    savingMode = false,
-                    errorMessage = null,
-                    homeData = data,
-                )
-            },
-            onFailure = { error ->
-                currentState.copy(
-                    loading = false,
-                    savingMode = false,
-                    errorMessage = error.message ?: "Не удалось переключить режим UI.",
-                )
-            },
-        )
-    }
+    ): HomePageState =
+        support.updateMode(currentState, mode)
 
     fun startReload(currentState: HomePageState): HomePageState {
         return currentState.copy(loading = true, errorMessage = null)
