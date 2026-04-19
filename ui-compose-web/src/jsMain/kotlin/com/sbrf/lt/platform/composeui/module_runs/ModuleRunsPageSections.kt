@@ -1,8 +1,10 @@
 package com.sbrf.lt.platform.composeui.module_runs
 
 import androidx.compose.runtime.Composable
+import com.sbrf.lt.platform.composeui.foundation.component.eventEntryCssClass
 import com.sbrf.lt.platform.composeui.foundation.component.EmptyStateCard
 import com.sbrf.lt.platform.composeui.foundation.component.RunProgressMetric
+import com.sbrf.lt.platform.composeui.foundation.component.runStatusCssClass
 import com.sbrf.lt.platform.composeui.foundation.component.RunProgressWidget
 import com.sbrf.lt.platform.composeui.foundation.component.SectionCard
 import com.sbrf.lt.platform.composeui.foundation.component.StatusBadge
@@ -15,6 +17,18 @@ import com.sbrf.lt.platform.composeui.foundation.format.formatNumber
 import com.sbrf.lt.platform.composeui.foundation.format.statusTone
 import com.sbrf.lt.platform.composeui.model.ModuleStoreMode
 import com.sbrf.lt.platform.composeui.model.label
+import com.sbrf.lt.platform.composeui.run.StructuredRunSummary
+import com.sbrf.lt.platform.composeui.run.artifactStatusTone
+import com.sbrf.lt.platform.composeui.run.detectRunStageKey
+import com.sbrf.lt.platform.composeui.run.formatFileSizeValue
+import com.sbrf.lt.platform.composeui.run.formatPercentValue
+import com.sbrf.lt.platform.composeui.run.summarizeSourceCounters
+import com.sbrf.lt.platform.composeui.run.translateArtifactKind
+import com.sbrf.lt.platform.composeui.run.translateArtifactStatus
+import com.sbrf.lt.platform.composeui.run.translateLaunchSource
+import com.sbrf.lt.platform.composeui.run.translateRunStatus
+import com.sbrf.lt.platform.composeui.run.translateStage
+import com.sbrf.lt.platform.composeui.run.translateStageKey
 import kotlinx.serialization.encodeToString
 import org.jetbrains.compose.web.attributes.InputType
 import org.jetbrains.compose.web.attributes.href

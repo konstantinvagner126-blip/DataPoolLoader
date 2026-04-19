@@ -1,4 +1,4 @@
-package com.sbrf.lt.platform.composeui.module_runs
+package com.sbrf.lt.platform.composeui.foundation.component
 
 fun runStatusCssClass(status: String?): String {
     val normalized = status?.trim()?.lowercase() ?: "pending"

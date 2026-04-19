@@ -94,7 +94,7 @@ fun ComposeSqlConsolePage(
         ?: scriptOutline.lastOrNull { editorCursorLine >= it.startLine }
     val isRunning = currentExecution?.status.equals("RUNNING", ignoreCase = true)
     val pendingManualTransaction = currentExecution?.transactionState == "PENDING_COMMIT"
-    val runButtonClass = buildRunButtonClass(statementAnalysis, state.strictSafetyEnabled)
+    val runButtonClass = "btn-${runButtonTone(statementAnalysis, state.strictSafetyEnabled)}"
     val runtimeContext = state.runtimeContext
     val connectionStatusBySource = state.connectionCheck?.sourceResults?.associateBy { it.sourceName }.orEmpty()
     val exportableResult = activeStatementResult?.toStandaloneQueryResult(currentResult)
@@ -184,7 +184,7 @@ fun ComposeSqlConsolePage(
     }
 
     runAllAction = {
-        if (state.actionInProgress != "run-query" && state.info?.configured.orFalse() && !pendingManualTransaction) {
+        if (state.actionInProgress != "run-query" && state.info?.configured == true && !pendingManualTransaction) {
             scope.launch {
                 state = store.beginAction(state, "run-query")
                 state = store.startQuery(state)
@@ -196,7 +196,7 @@ fun ComposeSqlConsolePage(
         if (
             statementSql.isNotBlank() &&
             state.actionInProgress != "run-current-query" &&
-            state.info?.configured.orFalse() &&
+            state.info?.configured == true &&
             !pendingManualTransaction
         ) {
             scope.launch {
@@ -355,7 +355,7 @@ fun ComposeSqlConsolePage(
                                 val sourceStatus = connectionStatusBySource[sourceName]
                                 val selected = sourceName in state.selectedSourceNames
                                 Label(attrs = {
-                                    classes("sql-source-checkbox", sourceStatusCardClass(sourceStatus))
+                                    classes("sql-source-checkbox", "sql-source-checkbox-${sourceStatusTone(sourceStatus)}")
                                     if (selected) {
                                         classes("sql-source-checkbox-selected")
                                     }
@@ -592,7 +592,7 @@ fun ComposeSqlConsolePage(
                                     attr("type", "button")
                                     if (
                                         state.actionInProgress == "run-current-query" ||
-                                        !state.info?.configured.orFalse() ||
+                                        state.info?.configured != true ||
                                         pendingManualTransaction ||
                                         currentOutlineItem == null
                                     ) {
@@ -605,7 +605,7 @@ fun ComposeSqlConsolePage(
                                 Button(attrs = {
                                     classes("btn", runButtonClass, "sql-action-button", "sql-action-button-run")
                                     attr("type", "button")
-                                    if (state.actionInProgress == "run-query" || !state.info?.configured.orFalse() || pendingManualTransaction) {
+                                    if (state.actionInProgress == "run-query" || state.info?.configured != true || pendingManualTransaction) {
                                         disabled()
                                     }
                                     onClick { runAllAction?.invoke() }

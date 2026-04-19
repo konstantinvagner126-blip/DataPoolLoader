@@ -1,4 +1,10 @@
-package com.sbrf.lt.platform.composeui.module_runs
+package com.sbrf.lt.platform.composeui.run
+
+import com.sbrf.lt.platform.composeui.module_runs.CompactProgressEntry
+import com.sbrf.lt.platform.composeui.module_runs.ModuleRunDetailsResponse
+import com.sbrf.lt.platform.composeui.module_runs.ModuleRunEventResponse
+import com.sbrf.lt.platform.composeui.module_runs.ModuleRunSourceResultResponse
+import com.sbrf.lt.platform.composeui.module_runs.ModuleRunSummaryResponse
 
 fun translateRunStatus(status: String?): String =
     when (status?.uppercase()) {

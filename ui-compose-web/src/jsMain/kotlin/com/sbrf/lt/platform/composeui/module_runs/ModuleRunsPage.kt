@@ -21,6 +21,7 @@ import com.sbrf.lt.platform.composeui.foundation.updates.PollingEffect
 import com.sbrf.lt.platform.composeui.foundation.updates.WebSocketEffect
 import com.sbrf.lt.platform.composeui.model.ModuleStoreMode
 import com.sbrf.lt.platform.composeui.model.label
+import com.sbrf.lt.platform.composeui.run.parseStructuredRunSummary
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.web.attributes.disabled
 import org.jetbrains.compose.web.attributes.href

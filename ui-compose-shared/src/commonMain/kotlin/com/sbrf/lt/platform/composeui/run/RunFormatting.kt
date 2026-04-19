@@ -1,4 +1,4 @@
-package com.sbrf.lt.platform.composeui.module_runs
+package com.sbrf.lt.platform.composeui.run
 
 import kotlin.math.abs
 

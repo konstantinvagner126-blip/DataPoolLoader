@@ -288,7 +288,6 @@
   - [SqlConsoleLibrarySections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleLibrarySections.kt)
   - [SqlConsoleEditorSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleEditorSections.kt)
   - [SqlConsoleResultSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleResultSections.kt)
-  - [SqlConsoleStatusTextSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleStatusTextSupport.kt)
   - [SqlConsolePageSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsolePageSupport.kt);
 - page-файл перестал держать почти всю SQL-console подсистему в одном месте;
 - package-level SQL helper-ы нормализованы и переиспользуются между SQL-console экранами;
@@ -467,6 +466,22 @@
   - экраны используют foundation helper напрямую:
     - [ModuleEditorPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPage.kt)
     - [ModuleRunsPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsPage.kt).
+- межфичевой helper cleanup:
+  - generic CSS/status helper-ы вынесены из `module_runs` в foundation:
+    - [StatusClassSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/foundation/component/StatusClassSupport.kt)
+  - `module_editor` больше не зависит от `module_runs` ради `eventEntryCssClass` и `runStatusCssClass`
+  - старый feature-scoped helper-файл [ModuleRunsFormatters.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsFormatters.kt) удален.
+- shared run-view helper cleanup:
+  - общие run presentation/parsing helper-ы вынесены из `module_runs` в нейтральный shared пакет [run](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/run)
+  - `module_editor` больше не зависит от `module_runs` ради `translate* / detect* / parseStructuredRunSummary / buildCompactProgressEntries / format*` helper-логики
+  - старые feature-scoped shared helper-файлы удалены:
+    - [ModuleRunsLabels.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsLabels.kt)
+    - [ModuleRunsFormatting.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsFormatting.kt)
+    - [ModuleRunsSummary.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsSummary.kt).
+- SQL-console label/helper cleanup:
+  - web-слой больше не дублирует shared label/status helper-ы поверх [SqlConsoleLabels.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleLabels.kt)
+  - локальный duplicate-файл [SqlConsoleStatusTextSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleStatusTextSupport.kt) удален
+  - `SqlConsolePage.kt` и `SqlConsoleResultSections.kt` используют shared `runButtonTone / sourceStatusTone / sourceStatusSuffix / build*Text` напрямую, без промежуточных web-wrapper-ов.
 - SQL store cleanup:
   - общее переключение `selectedSourceNames` вынесено в [SqlConsoleStateSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleStateSupport.kt)
   - `SqlConsoleStore` и `SqlConsoleObjectsStore` больше не держат одинаковые локальные реализации toggle-логики.

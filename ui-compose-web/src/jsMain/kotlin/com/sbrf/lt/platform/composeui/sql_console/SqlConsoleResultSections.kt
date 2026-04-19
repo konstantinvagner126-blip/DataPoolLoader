@@ -410,7 +410,7 @@ internal fun StatusResultPane(
     }
     Div({ classes("sql-shard-card-grid") }) {
         result.shardResults.forEach { shard ->
-            Div({ classes("sql-shard-card", "status-${statusCssSuffix(shard.status)}") }) {
+            Div({ classes("sql-shard-card", "status-${sourceStatusSuffix(shard.status)}") }) {
                 Div({ classes("d-flex", "justify-content-between", "align-items-start", "gap-3") }) {
                     Div {
                         H3({ classes("h6", "mb-1") }) { Text(shard.shardName) }
@@ -476,7 +476,7 @@ internal fun StatusResultPane(
 
 @Composable
 internal fun StatusBadge(status: String) {
-    val cssClass = "status-badge status-${statusCssSuffix(status)}"
+    val cssClass = "status-badge status-${sourceStatusSuffix(status)}"
     Span({ classes(*cssClass.split(" ").toTypedArray()) }) {
         Text(translateSourceStatus(status))
     }
