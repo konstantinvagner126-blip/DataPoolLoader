@@ -76,11 +76,7 @@ internal fun QueryLibraryBlock(
                 onSelected = onRecentSelected,
                 onApply = onApplyRecent,
             ) {
-                Button(attrs = {
-                    classes("btn", "btn-outline-secondary", "btn-sm")
-                    attr("type", "button")
-                    onClick { onClearRecent() }
-                }) { Text("Очистить") }
+                SqlLibraryActionButton("Очистить", "btn-outline-secondary") { onClearRecent() }
             }
             SqlConsoleQueryPickerBlock(
                 fieldId = "composeFavoriteQueries",
@@ -92,19 +88,12 @@ internal fun QueryLibraryBlock(
                 onSelected = onFavoriteSelected,
                 onApply = onApplyFavorite,
             ) {
-                Button(attrs = {
-                    classes("btn", "btn-outline-primary", "btn-sm")
-                    attr("type", "button")
-                    onClick { onRememberFavorite() }
-                }) { Text("В избранное") }
-                Button(attrs = {
-                    classes("btn", "btn-outline-danger", "btn-sm")
-                    attr("type", "button")
-                    if (selectedFavoriteQuery.isBlank()) {
-                        disabled()
-                    }
-                    onClick { onRemoveFavorite() }
-                }) { Text("Убрать") }
+                SqlLibraryActionButton("В избранное", "btn-outline-primary") { onRememberFavorite() }
+                SqlLibraryActionButton(
+                    "Убрать",
+                    "btn-outline-danger",
+                    disabled = selectedFavoriteQuery.isBlank(),
+                ) { onRemoveFavorite() }
             }
         }
         SqlConsoleSettingToggle(
@@ -150,14 +139,11 @@ private fun SqlConsoleQueryPickerBlock(
                     }
                 }
             }
-            Button(attrs = {
-                classes("btn", "btn-outline-secondary", "btn-sm")
-                attr("type", "button")
-                if (selectedQuery.isBlank()) {
-                    disabled()
-                }
-                onClick { onApply() }
-            }) { Text("Подставить") }
+            SqlLibraryActionButton(
+                "Подставить",
+                "btn-outline-secondary",
+                disabled = selectedQuery.isBlank(),
+            ) { onApply() }
             actions()
         }
     }
@@ -214,18 +200,18 @@ internal fun SqlFavoriteObjectsBlock(
                         }
                     }
                     Div({ classes("d-flex", "flex-wrap", "gap-2") }) {
-                        SqlFavoriteObjectActionButton("Вставить", "btn-outline-dark") { onInsert(favorite) }
-                        SqlFavoriteObjectActionButton(
+                        SqlLibraryActionButton("Вставить", "btn-outline-dark") { onInsert(favorite) }
+                        SqlLibraryActionButton(
                             if (supportsFavoriteRowPreview(favorite)) "SELECT *" else "В SQL",
                             "btn-dark",
                         ) {
                             onInsertSelect(favorite)
                         }
                         if (supportsFavoriteRowPreview(favorite)) {
-                            SqlFavoriteObjectActionButton("COUNT(*)", "btn-outline-dark") { onInsertCount(favorite) }
+                            SqlLibraryActionButton("COUNT(*)", "btn-outline-dark") { onInsertCount(favorite) }
                         }
-                        SqlFavoriteObjectActionButton("Метаданные", "btn-outline-secondary") { onOpenMetadata(favorite) }
-                        SqlFavoriteObjectActionButton("Убрать", "btn-outline-danger") { onRemove(favorite) }
+                        SqlLibraryActionButton("Метаданные", "btn-outline-secondary") { onOpenMetadata(favorite) }
+                        SqlLibraryActionButton("Убрать", "btn-outline-danger") { onRemove(favorite) }
                     }
                 }
             }
@@ -234,14 +220,18 @@ internal fun SqlFavoriteObjectsBlock(
 }
 
 @Composable
-private fun SqlFavoriteObjectActionButton(
+private fun SqlLibraryActionButton(
     label: String,
     toneClass: String,
+    disabled: Boolean = false,
     onClick: () -> Unit,
 ) {
     Button(attrs = {
         classes("btn", toneClass, "btn-sm")
         attr("type", "button")
+        if (disabled) {
+            disabled()
+        }
         onClick { onClick() }
     }) {
         Text(label)

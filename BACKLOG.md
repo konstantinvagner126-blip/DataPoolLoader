@@ -637,6 +637,15 @@
 - sql_console objects panel/action cleanup:
   - panel shell для `Текущий объект / Избранные объекты / Sources / Поиск объектов` сведен к локальному `SqlObjectPanel(...)` в [SqlConsoleObjectsPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectsPage.kt)
   - object card action-button markup сведен к `SqlObjectActionButton(...)`, поэтому `favorite/select/count` actions больше не повторяют один и тот же `btn-sm` pattern вручную.
+- sql_console output pane cleanup:
+  - повторяющийся wrapper `sql-output-pane + active` сведен к локальному `OutputPane(...)` в [SqlConsoleResultSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleResultSections.kt)
+  - `data/status` pane больше не держат две параллельные shell-ветки с одинаковым active-state markup.
+- sql_console muted result text cleanup:
+  - повторяющиеся `small text-secondary mb-3` summary-блоки сведены к локальному `ResultMutedText(...)` в [SqlConsoleResultSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleResultSections.kt)
+  - select/status/pending ветки больше не размазывают одинаковый muted summary markup по нескольким функциям.
+- sql_console library action cleanup:
+  - query picker и favorite object actions сведены к общему `SqlLibraryActionButton(...)` в [SqlConsoleLibrarySections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleLibrarySections.kt)
+  - library слой больше не держит отдельные `apply/clear/favorite object` button helper-ветки для одного и того же `btn-sm` action pattern.
 
 Критерий завершения:
 

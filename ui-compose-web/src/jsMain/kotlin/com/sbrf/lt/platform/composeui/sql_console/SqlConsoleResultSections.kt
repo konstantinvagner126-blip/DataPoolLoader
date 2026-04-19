@@ -95,12 +95,7 @@ internal fun QueryOutputPanel(
             onClick = { onSelectTab("status") },
         )
     }
-    Div({
-        classes("sql-output-pane")
-        if (activeTab == "data") {
-            classes("active")
-        }
-    }) {
+    OutputPane(activeTab == "data") {
         if (activeTab == "data") {
             SelectResultPane(
                 execution = execution,
@@ -113,12 +108,7 @@ internal fun QueryOutputPanel(
             )
         }
     }
-    Div({
-        classes("sql-output-pane")
-        if (activeTab == "status") {
-            classes("active")
-        }
-    }) {
+    OutputPane(activeTab == "status") {
         if (activeTab == "status") {
             StatusResultPane(
                 execution = execution,
@@ -191,9 +181,7 @@ internal fun SelectResultPane(
     val endIndexExclusive = minOf(startIndex + pageSize, activeShard.rowCount)
     val visibleRows = activeShard.rows.drop(startIndex).take(pageSize)
 
-    Div({ classes("text-secondary", "small", "mb-3") }) {
-        Text("Данные показываются отдельно по каждому source. Лимит на source: ${readyResult.maxRowsPerShard}.")
-    }
+    ResultMutedText("Данные показываются отдельно по каждому source. Лимит на source: ${readyResult.maxRowsPerShard}.")
     Ul({ classes("nav", "nav-tabs", "sql-result-tabs", "mb-3") }) {
         successfulShards.forEach { shard ->
             Li({ classes("nav-item") }) {
@@ -210,18 +198,16 @@ internal fun SelectResultPane(
             }
         }
     }
-    Div({ classes("small", "text-secondary", "mb-3") }) {
-        Text(
-            buildResultPageSummary(
-                shard = activeShard,
-                result = readyResult,
-                startIndex = startIndex,
-                endIndexExclusive = endIndexExclusive,
-                normalizedPage = normalizedPage,
-                totalPages = totalPages,
-            ),
-        )
-    }
+    ResultMutedText(
+        buildResultPageSummary(
+            shard = activeShard,
+            result = readyResult,
+            startIndex = startIndex,
+            endIndexExclusive = endIndexExclusive,
+            normalizedPage = normalizedPage,
+            totalPages = totalPages,
+        ),
+    )
     Div({ classes("table-responsive") }) {
         Table({ classes("table", "table-sm", "table-striped", "sql-result-table", "mb-0") }) {
             Thead {
@@ -284,9 +270,7 @@ internal fun StatusResultPane(
     val readyExecution = requireNotNull(execution)
     val readyResult = requireNotNull(result)
 
-    Div({ classes("text-secondary", "small", "mb-3") }) {
-        Text(buildResultStatusSummary(readyExecution, readyResult))
-    }
+    ResultMutedText(buildResultStatusSummary(readyExecution, readyResult))
     if (readyResult.shardResults.isEmpty()) {
         EmptyStateCard(
             title = "Результаты",
@@ -379,15 +363,37 @@ private fun RenderExecutionResultPlaceholder(
             AlertBanner(message, "danger")
         } else {
             resultPendingLeadText?.let { leadText ->
-                Div({ classes("text-secondary", "small", "mb-3") }) {
-                    Text(leadText)
-                }
+                ResultMutedText(leadText)
             }
             SqlResultPlaceholder(pendingText)
         }
         return true
     }
     return false
+}
+
+@Composable
+private fun OutputPane(
+    active: Boolean,
+    content: @Composable () -> Unit,
+) {
+    Div({
+        classes("sql-output-pane")
+        if (active) {
+            classes("active")
+        }
+    }) {
+        content()
+    }
+}
+
+@Composable
+private fun ResultMutedText(
+    text: String,
+) {
+    Div({ classes("small", "text-secondary", "mb-3") }) {
+        Text(text)
+    }
 }
 
 @Composable
