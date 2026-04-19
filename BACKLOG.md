@@ -702,6 +702,24 @@
 - module_editor catalog file split cleanup:
   - catalog/sidebar list flow вынесен из [ModuleEditorPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPage.kt) в [ModuleEditorCatalogSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorCatalogSections.kt)
   - catalog actions/body/item rendering теперь живут отдельным срезом, а не внутри основного page-файла.
+- sql_console second-level shell split cleanup:
+  - sidebar/navigation flow дальше разрезан из [SqlConsolePageShellSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsolePageShellSections.kt) в [SqlConsoleSidebarSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleSidebarSections.kt)
+  - workspace/toolbar flow вынесен в [SqlConsoleWorkspaceSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleWorkspaceSections.kt), а промежуточный mixed shell-файл удален.
+- module_editor second-level page-shell split cleanup:
+  - content/session flow дальше разрезан из [ModuleEditorPageShellSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPageShellSections.kt) в [ModuleEditorContentSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorContentSections.kt)
+  - hero/navigation flow вынесен в [ModuleEditorHeroSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorHeroSections.kt), а промежуточный shell-файл удален.
+- module_editor second-level catalog split cleanup:
+  - sidebar/body flow дальше разрезан из [ModuleEditorCatalogSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorCatalogSections.kt) в [ModuleEditorCatalogSidebarSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorCatalogSidebarSections.kt)
+  - rendering элемента каталога вынесен в [ModuleEditorCatalogItemSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorCatalogItemSections.kt), а старый mixed catalog-файл удален.
+- sql_console objects page split cleanup:
+  - shell/control секции вынесены из [SqlConsoleObjectsPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectsPage.kt) в [SqlConsoleObjectsShellSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectsShellSections.kt)
+  - result/card секции вынесены в [SqlConsoleObjectsResultSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectsResultSections.kt), поэтому основной page-файл больше не держит shell и result presentation в одном месте.
+- sql_console result sections split cleanup:
+  - data-pane flow вынесен из [SqlConsoleResultSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleResultSections.kt) в [SqlConsoleDataResultSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleDataResultSections.kt)
+  - status-pane flow вынесен в [SqlConsoleStatusResultSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleStatusResultSections.kt), а исходный файл остался aggregator/shared-ui слоем.
+- module_editor config field split cleanup:
+  - базовые text/select/checkbox form controls вынесены из [ModuleEditorConfigFormFieldSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorConfigFormFieldSupport.kt) в [ModuleEditorConfigFormBasicFieldSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorConfigFormBasicFieldSupport.kt)
+  - numeric form controls вынесены в [ModuleEditorConfigFormNumericFieldSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorConfigFormNumericFieldSupport.kt), а исходный файл оставлен для SQL-specific field flow.
 
 Критерий завершения:
 
