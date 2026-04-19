@@ -673,6 +673,17 @@
 - sql_console toolbar action cleanup:
   - основная toolbar action-strip сведен к `SqlToolbarActionButton(...)` в [SqlConsolePage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsolePage.kt)
   - workspace toolbar больше не повторяет восемь почти одинаковых `btn + type=button + disabled + onClick` веток для run/stop/commit/export действий.
+- sql_console page shell cleanup:
+  - hero navigation button-ы сведены к `SqlConsoleNavActionButton(...)` в [SqlConsolePage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsolePage.kt)
+  - source sidebar вынесен в `SqlConsoleSourceSidebar(...)`, а source selection в `SqlConsoleSourceSelectionBlock(...)` и `SqlConsoleSourceCheckbox(...)`
+  - page-level layout больше не смешивает hero, settings, source selection и sidebar wiring в одной большой inline-ветке.
+- sql_console credentials panel cleanup:
+  - credentials upload/details вынесены из page-layout в `SqlConsoleCredentialsPanel(...)` в [SqlConsolePage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsolePage.kt)
+  - SQL-консоль больше не держит inline file-input/upload status flow внутри общего sidebar-блока.
+- module_editor page shell cleanup:
+  - hero art вынесен в `ModuleEditorHeroArt(...)`, `DatabaseModuleHeroArt(...)` и `FilesModuleHeroArt(...)`
+  - catalog actions вынесены в `ModuleCatalogActionBar(...)`, а loading/list body в `ModuleCatalogBody(...)`
+  - [ModuleEditorPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPage.kt) стал ближе к shell/wiring-слою и меньше смешивает hero, catalog actions и catalog body.
 
 Критерий завершения:
 

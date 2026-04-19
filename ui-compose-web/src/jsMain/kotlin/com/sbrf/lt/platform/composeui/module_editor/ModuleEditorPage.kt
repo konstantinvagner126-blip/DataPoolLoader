@@ -529,34 +529,7 @@ fun ComposeModuleEditorPage(
             }
         },
         heroArt = {
-            if (currentRoute.storage == "database") {
-                Div({ classes("platform-stage") }) {
-                    Div({ classes("platform-node", "platform-node-db") }) { Text("POSTGRESQL") }
-                    Div({ classes("platform-node", "platform-node-kafka") }) { Text("REGISTRY") }
-                    Div({ classes("platform-node", "platform-node-pool") }) { Text("MODULES") }
-                    Div({ classes("platform-core") }) {
-                        Div({ classes("platform-core-title") }) { Text("DB") }
-                        Div({ classes("platform-core-subtitle") }) { Text("MODULE STORE") }
-                    }
-                    Div({ classes("platform-rail", "platform-rail-db") }) { Span({ classes("platform-packet", "packet-db") }) }
-                    Div({ classes("platform-rail", "platform-rail-kafka") }) { Span({ classes("platform-packet", "packet-kafka") }) }
-                    Div({ classes("platform-rail", "platform-rail-pool") }) { Span({ classes("platform-packet", "packet-pool") }) }
-                }
-            } else {
-                Div({ classes("flow-stage") }) {
-                    listOf("DB1", "DB2", "DB3", "DB4", "DB5").forEachIndexed { index, label ->
-                        Div({ classes("source-node", "source-node-${index + 1}") }) { Text(label) }
-                    }
-                    repeat(5) { index ->
-                        Div({ classes("flow-line", "flow-line-${index + 1}") }) {
-                            Span({ classes("flow-dot", "dot-${index + 1}") })
-                        }
-                    }
-                    Div({ classes("merge-hub") }) {
-                        Div({ classes("merge-title") }) { Text("DATAPOOL") }
-                    }
-                }
-            }
+            ModuleEditorHeroArt(currentRoute.storage)
         },
     )
 }
@@ -607,32 +580,14 @@ private fun ModuleCatalogSidebar(
             Text(buildCatalogStatus(state, route.storage))
         }
         if (route.storage == "database") {
-            Div({ classes("module-catalog-actions", "mb-3") }) {
-                EditorIconActionButton(
-                    icon = "+",
-                    label = "Новый",
-                    title = "Новый модуль",
-                    enabled = capabilities?.createModule == true && !actionBusy,
-                    style = EditorActionStyle.PrimaryOutline,
-                    onClick = onOpenCreateModule,
-                )
-                EditorIconActionButton(
-                    icon = "−",
-                    label = "Удалить",
-                    title = "Удалить модуль",
-                    enabled = capabilities?.deleteModule == true && !actionBusy && state.selectedModuleId != null,
-                    style = EditorActionStyle.DangerOutline,
-                    onClick = onDeleteModule,
-                )
-                EditorIconActionButton(
-                    icon = "⇅",
-                    label = "Импорт",
-                    title = "Импорт из файлов",
-                    enabled = true,
-                    style = EditorActionStyle.SecondaryOutline,
-                    onClick = onImportModules,
-                )
-            }
+            ModuleCatalogActionBar(
+                capabilities = capabilities,
+                actionBusy = actionBusy,
+                selectedModuleId = state.selectedModuleId,
+                onOpenCreateModule = onOpenCreateModule,
+                onDeleteModule = onDeleteModule,
+                onImportModules = onImportModules,
+            )
             Label(attrs = { classes("config-form-check", "mb-3") }) {
                 Input(type = org.jetbrains.compose.web.attributes.InputType.Checkbox, attrs = {
                     classes("form-check-input")
@@ -649,19 +604,113 @@ private fun ModuleCatalogSidebar(
                 Text("Каталог открыт с показом скрытых модулей.")
             }
         }
-        if (state.loading && state.modules.isEmpty()) {
-            P({ classes("text-secondary", "small", "mb-0") }) {
-                Text("Каталог модулей загружается.")
+        ModuleCatalogBody(
+            loading = state.loading,
+            modules = state.modules,
+            selectedModuleId = state.selectedModuleId,
+            onSelectModule = onSelectModule,
+        )
+    }
+}
+
+@Composable
+private fun ModuleEditorHeroArt(storage: String) {
+    if (storage == "database") {
+        DatabaseModuleHeroArt()
+    } else {
+        FilesModuleHeroArt()
+    }
+}
+
+@Composable
+private fun DatabaseModuleHeroArt() {
+    Div({ classes("platform-stage") }) {
+        Div({ classes("platform-node", "platform-node-db") }) { Text("POSTGRESQL") }
+        Div({ classes("platform-node", "platform-node-kafka") }) { Text("REGISTRY") }
+        Div({ classes("platform-node", "platform-node-pool") }) { Text("MODULES") }
+        Div({ classes("platform-core") }) {
+            Div({ classes("platform-core-title") }) { Text("DB") }
+            Div({ classes("platform-core-subtitle") }) { Text("MODULE STORE") }
+        }
+        Div({ classes("platform-rail", "platform-rail-db") }) { Span({ classes("platform-packet", "packet-db") }) }
+        Div({ classes("platform-rail", "platform-rail-kafka") }) { Span({ classes("platform-packet", "packet-kafka") }) }
+        Div({ classes("platform-rail", "platform-rail-pool") }) { Span({ classes("platform-packet", "packet-pool") }) }
+    }
+}
+
+@Composable
+private fun FilesModuleHeroArt() {
+    Div({ classes("flow-stage") }) {
+        listOf("DB1", "DB2", "DB3", "DB4", "DB5").forEachIndexed { index, label ->
+            Div({ classes("source-node", "source-node-${index + 1}") }) { Text(label) }
+        }
+        repeat(5) { index ->
+            Div({ classes("flow-line", "flow-line-${index + 1}") }) {
+                Span({ classes("flow-dot", "dot-${index + 1}") })
             }
-        } else {
-            Div({ classes("list-group", "module-list") }) {
-                state.modules.forEach { module ->
-                    ModuleCatalogListItem(
-                        module = module,
-                        selected = module.id == state.selectedModuleId,
-                        onClick = { onSelectModule(module.id) },
-                    )
-                }
+        }
+        Div({ classes("merge-hub") }) {
+            Div({ classes("merge-title") }) { Text("DATAPOOL") }
+        }
+    }
+}
+
+@Composable
+private fun ModuleCatalogActionBar(
+    capabilities: ModuleLifecycleCapabilities?,
+    actionBusy: Boolean,
+    selectedModuleId: String?,
+    onOpenCreateModule: () -> Unit,
+    onDeleteModule: () -> Unit,
+    onImportModules: () -> Unit,
+) {
+    Div({ classes("module-catalog-actions", "mb-3") }) {
+        EditorIconActionButton(
+            icon = "+",
+            label = "Новый",
+            title = "Новый модуль",
+            enabled = capabilities?.createModule == true && !actionBusy,
+            style = EditorActionStyle.PrimaryOutline,
+            onClick = onOpenCreateModule,
+        )
+        EditorIconActionButton(
+            icon = "−",
+            label = "Удалить",
+            title = "Удалить модуль",
+            enabled = capabilities?.deleteModule == true && !actionBusy && selectedModuleId != null,
+            style = EditorActionStyle.DangerOutline,
+            onClick = onDeleteModule,
+        )
+        EditorIconActionButton(
+            icon = "⇅",
+            label = "Импорт",
+            title = "Импорт из файлов",
+            enabled = true,
+            style = EditorActionStyle.SecondaryOutline,
+            onClick = onImportModules,
+        )
+    }
+}
+
+@Composable
+private fun ModuleCatalogBody(
+    loading: Boolean,
+    modules: List<ModuleCatalogItem>,
+    selectedModuleId: String?,
+    onSelectModule: (String) -> Unit,
+) {
+    if (loading && modules.isEmpty()) {
+        P({ classes("text-secondary", "small", "mb-0") }) {
+            Text("Каталог модулей загружается.")
+        }
+    } else {
+        Div({ classes("list-group", "module-list") }) {
+            modules.forEach { module ->
+                ModuleCatalogListItem(
+                    module = module,
+                    selected = module.id == selectedModuleId,
+                    onClick = { onSelectModule(module.id) },
+                )
             }
         }
     }
