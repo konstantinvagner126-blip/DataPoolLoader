@@ -122,9 +122,6 @@ fun ComposeModuleRunsPage(
                 liveRefreshInProgress = false
             }
         },
-        onError = { message ->
-            state = state.copy(errorMessage = message)
-        },
     )
 
     PageScaffold(

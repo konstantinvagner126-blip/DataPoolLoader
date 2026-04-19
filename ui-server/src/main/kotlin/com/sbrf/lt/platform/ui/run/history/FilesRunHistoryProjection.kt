@@ -8,6 +8,8 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Instant
 import kotlin.io.path.fileSize
+import kotlin.math.absoluteValue
+import kotlin.math.floor
 
 internal fun projectFilesRunSourceResults(run: UiRunSnapshot): List<ModuleRunSourceResultResponse> {
     val states = linkedMapOf<String, FilesSourceState>()
@@ -56,6 +58,64 @@ internal fun projectFilesRunSourceResults(run: UiRunSnapshot): List<ModuleRunSou
             errorMessage = state.errorMessage,
         )
     }
+}
+
+internal data class FilesTargetState(
+    val enabled: Boolean,
+    val status: String,
+    val tableName: String? = null,
+    val rowsLoaded: Long? = null,
+)
+
+internal fun projectFilesTargetState(run: UiRunSnapshot): FilesTargetState {
+    var targetEnabled = false
+    var targetStatus = if (run.status.name == "FAILED") "FAILED" else "NOT_ENABLED"
+    var targetTableName: String? = null
+    var targetRowsLoaded: Long? = null
+
+    run.events.forEach { event ->
+        when (detectFilesEventType(event)) {
+            "RunStartedEvent" -> {
+                targetEnabled = event.booleanValue("targetEnabled") == true
+                if (targetEnabled && targetStatus == "NOT_ENABLED") {
+                    targetStatus = if (run.status.name == "FAILED") "FAILED" else "PENDING"
+                }
+            }
+
+            "TargetImportStartedEvent" -> {
+                targetEnabled = true
+                targetStatus = if (run.status.name == "FAILED") "FAILED" else "RUNNING"
+                targetTableName = event.stringValue("table") ?: targetTableName
+            }
+
+            "TargetImportFinishedEvent" -> {
+                targetEnabled = true
+                targetStatus = event.statusValue() ?: targetStatus
+                targetTableName = event.stringValue("table") ?: targetTableName
+                targetRowsLoaded = event.longValue("rowCount") ?: targetRowsLoaded
+            }
+        }
+    }
+
+    if (!targetEnabled) {
+        return FilesTargetState(
+            enabled = false,
+            status = "NOT_ENABLED",
+        )
+    }
+
+    if (run.status.name == "SUCCESS" && targetStatus == "RUNNING") {
+        targetStatus = "SUCCESS"
+    } else if (run.status.name == "FAILED" && targetStatus == "PENDING") {
+        targetStatus = "FAILED"
+    }
+
+    return FilesTargetState(
+        enabled = true,
+        status = targetStatus,
+        tableName = targetTableName,
+        rowsLoaded = targetRowsLoaded,
+    )
 }
 
 internal fun projectFilesRunArtifacts(
@@ -235,14 +295,37 @@ private fun Map<String, Any?>.longValue(key: String): Long? =
     }
 
 private fun Map<String, Any?>.instantValue(key: String): Instant? =
-    stringValue(key)?.let {
-        runCatching { Instant.parse(it) }.getOrNull()
+    when (val raw = this[key]) {
+        null -> null
+        is Number -> raw.toInstant()
+        else -> raw.toString().takeIf { it.isNotBlank() }?.let { value ->
+            runCatching { Instant.parse(value) }.getOrNull()
+                ?: value.toDoubleOrNull()?.toInstant()
+        }
     }
+
+private fun Number.toInstant(): Instant {
+    val numericValue = toDouble()
+    return if (numericValue.absoluteValue >= 100_000_000_000.0) {
+        Instant.ofEpochMilli(toLong())
+    } else {
+        val epochSeconds = floor(numericValue).toLong()
+        val nanos = ((numericValue - epochSeconds) * 1_000_000_000.0).toLong()
+        Instant.ofEpochSecond(epochSeconds, nanos)
+    }
+}
 
 private fun Map<String, Any?>.stringList(key: String): List<String> =
     when (val value = this[key]) {
         is Iterable<*> -> value.mapNotNull { it?.toString() }
         else -> emptyList()
+    }
+
+private fun Map<String, Any?>.booleanValue(key: String): Boolean? =
+    when (val value = this[key]) {
+        null -> null
+        is Boolean -> value
+        else -> value.toString().toBooleanStrictOrNull()
     }
 
 private fun Map<String, Any?>.longMap(key: String): Map<String, Long> =

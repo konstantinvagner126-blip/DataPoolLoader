@@ -42,6 +42,8 @@ class SqlConsoleService(
         rawSql: String,
         credentialsPath: Path?,
         selectedSourceNames: List<String>,
+        executionPolicy: SqlConsoleExecutionPolicy,
+        transactionMode: SqlConsoleTransactionMode,
         executionControl: SqlConsoleExecutionControl,
     ): SqlConsoleQueryResult =
         executionSupport.executeQuery(
@@ -49,6 +51,8 @@ class SqlConsoleService(
             rawSql = rawSql,
             credentialsPath = credentialsPath,
             selectedSourceNames = selectedSourceNames,
+            executionPolicy = executionPolicy,
+            transactionMode = transactionMode,
             executionControl = executionControl,
         )
 

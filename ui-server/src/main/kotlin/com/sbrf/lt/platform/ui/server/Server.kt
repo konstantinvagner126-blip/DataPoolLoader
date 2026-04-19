@@ -43,6 +43,7 @@ import com.sbrf.lt.platform.ui.module.backend.DatabaseModuleBackend
 import com.sbrf.lt.platform.ui.module.backend.FilesModuleBackend
 import com.sbrf.lt.platform.ui.module.backend.ModuleActor
 import com.sbrf.lt.platform.ui.run.DatabaseModuleExecutionSource
+import com.sbrf.lt.platform.ui.run.DatabaseModuleActiveRunRegistry
 import com.sbrf.lt.platform.ui.run.DatabaseModuleRunOperations
 import com.sbrf.lt.platform.ui.run.DatabaseModuleRunService
 import com.sbrf.lt.platform.ui.run.DatabaseOutputRetentionService
@@ -212,6 +213,7 @@ fun Application.uiModule(
     uiConfigPersistenceService: UiConfigPersistenceService = UiConfigPersistenceService(),
     moduleSyncService: ModuleSyncService? = null,
     databaseModuleRunService: DatabaseModuleRunOperations? = null,
+    databaseModuleActiveRunRegistry: DatabaseModuleActiveRunRegistry = DatabaseModuleActiveRunRegistry(),
     databaseRunHistoryCleanupService: DatabaseRunHistoryCleanupService? = null,
     databaseOutputRetentionService: DatabaseOutputRetentionService? = null,
     filesModuleRunHistoryService: ModuleRunHistoryService = FilesModuleRunHistoryService(moduleRegistry, runManager),
@@ -261,6 +263,7 @@ fun Application.uiModule(
         uiConfigPersistenceService = uiConfigPersistenceService,
         moduleSyncService = moduleSyncService,
         databaseModuleRunService = databaseModuleRunService,
+        databaseModuleActiveRunRegistry = databaseModuleActiveRunRegistry,
         databaseRunHistoryCleanupService = databaseRunHistoryCleanupService,
         databaseOutputRetentionService = databaseOutputRetentionService,
         filesModuleRunHistoryService = filesModuleRunHistoryService,

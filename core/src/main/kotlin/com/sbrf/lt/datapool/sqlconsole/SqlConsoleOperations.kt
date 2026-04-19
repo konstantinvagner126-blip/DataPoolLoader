@@ -16,6 +16,8 @@ interface SqlConsoleOperations {
         rawSql: String,
         credentialsPath: Path?,
         selectedSourceNames: List<String> = emptyList(),
+        executionPolicy: SqlConsoleExecutionPolicy = SqlConsoleExecutionPolicy.STOP_ON_FIRST_ERROR,
+        transactionMode: SqlConsoleTransactionMode = SqlConsoleTransactionMode.AUTO_COMMIT,
         executionControl: SqlConsoleExecutionControl = SqlConsoleExecutionControl(),
     ): SqlConsoleQueryResult
 

@@ -276,6 +276,61 @@
 
 - `2026-04-19`
 
+## P3
+
+### 20. `multi-statement SQL` в SQL-консоли
+
+Статус:
+
+- реализовано
+
+Ключевой результат:
+
+- SQL-консоль умеет разбирать SQL-скрипт на несколько statement-ов;
+- statement-ы выполняются последовательно по каждому выбранному shard/source;
+- поддержаны обе runtime policy:
+  - `STOP_ON_FIRST_ERROR`;
+  - `CONTINUE_ON_ERROR`;
+- добавлен transaction mode `TRANSACTION_PER_SHARD`:
+  - все statement-ы одного shard выполняются в одной JDBC-транзакции;
+  - при ошибке выполняется rollback;
+  - режим совместим только с `STOP_ON_FIRST_ERROR`;
+- результат SQL-консоли расширен до `statementResults`;
+- UI умеет:
+  - переключаться между statement-ами;
+  - показывать данные и статусы по выбранному statement;
+  - экспортировать CSV/ZIP для выбранного statement;
+  - сохранять и менять execution policy и transaction mode.
+
+Основные даты:
+
+- `2026-04-19`
+
+### 21. Refactoring крупных классов
+
+Статус:
+
+- реализовано
+
+Ключевой результат:
+
+- `Server.kt` разложен на runtime context и route-группы;
+- DB-boundary переведены на явные интерфейсы:
+  - `DatabaseModuleRegistryOperations`
+  - `DatabaseModuleRunOperations`
+  - `DatabaseRunExecutionStore / DatabaseRunQueryStore / DatabaseRunMaintenanceStore`
+  - `FilesModuleRunOperations / FilesRunHistoryMaintenanceOperations`
+  - `SqlConsoleOperations / SqlConsoleAsyncQueryOperations`
+- `DatabaseModuleStore`, `DatabaseModuleRunService`, `DatabaseRunStore`, `RunManager`, `SqlConsoleService`, `SqlConsoleQueryManager` и `ApplicationRunner` превращены в тонкие orchestration/facade-слои;
+- тяжелая логика вынесена в support-компоненты:
+  - lifecycle/start/execution/query/event/cleanup/persistence;
+- active-run состояние DB-run слоя больше не хранится в `companion object`, а живет в явном shared registry server runtime;
+- рабочий техдолг по крупным целевым классам закрыт без изменения пользовательского контракта.
+
+Основные даты:
+
+- `2026-04-19`
+
 ### 6. Экспорт результатов SQL-консоли
 
 Статус:

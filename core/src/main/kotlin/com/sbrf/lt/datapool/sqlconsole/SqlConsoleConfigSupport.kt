@@ -49,28 +49,21 @@ internal class SqlConsoleConfigSupport {
         )
     }
 
-    fun parseAndValidateStatement(rawSql: String): SqlConsoleStatement {
+    fun parseAndValidateStatements(rawSql: String): List<SqlConsoleStatement> {
         val trimmed = rawSql.trim()
         require(trimmed.isNotBlank()) { "SQL-запрос не должен быть пустым." }
 
-        val normalized = trimmed
-            .replace(Regex("(?s)/\\*.*?\\*/"), " ")
-            .lineSequence()
-            .map { it.substringBefore("--") }
-            .joinToString(" ")
-            .trim()
-
-        val withoutTrailingSemicolon = normalized.removeSuffix(";").trim()
-        require(!withoutTrailingSemicolon.contains(";")) {
-            "В SQL-консоли разрешен только один SQL-запрос за запуск."
+        val statements = splitStatements(trimmed).map { statementSql ->
+            val normalized = normalizeSql(statementSql)
+            val leadingKeyword = normalized
+                .substringBefore(" ")
+                .ifBlank { normalized }
+                .uppercase()
+            SqlConsoleStatement(sql = statementSql, leadingKeyword = leadingKeyword)
         }
 
-        val leadingKeyword = withoutTrailingSemicolon
-            .substringBefore(" ")
-            .ifBlank { withoutTrailingSemicolon }
-            .uppercase()
-
-        return SqlConsoleStatement(sql = trimmed, leadingKeyword = leadingKeyword)
+        require(statements.isNotEmpty()) { "SQL-запрос не должен быть пустым." }
+        return statements
     }
 
     private fun validateConfig(config: SqlConsoleConfig) {
@@ -103,5 +96,111 @@ internal class SqlConsoleConfigSupport {
             "В SQL-консоли должен быть выбран хотя бы один source."
         }
         return selectedSources
+    }
+
+    private fun normalizeSql(sql: String): String =
+        sql
+            .replace(Regex("(?s)/\\*.*?\\*/"), " ")
+            .lineSequence()
+            .map { it.substringBefore("--") }
+            .joinToString(" ")
+            .trim()
+            .removeSuffix(";")
+            .trim()
+
+    private fun splitStatements(sql: String): List<String> {
+        val statements = mutableListOf<String>()
+        val current = StringBuilder()
+        var index = 0
+        var inSingleQuote = false
+        var inDoubleQuote = false
+        var inLineComment = false
+        var inBlockComment = false
+
+        while (index < sql.length) {
+            val char = sql[index]
+            val next = sql.getOrNull(index + 1)
+
+            when {
+                inLineComment -> {
+                    current.append(char)
+                    if (char == '\n') {
+                        inLineComment = false
+                    }
+                }
+
+                inBlockComment -> {
+                    current.append(char)
+                    if (char == '*' && next == '/') {
+                        current.append(next)
+                        index++
+                        inBlockComment = false
+                    }
+                }
+
+                inSingleQuote -> {
+                    current.append(char)
+                    if (char == '\'' && next == '\'') {
+                        current.append(next)
+                        index++
+                    } else if (char == '\'') {
+                        inSingleQuote = false
+                    }
+                }
+
+                inDoubleQuote -> {
+                    current.append(char)
+                    if (char == '"' && next == '"') {
+                        current.append(next)
+                        index++
+                    } else if (char == '"') {
+                        inDoubleQuote = false
+                    }
+                }
+
+                char == '-' && next == '-' -> {
+                    current.append(char).append(next)
+                    index++
+                    inLineComment = true
+                }
+
+                char == '/' && next == '*' -> {
+                    current.append(char).append(next)
+                    index++
+                    inBlockComment = true
+                }
+
+                char == '\'' -> {
+                    current.append(char)
+                    inSingleQuote = true
+                }
+
+                char == '"' -> {
+                    current.append(char)
+                    inDoubleQuote = true
+                }
+
+                char == ';' -> {
+                    current
+                        .toString()
+                        .trim()
+                        .takeIf { it.isNotBlank() }
+                        ?.let(statements::add)
+                    current.clear()
+                }
+
+                else -> current.append(char)
+            }
+
+            index++
+        }
+
+        current
+            .toString()
+            .trim()
+            .takeIf { it.isNotBlank() }
+            ?.let(statements::add)
+
+        return statements
     }
 }

@@ -20,6 +20,7 @@ import com.sbrf.lt.platform.ui.module.backend.DatabaseModuleBackend
 import com.sbrf.lt.platform.ui.module.backend.FilesModuleBackend
 import com.sbrf.lt.platform.ui.module.backend.ModuleActor
 import com.sbrf.lt.platform.ui.run.DatabaseModuleExecutionSource
+import com.sbrf.lt.platform.ui.run.DatabaseModuleActiveRunRegistry
 import com.sbrf.lt.platform.ui.run.DatabaseModuleRunOperations
 import com.sbrf.lt.platform.ui.run.DatabaseModuleRunService
 import com.sbrf.lt.platform.ui.run.DatabaseOutputRetentionService
@@ -62,6 +63,7 @@ internal class UiServerContext(
     internal val uiConfigPersistenceService: UiConfigPersistenceService,
     private val moduleSyncService: ModuleSyncService?,
     private val databaseModuleRunService: DatabaseModuleRunOperations?,
+    private val databaseModuleActiveRunRegistry: DatabaseModuleActiveRunRegistry,
     private val databaseRunHistoryCleanupService: DatabaseRunHistoryCleanupService?,
     private val databaseOutputRetentionService: DatabaseOutputRetentionService?,
     private val filesModuleRunHistoryService: ModuleRunHistoryService,
@@ -112,6 +114,7 @@ internal class UiServerContext(
                 runExecutionStore = runStore,
                 runQueryStore = runStore,
                 credentialsProvider = credentialsService,
+                activeRunRegistry = databaseModuleActiveRunRegistry,
             )
         }
 

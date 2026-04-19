@@ -30,6 +30,11 @@ class SqlConsoleStore(
         val selectedSources = persistedState.selectedSourceNames
             .filter { it in info.sourceNames }
             .ifEmpty { info.sourceNames }
+        val normalizedTransactionMode = normalizeTransactionMode(persistedState.transactionMode)
+        val normalizedExecutionPolicy = normalizeExecutionPolicy(
+            persistedState.executionPolicy,
+            normalizedTransactionMode,
+        )
         return SqlConsolePageState(
             loading = false,
             runtimeContext = runtimeContext,
@@ -40,6 +45,8 @@ class SqlConsoleStore(
             selectedSourceNames = selectedSources,
             pageSize = normalizePageSize(persistedState.pageSize),
             strictSafetyEnabled = persistedState.strictSafetyEnabled,
+            executionPolicy = normalizedExecutionPolicy,
+            transactionMode = normalizedTransactionMode,
             maxRowsPerShardDraft = info.maxRowsPerShard.toString(),
             queryTimeoutSecDraft = info.queryTimeoutSec?.toString().orEmpty(),
             errorMessage = persistedStateResult.exceptionOrNull()?.message,
@@ -79,6 +86,27 @@ class SqlConsoleStore(
         enabled: Boolean,
     ): SqlConsolePageState =
         current.copy(strictSafetyEnabled = enabled)
+
+    fun updateExecutionPolicy(
+        current: SqlConsolePageState,
+        value: String,
+    ): SqlConsolePageState {
+        val normalized = normalizeExecutionPolicy(value, current.transactionMode)
+        return current.copy(
+            executionPolicy = normalized,
+        )
+    }
+
+    fun updateTransactionMode(
+        current: SqlConsolePageState,
+        value: String,
+    ): SqlConsolePageState {
+        val normalized = normalizeTransactionMode(value)
+        return current.copy(
+            transactionMode = normalized,
+            executionPolicy = normalizeExecutionPolicy(current.executionPolicy, normalized),
+        )
+    }
 
     fun updateMaxRowsPerShardDraft(
         current: SqlConsolePageState,
@@ -220,6 +248,8 @@ class SqlConsoleStore(
                 SqlConsoleQueryStartRequest(
                     sql = sql,
                     selectedSourceNames = current.selectedSourceNames,
+                    executionPolicy = current.executionPolicy,
+                    transactionMode = current.transactionMode,
                 ),
             )
             current.copy(
@@ -297,6 +327,8 @@ private fun SqlConsolePageState.toPersistedState(): SqlConsoleStateUpdate =
         selectedSourceNames = selectedSourceNames,
         pageSize = pageSize,
         strictSafetyEnabled = strictSafetyEnabled,
+        executionPolicy = executionPolicy,
+        transactionMode = transactionMode,
     )
 
 private fun rememberQuery(
@@ -310,4 +342,25 @@ private fun normalizePageSize(value: Int): Int =
     when (value) {
         25, 50, 100 -> value
         else -> 50
+    }
+
+private fun normalizeExecutionPolicy(
+    value: String,
+    transactionMode: String,
+): String {
+    val normalized = when (value.uppercase()) {
+        "CONTINUE_ON_ERROR" -> "CONTINUE_ON_ERROR"
+        else -> "STOP_ON_FIRST_ERROR"
+    }
+    return if (transactionMode == "TRANSACTION_PER_SHARD" && normalized == "CONTINUE_ON_ERROR") {
+        "STOP_ON_FIRST_ERROR"
+    } else {
+        normalized
+    }
+}
+
+private fun normalizeTransactionMode(value: String): String =
+    when (value.uppercase()) {
+        "TRANSACTION_PER_SHARD" -> "TRANSACTION_PER_SHARD"
+        else -> "AUTO_COMMIT"
     }

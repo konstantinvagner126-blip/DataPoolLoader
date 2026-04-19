@@ -29,6 +29,16 @@ enum class SqlConsoleStatementType {
     COMMAND,
 }
 
+enum class SqlConsoleExecutionPolicy {
+    STOP_ON_FIRST_ERROR,
+    CONTINUE_ON_ERROR,
+}
+
+enum class SqlConsoleTransactionMode {
+    AUTO_COMMIT,
+    TRANSACTION_PER_SHARD,
+}
+
 data class SqlConsoleStatement(
     val sql: String,
     val leadingKeyword: String,
@@ -65,6 +75,14 @@ data class SqlConsoleQueryResult(
     val statementKeyword: String,
     val shardResults: List<RawShardExecutionResult>,
     val maxRowsPerShard: Int,
+    val statementResults: List<SqlConsoleStatementResult> = emptyList(),
+)
+
+data class SqlConsoleStatementResult(
+    val sql: String,
+    val statementType: SqlConsoleStatementType,
+    val statementKeyword: String,
+    val shardResults: List<RawShardExecutionResult>,
 )
 
 data class SqlConsoleConnectionCheckResult(

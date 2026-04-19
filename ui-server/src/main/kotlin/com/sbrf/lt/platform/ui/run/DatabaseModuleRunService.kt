@@ -5,12 +5,9 @@ import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.sbrf.lt.datapool.app.ApplicationRunner
-import com.sbrf.lt.platform.ui.model.DatabaseModuleRunDetailsResponse
-import com.sbrf.lt.platform.ui.model.DatabaseModuleRunsResponse
 import com.sbrf.lt.platform.ui.model.DatabaseRunStartResponse
 import com.sbrf.lt.platform.ui.module.DatabaseModuleRegistryOperations
 import org.slf4j.LoggerFactory
-import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
@@ -24,6 +21,7 @@ open class DatabaseModuleRunService(
     private val runQueryStore: DatabaseRunQueryStore,
     private val applicationRunner: ApplicationRunner = ApplicationRunner(),
     private val credentialsProvider: UiCredentialsProvider,
+    private val activeRunRegistry: DatabaseModuleActiveRunRegistry = DatabaseModuleActiveRunRegistry(),
     private val executor: ExecutorService = Executors.newCachedThreadPool(),
     private val objectMapper: ObjectMapper = jacksonObjectMapper()
         .registerModule(JavaTimeModule())
@@ -47,10 +45,10 @@ open class DatabaseModuleRunService(
         eventSupport = eventSupport,
         logger = logger,
     )
-
-    companion object {
-        private val activeRunIdsByModule = ConcurrentHashMap<String, String>()
-    }
+    private val querySupport = DatabaseModuleRunQuerySupport(
+        runQueryStore = runQueryStore,
+        activeRunRegistry = activeRunRegistry,
+    )
 
     override fun startRun(
         moduleCode: String,
@@ -63,9 +61,9 @@ open class DatabaseModuleRunService(
             actorId = actorId,
             actorSource = actorSource,
             actorDisplayName = actorDisplayName,
-            localActiveRunId = activeRunIdsByModule[moduleCode],
+            localActiveRunId = activeRunRegistry.currentRunId(moduleCode),
         )
-        activeRunIdsByModule[moduleCode] = context.runId
+        activeRunRegistry.markActive(moduleCode, context.runId)
         executor.submit {
             try {
                 executionSupport.executeRun(
@@ -73,7 +71,7 @@ open class DatabaseModuleRunService(
                     context = context,
                 )
             } finally {
-                activeRunIdsByModule.remove(moduleCode, context.runId)
+                activeRunRegistry.clear(moduleCode, context.runId)
             }
         }
 
@@ -88,18 +86,11 @@ open class DatabaseModuleRunService(
         )
     }
 
-    override fun listRuns(moduleCode: String, limit: Int): DatabaseModuleRunsResponse =
-        DatabaseModuleRunsResponse(
-            moduleCode = moduleCode,
-            runs = runQueryStore.listRuns(moduleCode, limit),
-        )
+    override fun listRuns(moduleCode: String, limit: Int) =
+        querySupport.listRuns(moduleCode, limit)
 
-    override fun loadRunDetails(moduleCode: String, runId: String): DatabaseModuleRunDetailsResponse =
-        runQueryStore.loadRunDetails(moduleCode, runId)
+    override fun loadRunDetails(moduleCode: String, runId: String) =
+        querySupport.loadRunDetails(moduleCode, runId)
 
-    override fun activeModuleCodes(): Set<String> =
-        buildSet {
-            addAll(runQueryStore.activeModuleCodes())
-            addAll(activeRunIdsByModule.keys)
-        }
+    override fun activeModuleCodes(): Set<String> = querySupport.activeModuleCodes()
 }

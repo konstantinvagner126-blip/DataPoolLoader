@@ -3,6 +3,7 @@ package com.sbrf.lt.platform.composeui.module_editor
 import com.sbrf.lt.platform.composeui.foundation.http.ComposeHttpClient
 import com.sbrf.lt.platform.composeui.model.DatabaseModulesCatalogResponse
 import com.sbrf.lt.platform.composeui.model.FilesModulesCatalogResponse
+import com.sbrf.lt.platform.composeui.model.RuntimeContext
 
 class ModuleEditorApiClient(
     private val httpClient: ComposeHttpClient = ComposeHttpClient(),
@@ -14,6 +15,9 @@ class ModuleEditorApiClient(
         val suffix = if (includeHidden) "?includeHidden=true" else ""
         return httpClient.get("/api/db/modules/catalog$suffix", DatabaseModulesCatalogResponse.serializer())
     }
+
+    override suspend fun loadRuntimeContext(): RuntimeContext =
+        httpClient.get("/api/ui/runtime-context", RuntimeContext.serializer())
 
     override suspend fun loadFilesSession(moduleId: String): ModuleEditorSessionResponse =
         httpClient.get("/api/modules/$moduleId", ModuleEditorSessionResponse.serializer())

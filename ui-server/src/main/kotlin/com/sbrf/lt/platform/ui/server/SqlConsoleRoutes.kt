@@ -1,5 +1,7 @@
 package com.sbrf.lt.platform.ui.server
 
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleExecutionPolicy
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleTransactionMode
 import com.sbrf.lt.platform.ui.model.SqlConsoleExportRequest
 import com.sbrf.lt.platform.ui.model.SqlConsoleQueryRequest
 import com.sbrf.lt.platform.ui.model.SqlConsoleSettingsUpdateRequest
@@ -70,6 +72,8 @@ internal fun Route.registerSqlConsoleRoutes(context: UiServerContext) {
                     rawSql = request.sql,
                     credentialsPath = credentialsPath,
                     selectedSourceNames = request.selectedSourceNames,
+                    executionPolicy = request.toExecutionPolicy(),
+                    transactionMode = request.toTransactionMode(),
                 ).toResponse(),
             )
         } finally {
@@ -121,6 +125,8 @@ internal fun Route.registerSqlConsoleRoutes(context: UiServerContext) {
                     sql = request.sql,
                     credentialsPath = credentialsPath,
                     selectedSourceNames = request.selectedSourceNames,
+                    executionPolicy = request.toExecutionPolicy(),
+                    transactionMode = request.toTransactionMode(),
                     cleanupDir = tempDir,
                 ).toStartResponse(),
             )
@@ -138,3 +144,11 @@ internal fun Route.registerSqlConsoleRoutes(context: UiServerContext) {
         call.respond(context.sqlConsoleQueryManager.cancel(requireNotNull(call.parameters["id"])).toResponse())
     }
 }
+
+private fun SqlConsoleQueryRequest.toExecutionPolicy(): SqlConsoleExecutionPolicy =
+    runCatching { SqlConsoleExecutionPolicy.valueOf(executionPolicy.uppercase()) }
+        .getOrDefault(SqlConsoleExecutionPolicy.STOP_ON_FIRST_ERROR)
+
+private fun SqlConsoleQueryRequest.toTransactionMode(): SqlConsoleTransactionMode =
+    runCatching { SqlConsoleTransactionMode.valueOf(transactionMode.uppercase()) }
+        .getOrDefault(SqlConsoleTransactionMode.AUTO_COMMIT)

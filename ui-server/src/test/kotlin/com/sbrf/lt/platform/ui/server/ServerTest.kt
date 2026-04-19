@@ -12,6 +12,8 @@ import com.sbrf.lt.datapool.sqlconsole.SqlConsoleExecutionCancelledException
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleSourceConfig
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleService
 import com.sbrf.lt.datapool.app.ApplicationRunner
+import com.sbrf.lt.datapool.app.port.TargetImporter
+import com.sbrf.lt.datapool.app.port.TargetSchemaValidator
 import com.sbrf.lt.datapool.db.registry.DatabaseConnectionProvider
 import com.sbrf.lt.datapool.db.registry.model.RegistryModuleCreationResult
 import com.sbrf.lt.datapool.db.registry.model.RegistryModuleDraft
@@ -95,6 +97,13 @@ import java.sql.PreparedStatement
 import java.sql.ResultSet
 import java.sql.ResultSetMetaData
 import java.time.Instant
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import com.sbrf.lt.datapool.model.ExecutionStatus
+import com.sbrf.lt.datapool.model.TargetLoadSummary
+import com.sbrf.lt.datapool.model.SourceExecutionResult
+import com.sbrf.lt.datapool.app.SourceExportProgressEvent
+import com.sbrf.lt.datapool.app.SourceExportStartedEvent
 import org.slf4j.helpers.NOPLogger
 
 class ServerTest {
@@ -1022,6 +1031,16 @@ class ServerTest {
                         rows = listOf(listOf(1)),
                     )
                 },
+                targetTableValidator = TargetSchemaValidator { _, _, _, _, _ -> Unit },
+                importer = TargetImporter { target, _, _, _, _, expectedRowCount, _ ->
+                    TargetLoadSummary(
+                        table = target.table,
+                        status = ExecutionStatus.SUCCESS,
+                        rowCount = expectedRowCount,
+                        finishedAt = Instant.now(),
+                        enabled = true,
+                    )
+                },
             ),
             uiConfig = uiConfig,
         )
@@ -1033,7 +1052,17 @@ class ServerTest {
                   commonSqlFile: classpath:sql/common.sql
                   sources:
                     - name: db2
+                      jdbcUrl: jdbc:postgresql://localhost:5432/source
+                      username: source_user
+                      password: source_password
                       sqlFile: classpath:sql/db2.sql
+                  target:
+                    enabled: true
+                    jdbcUrl: jdbc:postgresql://localhost:5432/target
+                    username: target_user
+                    password: target_password
+                    table: public.demo_target
+                    truncateBeforeLoad: true
                 """.trimIndent(),
                 sqlFiles = mapOf(
                     "classpath:sql/common.sql" to "select 1",
@@ -1072,8 +1101,112 @@ class ServerTest {
 
         val detailsResponse = client.get("/api/module-runs/files/demo-app/runs/${startedRun.id}")
         assertEquals(HttpStatusCode.OK, detailsResponse.status)
-        assertTrue(detailsResponse.bodyAsText().contains("\"events\":"))
-        assertTrue(detailsResponse.bodyAsText().contains("\"artifacts\":"))
+        val detailsBody = detailsResponse.bodyAsText()
+        assertTrue(detailsBody.contains("\"events\":"))
+        assertTrue(detailsBody.contains("\"artifacts\":"))
+        assertFalse(detailsBody.contains("\"timestamp\":null"))
+        assertTrue(detailsBody.contains("\"targetStatus\":\"SUCCESS\""))
+        assertTrue(detailsBody.contains("\"targetTableName\":\"public.demo_target\""))
+        assertTrue(detailsBody.contains("\"targetRowsLoaded\":1"))
+    }
+
+    @Test
+    fun `module runs api returns live files details for active run`() = testApplication {
+        val root = createProject()
+        val registry = ModuleRegistry(appsRoot = root.resolve("apps"))
+        val uiConfig = UiAppConfig(
+            storageDir = Files.createTempDirectory("ui-runs-api-files-live-state-").toString(),
+            moduleStore = UiModuleStoreConfig(mode = UiModuleStoreMode.FILES),
+            sqlConsole = SqlConsoleConfig(),
+        )
+        val progressLatch = CountDownLatch(1)
+        val releaseLatch = CountDownLatch(1)
+        val runManager = RunManager(
+            moduleRegistry = registry,
+            applicationRunner = ApplicationRunner(
+                exporter = { task ->
+                    val startedAt = Instant.now()
+                    task.executionListener.onEvent(SourceExportStartedEvent(startedAt, task.source.name))
+                    task.executionListener.onEvent(SourceExportProgressEvent(Instant.now(), task.source.name, 1))
+                    progressLatch.countDown()
+                    check(releaseLatch.await(5, TimeUnit.SECONDS)) { "Timed out waiting to release exporter" }
+                    Files.writeString(task.outputFile, "id\n1\n")
+                    SourceExecutionResult(
+                        sourceName = task.source.name,
+                        status = ExecutionStatus.SUCCESS,
+                        rowCount = 1,
+                        outputFile = task.outputFile,
+                        columns = listOf("id"),
+                        startedAt = startedAt,
+                        finishedAt = Instant.now(),
+                    )
+                },
+                targetTableValidator = TargetSchemaValidator { _, _, _, _, _ -> Unit },
+                importer = TargetImporter { target, _, _, _, _, expectedRowCount, _ ->
+                    TargetLoadSummary(
+                        table = target.table,
+                        status = ExecutionStatus.SUCCESS,
+                        rowCount = expectedRowCount,
+                        finishedAt = Instant.now(),
+                        enabled = true,
+                    )
+                },
+            ),
+            uiConfig = uiConfig,
+        )
+
+        try {
+            val startedRun = runManager.startRun(
+                StartRunRequest(
+                    moduleId = "demo-app",
+                    configText = """
+                    app:
+                      commonSqlFile: classpath:sql/common.sql
+                      sources:
+                        - name: db2
+                          jdbcUrl: jdbc:postgresql://localhost:5432/source
+                          username: source_user
+                          password: source_password
+                          sqlFile: classpath:sql/db2.sql
+                      target:
+                        enabled: true
+                        jdbcUrl: jdbc:postgresql://localhost:5432/target
+                        username: target_user
+                        password: target_password
+                        table: public.demo_target
+                        truncateBeforeLoad: true
+                    """.trimIndent(),
+                    sqlFiles = mapOf(
+                        "classpath:sql/common.sql" to "select 1",
+                        "classpath:sql/db2.sql" to "select 2",
+                    ),
+                ),
+            )
+            assertTrue(progressLatch.await(2, TimeUnit.SECONDS))
+
+            application {
+                uiModule(
+                    uiConfig = uiConfig,
+                    moduleRegistry = registry,
+                    runManager = runManager,
+                    runtimeContextService = object : UiRuntimeContextService() {
+                        override fun resolve(uiConfig: UiAppConfig): UiRuntimeContext =
+                            testRuntimeContext(UiModuleStoreMode.FILES)
+                    },
+                )
+            }
+
+            val detailsResponse = client.get("/api/module-runs/files/demo-app/runs/${startedRun.id}")
+            assertEquals(HttpStatusCode.OK, detailsResponse.status)
+            val detailsBody = detailsResponse.bodyAsText()
+            assertFalse(detailsBody.contains("\"timestamp\":null"))
+            assertTrue(detailsBody.contains("\"status\":\"RUNNING\""))
+            assertTrue(detailsBody.contains("\"targetStatus\":\"PENDING\""))
+            assertTrue(detailsBody.contains("\"sourceName\":\"db2\""))
+            assertTrue(detailsBody.contains("\"rowCount\":1"))
+        } finally {
+            releaseLatch.countDown()
+        }
     }
 
     @Test
@@ -1279,6 +1412,179 @@ class ServerTest {
         assertTrue(detailsResponse.bodyAsText().contains("\"summaryJson\":\"{\\\"mergedRowCount\\\":10}\""))
         assertTrue(detailsResponse.bodyAsText().contains("\"sourceName\":\"db1\""))
         assertTrue(detailsResponse.bodyAsText().contains("\"artifactKind\":\"SUMMARY_JSON\""))
+    }
+
+    @Test
+    fun `module runs api returns live database details for active run`() = testApplication {
+        val uiConfig = UiAppConfig(
+            storageDir = Files.createTempDirectory("ui-runs-api-db-active-state-").toString(),
+            moduleStore = UiModuleStoreConfig(mode = UiModuleStoreMode.DATABASE),
+            sqlConsole = SqlConsoleConfig(),
+        )
+        val runtimeContextService = object : UiRuntimeContextService() {
+            override fun resolve(uiConfig: UiAppConfig): UiRuntimeContext =
+                testRuntimeContext(UiModuleStoreMode.DATABASE)
+        }
+        val databaseBackend = DatabaseModuleBackend(
+            object : DatabaseModuleStore(
+                connectionProvider = DatabaseConnectionProvider { error("connection must not be requested") },
+            ) {
+                override fun loadModuleDetails(
+                    moduleCode: String,
+                    actorId: String,
+                    actorSource: String,
+                ) = DatabaseEditableModule(
+                    module = ModuleDetailsResponse(
+                        id = moduleCode,
+                        descriptor = com.sbrf.lt.platform.ui.model.ModuleMetadataDescriptorResponse(
+                            title = "DB Demo Active",
+                        ),
+                        configPath = "db:$moduleCode",
+                        configText = "app:\n  sources: []",
+                        sqlFiles = emptyList(),
+                        requiresCredentials = false,
+                        credentialsStatus = com.sbrf.lt.platform.ui.model.CredentialsStatusResponse(
+                            mode = "NOT_FOUND",
+                            displayName = "credential.properties не найден",
+                            fileAvailable = false,
+                            uploaded = false,
+                        ),
+                    ),
+                    sourceKind = "CURRENT_REVISION",
+                    currentRevisionId = "revision-active",
+                )
+            },
+        )
+        val runService = object : DatabaseModuleRunService(
+            databaseModuleStore = DatabaseModuleStore(
+                connectionProvider = DatabaseConnectionProvider { error("connection must not be requested") },
+            ),
+            executionSource = DatabaseModuleExecutionSource(
+                connectionProvider = DatabaseConnectionProvider { error("connection must not be requested") },
+            ),
+            runExecutionStore = DatabaseRunStore(
+                connectionProvider = DatabaseConnectionProvider { error("connection must not be requested") },
+            ),
+            runQueryStore = DatabaseRunStore(
+                connectionProvider = DatabaseConnectionProvider { error("connection must not be requested") },
+            ),
+            credentialsProvider = object : UiCredentialsProvider {
+                override fun materializeCredentialsFile(tempDir: Path) = null
+
+                override fun currentProperties(): Map<String, String> = emptyMap()
+
+                override fun currentCredentialsStatus() = com.sbrf.lt.platform.ui.model.CredentialsStatusResponse(
+                    mode = "NOT_FOUND",
+                    displayName = "credential.properties не найден",
+                    fileAvailable = false,
+                    uploaded = false,
+                )
+            },
+        ) {
+            override fun listRuns(moduleCode: String, limit: Int): com.sbrf.lt.platform.ui.model.DatabaseModuleRunsResponse =
+                com.sbrf.lt.platform.ui.model.DatabaseModuleRunsResponse(
+                    moduleCode = moduleCode,
+                    runs = listOf(
+                        com.sbrf.lt.platform.ui.model.DatabaseModuleRunSummaryResponse(
+                            runId = "run-active",
+                            executionSnapshotId = "snapshot-active",
+                            status = "RUNNING",
+                            launchSourceKind = "WORKING_COPY",
+                            requestedAt = Instant.parse("2026-04-19T08:00:00Z"),
+                            startedAt = Instant.parse("2026-04-19T08:00:02Z"),
+                            finishedAt = null,
+                            moduleCode = moduleCode,
+                            moduleTitle = "DB Demo Active",
+                            outputDir = "/tmp/out-active",
+                            mergedRowCount = 1234,
+                            successfulSourceCount = 0,
+                            failedSourceCount = 0,
+                            skippedSourceCount = 0,
+                            targetStatus = "RUNNING",
+                            targetTableName = "demo_target_active",
+                            targetRowsLoaded = null,
+                            errorMessage = null,
+                        ),
+                    ).take(limit),
+                )
+
+            override fun loadRunDetails(
+                moduleCode: String,
+                runId: String,
+            ): com.sbrf.lt.platform.ui.model.DatabaseModuleRunDetailsResponse =
+                com.sbrf.lt.platform.ui.model.DatabaseModuleRunDetailsResponse(
+                    run = com.sbrf.lt.platform.ui.model.DatabaseModuleRunSummaryResponse(
+                        runId = runId,
+                        executionSnapshotId = "snapshot-active",
+                        status = "RUNNING",
+                        launchSourceKind = "WORKING_COPY",
+                        requestedAt = Instant.parse("2026-04-19T08:00:00Z"),
+                        startedAt = Instant.parse("2026-04-19T08:00:02Z"),
+                        finishedAt = null,
+                        moduleCode = moduleCode,
+                        moduleTitle = "DB Demo Active",
+                        outputDir = "/tmp/out-active",
+                        mergedRowCount = 1234,
+                        successfulSourceCount = 0,
+                        failedSourceCount = 0,
+                        skippedSourceCount = 0,
+                        targetStatus = "RUNNING",
+                        targetTableName = "demo_target_active",
+                        targetRowsLoaded = null,
+                        errorMessage = null,
+                    ),
+                    summaryJson = """{"mergedRowCount":1234}""",
+                    sourceResults = listOf(
+                        com.sbrf.lt.platform.ui.model.DatabaseRunSourceResultResponse(
+                            runSourceResultId = "source-active-1",
+                            sourceName = "db3",
+                            sortOrder = 0,
+                            status = "RUNNING",
+                            startedAt = Instant.parse("2026-04-19T08:00:03Z"),
+                            finishedAt = null,
+                            exportedRowCount = 10000,
+                            mergedRowCount = null,
+                            errorMessage = null,
+                        ),
+                    ),
+                    events = listOf(
+                        com.sbrf.lt.platform.ui.model.DatabaseRunEventResponse(
+                            runEventId = "event-active-1",
+                            seqNo = 1,
+                            createdAt = Instant.parse("2026-04-19T08:00:05Z"),
+                            stage = "SOURCE",
+                            eventType = "SOURCE_PROGRESS",
+                            severity = "INFO",
+                            sourceName = "db3",
+                            message = "Источник db3: выгружено 10000 строк.",
+                            payloadJson = mapOf("rowCount" to 10000),
+                        ),
+                    ),
+                    artifacts = emptyList(),
+                )
+        }
+        application {
+            uiModule(
+                uiConfig = uiConfig,
+                runtimeContextService = runtimeContextService,
+                databaseModuleRunService = runService,
+                databaseModuleBackend = databaseBackend,
+            )
+        }
+
+        val historyResponse = client.get("/api/module-runs/database/db-demo/runs?limit=1")
+        assertEquals(HttpStatusCode.OK, historyResponse.status)
+        assertTrue(historyResponse.bodyAsText().contains("\"activeRunId\":\"run-active\""))
+        assertTrue(historyResponse.bodyAsText().contains("\"targetStatus\":\"RUNNING\""))
+
+        val detailsResponse = client.get("/api/module-runs/database/db-demo/runs/run-active")
+        assertEquals(HttpStatusCode.OK, detailsResponse.status)
+        val detailsBody = detailsResponse.bodyAsText()
+        assertTrue(detailsBody.contains("\"status\":\"RUNNING\""))
+        assertTrue(detailsBody.contains("\"sourceName\":\"db3\""))
+        assertTrue(detailsBody.contains("\"exportedRowCount\":10000"))
+        assertTrue(detailsBody.contains("Источник db3: выгружено 10000 строк."))
+        assertTrue(detailsBody.contains("\"targetTableName\":\"demo_target_active\""))
     }
 
     @Test

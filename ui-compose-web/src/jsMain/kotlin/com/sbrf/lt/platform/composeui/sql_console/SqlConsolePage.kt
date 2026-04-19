@@ -73,16 +73,20 @@ fun ComposeSqlConsolePage(
     var credentialsMessage by remember { mutableStateOf<String?>(null) }
     var credentialsMessageLevel by remember { mutableStateOf("success") }
     var activeOutputTab by remember { mutableStateOf("data") }
+    var selectedStatementIndex by remember { mutableStateOf(0) }
     var selectedResultShard by remember { mutableStateOf<String?>(null) }
     var currentDataPage by remember { mutableStateOf(1) }
     val currentExecution = state.currentExecution
     val currentResult = currentExecution?.result
+    val statementResults = currentResult.statementResultsOrSelf()
+    val activeStatementResult = statementResults.getOrNull(selectedStatementIndex)
     val statementAnalysis = analyzeSqlStatement(state.draftSql)
     val isRunning = currentExecution?.status.equals("RUNNING", ignoreCase = true)
     val runButtonClass = buildRunButtonClass(statementAnalysis, state.strictSafetyEnabled)
     val runtimeContext = state.runtimeContext
     val connectionStatusBySource = state.connectionCheck?.sourceResults?.associateBy { it.sourceName }.orEmpty()
-    val activeExportShard = currentResult
+    val exportableResult = activeStatementResult?.toStandaloneQueryResult(currentResult)
+    val activeExportShard = activeStatementResult
         ?.takeIf { it.statementType == "RESULT_SET" }
         ?.shardResults
         ?.firstOrNull { it.shardName == selectedResultShard && it.status.equals("SUCCESS", ignoreCase = true) && it.rows.isNotEmpty() }
@@ -94,15 +98,26 @@ fun ComposeSqlConsolePage(
         credentialsStatus = loadCredentialsStatus(httpClient)
     }
 
-    LaunchedEffect(currentResult?.statementType, currentResult?.shardResults?.joinToString("\u0001") { it.shardName }) {
+    LaunchedEffect(
+        currentResult?.statementType,
+        currentResult?.statementKeyword,
+        currentResult?.statementResults?.joinToString("\u0001") { it.statementKeyword + ":" + it.shardResults.joinToString(",") { shard -> shard.shardName } },
+        currentResult?.shardResults?.joinToString("\u0001") { it.shardName },
+    ) {
         if (currentResult == null) {
             activeOutputTab = "data"
+            selectedStatementIndex = 0
             selectedResultShard = null
             currentDataPage = 1
         } else {
-            if (currentResult.statementType == "RESULT_SET") {
+            val normalizedStatementIndex = selectedStatementIndex.coerceIn(0, statementResults.lastIndex.coerceAtLeast(0))
+            if (selectedStatementIndex != normalizedStatementIndex) {
+                selectedStatementIndex = normalizedStatementIndex
+            }
+            val resultForDisplay = statementResults.getOrNull(normalizedStatementIndex)
+            if (resultForDisplay?.statementType == "RESULT_SET") {
                 activeOutputTab = "data"
-                val successfulShards = currentResult.shardResults.filter { it.status.equals("SUCCESS", ignoreCase = true) }
+                val successfulShards = resultForDisplay.shardResults.filter { it.status.equals("SUCCESS", ignoreCase = true) }
                 if (selectedResultShard !in successfulShards.map { it.shardName }) {
                     selectedResultShard = successfulShards.firstOrNull()?.shardName
                     currentDataPage = 1
@@ -141,7 +156,7 @@ fun ComposeSqlConsolePage(
     PageScaffold(
         eyebrow = "Load Testing Data Platform",
         title = "SQL-консоль по источникам",
-        subtitle = "Проверяй доступность sources, выполняй SQL по выбранным подключениям и сравнивай данные или статусы отдельно по каждому источнику.",
+        subtitle = "Проверяй доступность sources, выполняй один SQL или SQL-скрипт по выбранным подключениям и сравнивай результат по каждому statement и source.",
         heroClassNames = listOf("hero-card-compact", "sql-console-hero"),
         heroCopyClassNames = listOf("sql-console-hero-copy"),
         heroHeader = {
@@ -354,7 +369,7 @@ fun ComposeSqlConsolePage(
                             Div {
                                 Div({ classes("panel-title", "mb-1") }) { Text("SQL-редактор") }
                                 Div({ classes("text-secondary", "small") }) {
-                                    Text("Поддерживается один SQL за запуск. Если запрос возвращает данные, результат показывается отдельно по каждому source.")
+                                    Text("Поддерживается один SQL или SQL-скрипт из нескольких statement-ов. Результат показывается отдельно по каждому statement и source.")
                                 }
                             }
                         }
@@ -384,6 +399,12 @@ fun ComposeSqlConsolePage(
                             },
                             onStrictSafetyToggle = {
                                 state = store.updateStrictSafety(state, !state.strictSafetyEnabled)
+                            },
+                            onExecutionPolicyChange = {
+                                state = store.updateExecutionPolicy(state, it)
+                            },
+                            onTransactionModeChange = {
+                                state = store.updateTransactionMode(state, it)
                             },
                         )
 
@@ -459,7 +480,7 @@ fun ComposeSqlConsolePage(
                                         disabled()
                                     }
                                     onClick {
-                                        val result = currentResult ?: return@onClick
+                                        val result = exportableResult ?: return@onClick
                                         val shardName = activeExportShard ?: return@onClick
                                         scope.launch {
                                             runCatching {
@@ -486,11 +507,11 @@ fun ComposeSqlConsolePage(
                                 Button(attrs = {
                                     classes("btn", "btn-outline-secondary")
                                     attr("type", "button")
-                                    if (currentResult?.statementType != "RESULT_SET") {
+                                    if (exportableResult?.statementType != "RESULT_SET") {
                                         disabled()
                                     }
                                     onClick {
-                                        val result = currentResult ?: return@onClick
+                                        val result = exportableResult ?: return@onClick
                                         scope.launch {
                                             runCatching {
                                                 httpClient.downloadPostJson(
@@ -517,9 +538,18 @@ fun ComposeSqlConsolePage(
                         ExecutionStatusStrip(currentExecution)
 
                         Div({ classes("sql-output-panel") }) {
+                            StatementSelectionBlock(
+                                statementResults = statementResults,
+                                selectedStatementIndex = selectedStatementIndex,
+                                onSelectStatement = {
+                                    selectedStatementIndex = it
+                                    selectedResultShard = null
+                                    currentDataPage = 1
+                                },
+                            )
                             QueryOutputPanel(
                                 execution = currentExecution,
-                                result = currentResult,
+                                result = exportableResult,
                                 pageSize = state.pageSize,
                                 activeTab = activeOutputTab,
                                 selectedShard = selectedResultShard,
@@ -562,6 +592,16 @@ private fun SqlConsoleOverviewStrip(
         else -> execution.status
     }
     val safetyLabel = if (state.strictSafetyEnabled) "Только read-only" else "Разрешены mutating SQL"
+    val executionPolicyLabel = if (state.executionPolicy == "CONTINUE_ON_ERROR") {
+        "Продолжать после ошибки"
+    } else {
+        "Останавливать shard после ошибки"
+    }
+    val transactionModeLabel = if (state.transactionMode == "TRANSACTION_PER_SHARD") {
+        "Одна транзакция на shard"
+    } else {
+        "Авто-коммит"
+    }
 
     Div({ classes("sql-console-overview-grid", "mb-4") }) {
         SqlConsoleOverviewCard(
@@ -582,6 +622,24 @@ private fun SqlConsoleOverviewStrip(
             label = "Последний запуск",
             value = executionLabel,
             note = connectionStatusText ?: "Проверка подключений еще не выполнялась.",
+        )
+        SqlConsoleOverviewCard(
+            label = "Скрипт policy",
+            value = executionPolicyLabel,
+            note = if (state.executionPolicy == "CONTINUE_ON_ERROR") {
+                "Следующие statement-ы продолжают выполняться даже после ошибки на shard."
+            } else {
+                "После ошибки на shard последующие statement-ы для него помечаются как SKIPPED."
+            },
+        )
+        SqlConsoleOverviewCard(
+            label = "Транзакции",
+            value = transactionModeLabel,
+            note = if (state.transactionMode == "TRANSACTION_PER_SHARD") {
+                "Все statement-ы для одного shard выполняются в одной JDBC-транзакции и откатываются при первой ошибке."
+            } else {
+                "Каждый statement выполняется в своем обычном auto-commit цикле."
+            },
         )
     }
 }
@@ -646,6 +704,8 @@ private fun QueryLibraryBlock(
     onRemoveFavorite: () -> Unit,
     onClearRecent: () -> Unit,
     onStrictSafetyToggle: () -> Unit,
+    onExecutionPolicyChange: (String) -> Unit,
+    onTransactionModeChange: (String) -> Unit,
 ) {
     Div({ classes("sql-query-library", "mb-3") }) {
         Div({ classes("sql-query-library-row") }) {
@@ -736,6 +796,48 @@ private fun QueryLibraryBlock(
                 Span { Text("Строгая защита: разрешать только read-only запросы") }
             }
         }
+        Div({ classes("sql-query-library-block") }) {
+            Label(attrs = {
+                classes("small", "text-secondary", "mb-1")
+                attr("for", "composeExecutionPolicy")
+            }) { Text("Политика выполнения скрипта") }
+            Select(attrs = {
+                id("composeExecutionPolicy")
+                classes("form-select", "form-select-sm", "sql-recent-query-select")
+                onChange { onExecutionPolicyChange(it.value ?: "STOP_ON_FIRST_ERROR") }
+            }) {
+                Option(value = "STOP_ON_FIRST_ERROR", attrs = {
+                    if (state.executionPolicy == "STOP_ON_FIRST_ERROR") selected()
+                }) { Text("Остановить shard после ошибки") }
+                Option(value = "CONTINUE_ON_ERROR", attrs = {
+                    if (state.executionPolicy == "CONTINUE_ON_ERROR") selected()
+                    if (state.transactionMode == "TRANSACTION_PER_SHARD") disabled()
+                }) { Text("Продолжать несмотря на ошибки") }
+            }
+            if (state.transactionMode == "TRANSACTION_PER_SHARD") {
+                Div({ classes("small", "text-secondary", "mt-1") }) {
+                    Text("В транзакционном режиме доступна только политика «Остановить shard после ошибки».")
+                }
+            }
+        }
+        Div({ classes("sql-query-library-block") }) {
+            Label(attrs = {
+                classes("small", "text-secondary", "mb-1")
+                attr("for", "composeTransactionMode")
+            }) { Text("Режим транзакций") }
+            Select(attrs = {
+                id("composeTransactionMode")
+                classes("form-select", "form-select-sm", "sql-recent-query-select")
+                onChange { onTransactionModeChange(it.value ?: "AUTO_COMMIT") }
+            }) {
+                Option(value = "AUTO_COMMIT", attrs = {
+                    if (state.transactionMode == "AUTO_COMMIT") selected()
+                }) { Text("Авто-коммит") }
+                Option(value = "TRANSACTION_PER_SHARD", attrs = {
+                    if (state.transactionMode == "TRANSACTION_PER_SHARD") selected()
+                }) { Text("Одна транзакция на shard") }
+            }
+        }
     }
 }
 
@@ -760,6 +862,38 @@ private fun CommandGuardrail(
     }
     Div({ classes(*cssClass.split(" ").toTypedArray()) }) {
         Text(text)
+    }
+}
+
+@Composable
+private fun StatementSelectionBlock(
+    statementResults: List<SqlConsoleStatementResult>,
+    selectedStatementIndex: Int,
+    onSelectStatement: (Int) -> Unit,
+) {
+    if (statementResults.size <= 1) {
+        return
+    }
+
+    Div({ classes("sql-query-library", "mb-3") }) {
+        Div({ classes("small", "text-secondary", "mb-2") }) {
+            Text("Скрипт содержит ${statementResults.size} statement-ов. Выбери statement, для которого показывать данные, статусы и экспорт.")
+        }
+        Div({ classes("d-flex", "flex-wrap", "gap-2") }) {
+            statementResults.forEachIndexed { index, statement ->
+                Button(attrs = {
+                    classes(
+                        "btn",
+                        "btn-sm",
+                        if (index == selectedStatementIndex) "btn-dark" else "btn-outline-secondary",
+                    )
+                    attr("type", "button")
+                    onClick { onSelectStatement(index) }
+                }) {
+                    Text("#${index + 1} ${statement.statementKeyword}")
+                }
+            }
+        }
     }
 }
 
@@ -1188,3 +1322,27 @@ private data class SqlConsoleExportRequest(
     val result: SqlConsoleQueryResult,
     val shardName: String? = null,
 )
+
+private fun SqlConsoleQueryResult?.statementResultsOrSelf(): List<SqlConsoleStatementResult> =
+    when {
+        this == null -> emptyList()
+        statementResults.isNotEmpty() -> statementResults
+        else -> listOf(
+            SqlConsoleStatementResult(
+                sql = sql,
+                statementType = statementType,
+                statementKeyword = statementKeyword,
+                shardResults = shardResults,
+            )
+        )
+    }
+
+private fun SqlConsoleStatementResult.toStandaloneQueryResult(source: SqlConsoleQueryResult?): SqlConsoleQueryResult =
+    SqlConsoleQueryResult(
+        sql = sql,
+        statementType = statementType,
+        statementKeyword = statementKeyword,
+        shardResults = shardResults,
+        maxRowsPerShard = source?.maxRowsPerShard ?: 0,
+        statementResults = emptyList(),
+    )

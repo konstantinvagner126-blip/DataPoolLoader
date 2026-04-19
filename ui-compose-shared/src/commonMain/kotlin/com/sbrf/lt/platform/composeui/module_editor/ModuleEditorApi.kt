@@ -2,11 +2,14 @@ package com.sbrf.lt.platform.composeui.module_editor
 
 import com.sbrf.lt.platform.composeui.model.DatabaseModulesCatalogResponse
 import com.sbrf.lt.platform.composeui.model.FilesModulesCatalogResponse
+import com.sbrf.lt.platform.composeui.model.RuntimeContext
 
 interface ModuleEditorApi {
     suspend fun loadFilesCatalog(): FilesModulesCatalogResponse
 
     suspend fun loadDatabaseCatalog(includeHidden: Boolean): DatabaseModulesCatalogResponse
+
+    suspend fun loadRuntimeContext(): RuntimeContext
 
     suspend fun loadFilesSession(moduleId: String): ModuleEditorSessionResponse
 

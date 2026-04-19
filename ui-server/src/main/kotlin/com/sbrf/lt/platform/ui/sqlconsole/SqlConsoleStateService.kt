@@ -21,6 +21,8 @@ class SqlConsoleStateService(
             selectedSourceNames = request.selectedSourceNames,
             pageSize = request.pageSize,
             strictSafetyEnabled = request.strictSafetyEnabled,
+            executionPolicy = request.executionPolicy,
+            transactionMode = request.transactionMode,
         ).normalized()
         stateStore.save(state)
         state.toResponse()
@@ -34,4 +36,6 @@ private fun PersistedSqlConsoleState.toResponse(): SqlConsoleStateResponse = Sql
     selectedSourceNames = selectedSourceNames,
     pageSize = pageSize,
     strictSafetyEnabled = strictSafetyEnabled,
+    executionPolicy = executionPolicy,
+    transactionMode = transactionMode,
 )

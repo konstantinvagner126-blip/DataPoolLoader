@@ -3,11 +3,17 @@ package com.sbrf.lt.datapool
 import com.sbrf.lt.datapool.sqlconsole.RawShardExecutionResult
 import com.sbrf.lt.datapool.sqlconsole.RawShardConnectionCheckResult
 import com.sbrf.lt.datapool.sqlconsole.ShardConnectionChecker
+import com.sbrf.lt.datapool.sqlconsole.ShardSqlScriptExecutor
 import com.sbrf.lt.datapool.sqlconsole.ShardSqlExecutor
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleConfig
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleExecutionPolicy
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleTransactionMode
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleSourceConfig
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleService
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleStatementType
+import com.sbrf.lt.datapool.sqlconsole.ResolvedSqlConsoleShardConfig
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleStatement
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleExecutionControl
 import kotlin.io.path.createTempDirectory
 import kotlin.io.path.writeText
 import kotlin.test.Test
@@ -192,19 +198,241 @@ class SqlConsoleServiceTest {
     }
 
     @Test
-    fun `rejects multiple statements`() {
+    fun `executes multiple statements sequentially`() {
+        val service = SqlConsoleService(
+            config = SqlConsoleConfig(
+                sources = listOf(
+                    SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user1", "pwd1"),
+                    SqlConsoleSourceConfig("shard2", "jdbc:test:two", "user2", "pwd2"),
+                ),
+            ),
+            executor = ShardSqlExecutor { shard, statement, _, _, _, _ ->
+                when (statement.leadingKeyword) {
+                    "UPDATE" -> RawShardExecutionResult(
+                        shardName = shard.name,
+                        status = "SUCCESS",
+                        affectedRows = 3,
+                        message = "UPDATE выполнен успешно.",
+                    )
+
+                    "SELECT" -> RawShardExecutionResult(
+                        shardName = shard.name,
+                        status = "SUCCESS",
+                        columns = listOf("id"),
+                        rows = listOf(mapOf("id" to "${shard.name}-1")),
+                    )
+
+                    else -> error("unexpected statement ${statement.leadingKeyword}")
+                }
+            },
+        )
+
+        val response = service.executeQuery("update demo set flag = true; select id from demo", null)
+
+        assertEquals("SCRIPT", response.statementKeyword)
+        assertEquals(2, response.statementResults.size)
+        assertEquals("UPDATE", response.statementResults[0].statementKeyword)
+        assertEquals("SELECT", response.statementResults[1].statementKeyword)
+        assertEquals(SqlConsoleStatementType.RESULT_SET, response.statementResults[1].statementType)
+        assertEquals("shard1-1", response.statementResults[1].shardResults.first { it.shardName == "shard1" }.rows.first()["id"])
+    }
+
+    @Test
+    fun `stops next statements for shard after previous failure`() {
+        val service = SqlConsoleService(
+            config = SqlConsoleConfig(
+                sources = listOf(
+                    SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user1", "pwd1"),
+                    SqlConsoleSourceConfig("shard2", "jdbc:test:two", "user2", "pwd2"),
+                ),
+            ),
+            executor = ShardSqlExecutor { shard, statement, _, _, _, _ ->
+                when {
+                    shard.name == "shard2" && statement.leadingKeyword == "UPDATE" -> error("boom")
+                    statement.leadingKeyword == "UPDATE" -> RawShardExecutionResult(
+                        shardName = shard.name,
+                        status = "SUCCESS",
+                        affectedRows = 1,
+                        message = "UPDATE выполнен успешно.",
+                    )
+
+                    statement.leadingKeyword == "SELECT" -> RawShardExecutionResult(
+                        shardName = shard.name,
+                        status = "SUCCESS",
+                        columns = listOf("id"),
+                        rows = listOf(mapOf("id" to shard.name)),
+                    )
+
+                    else -> error("unexpected statement")
+                }
+            },
+        )
+
+        val response = service.executeQuery("update demo set flag = true; select id from demo", null)
+
+        val secondStatement = response.statementResults[1]
+        assertEquals("SUCCESS", secondStatement.shardResults.first { it.shardName == "shard1" }.status)
+        assertEquals("SKIPPED", secondStatement.shardResults.first { it.shardName == "shard2" }.status)
+    }
+
+    @Test
+    fun `continues next statements for shard when continue on error policy is selected`() {
+        val service = SqlConsoleService(
+            config = SqlConsoleConfig(
+                sources = listOf(
+                    SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user1", "pwd1"),
+                    SqlConsoleSourceConfig("shard2", "jdbc:test:two", "user2", "pwd2"),
+                ),
+            ),
+            executor = ShardSqlExecutor { shard, statement, _, _, _, _ ->
+                when {
+                    shard.name == "shard2" && statement.leadingKeyword == "UPDATE" -> error("boom")
+                    statement.leadingKeyword == "UPDATE" -> RawShardExecutionResult(
+                        shardName = shard.name,
+                        status = "SUCCESS",
+                        affectedRows = 1,
+                        message = "UPDATE выполнен успешно.",
+                    )
+
+                    statement.leadingKeyword == "SELECT" -> RawShardExecutionResult(
+                        shardName = shard.name,
+                        status = "SUCCESS",
+                        columns = listOf("id"),
+                        rows = listOf(mapOf("id" to "${shard.name}-select")),
+                    )
+
+                    else -> error("unexpected statement")
+                }
+            },
+        )
+
+        val response = service.executeQuery(
+            "update demo set flag = true; select id from demo",
+            null,
+            executionPolicy = SqlConsoleExecutionPolicy.CONTINUE_ON_ERROR,
+        )
+
+        val secondStatement = response.statementResults[1]
+        assertEquals("SUCCESS", secondStatement.shardResults.first { it.shardName == "shard1" }.status)
+        assertEquals("SUCCESS", secondStatement.shardResults.first { it.shardName == "shard2" }.status)
+        assertEquals(
+            "shard2-select",
+            secondStatement.shardResults.first { it.shardName == "shard2" }.rows.first()["id"],
+        )
+    }
+
+    @Test
+    fun `executes script through transaction executor when transaction mode is enabled`() {
+        var observedPolicy: SqlConsoleExecutionPolicy? = null
+        var observedTransactionMode: SqlConsoleTransactionMode? = null
+        val service = SqlConsoleService(
+            config = SqlConsoleConfig(
+                sources = listOf(
+                    SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user1", "pwd1"),
+                    SqlConsoleSourceConfig("shard2", "jdbc:test:two", "user2", "pwd2"),
+                ),
+            ),
+            executor = object : ShardSqlExecutor, ShardSqlScriptExecutor {
+                override fun execute(
+                    shard: ResolvedSqlConsoleShardConfig,
+                    statement: SqlConsoleStatement,
+                    fetchSize: Int,
+                    maxRows: Int,
+                    queryTimeoutSec: Int?,
+                    executionControl: SqlConsoleExecutionControl,
+                ): RawShardExecutionResult = error("single statement executor should not be used in transaction mode")
+
+                override fun executeScript(
+                    shard: ResolvedSqlConsoleShardConfig,
+                    statements: List<SqlConsoleStatement>,
+                    fetchSize: Int,
+                    maxRows: Int,
+                    queryTimeoutSec: Int?,
+                    executionPolicy: SqlConsoleExecutionPolicy,
+                    transactionMode: SqlConsoleTransactionMode,
+                    executionControl: SqlConsoleExecutionControl,
+                ): List<RawShardExecutionResult> {
+                    observedPolicy = executionPolicy
+                    observedTransactionMode = transactionMode
+                    return statements.mapIndexed { index, statement ->
+                        when (statement.leadingKeyword) {
+                            "UPDATE" -> RawShardExecutionResult(
+                                shardName = shard.name,
+                                status = "SUCCESS",
+                                affectedRows = index + 1,
+                                message = "UPDATE выполнен успешно.",
+                            )
+
+                            "SELECT" -> RawShardExecutionResult(
+                                shardName = shard.name,
+                                status = "SUCCESS",
+                                columns = listOf("id"),
+                                rows = listOf(mapOf("id" to "${shard.name}-${index + 1}")),
+                            )
+
+                            else -> error("unexpected statement ${statement.leadingKeyword}")
+                        }
+                    }
+                }
+            },
+        )
+
+        val response = service.executeQuery(
+            rawSql = "update demo set flag = true; select id from demo",
+            credentialsPath = null,
+            transactionMode = SqlConsoleTransactionMode.TRANSACTION_PER_SHARD,
+        )
+
+        assertEquals(SqlConsoleExecutionPolicy.STOP_ON_FIRST_ERROR, observedPolicy)
+        assertEquals(SqlConsoleTransactionMode.TRANSACTION_PER_SHARD, observedTransactionMode)
+        assertEquals(2, response.statementResults.size)
+        assertEquals("UPDATE", response.statementResults[0].statementKeyword)
+        assertEquals("SELECT", response.statementResults[1].statementKeyword)
+        assertEquals(
+            "shard2-2",
+            response.statementResults[1].shardResults.first { it.shardName == "shard2" }.rows.first()["id"],
+        )
+    }
+
+    @Test
+    fun `rejects continue on error in transaction mode`() {
         val service = SqlConsoleService(
             config = SqlConsoleConfig(
                 sources = listOf(SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user1", "pwd1")),
             ),
-            executor = ShardSqlExecutor { _, _, _, _, _, _ -> error("should not be called") },
+            executor = object : ShardSqlExecutor, ShardSqlScriptExecutor {
+                override fun execute(
+                    shard: ResolvedSqlConsoleShardConfig,
+                    statement: SqlConsoleStatement,
+                    fetchSize: Int,
+                    maxRows: Int,
+                    queryTimeoutSec: Int?,
+                    executionControl: SqlConsoleExecutionControl,
+                ): RawShardExecutionResult = error("unexpected single-statement path")
+
+                override fun executeScript(
+                    shard: ResolvedSqlConsoleShardConfig,
+                    statements: List<SqlConsoleStatement>,
+                    fetchSize: Int,
+                    maxRows: Int,
+                    queryTimeoutSec: Int?,
+                    executionPolicy: SqlConsoleExecutionPolicy,
+                    transactionMode: SqlConsoleTransactionMode,
+                    executionControl: SqlConsoleExecutionControl,
+                ): List<RawShardExecutionResult> = error("unexpected transaction execution")
+            },
         )
 
         val error = assertFailsWith<IllegalArgumentException> {
-            service.executeQuery("select 1; select 2", null)
+            service.executeQuery(
+                rawSql = "update demo set flag = true; select id from demo",
+                credentialsPath = null,
+                executionPolicy = SqlConsoleExecutionPolicy.CONTINUE_ON_ERROR,
+                transactionMode = SqlConsoleTransactionMode.TRANSACTION_PER_SHARD,
+            )
         }
 
-        assertEquals("В SQL-консоли разрешен только один SQL-запрос за запуск.", error.message)
+        assertTrue(error.message!!.contains("Транзакционный режим"))
     }
 
     @Test

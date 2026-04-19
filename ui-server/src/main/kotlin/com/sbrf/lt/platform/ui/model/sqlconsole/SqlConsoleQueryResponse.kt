@@ -9,4 +9,5 @@ data class SqlConsoleQueryResponse(
     val statementKeyword: String,
     val shardResults: List<SqlConsoleShardResultResponse>,
     val maxRowsPerShard: Int,
+    val statementResults: List<SqlConsoleStatementResultResponse> = emptyList(),
 )

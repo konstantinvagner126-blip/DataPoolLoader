@@ -41,6 +41,19 @@
 - частота live-refresh для `FILES` выровнена между editor и экраном `История и результаты`;
 - из compact-ленты убраны стартовые технические события `RUN_STARTED / SOURCE_STARTED / MERGE_STARTED / TARGET_STARTED`.
 - в compact-блоке live-лента теперь умеет синтезировать уже существующее сообщение прогресса вида `Источник X: выгружено N строк` из `sourceResults`, если event еще не успел попасть в ленту.
+- transient WebSocket-сбои в `FILES` больше не шумят пользовательскими warning-banner'ами:
+  - live-обновление по WebSocket остается;
+  - polling продолжает работать как тихий fallback на длинных сценариях.
+- `FILES` history/details теперь корректно проецирует live-события и source lifecycle из persisted state:
+  - numeric timestamp в event payload больше не теряется;
+  - `events` и `sourceResults` отдают корректные `startedAt / finishedAt / timestamp` еще во время активного запуска.
+- `FILES` target lifecycle в истории тоже стал промежуточно-честным:
+  - при включенном target во время активного запуска показывается `PENDING / RUNNING`, а не `NOT_ENABLED`;
+  - после завершения сохраняются `targetStatus / targetTableName / targetRowsLoaded`.
+- server contract покрыт тестами не только на finished-run, но и на active-run файлового запуска.
+- `DB` live history/details тоже закреплен server-regression тестом на active-run:
+  - `activeRunId` корректно поднимается в history;
+  - details для активного запуска отдают live `SOURCE_PROGRESS`, running source и running target lifecycle.
 
 Что осталось:
 
@@ -54,6 +67,35 @@
   - обновление стадий;
   - появление live-сообщений о прогрессе выгрузки;
   - обновление без ручного refresh страницы.
+
+### 1. SQL-консоль: индикатор активного сценария и тайминги по source
+
+Статус:
+
+- не реализовано
+
+Цель:
+
+- во время выполнения SQL-сценария пользователь должен явно видеть, что сценарий еще работает;
+- после выполнения должно быть видно, сколько времени отработал каждый source/shard.
+
+Что нужно сделать:
+
+- добавить явный индикатор активного выполнения SQL-сценария на экране SQL-консоли:
+  - анимированный индикатор/спиннер;
+  - понятный running-state для текущего async execution;
+  - без необходимости вручную обновлять экран;
+- зафиксировать и показывать время работы по каждому source/shard:
+  - длительность выполнения;
+  - при необходимости `startedAt / finishedAt` и итоговую duration;
+- встроить это в текущий async lifecycle SQL-консоли, а не отдельным обходным механизмом.
+
+Критичное требование:
+
+- пользователь должен безошибочно понимать:
+  - что сценарий сейчас выполняется;
+  - какие source уже завершились;
+  - сколько времени занял каждый source.
 
 ## P1
 
@@ -81,120 +123,16 @@
   - при live-refresh перечитывает `runtimeContext`;
   - при переходе `DATABASE -> FILES` очищает stale DB-историю и выбранный запуск, вместо показа устаревших данных.
 - SQL-консоль тоже читает `runtimeContext` и показывает явный warning при fallback `DATABASE -> FILES`, вместо немой работы без контекста.
+- DB editor тоже стал runtime-aware в live-refresh:
+  - при недоступности `DATABASE` больше не удерживает stale DB-catalog/session;
+  - перечитывает `runtimeContext` и очищает старое состояние editor, чтобы пользователь видел честный fallback-режим.
 
 Что осталось:
 
-- при необходимости расширить live DB-context на остальные экраны.
-
-## P3
-
-### 20. `multi-statement SQL` в SQL-консоли
-
-Статус:
-
-- отложено как отдельный большой этап
-
-Что нужно сделать:
-
-- разбор SQL-скрипта на statement;
-- выполнение по каждому source по порядку;
-- политика ошибок:
-  - `stop on first error`;
-  - `continue on error`;
-- транзакционный режим;
-- UI результата по `statement` и по `source`.
-
-### 21. Refactoring крупных классов
-
-Статус:
-
-- частично реализовано
-
-Что уже сделано:
-
-- `Server.kt` декомпозирован на `UiServerContext` и route-группы.
-- `DatabaseModuleStore` начал распиливаться на отдельные support-компоненты:
-  - [DatabaseModuleStoreSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/DatabaseModuleStoreSupport.kt)
-  - [DatabaseModuleStoreLifecycleSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/DatabaseModuleStoreLifecycleSupport.kt)
-  - [DatabaseModuleStoreQuerySupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/DatabaseModuleStoreQuerySupport.kt)
-  - [DatabaseModuleStoreMutationSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/DatabaseModuleStoreMutationSupport.kt)
-  - [DatabaseModuleStore.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/DatabaseModuleStore.kt) теперь остался тонким фасадом над query/lifecycle/mutation support-слоями
-- для DB-registry добавлен интерфейсный boundary:
-  - [DatabaseModuleRegistryOperations.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/DatabaseModuleRegistryOperations.kt)
-  - `DatabaseModuleBackend`, `DatabaseModuleRunService`, `DatabaseModuleSyncImporter` и `UiServerContext` теперь зависят от контракта, а не от concrete `DatabaseModuleStore`
-- для DB-run service добавлен интерфейсный boundary:
-  - [DatabaseModuleRunOperations.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleRunOperations.kt)
-  - server-layer и `DatabaseModuleRunHistoryService` теперь зависят от контракта, а не от concrete `DatabaseModuleRunService`
-- `DatabaseModuleRunService` начал отделять orchestration DB-запуска от event/history логики:
-  - [DatabaseModuleRunEventSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleRunEventSupport.kt)
-  - [DatabaseModuleRunArtifactSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleRunArtifactSupport.kt)
-  - [DatabaseModuleRunEventLogSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleRunEventLogSupport.kt)
-  - [DatabaseModuleRunCompletionSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleRunCompletionSupport.kt)
-  - [DatabaseModuleRunSourceEventSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleRunSourceEventSupport.kt)
-  - [DatabaseModuleRunMergeTargetEventSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleRunMergeTargetEventSupport.kt)
-  - [DatabaseModuleRunStartSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleRunStartSupport.kt)
-  - [DatabaseModuleRunExecutionSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleRunExecutionSupport.kt)
-  - [DatabaseModuleRunService.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleRunService.kt) теперь не держит в себе обработку всех `ExecutionEvent`, artifact bookkeeping, source/merge/target lifecycle, event logging, fail-run recovery и сам фоновый `ApplicationRunner` execution-code
-  - `DatabaseModuleRunService` также перестал держать validation/recover-orphan/context-assembly стартового lifecycle
-- `SqlConsoleService` начал распиливаться на отдельные support-компоненты:
-  - [SqlConsoleModels.kt](/Users/kwdev/DataPoolLoader/core/src/main/kotlin/com/sbrf/lt/datapool/sqlconsole/SqlConsoleModels.kt)
-  - [SqlConsoleShardContracts.kt](/Users/kwdev/DataPoolLoader/core/src/main/kotlin/com/sbrf/lt/datapool/sqlconsole/SqlConsoleShardContracts.kt)
-  - [SqlConsoleConfigSupport.kt](/Users/kwdev/DataPoolLoader/core/src/main/kotlin/com/sbrf/lt/datapool/sqlconsole/SqlConsoleConfigSupport.kt)
-  - [SqlConsoleJdbcSupport.kt](/Users/kwdev/DataPoolLoader/core/src/main/kotlin/com/sbrf/lt/datapool/sqlconsole/SqlConsoleJdbcSupport.kt)
-  - [SqlConsoleStateSupport.kt](/Users/kwdev/DataPoolLoader/core/src/main/kotlin/com/sbrf/lt/datapool/sqlconsole/SqlConsoleStateSupport.kt)
-  - [SqlConsoleExecutionSupport.kt](/Users/kwdev/DataPoolLoader/core/src/main/kotlin/com/sbrf/lt/datapool/sqlconsole/SqlConsoleExecutionSupport.kt)
-  - [SqlConsoleService.kt](/Users/kwdev/DataPoolLoader/core/src/main/kotlin/com/sbrf/lt/datapool/sqlconsole/SqlConsoleService.kt) теперь остался сервисным facade-слоем, а модели и shard-контракты вынесены из него в отдельные файлы
-- для SQL-консоли добавлен сервисный интерфейс:
-  - [SqlConsoleOperations.kt](/Users/kwdev/DataPoolLoader/core/src/main/kotlin/com/sbrf/lt/datapool/sqlconsole/SqlConsoleOperations.kt)
-  - server-layer и query manager теперь зависят от контракта, а не от concrete `SqlConsoleService`
-- async query-слой SQL-консоли тоже получил boundary и execution support:
-  - [SqlConsoleAsyncQueryOperations.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/sqlconsole/SqlConsoleAsyncQueryOperations.kt)
-  - [SqlConsoleQueryExecutionSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/sqlconsole/SqlConsoleQueryExecutionSupport.kt)
-  - [SqlConsoleQueryManager.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/sqlconsole/SqlConsoleQueryManager.kt) теперь отделяет execution от state/cancel и server-layer зависит от контракта, а не от concrete manager
-- `ApplicationRunner` начал распиливаться на отдельные support-компоненты:
-  - [ApplicationRunnerSupport.kt](/Users/kwdev/DataPoolLoader/core/src/main/kotlin/com/sbrf/lt/datapool/app/ApplicationRunnerSupport.kt)
-  - [ApplicationRunnerPipelineSupport.kt](/Users/kwdev/DataPoolLoader/core/src/main/kotlin/com/sbrf/lt/datapool/app/ApplicationRunnerPipelineSupport.kt)
-  - [ApplicationRunner.kt](/Users/kwdev/DataPoolLoader/core/src/main/kotlin/com/sbrf/lt/datapool/app/ApplicationRunner.kt) теперь остался boundary-слоем над config loading и pipeline execution support
-- `DatabaseRunStore` начал делиться на узкие контракты:
-  - [DatabaseRunExecutionStore.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunExecutionStore.kt)
-  - [DatabaseRunQueryStore.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunQueryStore.kt)
-  - [DatabaseRunMaintenanceStore.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunMaintenanceStore.kt)
-  - `DatabaseModuleRunService`, cleanup и retention теперь зависят от узких контрактов, а не от одного concrete `DatabaseRunStore`
-  - внутренняя логика самого store вынесена в support-компоненты:
-    - [DatabaseRunStoreExecutionSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreExecutionSupport.kt)
-    - [DatabaseRunStoreRunLifecycleSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreRunLifecycleSupport.kt)
-    - [DatabaseRunStoreEventArtifactSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreEventArtifactSupport.kt)
-    - [DatabaseRunStoreProgressUpdateSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreProgressUpdateSupport.kt)
-    - [DatabaseRunStoreQuerySupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreQuerySupport.kt)
-    - [DatabaseRunStoreRunOverviewSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreRunOverviewSupport.kt)
-    - [DatabaseRunStoreRunDetailsSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreRunDetailsSupport.kt)
-    - [DatabaseRunStoreMaintenanceSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreMaintenanceSupport.kt)
-    - [DatabaseRunStoreCleanupPlanningSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreCleanupPlanningSupport.kt)
-    - [DatabaseRunStoreCleanupExecutionSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreCleanupExecutionSupport.kt)
-    - [DatabaseRunStoreHistoryUsageSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreHistoryUsageSupport.kt)
-    - [DatabaseRunStore.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStore.kt) теперь остался тонким фасадом над этими слоями
-- `RunManager` тоже начал отделять orchestration от persisted history:
-  - [RunManagerStartSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/RunManagerStartSupport.kt)
-  - [RunManagerExecutionSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/RunManagerExecutionSupport.kt)
-  - [RunManagerStateSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/RunManagerStateSupport.kt)
-  - [RunManagerPersistenceSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/RunManagerPersistenceSupport.kt)
-  - [RunManagerHistoryCleanupSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/RunManagerHistoryCleanupSupport.kt)
-  - [RunManager.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/RunManager.kt) теперь не держит в себе целиком восстановление persisted history, cleanup-планирование, UI-state assembly, credential-aware module details и стартовый/lifecycle flow одного запуска
-- для файлового run-слоя добавлены интерфейсные boundaries:
-  - [FilesModuleRunOperations.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/FilesModuleRunOperations.kt)
-  - [FilesRunHistoryMaintenanceOperations.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/FilesRunHistoryMaintenanceOperations.kt)
-  - `CommonRoutes`, `FilesModuleRunHistoryService`, `FilesRunHistoryCleanupService`, `FilesOutputRetentionService` и `UiServerContext` теперь зависят от контрактов, а не от concrete `RunManager`
-
-Что осталось:
-
-- продолжить рефакторинг:
-  - [SqlConsoleService.kt](/Users/kwdev/DataPoolLoader/core/src/main/kotlin/com/sbrf/lt/datapool/sqlconsole/SqlConsoleService.kt)
-  - при необходимости [RunManager.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/RunManager.kt) как orchestration-слой и дальнейшее упрощение внутренних support-слоев DB run-store
-
+- финально проверить руками live fallback-сценарий именно на экране DB editor;
+- при необходимости расширить live DB-context на прочие вспомогательные экраны, если такие еще всплывут.
 
 ## Рекомендуемый порядок выполнения
 
 1. Добить `P0.0` по онлайн-прогрессу.
 2. При необходимости закрыть остатки `P1.9` по runtime-aware DB-экранам.
-3. Продолжить рефакторинг крупных классов.
-4. Вернуться к `multi-statement SQL` как к отдельному большому этапу.

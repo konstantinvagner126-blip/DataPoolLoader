@@ -1,5 +1,10 @@
 package com.sbrf.lt.platform.composeui.module_editor
 
+import com.sbrf.lt.platform.composeui.model.DatabaseModulesCatalogResponse
+import com.sbrf.lt.platform.composeui.model.ModuleCatalogDiagnostics
+import com.sbrf.lt.platform.composeui.model.ModuleStoreMode
+import com.sbrf.lt.platform.composeui.model.RuntimeContext
+
 class ModuleEditorStore(
     private val api: ModuleEditorApi,
     private val syncRoute: (storage: String, moduleId: String?, includeHidden: Boolean) -> Unit = { _, _, _ -> },
@@ -57,6 +62,9 @@ class ModuleEditorStore(
                     configFormSourceText = if (configForm?.state != null) session?.module?.configText.orEmpty() else "",
                 )
             }
+        }.recoverCatching { error ->
+            loadDatabaseFallbackState()
+                ?: throw error
         }.getOrElse { error ->
             ModuleEditorPageState(
                 loading = false,
@@ -98,6 +106,12 @@ class ModuleEditorStore(
                 loading = false,
                 errorMessage = error.message ?: "Не удалось загрузить выбранный модуль.",
             )
+        }.let { nextState ->
+            if (route.storage != "database" || nextState.session != null || nextState.errorMessage == null) {
+                nextState
+            } else {
+                loadDatabaseFallbackState(nextState) ?: nextState
+            }
         }
     }
 
@@ -127,7 +141,48 @@ class ModuleEditorStore(
                     selectedModuleId = selectedModuleId,
                 )
             }
-        }.getOrElse { current }
+        }.getOrElse {
+            if (route.storage == "database") {
+                loadDatabaseFallbackState(current) ?: current
+            } else {
+                current
+            }
+        }
+
+    private suspend fun loadDatabaseFallbackState(current: ModuleEditorPageState? = null): ModuleEditorPageState? {
+        val runtimeContext = runCatching { api.loadRuntimeContext() }.getOrNull() ?: return null
+        if (runtimeContext.requestedMode != ModuleStoreMode.DATABASE || runtimeContext.effectiveMode == ModuleStoreMode.DATABASE) {
+            return null
+        }
+        return createDatabaseFallbackState(runtimeContext, current)
+    }
+
+    private fun createDatabaseFallbackState(
+        runtimeContext: RuntimeContext,
+        current: ModuleEditorPageState?,
+    ): ModuleEditorPageState =
+        (current ?: ModuleEditorPageState()).copy(
+            loading = false,
+            errorMessage = null,
+            successMessage = null,
+            actionInProgress = null,
+            databaseCatalog = DatabaseModulesCatalogResponse(
+                runtimeContext = runtimeContext,
+                diagnostics = current?.databaseCatalog?.diagnostics ?: ModuleCatalogDiagnostics(),
+                modules = emptyList(),
+            ),
+            selectedModuleId = null,
+            session = null,
+            selectedSqlPath = null,
+            configTextDraft = "",
+            sqlContentsDraft = emptyMap(),
+            metadataDraft = ModuleMetadataDraft(),
+            configFormState = null,
+            configFormLoading = false,
+            configFormError = null,
+            configFormSourceText = "",
+            createModuleDialogOpen = false,
+        )
 
     fun selectTab(
         current: ModuleEditorPageState,

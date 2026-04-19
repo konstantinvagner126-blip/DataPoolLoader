@@ -5,6 +5,7 @@ import com.sbrf.lt.datapool.sqlconsole.RawShardExecutionResult
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleConnectionCheckResult
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleInfo
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleQueryResult
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleStatementResult
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleExecutionSnapshot
 
 /**
@@ -34,6 +35,7 @@ fun SqlConsoleQueryResult.toResponse(): SqlConsoleQueryResponse = SqlConsoleQuer
     statementKeyword = statementKeyword,
     shardResults = shardResults.map { it.toResponse() },
     maxRowsPerShard = maxRowsPerShard,
+    statementResults = statementResults.map { it.toResponse() },
 )
 
 /**
@@ -69,6 +71,13 @@ private fun RawShardExecutionResult.toResponse(): SqlConsoleShardResultResponse 
     affectedRows = affectedRows,
     message = message,
     errorMessage = errorMessage,
+)
+
+private fun SqlConsoleStatementResult.toResponse(): SqlConsoleStatementResultResponse = SqlConsoleStatementResultResponse(
+    sql = sql,
+    statementType = statementType.name,
+    statementKeyword = statementKeyword,
+    shardResults = shardResults.map { it.toResponse() },
 )
 
 private fun RawShardConnectionCheckResult.toResponse(): SqlConsoleSourceConnectionStatusResponse = SqlConsoleSourceConnectionStatusResponse(

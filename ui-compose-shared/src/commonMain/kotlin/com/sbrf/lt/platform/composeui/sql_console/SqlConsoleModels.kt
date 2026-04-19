@@ -19,6 +19,8 @@ data class SqlConsoleStateSnapshot(
     val selectedSourceNames: List<String> = emptyList(),
     val pageSize: Int = 50,
     val strictSafetyEnabled: Boolean = false,
+    val executionPolicy: String = "STOP_ON_FIRST_ERROR",
+    val transactionMode: String = "AUTO_COMMIT",
 )
 
 @Serializable
@@ -29,6 +31,8 @@ data class SqlConsoleStateUpdate(
     val selectedSourceNames: List<String> = emptyList(),
     val pageSize: Int = 50,
     val strictSafetyEnabled: Boolean = false,
+    val executionPolicy: String = "STOP_ON_FIRST_ERROR",
+    val transactionMode: String = "AUTO_COMMIT",
 )
 
 @Serializable
@@ -41,6 +45,8 @@ data class SqlConsoleSettingsUpdate(
 data class SqlConsoleQueryStartRequest(
     val sql: String,
     val selectedSourceNames: List<String> = emptyList(),
+    val executionPolicy: String = "STOP_ON_FIRST_ERROR",
+    val transactionMode: String = "AUTO_COMMIT",
 )
 
 @Serializable
@@ -69,6 +75,15 @@ data class SqlConsoleQueryResult(
     val statementKeyword: String,
     val shardResults: List<SqlConsoleShardResult>,
     val maxRowsPerShard: Int,
+    val statementResults: List<SqlConsoleStatementResult> = emptyList(),
+)
+
+@Serializable
+data class SqlConsoleStatementResult(
+    val sql: String,
+    val statementType: String,
+    val statementKeyword: String,
+    val shardResults: List<SqlConsoleShardResult>,
 )
 
 @Serializable
@@ -112,6 +127,8 @@ data class SqlConsolePageState(
     val selectedSourceNames: List<String> = emptyList(),
     val pageSize: Int = 50,
     val strictSafetyEnabled: Boolean = false,
+    val executionPolicy: String = "STOP_ON_FIRST_ERROR",
+    val transactionMode: String = "AUTO_COMMIT",
     val maxRowsPerShardDraft: String = "",
     val queryTimeoutSecDraft: String = "",
     val currentExecutionId: String? = null,

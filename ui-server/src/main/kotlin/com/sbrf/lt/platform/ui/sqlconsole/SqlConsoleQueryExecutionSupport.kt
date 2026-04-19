@@ -1,6 +1,8 @@
 package com.sbrf.lt.platform.ui.sqlconsole
 
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleExecutionCancelledException
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleExecutionPolicy
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleTransactionMode
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleOperations
 import java.nio.file.Path
 import java.time.Instant
@@ -13,6 +15,8 @@ internal class SqlConsoleQueryExecutionSupport(
         sql: String,
         credentialsPath: Path?,
         selectedSourceNames: List<String>,
+        executionPolicy: SqlConsoleExecutionPolicy,
+        transactionMode: SqlConsoleTransactionMode,
         cleanupDir: Path?,
     ): SqlConsoleExecutionSnapshot {
         return try {
@@ -23,6 +27,8 @@ internal class SqlConsoleQueryExecutionSupport(
                     rawSql = sql,
                     credentialsPath = credentialsPath,
                     selectedSourceNames = selectedSourceNames,
+                    executionPolicy = executionPolicy,
+                    transactionMode = transactionMode,
                     executionControl = execution.control,
                 ),
             )

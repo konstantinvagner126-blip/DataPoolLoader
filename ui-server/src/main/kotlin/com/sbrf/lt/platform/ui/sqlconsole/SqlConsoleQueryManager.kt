@@ -1,6 +1,8 @@
 package com.sbrf.lt.platform.ui.sqlconsole
 
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleExecutionControl
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleExecutionPolicy
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleTransactionMode
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleOperations
 import java.nio.file.Path
 import java.time.Instant
@@ -27,6 +29,8 @@ class SqlConsoleQueryManager(
         sql: String,
         credentialsPath: Path?,
         selectedSourceNames: List<String>,
+        executionPolicy: SqlConsoleExecutionPolicy,
+        transactionMode: SqlConsoleTransactionMode,
         cleanupDir: Path?,
     ): SqlConsoleExecutionSnapshot {
         val execution = synchronized(lock) {
@@ -49,6 +53,8 @@ class SqlConsoleQueryManager(
                 sql = sql,
                 credentialsPath = credentialsPath,
                 selectedSourceNames = selectedSourceNames,
+                executionPolicy = executionPolicy,
+                transactionMode = transactionMode,
                 cleanupDir = cleanupDir,
             )
             synchronized(lock) {

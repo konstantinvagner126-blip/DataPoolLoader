@@ -1,6 +1,5 @@
 package com.sbrf.lt.platform.ui.run.history
 
-import com.sbrf.lt.datapool.model.ExecutionStatus
 import com.sbrf.lt.platform.ui.model.ModuleRunDetailsResponse
 import com.sbrf.lt.platform.ui.model.ModuleRunHistoryResponse
 import com.sbrf.lt.platform.ui.model.ModuleRunPageSessionResponse
@@ -61,7 +60,7 @@ class FilesModuleRunHistoryService(
 
 private fun UiRunSnapshot.toCommonSummary(): ModuleRunSummaryResponse {
     val sourceResults = projectFilesRunSourceResults(this)
-    val targetStatus = detectFilesTargetStatus(events, status)
+    val targetState = projectFilesTargetState(this)
     return ModuleRunSummaryResponse(
         runId = id,
         moduleId = moduleId,
@@ -76,16 +75,8 @@ private fun UiRunSnapshot.toCommonSummary(): ModuleRunSummaryResponse {
         successfulSourceCount = sourceResults.count { it.status == "SUCCESS" },
         failedSourceCount = sourceResults.count { it.status == "FAILED" },
         skippedSourceCount = sourceResults.count { it.status == "SKIPPED" },
-        targetStatus = targetStatus,
+        targetStatus = targetState.status,
+        targetTableName = targetState.tableName,
+        targetRowsLoaded = targetState.rowsLoaded,
     )
 }
-
-private fun detectFilesTargetStatus(events: List<Map<String, Any?>>, runStatus: ExecutionStatus): String =
-    events.asReversed()
-        .firstNotNullOfOrNull { event ->
-            when (detectFilesEventType(event)) {
-                "TargetImportFinishedEvent" -> event.statusValue()
-                else -> null
-            }
-        }
-        ?: if (runStatus == ExecutionStatus.FAILED) "FAILED" else "NOT_ENABLED"

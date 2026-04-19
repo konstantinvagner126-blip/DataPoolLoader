@@ -3,10 +3,18 @@ package com.sbrf.lt.platform.ui.sqlconsole
 import com.sbrf.lt.datapool.sqlconsole.RawShardExecutionResult
 import com.sbrf.lt.datapool.sqlconsole.ShardSqlExecutor
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleConfig
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleConnectionCheckResult
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleExecutionCancelledException
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleExecutionControl
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleExecutionPolicy
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleTransactionMode
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleInfo
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleOperations
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleQueryResult
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleService
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleSourceConfig
 import java.nio.file.Files
+import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -95,6 +103,62 @@ class SqlConsoleQueryManagerTest {
         assertEquals(SqlConsoleExecutionStatus.SUCCESS, snapshot.status)
         assertEquals("FAILED", snapshot.result?.shardResults?.single()?.status)
         assertEquals("boom", snapshot.result?.shardResults?.single()?.errorMessage)
+    }
+
+    @Test
+    fun `passes execution policy to sql console service`() {
+        var observedPolicy: SqlConsoleExecutionPolicy? = null
+        val manager = SqlConsoleQueryManager(
+            sqlConsoleService = object : SqlConsoleOperations {
+                override fun info(): SqlConsoleInfo = SqlConsoleInfo(
+                    configured = true,
+                    sourceNames = listOf("db1"),
+                    maxRowsPerShard = 200,
+                    queryTimeoutSec = null,
+                )
+
+                override fun updateMaxRowsPerShard(maxRowsPerShard: Int): SqlConsoleInfo = info()
+
+                override fun updateSettings(
+                    maxRowsPerShard: Int,
+                    queryTimeoutSec: Int?,
+                ): SqlConsoleInfo = info()
+
+                override fun executeQuery(
+                    rawSql: String,
+                    credentialsPath: Path?,
+                    selectedSourceNames: List<String>,
+                    executionPolicy: SqlConsoleExecutionPolicy,
+                    transactionMode: SqlConsoleTransactionMode,
+                    executionControl: SqlConsoleExecutionControl,
+                ): SqlConsoleQueryResult {
+                    observedPolicy = executionPolicy
+                    return serviceWithSuccess().executeQuery(
+                        rawSql = rawSql,
+                        credentialsPath = credentialsPath,
+                        selectedSourceNames = selectedSourceNames,
+                        executionPolicy = executionPolicy,
+                        transactionMode = transactionMode,
+                        executionControl = executionControl,
+                    )
+                }
+
+                override fun checkConnections(
+                    credentialsPath: Path?,
+                    selectedSourceNames: List<String>,
+                ): SqlConsoleConnectionCheckResult = SqlConsoleConnectionCheckResult(emptyList())
+            },
+        )
+
+        val started = manager.startQuery(
+            sql = "select 1 as id",
+            credentialsPath = null,
+            executionPolicy = SqlConsoleExecutionPolicy.CONTINUE_ON_ERROR,
+        )
+        val snapshot = waitForCompletion(manager, started.id)
+
+        assertEquals(SqlConsoleExecutionStatus.SUCCESS, snapshot.status)
+        assertEquals(SqlConsoleExecutionPolicy.CONTINUE_ON_ERROR, observedPolicy)
     }
 
     @Test

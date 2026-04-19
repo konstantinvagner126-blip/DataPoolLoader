@@ -11,6 +11,19 @@ fun interface ShardSqlExecutor {
     ): RawShardExecutionResult
 }
 
+interface ShardSqlScriptExecutor {
+    fun executeScript(
+        shard: ResolvedSqlConsoleShardConfig,
+        statements: List<SqlConsoleStatement>,
+        fetchSize: Int,
+        maxRows: Int,
+        queryTimeoutSec: Int?,
+        executionPolicy: SqlConsoleExecutionPolicy,
+        transactionMode: SqlConsoleTransactionMode,
+        executionControl: SqlConsoleExecutionControl,
+    ): List<RawShardExecutionResult>
+}
+
 fun interface ShardConnectionChecker {
     fun check(
         shard: ResolvedSqlConsoleShardConfig,

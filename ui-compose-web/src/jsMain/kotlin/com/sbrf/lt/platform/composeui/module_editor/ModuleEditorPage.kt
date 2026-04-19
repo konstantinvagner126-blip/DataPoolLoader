@@ -315,9 +315,6 @@ fun ComposeModuleEditorPage(
                 runPanelRefreshInProgress = false
             }
         },
-        onError = { message ->
-            runPanelState = runPanelState.copy(errorMessage = message)
-        },
     )
 
     if (state.errorMessage != null) {

@@ -7,7 +7,7 @@ import java.sql.Statement
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicBoolean
 
-class JdbcShardSqlExecutor : ShardSqlExecutor {
+class JdbcShardSqlExecutor : ShardSqlExecutor, ShardSqlScriptExecutor {
     override fun execute(
         shard: ResolvedSqlConsoleShardConfig,
         statement: SqlConsoleStatement,
@@ -18,6 +18,66 @@ class JdbcShardSqlExecutor : ShardSqlExecutor {
     ): RawShardExecutionResult {
         DriverManager.getConnection(shard.jdbcUrl, shard.username, shard.password).use { connection ->
             return executeSql(connection, shard, statement, fetchSize, maxRows, queryTimeoutSec, executionControl)
+        }
+    }
+
+    override fun executeScript(
+        shard: ResolvedSqlConsoleShardConfig,
+        statements: List<SqlConsoleStatement>,
+        fetchSize: Int,
+        maxRows: Int,
+        queryTimeoutSec: Int?,
+        executionPolicy: SqlConsoleExecutionPolicy,
+        transactionMode: SqlConsoleTransactionMode,
+        executionControl: SqlConsoleExecutionControl,
+    ): List<RawShardExecutionResult> {
+        require(transactionMode == SqlConsoleTransactionMode.TRANSACTION_PER_SHARD) {
+            "Script executor поддерживает только TRANSACTION_PER_SHARD."
+        }
+        require(executionPolicy == SqlConsoleExecutionPolicy.STOP_ON_FIRST_ERROR) {
+            "TRANSACTION_PER_SHARD поддерживает только STOP_ON_FIRST_ERROR."
+        }
+
+        DriverManager.getConnection(shard.jdbcUrl, shard.username, shard.password).use { connection ->
+            connection.autoCommit = false
+            val results = mutableListOf<RawShardExecutionResult>()
+            try {
+                statements.forEachIndexed { index, statement ->
+                    if (executionControl.isCancelled()) {
+                        throw SqlConsoleExecutionCancelledException("Запрос отменен пользователем.")
+                    }
+                    val result = runCatching {
+                        executeSql(connection, shard, statement, fetchSize, maxRows, queryTimeoutSec, executionControl)
+                    }.getOrElse { ex ->
+                        if (ex is SqlConsoleExecutionCancelledException) {
+                            throw ex
+                        }
+                        rollbackQuietly(connection)
+                        results += RawShardExecutionResult(
+                            shardName = shard.name,
+                            status = "FAILED",
+                            errorMessage = ex.message ?: "Неизвестная ошибка",
+                        )
+                        repeat(statements.lastIndex - index) {
+                            results += RawShardExecutionResult(
+                                shardName = shard.name,
+                                status = "SKIPPED",
+                                message = "Statement пропущен из-за rollback после ошибки в транзакции.",
+                            )
+                        }
+                        return results
+                    }
+                    results += result
+                }
+                connection.commit()
+                return results
+            } catch (ex: SqlConsoleExecutionCancelledException) {
+                rollbackQuietly(connection)
+                throw ex
+            } catch (ex: Exception) {
+                rollbackQuietly(connection)
+                throw ex
+            }
         }
     }
 
@@ -83,6 +143,10 @@ class JdbcShardSqlExecutor : ShardSqlExecutor {
                 executionControl.unregister(jdbcStatement)
             }
         }
+    }
+
+    private fun rollbackQuietly(connection: Connection) {
+        runCatching { connection.rollback() }
     }
 }
 
