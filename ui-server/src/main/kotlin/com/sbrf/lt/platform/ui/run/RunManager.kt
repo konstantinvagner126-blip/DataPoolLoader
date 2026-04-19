@@ -25,9 +25,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Instant
-import java.util.UUID
 import java.util.concurrent.Executors
-import kotlin.io.path.readText
 
 class RunManager(
     private val moduleRegistry: ModuleRegistry = ModuleRegistry(),
@@ -41,6 +39,8 @@ class RunManager(
     private val snapshots = mutableListOf<MutableRunSnapshot>()
     private val updatesFlow = MutableSharedFlow<UiStateResponse>(replay = 1, extraBufferCapacity = 32)
     private val mapper = com.sbrf.lt.datapool.config.ConfigLoader().objectMapper()
+    private val historySupport = RunManagerHistorySupport(stateStore, mapper)
+    private val executionSupport = RunManagerExecutionSupport(mapper)
 
     init {
         restorePersistedState()
@@ -81,13 +81,7 @@ class RunManager(
         validateCredentialsBeforeRun(request.configText)
 
         val module = moduleRegistry.getModule(request.moduleId)
-        val snapshot = MutableRunSnapshot(
-            id = UUID.randomUUID().toString(),
-            moduleId = module.id,
-            moduleTitle = module.title,
-            status = ExecutionStatus.RUNNING,
-            startedAt = Instant.now(),
-        )
+        val snapshot = executionSupport.createSnapshot(module)
         snapshots.add(0, snapshot)
         publishState()
 
@@ -163,38 +157,19 @@ class RunManager(
 
     @Synchronized
     private fun handleEvent(snapshot: MutableRunSnapshot, event: ExecutionEvent) {
-        snapshot.events.add(event.toUiEventMap())
-        when (event) {
-            is com.sbrf.lt.datapool.app.RunStartedEvent -> snapshot.status = ExecutionStatus.RUNNING
-            is com.sbrf.lt.datapool.app.SourceExportProgressEvent -> snapshot.sourceProgress[event.sourceName] = event.rowCount
-            is com.sbrf.lt.datapool.app.RunFinishedEvent -> {
-                snapshot.status = event.status
-                snapshot.finishedAt = event.timestamp
-                snapshot.outputDir = event.outputDir
-                snapshot.mergedRowCount = event.mergedRowCount
-                snapshot.errorMessage = event.errorMessage
-            }
-            is com.sbrf.lt.datapool.app.MergeFinishedEvent -> snapshot.mergedRowCount = event.rowCount
-            else -> Unit
-        }
+        executionSupport.applyEvent(snapshot, event)
         publishState()
     }
 
     @Synchronized
     private fun finalizeSuccess(snapshot: MutableRunSnapshot, result: ApplicationRunResult) {
-        snapshot.status = result.status
-        snapshot.finishedAt = Instant.now()
-        snapshot.outputDir = result.outputDir.toString()
-        snapshot.mergedRowCount = result.mergedRowCount
-        snapshot.summaryJson = result.summaryFile?.takeIf { Files.exists(it) }?.readText()
+        executionSupport.finalizeSuccess(snapshot, result)
         publishState()
     }
 
     @Synchronized
     private fun finalizeFailure(snapshot: MutableRunSnapshot, ex: Throwable) {
-        snapshot.status = ExecutionStatus.FAILED
-        snapshot.finishedAt = Instant.now()
-        snapshot.errorMessage = ex.message ?: "Неизвестная ошибка"
+        executionSupport.finalizeFailure(snapshot, ex)
         publishState()
     }
 
@@ -206,26 +181,8 @@ class RunManager(
 
     @Synchronized
     private fun restorePersistedState() {
-        val persisted = stateStore.load()
         snapshots.clear()
-        snapshots.addAll(
-            persisted.history.map { snapshot ->
-                MutableRunSnapshot(
-                    id = snapshot.id,
-                    moduleId = snapshot.moduleId,
-                    moduleTitle = snapshot.moduleTitle,
-                    status = snapshot.status,
-                    startedAt = snapshot.startedAt,
-                    finishedAt = snapshot.finishedAt,
-                    outputDir = snapshot.outputDir,
-                    mergedRowCount = snapshot.mergedRowCount,
-                    summaryJson = snapshot.summaryJson,
-                    errorMessage = snapshot.errorMessage,
-                    sourceProgress = snapshot.sourceProgress.toMutableMap(),
-                    events = snapshot.events.toMutableList(),
-                )
-            },
-        )
+        snapshots.addAll(historySupport.restoreSnapshots())
     }
 
     @Synchronized
@@ -234,32 +191,14 @@ class RunManager(
         retentionDays: Int,
         keepMinRunsPerModule: Int,
         disableSafeguard: Boolean,
-    ): RunHistoryCleanupPreviewResponse {
-        val preview = buildHistoryCleanupPreview(
+    ): RunHistoryCleanupPreviewResponse =
+        historySupport.previewHistoryCleanup(
+            snapshots = snapshots,
             cutoffTimestamp = cutoffTimestamp,
             retentionDays = retentionDays,
             keepMinRunsPerModule = keepMinRunsPerModule,
             disableSafeguard = disableSafeguard,
         )
-        return RunHistoryCleanupPreviewResponse(
-            storageMode = "FILES",
-            safeguardEnabled = !disableSafeguard,
-            retentionDays = retentionDays,
-            keepMinRunsPerModule = keepMinRunsPerModule,
-            cutoffTimestamp = cutoffTimestamp,
-            currentRunsCount = snapshots.size,
-            currentModulesCount = snapshots.map { it.moduleId }.distinct().size,
-            currentStorageBytes = stateStore.currentFileSizeBytes(),
-            currentOldestRequestedAt = snapshots.minOfOrNull { it.startedAt },
-            currentNewestRequestedAt = snapshots.maxOfOrNull { it.startedAt },
-            currentTopModules = buildCurrentHistoryUsageModules(),
-            estimatedBytesToFree = estimateHistoryCleanupBytesToFree(preview.runIds),
-            totalModulesAffected = preview.modules.size,
-            totalRunsToDelete = preview.runIds.size,
-            totalEventsToDelete = preview.totalEventsToDelete,
-            modules = preview.modules,
-        )
-    }
 
     @Synchronized
     fun executeHistoryCleanup(
@@ -268,147 +207,21 @@ class RunManager(
         keepMinRunsPerModule: Int,
         disableSafeguard: Boolean,
     ): RunHistoryCleanupResultResponse {
-        val preview = buildHistoryCleanupPreview(
+        val result = historySupport.executeHistoryCleanup(
+            snapshots = snapshots,
             cutoffTimestamp = cutoffTimestamp,
             retentionDays = retentionDays,
             keepMinRunsPerModule = keepMinRunsPerModule,
             disableSafeguard = disableSafeguard,
         )
-        if (preview.runIds.isNotEmpty()) {
-            snapshots.removeAll { snapshot -> snapshot.id in preview.runIds }
+        if (result.deleted) {
             publishState()
         }
-        return RunHistoryCleanupResultResponse(
-            storageMode = "FILES",
-            safeguardEnabled = !disableSafeguard,
-            retentionDays = retentionDays,
-            keepMinRunsPerModule = keepMinRunsPerModule,
-            cutoffTimestamp = cutoffTimestamp,
-            finishedAt = Instant.now(),
-            totalModulesAffected = preview.modules.size,
-            totalRunsDeleted = preview.runIds.size,
-            totalEventsDeleted = preview.totalEventsToDelete,
-            modules = preview.modules,
-        )
+        return result.response
     }
 
     @Synchronized
     private fun persistState() {
-        stateStore.save(
-            PersistedRunState(
-                history = snapshots
-                    .sortedByDescending { it.startedAt }
-                    .map { it.toUi() },
-            ),
-        )
+        historySupport.persistSnapshots(snapshots)
     }
-
-    private fun ExecutionEvent.toUiEventMap(): Map<String, Any?> {
-        val result = mapper.convertValue(this, MutableMap::class.java)
-            .mapKeys { it.key.toString() }
-            .toMutableMap()
-        result["type"] = javaClass.simpleName
-        return result
-    }
-
-    private fun buildHistoryCleanupPreview(
-        cutoffTimestamp: Instant,
-        retentionDays: Int,
-        keepMinRunsPerModule: Int,
-        disableSafeguard: Boolean,
-    ): FilesHistoryCleanupPreview {
-        val deletableByModule = snapshots
-            .sortedByDescending { it.startedAt }
-            .groupBy { it.moduleId }
-            .mapNotNull { (moduleId, moduleSnapshots) ->
-                val runsToDelete = moduleSnapshots.filterIndexed { index, snapshot ->
-                    val olderThanCutoff = snapshot.startedAt.isBefore(cutoffTimestamp)
-                    val canDeleteBySafeguard = disableSafeguard || index >= keepMinRunsPerModule
-                    snapshot.status != ExecutionStatus.RUNNING &&
-                        olderThanCutoff &&
-                        canDeleteBySafeguard
-                }
-                if (runsToDelete.isEmpty()) {
-                    null
-                } else {
-                    FilesHistoryCleanupModulePreview(
-                        moduleCode = moduleId,
-                        runIds = runsToDelete.map { it.id },
-                        totalEventsToDelete = runsToDelete.sumOf { it.events.size },
-                        summary = RunHistoryCleanupModuleResponse(
-                            moduleCode = moduleId,
-                            totalRunsToDelete = runsToDelete.size,
-                            oldestRequestedAt = runsToDelete.minOfOrNull { it.startedAt },
-                            newestRequestedAt = runsToDelete.maxOfOrNull { it.startedAt },
-                        ),
-                    )
-                }
-            }
-
-        return FilesHistoryCleanupPreview(
-            retentionDays = retentionDays,
-            keepMinRunsPerModule = keepMinRunsPerModule,
-            runIds = deletableByModule.flatMapTo(linkedSetOf()) { it.runIds },
-            totalEventsToDelete = deletableByModule.sumOf { it.totalEventsToDelete },
-            modules = deletableByModule.map { it.summary }.sortedBy { it.moduleCode },
-        )
-    }
-
-    private fun estimateHistoryCleanupBytesToFree(runIdsToDelete: Set<String>): Long? {
-        val currentSize = stateStore.currentFileSizeBytes()
-        if (currentSize <= 0L || runIdsToDelete.isEmpty()) {
-            return 0L
-        }
-        val projectedState = PersistedRunState(
-            history = snapshots
-                .filterNot { it.id in runIdsToDelete }
-                .sortedByDescending { it.startedAt }
-                .map { it.toUi() },
-        )
-        val projectedBytes = mapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(projectedState).size.toLong()
-        return (currentSize - projectedBytes).coerceAtLeast(0L)
-    }
-
-    private fun buildCurrentHistoryUsageModules(): List<CurrentStorageModuleResponse> =
-        snapshots
-            .groupBy { it.moduleId }
-            .map { (moduleCode, moduleSnapshots) ->
-                CurrentStorageModuleResponse(
-                    moduleCode = moduleCode,
-                    currentRunsCount = moduleSnapshots.size,
-                    currentStorageBytes = estimateHistoryStorageBytesForSnapshots(moduleSnapshots),
-                    oldestRequestedAt = moduleSnapshots.minOfOrNull { it.startedAt },
-                    newestRequestedAt = moduleSnapshots.maxOfOrNull { it.startedAt },
-                )
-            }
-            .sortedWith(
-                compareByDescending<CurrentStorageModuleResponse> { it.currentStorageBytes }
-                    .thenByDescending { it.currentRunsCount }
-                    .thenBy { it.moduleCode },
-            )
-            .take(5)
-
-    private fun estimateHistoryStorageBytesForSnapshots(moduleSnapshots: List<MutableRunSnapshot>): Long =
-        mapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(
-            PersistedRunState(
-                history = moduleSnapshots
-                    .sortedByDescending { it.startedAt }
-                    .map { it.toUi() },
-            ),
-        ).size.toLong()
-
-    private data class FilesHistoryCleanupPreview(
-        val retentionDays: Int,
-        val keepMinRunsPerModule: Int,
-        val runIds: Set<String>,
-        val totalEventsToDelete: Int,
-        val modules: List<RunHistoryCleanupModuleResponse>,
-    )
-
-    private data class FilesHistoryCleanupModulePreview(
-        val moduleCode: String,
-        val runIds: List<String>,
-        val totalEventsToDelete: Int,
-        val summary: RunHistoryCleanupModuleResponse,
-    )
 }

@@ -69,6 +69,9 @@ fun ComposeModuleRunsPage(
     val history = state.history
     val details = state.selectedRunDetails
     val runtimeContext = state.runtimeContext
+    val databaseFallbackActive = route.storage == "database" &&
+        runtimeContext?.effectiveMode != null &&
+        runtimeContext.effectiveMode != ModuleStoreMode.DATABASE
     val structuredSummary = details?.summaryJson?.let(::parseStructuredRunSummary)
     val filteredRuns = filterRuns(history?.runs.orEmpty(), state.historyFilter, state.searchQuery)
     val hasRunningRun = history?.runs?.any { it.status.equals("RUNNING", ignoreCase = true) } == true
@@ -175,7 +178,13 @@ fun ComposeModuleRunsPage(
                     state = state,
                 )
 
-                if (history == null || history.runs.isEmpty()) {
+                if (databaseFallbackActive) {
+                    EmptyStateCard(
+                        title = "История запусков БД недоступна",
+                        text = runtimeContext?.fallbackReason
+                            ?: "Режим базы данных сейчас недоступен. История DB-запусков временно недоступна.",
+                    )
+                } else if (history == null || history.runs.isEmpty()) {
                     EmptyStateCard(
                         title = "История запусков",
                         text = "Для этого модуля запусков пока нет.",

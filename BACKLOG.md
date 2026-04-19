@@ -78,6 +78,8 @@
   - загружает `runtimeContext`;
   - не пытается грузить DB-историю вслепую при fallback;
   - показывает явное warning-сообщение о недоступности БД и активном fallback-режиме.
+  - при live-refresh перечитывает `runtimeContext`;
+  - при переходе `DATABASE -> FILES` очищает stale DB-историю и выбранный запуск, вместо показа устаревших данных.
 - SQL-консоль тоже читает `runtimeContext` и показывает явный warning при fallback `DATABASE -> FILES`, вместо немой работы без контекста.
 
 Что осталось:
@@ -114,6 +116,8 @@
 - `DatabaseModuleStore` начал распиливаться на отдельные support-компоненты:
   - [DatabaseModuleStoreSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/DatabaseModuleStoreSupport.kt)
   - [DatabaseModuleStoreLifecycleSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/DatabaseModuleStoreLifecycleSupport.kt)
+  - [DatabaseModuleStoreQuerySupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/DatabaseModuleStoreQuerySupport.kt)
+  - [DatabaseModuleStore.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/DatabaseModuleStore.kt) теперь координирует lifecycle и query-слои, а не держит каталог, детали и SQL-assets прямо в одном файле
 - для DB-registry добавлен интерфейсный boundary:
   - [DatabaseModuleRegistryOperations.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/DatabaseModuleRegistryOperations.kt)
   - `DatabaseModuleBackend`, `DatabaseModuleRunService`, `DatabaseModuleSyncImporter` и `UiServerContext` теперь зависят от контракта, а не от concrete `DatabaseModuleStore`
@@ -133,6 +137,15 @@
   - [DatabaseRunQueryStore.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunQueryStore.kt)
   - [DatabaseRunMaintenanceStore.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunMaintenanceStore.kt)
   - `DatabaseModuleRunService`, cleanup и retention теперь зависят от узких контрактов, а не от одного concrete `DatabaseRunStore`
+  - внутренняя логика самого store вынесена в support-компоненты:
+    - [DatabaseRunStoreExecutionSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreExecutionSupport.kt)
+    - [DatabaseRunStoreQuerySupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreQuerySupport.kt)
+    - [DatabaseRunStoreMaintenanceSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreMaintenanceSupport.kt)
+    - [DatabaseRunStore.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStore.kt) теперь остался тонким фасадом над этими слоями
+- `RunManager` тоже начал отделять orchestration от persisted history:
+  - [RunManagerHistorySupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/RunManagerHistorySupport.kt)
+  - [RunManagerExecutionSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/RunManagerExecutionSupport.kt)
+  - [RunManager.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/RunManager.kt) теперь не держит в себе целиком восстановление persisted history, cleanup-планирование и мутацию live snapshot/event-state
 
 Что осталось:
 
@@ -140,7 +153,7 @@
   - [ApplicationRunner.kt](/Users/kwdev/DataPoolLoader/core/src/main/kotlin/com/sbrf/lt/datapool/app/ApplicationRunner.kt)
   - [SqlConsoleService.kt](/Users/kwdev/DataPoolLoader/core/src/main/kotlin/com/sbrf/lt/datapool/sqlconsole/SqlConsoleService.kt)
   - [DatabaseModuleStore.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/DatabaseModuleStore.kt)
-  - при необходимости [RunManager.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/RunManager.kt) и [DatabaseRunStore.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStore.kt)
+  - при необходимости [RunManager.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/RunManager.kt) и дальнейшее упрощение внутренних support-слоев DB run-store
 
 
 ## Рекомендуемый порядок выполнения

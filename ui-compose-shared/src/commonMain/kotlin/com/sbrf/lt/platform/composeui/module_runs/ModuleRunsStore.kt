@@ -49,11 +49,18 @@ class ModuleRunsStore(
         runId: String,
     ): ModuleRunsPageState {
         return runCatching {
+            val runtimeContext = loadDatabaseRuntimeContext(route) ?: current.runtimeContext
+            if (route.storage == "database" && runtimeContext?.effectiveMode != ModuleStoreMode.DATABASE) {
+                return buildDatabaseFallbackState(
+                    current = current,
+                    runtimeContext = runtimeContext,
+                )
+            }
             val details = api.loadRunDetails(route.storage, route.moduleId, runId)
             current.copy(
                 loading = false,
                 errorMessage = null,
-                runtimeContext = current.runtimeContext,
+                runtimeContext = runtimeContext,
                 selectedRunId = runId,
                 selectedRunDetails = details,
             )
@@ -71,13 +78,20 @@ class ModuleRunsStore(
         preferActiveRun: Boolean = false,
     ): ModuleRunsPageState {
         return runCatching {
+            val runtimeContext = loadDatabaseRuntimeContext(route) ?: current.runtimeContext
+            if (route.storage == "database" && runtimeContext?.effectiveMode != ModuleStoreMode.DATABASE) {
+                return buildDatabaseFallbackState(
+                    current = current,
+                    runtimeContext = runtimeContext,
+                )
+            }
             val history = api.loadHistory(route.storage, route.moduleId, current.historyLimit)
             val selectedRunId = resolveSelectedRunId(history, current.selectedRunId, preferActiveRun)
             val details = selectedRunId?.let { api.loadRunDetails(route.storage, route.moduleId, it) }
             current.copy(
                 loading = false,
                 errorMessage = null,
-                runtimeContext = current.runtimeContext,
+                runtimeContext = runtimeContext,
                 history = history,
                 selectedRunId = selectedRunId,
                 selectedRunDetails = details,
@@ -115,6 +129,26 @@ class ModuleRunsStore(
 
     fun startLoading(current: ModuleRunsPageState): ModuleRunsPageState =
         current.copy(loading = true, errorMessage = null)
+
+    private suspend fun loadDatabaseRuntimeContext(route: ModuleRunsRouteState) =
+        if (route.storage == "database") {
+            api.loadRuntimeContext()
+        } else {
+            null
+        }
+
+    private fun buildDatabaseFallbackState(
+        current: ModuleRunsPageState,
+        runtimeContext: com.sbrf.lt.platform.composeui.model.RuntimeContext?,
+    ): ModuleRunsPageState =
+        current.copy(
+            loading = false,
+            errorMessage = runtimeContext?.fallbackReason ?: "Режим базы данных сейчас недоступен.",
+            runtimeContext = runtimeContext,
+            history = null,
+            selectedRunId = null,
+            selectedRunDetails = null,
+        )
 
     private fun resolveSelectedRunId(
         history: ModuleRunHistoryResponse,
