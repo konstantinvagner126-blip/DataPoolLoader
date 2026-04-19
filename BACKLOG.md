@@ -64,7 +64,9 @@
   - [UiServerRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/UiServerRoutes.kt);
 - [Server.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/Server.kt) стал ближе к composition root, а не к transport-свалке.
 - DB route layer больше не держится на одном смешанном support-файле:
-  - cleanup flow вынесен в [DatabaseCleanupRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseCleanupRouteSupport.kt)
+  - cleanup flow разрезан на payload/action слои:
+    - [DatabaseCleanupRoutePayloadSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseCleanupRoutePayloadSupport.kt)
+    - [DatabaseCleanupRouteActions.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseCleanupRouteActions.kt)
   - sync/import flow больше не смешивает context, payload parsing и actions в одном файле:
     - [DatabaseSyncRouteContexts.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseSyncRouteContexts.kt)
     - [DatabaseSyncRoutePayloadSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseSyncRoutePayloadSupport.kt)
@@ -86,7 +88,8 @@
   - [SqlConsoleExportRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/SqlConsoleExportRouteSupport.kt)
   - execution flow дополнительно разрезан на:
     - [SqlConsoleExecutionPathSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/SqlConsoleExecutionPathSupport.kt)
-    - [SqlConsoleExecutionActionSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/SqlConsoleExecutionActionSupport.kt);
+    - sync execution в [SqlConsoleSyncExecutionSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/SqlConsoleSyncExecutionSupport.kt)
+    - async execution/session actions в [SqlConsoleAsyncExecutionSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/SqlConsoleAsyncExecutionSupport.kt);
 - [SqlConsoleRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/SqlConsoleRoutes.kt) теперь только агрегирует отдельные route groups:
   - [SqlConsoleStateRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/SqlConsoleStateRoutes.kt)
   - [SqlConsoleMetadataRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/SqlConsoleMetadataRoutes.kt)
@@ -137,7 +140,9 @@
     - DB run/history/retention services живут в [UiServerDatabaseRunDynamicServices.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/UiServerDatabaseRunDynamicServices.kt)
     - [UiServerFilesDynamicServices.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/UiServerFilesDynamicServices.kt)
   - runtime guards и route query helpers разрезаны по отдельным слоям:
-    - DB runtime guards живут в [UiServerDatabaseRuntimeGuards.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/UiServerDatabaseRuntimeGuards.kt)
+    - DB sync/maintenance guards живут в [UiServerDatabaseSyncGuards.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/UiServerDatabaseSyncGuards.kt)
+    - DB mode availability logic живет в [UiServerDatabaseModeSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/UiServerDatabaseModeSupport.kt)
+    - DB actor extraction живет в [UiServerDatabaseActorSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/UiServerDatabaseActorSupport.kt)
     - query parsing helpers живут в [UiServerRouteQuerySupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/UiServerRouteQuerySupport.kt)
   - runtime config/context access вынесен в [UiServerRuntimeAccess.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/UiServerRuntimeAccess.kt);
 - DB module lifecycle route group дальше разрезан:
