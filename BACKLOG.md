@@ -65,7 +65,11 @@
 - [Server.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/Server.kt) стал ближе к composition root, а не к transport-свалке.
 - DB route layer больше не держится на одном смешанном support-файле:
   - cleanup flow вынесен в [DatabaseCleanupRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseCleanupRouteSupport.kt)
-  - sync/import flow вынесен в [DatabaseSyncRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseSyncRouteSupport.kt)
+  - sync/import flow больше не смешивает context, payload parsing и actions в одном файле:
+    - [DatabaseSyncRouteContexts.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseSyncRouteContexts.kt)
+    - [DatabaseSyncRoutePayloadSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseSyncRoutePayloadSupport.kt)
+    - [DatabaseSyncRouteActions.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseSyncRouteActions.kt)
+    - [DatabaseSyncRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseSyncRouteSupport.kt) остался совместимым thin-слоем
   - module flow вынесен в отдельные support-слои:
     - [DatabaseModuleRouteContexts.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseModuleRouteContexts.kt)
     - [DatabaseModuleServiceRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseModuleServiceRouteSupport.kt)
@@ -97,6 +101,10 @@
   - [PageComposeAliasRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/PageComposeAliasRoutes.kt)
   - [PageScreenRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/PageScreenRoutes.kt)
   - [PageStaticRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/PageStaticRoutes.kt);
+- page screen route layer дальше разрезан:
+  - module-related screens живут в [PageModuleScreenRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/PageModuleScreenRoutes.kt)
+  - SQL/maintenance screens живут в [PageSqlScreenRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/PageSqlScreenRoutes.kt)
+  - [PageScreenRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/PageScreenRoutes.kt) остался тонким агрегатором;
 - `CommonRoutes`, `DatabaseRoutes` и `SqlConsoleRoutes` уже меньше знают о mode-specific maintenance flow, actor wiring, credentials/appsRoot orchestration и service resolution.
 - [CommonRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/CommonRoutes.kt) больше не смешивает runtime, files modules, files run, cleanup и websocket transport в одном файле;
 - общий files/runtime route layer разрезан на отдельные route groups:
@@ -118,6 +126,7 @@
 - для экрана `История и результаты` появился отдельный support-слой:
   - [ModuleRunRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/ModuleRunRouteSupport.kt).
 - startup/bootstrap слой `ui-server` вынесен из [Server.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/Server.kt) в [UiServerStartup.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/UiServerStartup.kt);
+- сборка [UiServerContext.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/UiServerContext.kt) вынесена из [Server.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/Server.kt) в [UiServerContextFactory.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/UiServerContextFactory.kt);
 - default factory wiring для `ModuleRegistry / RunManager / SqlConsole* / FilesRunHistoryService` теперь живет рядом со startup-слоем, а не в composition root;
 - startup слой дальше разрезан по ответственности:
   - default factory wiring живет в [UiServerDefaultFactories.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/UiServerDefaultFactories.kt)

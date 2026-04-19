@@ -69,7 +69,7 @@ fun Application.uiModule(
     val logger = defaultUiServerLogger()
     val mapper = createUiServerObjectMapper()
     installUiServerPlugins(logger)
-    val serverContext = UiServerContext(
+    val serverContext = buildUiServerContext(
         uiConfig = uiConfig,
         uiConfigLoader = uiConfigLoader,
         credentialsService = credentialsService,
@@ -80,8 +80,7 @@ fun Application.uiModule(
         filesModuleBackend = filesModuleBackend,
         databaseModuleStore = databaseModuleStore,
         databaseModuleBackend = databaseModuleBackend,
-        filesRunService = runManager,
-        filesRunHistoryMaintenance = runManager,
+        runManager = runManager,
         configFormService = configFormService,
         sqlConsoleService = sqlConsoleService,
         sqlConsoleQueryManager = sqlConsoleQueryManager,
