@@ -371,9 +371,9 @@ private fun SqlConsoleObjectCard(
                         Text("Точное совпадение по deep-link")
                     }
                 }
-                dbObject.tableName?.let { tableName ->
+                dbObject.tableReferenceLabel()?.let { tableReference ->
                     Div({ classes("small", "text-secondary") }) {
-                        Text("Таблица: ${dbObject.schemaName}.$tableName")
+                        Text(tableReference)
                     }
                 }
             }

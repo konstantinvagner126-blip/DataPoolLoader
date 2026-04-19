@@ -547,6 +547,15 @@
 - sql_console result text cleanup:
   - execution/shard summary text builder-ы вынесены из [SqlConsoleResultSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleResultSections.kt) в focused [SqlConsoleResultTextSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleResultTextSupport.kt)
   - result sections больше не держат несколько локальных `buildString`-веток для execution meta, shard status и data-page summary в одном UI-файле.
+- sql_console status badge cleanup:
+  - локальный `StatusBadge(status)` удален из [SqlConsoleResultSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleResultSections.kt)
+  - SQL result sections используют foundation [StatusBadge](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/foundation/component/SectionCard.kt) и shared `sourceStatusBadgeTone(...)` из [SqlConsoleLabels.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleLabels.kt) вместо feature-scoped badge renderer-а.
+- module_editor numeric field cleanup:
+  - повторяющиеся wrapper-ы `CommitIntField/CommitOptionalIntField/CommitLongField/CommitOptionalLongField/CommitOptionalDoubleField` больше не держат копипасту parse-веток
+  - общий required/optional numeric commit helper живет внутри [ModuleEditorConfigFormFieldSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorConfigFormFieldSupport.kt), а typed wrapper-ы сведены к тонким adapter-функциям.
+- sql_console object table-reference cleanup:
+  - подпись связанной таблицы вынесена из [SqlConsoleObjectsPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectsPage.kt) в общий object helper [SqlConsoleObjectSqlSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectSqlSupport.kt)
+  - object card больше не собирает `Таблица: schema.table` строку локально внутри экранного файла.
 - module_runs support cleanup:
   - остаточный [ModuleRunsPageSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsPageSupport.kt) удален
   - `backHref` перенесен в [ModuleRunsRoute.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsRoute.kt)

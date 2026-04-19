@@ -3,6 +3,7 @@ package com.sbrf.lt.platform.composeui.sql_console
 import androidx.compose.runtime.Composable
 import com.sbrf.lt.platform.composeui.foundation.component.AlertBanner
 import com.sbrf.lt.platform.composeui.foundation.component.EmptyStateCard
+import com.sbrf.lt.platform.composeui.foundation.component.StatusBadge
 import com.sbrf.lt.platform.composeui.foundation.dom.classes
 import com.sbrf.lt.platform.composeui.foundation.format.formatDateTime
 import com.sbrf.lt.platform.composeui.foundation.format.formatDuration
@@ -332,7 +333,12 @@ internal fun StatusResultPane(
                 result.shardResults.forEach { shard ->
                     Tr {
                         Td { org.jetbrains.compose.web.dom.B { Text(shard.shardName) } }
-                        Td { StatusBadge(shard.status) }
+                        Td {
+                            StatusBadge(
+                                text = translateSourceStatus(shard.status),
+                                tone = sourceStatusBadgeTone(shard.status),
+                            )
+                        }
                         Td { Text(formatDateTime(shard.startedAt)) }
                         Td { Text(formatDateTime(shard.finishedAt)) }
                         Td { Text(formatDuration(shard.startedAt, shard.finishedAt, running = shard.status.equals("RUNNING", ignoreCase = true))) }
@@ -354,7 +360,10 @@ internal fun StatusResultPane(
                             Text(buildShardStatusSummary(shard))
                         }
                     }
-                    StatusBadge(shard.status)
+                    StatusBadge(
+                        text = translateSourceStatus(shard.status),
+                        tone = sourceStatusBadgeTone(shard.status),
+                    )
                 }
                 if (!shard.errorMessage.isNullOrBlank()) {
                     AlertBanner(shard.errorMessage ?: "", "danger")
@@ -370,13 +379,5 @@ internal fun StatusResultPane(
                 }
             }
         }
-    }
-}
-
-@Composable
-internal fun StatusBadge(status: String) {
-    val cssClass = "status-badge status-${sourceStatusSuffix(status)}"
-    Span({ classes(*cssClass.split(" ").toTypedArray()) }) {
-        Text(translateSourceStatus(status))
     }
 }

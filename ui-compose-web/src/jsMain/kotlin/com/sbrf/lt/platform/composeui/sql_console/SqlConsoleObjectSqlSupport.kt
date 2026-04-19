@@ -26,6 +26,9 @@ internal fun SqlConsoleDatabaseObject.contextLabel(sourceName: String): String =
         }
     }
 
+internal fun SqlConsoleDatabaseObject.tableReferenceLabel(): String? =
+    tableName?.let { "Таблица: ${schemaName}.$it" }
+
 internal fun supportsFavoriteRowPreview(favorite: SqlConsoleFavoriteObject): Boolean =
     supportsRowPreview(favorite.objectType)
 

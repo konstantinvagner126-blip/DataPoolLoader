@@ -183,14 +183,13 @@ internal fun CommitIntField(
     disabled: Boolean,
     helpText: String = "",
     onCommit: (Int) -> Unit,
-) = CommitNumericTextField(
+) = CommitRequiredNumericField(
     label = label,
     valueText = value.toString(),
     disabled = disabled,
     helpText = helpText,
-    onCommitText = { nextValue ->
-        nextValue.toIntOrNull()?.let(onCommit)
-    },
+    parse = String::toIntOrNull,
+    onCommit = onCommit,
 )
 
 @Composable
@@ -200,18 +199,13 @@ internal fun CommitOptionalIntField(
     disabled: Boolean,
     helpText: String = "",
     onCommit: (Int?) -> Unit,
-) = CommitNumericTextField(
+) = CommitOptionalNumericField(
     label = label,
     valueText = value?.toString().orEmpty(),
     disabled = disabled,
     helpText = helpText,
-    onCommitText = { nextValue ->
-        if (nextValue.isBlank()) {
-            onCommit(null)
-        } else {
-            nextValue.toIntOrNull()?.let(onCommit)
-        }
-    },
+    parse = String::toIntOrNull,
+    onCommit = onCommit,
 )
 
 @Composable
@@ -221,14 +215,13 @@ internal fun CommitLongField(
     disabled: Boolean,
     helpText: String = "",
     onCommit: (Long) -> Unit,
-) = CommitNumericTextField(
+) = CommitRequiredNumericField(
     label = label,
     valueText = value.toString(),
     disabled = disabled,
     helpText = helpText,
-    onCommitText = { nextValue ->
-        nextValue.toLongOrNull()?.let(onCommit)
-    },
+    parse = String::toLongOrNull,
+    onCommit = onCommit,
 )
 
 @Composable
@@ -238,18 +231,13 @@ internal fun CommitOptionalLongField(
     disabled: Boolean,
     helpText: String = "",
     onCommit: (Long?) -> Unit,
-) = CommitNumericTextField(
+) = CommitOptionalNumericField(
     label = label,
     valueText = value?.toString().orEmpty(),
     disabled = disabled,
     helpText = helpText,
-    onCommitText = { nextValue ->
-        if (nextValue.isBlank()) {
-            onCommit(null)
-        } else {
-            nextValue.toLongOrNull()?.let(onCommit)
-        }
-    },
+    parse = String::toLongOrNull,
+    onCommit = onCommit,
 )
 
 @Composable
@@ -259,18 +247,13 @@ internal fun CommitOptionalDoubleField(
     disabled: Boolean,
     helpText: String = "",
     onCommit: (Double?) -> Unit,
-) = CommitNumericTextField(
+) = CommitOptionalNumericField(
     label = label,
     valueText = value?.toString().orEmpty(),
     disabled = disabled,
     helpText = helpText,
-    onCommitText = { nextValue ->
-        if (nextValue.isBlank()) {
-            onCommit(null)
-        } else {
-            nextValue.toDoubleOrNull()?.let(onCommit)
-        }
-    },
+    parse = String::toDoubleOrNull,
+    onCommit = onCommit,
 )
 
 @Composable
@@ -301,6 +284,46 @@ internal fun CommitNumericTextField(
         })
     }
 }
+
+@Composable
+private fun <T> CommitRequiredNumericField(
+    label: String,
+    valueText: String,
+    disabled: Boolean,
+    helpText: String,
+    parse: (String) -> T?,
+    onCommit: (T) -> Unit,
+) = CommitNumericTextField(
+    label = label,
+    valueText = valueText,
+    disabled = disabled,
+    helpText = helpText,
+    onCommitText = { nextValue ->
+        parse(nextValue)?.let(onCommit)
+    },
+)
+
+@Composable
+private fun <T> CommitOptionalNumericField(
+    label: String,
+    valueText: String,
+    disabled: Boolean,
+    helpText: String,
+    parse: (String) -> T?,
+    onCommit: (T?) -> Unit,
+) = CommitNumericTextField(
+    label = label,
+    valueText = valueText,
+    disabled = disabled,
+    helpText = helpText,
+    onCommitText = { nextValue ->
+        if (nextValue.isBlank()) {
+            onCommit(null)
+        } else {
+            parse(nextValue)?.let(onCommit)
+        }
+    },
+)
 
 @Composable
 internal fun ExternalSqlAlert(

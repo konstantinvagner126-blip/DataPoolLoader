@@ -53,6 +53,15 @@ fun sourceStatusSuffix(status: String): String =
         else -> "not_enabled"
     }
 
+fun sourceStatusBadgeTone(status: String): String =
+    when {
+        status.equals("SUCCESS", ignoreCase = true) || status.equals("OK", ignoreCase = true) -> "success"
+        status.equals("FAILED", ignoreCase = true) || status.equals("ERROR", ignoreCase = true) -> "danger"
+        status.equals("RUNNING", ignoreCase = true) -> "primary"
+        status.equals("SUCCESS_WITH_WARNINGS", ignoreCase = true) -> "warning"
+        else -> "secondary"
+    }
+
 fun buildCredentialsStatusText(status: CredentialsStatusResponse): String {
     val sourceLabel = when {
         status.uploaded -> "загружен через UI"
