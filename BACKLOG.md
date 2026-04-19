@@ -63,6 +63,11 @@
   - [UiServerPlugins.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/UiServerPlugins.kt)
   - [UiServerRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/UiServerRoutes.kt);
 - [Server.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/Server.kt) стал ближе к composition root, а не к transport-свалке.
+- route-specific transport/support-слои начали дробиться отдельно от самих handlers:
+  - [SqlConsoleRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/SqlConsoleRouteSupport.kt)
+  - [CommonRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/CommonRouteSupport.kt)
+  - [DatabaseRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseRouteSupport.kt);
+- `CommonRoutes` и `DatabaseRoutes` уже меньше знают о mode-specific maintenance flow, actor wiring и service resolution.
 
 Критерий завершения:
 
@@ -210,7 +215,7 @@
 
 Статус:
 
-- не реализовано
+- частично реализовано
 
 Цель:
 
@@ -230,6 +235,17 @@
   - maintenance screens;
 - удалить мертвые и дублирующие классы;
 - запретить добавление новых крупных блоков в один общий CSS-файл без явной причины.
+
+Что уже сделано:
+
+- giant [styles.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles.css) переведен в import-manifest;
+- порядок каскада сохранен через ordered CSS-chunks:
+  - [00-foundation-home.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/00-foundation-home.css)
+  - [10-config-editor.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/10-config-editor.css)
+  - [20-sql-console.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/20-sql-console.css)
+  - [30-run-history.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/30-run-history.css)
+  - [40-sql-results.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/40-sql-results.css);
+- ресурсы проходят packaging и попадают в `ui-server` bundle.
 
 Критерий завершения:
 

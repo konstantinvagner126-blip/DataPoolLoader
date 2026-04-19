@@ -4,9 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.sbrf.lt.platform.ui.model.ConfigFormParseRequest
 import com.sbrf.lt.platform.ui.model.ConfigFormUpdateRequest
 import com.sbrf.lt.platform.ui.model.ModulesCatalogResponse
-import com.sbrf.lt.platform.ui.model.RunHistoryCleanupPreviewResponse
 import com.sbrf.lt.platform.ui.model.RunHistoryCleanupRequest
-import com.sbrf.lt.platform.ui.model.RunHistoryCleanupResultResponse
 import com.sbrf.lt.platform.ui.model.SaveModuleRequest
 import com.sbrf.lt.platform.ui.model.SaveResultResponse
 import com.sbrf.lt.platform.ui.model.StartRunRequest
@@ -130,20 +128,7 @@ internal fun Route.registerCommonRoutes(
     get("/api/run-history/cleanup/preview") {
         val runtimeContext = context.currentRuntimeContext()
         val disableSafeguard = context.includeHiddenQueryParam(call.request.queryParameters["disableSafeguard"])
-        val response = when (runtimeContext.requestedMode) {
-            com.sbrf.lt.platform.ui.config.UiModuleStoreMode.FILES -> {
-                context.currentFilesRunHistoryCleanupService().previewCleanup(disableSafeguard)
-            }
-            com.sbrf.lt.platform.ui.config.UiModuleStoreMode.DATABASE -> {
-                context.requireDatabaseMaintenanceIsInactive()
-                context.requireDatabaseMode(runtimeContext)
-                val cleanupService = requireNotNull(context.currentDatabaseRunHistoryCleanupService()) {
-                    "Сервис cleanup истории запусков для режима базы данных не настроен."
-                }
-                cleanupService.previewCleanup(disableSafeguard).toCommonResponse()
-            }
-        }
-        call.respond(response)
+        call.respond(context.previewCommonRunHistoryCleanup(runtimeContext, disableSafeguard))
     }
 
     post("/api/run-history/cleanup") {
@@ -158,39 +143,13 @@ internal fun Route.registerCommonRoutes(
         } catch (_: Exception) {
             badRequest("Некорректные данные для cleanup истории запусков.")
         }
-        val response = when (runtimeContext.requestedMode) {
-            com.sbrf.lt.platform.ui.config.UiModuleStoreMode.FILES -> {
-                context.currentFilesRunHistoryCleanupService().executeCleanup(request.disableSafeguard)
-            }
-            com.sbrf.lt.platform.ui.config.UiModuleStoreMode.DATABASE -> {
-                context.requireDatabaseMaintenanceIsInactive()
-                context.requireDatabaseMode(runtimeContext)
-                val cleanupService = requireNotNull(context.currentDatabaseRunHistoryCleanupService()) {
-                    "Сервис cleanup истории запусков для режима базы данных не настроен."
-                }
-                cleanupService.executeCleanup(request.disableSafeguard).toCommonResponse()
-            }
-        }
-        call.respond(response)
+        call.respond(context.executeCommonRunHistoryCleanup(runtimeContext, request.disableSafeguard))
     }
 
     get("/api/output-retention/preview") {
         val runtimeContext = context.currentRuntimeContext()
         val disableSafeguard = context.includeHiddenQueryParam(call.request.queryParameters["disableSafeguard"])
-        val response = when (runtimeContext.requestedMode) {
-            com.sbrf.lt.platform.ui.config.UiModuleStoreMode.FILES -> {
-                context.currentFilesOutputRetentionService().previewCleanup(disableSafeguard)
-            }
-            com.sbrf.lt.platform.ui.config.UiModuleStoreMode.DATABASE -> {
-                context.requireDatabaseMaintenanceIsInactive()
-                context.requireDatabaseMode(runtimeContext)
-                val cleanupService = requireNotNull(context.currentDatabaseOutputRetentionService()) {
-                    "Сервис retention output-каталогов для режима базы данных не настроен."
-                }
-                cleanupService.previewCleanup(disableSafeguard)
-            }
-        }
-        call.respond(response)
+        call.respond(context.previewCommonOutputRetention(runtimeContext, disableSafeguard))
     }
 
     post("/api/output-retention") {
@@ -205,20 +164,7 @@ internal fun Route.registerCommonRoutes(
         } catch (_: Exception) {
             badRequest("Некорректные данные для retention output-каталогов.")
         }
-        val response = when (runtimeContext.requestedMode) {
-            com.sbrf.lt.platform.ui.config.UiModuleStoreMode.FILES -> {
-                context.currentFilesOutputRetentionService().executeCleanup(request.disableSafeguard)
-            }
-            com.sbrf.lt.platform.ui.config.UiModuleStoreMode.DATABASE -> {
-                context.requireDatabaseMaintenanceIsInactive()
-                context.requireDatabaseMode(runtimeContext)
-                val cleanupService = requireNotNull(context.currentDatabaseOutputRetentionService()) {
-                    "Сервис retention output-каталогов для режима базы данных не настроен."
-                }
-                cleanupService.executeCleanup(request.disableSafeguard)
-            }
-        }
-        call.respond(response)
+        call.respond(context.executeCommonOutputRetention(runtimeContext, request.disableSafeguard))
     }
 
     post("/api/credentials/upload") {
@@ -249,66 +195,3 @@ internal fun Route.registerCommonRoutes(
         }
     }
 }
-
-private fun com.sbrf.lt.platform.ui.model.DatabaseRunHistoryCleanupPreviewResponse.toCommonResponse(): RunHistoryCleanupPreviewResponse =
-    RunHistoryCleanupPreviewResponse(
-        storageMode = "DATABASE",
-        safeguardEnabled = safeguardEnabled,
-        retentionDays = retentionDays,
-        keepMinRunsPerModule = keepMinRunsPerModule,
-        cutoffTimestamp = cutoffTimestamp,
-        currentRunsCount = currentRunsCount,
-        currentModulesCount = currentModulesCount,
-        currentStorageBytes = currentStorageBytes,
-        currentOldestRequestedAt = currentOldestRequestedAt,
-        currentNewestRequestedAt = currentNewestRequestedAt,
-        currentTopModules = currentTopModules.map { module ->
-            com.sbrf.lt.platform.ui.model.CurrentStorageModuleResponse(
-                moduleCode = module.moduleCode,
-                currentRunsCount = module.currentRunsCount,
-                currentStorageBytes = module.currentStorageBytes,
-                currentOutputDirs = module.currentOutputDirs,
-                oldestRequestedAt = module.oldestRequestedAt,
-                newestRequestedAt = module.newestRequestedAt,
-            )
-        },
-        estimatedBytesToFree = estimatedBytesToFree,
-        totalModulesAffected = totalModulesAffected,
-        totalRunsToDelete = totalRunsToDelete,
-        totalSourceResultsToDelete = totalSourceResultsToDelete,
-        totalEventsToDelete = totalEventsToDelete,
-        totalArtifactsToDelete = totalArtifactsToDelete,
-        totalOrphanExecutionSnapshotsToDelete = totalOrphanExecutionSnapshotsToDelete,
-        modules = modules.map { module ->
-            com.sbrf.lt.platform.ui.model.RunHistoryCleanupModuleResponse(
-                moduleCode = module.moduleCode,
-                totalRunsToDelete = module.totalRunsToDelete,
-                oldestRequestedAt = module.oldestRequestedAt,
-                newestRequestedAt = module.newestRequestedAt,
-            )
-        },
-    )
-
-private fun com.sbrf.lt.platform.ui.model.DatabaseRunHistoryCleanupResultResponse.toCommonResponse(): RunHistoryCleanupResultResponse =
-    RunHistoryCleanupResultResponse(
-        storageMode = "DATABASE",
-        safeguardEnabled = safeguardEnabled,
-        retentionDays = retentionDays,
-        keepMinRunsPerModule = keepMinRunsPerModule,
-        cutoffTimestamp = cutoffTimestamp,
-        finishedAt = finishedAt,
-        totalModulesAffected = totalModulesAffected,
-        totalRunsDeleted = totalRunsDeleted,
-        totalSourceResultsDeleted = totalSourceResultsDeleted,
-        totalEventsDeleted = totalEventsDeleted,
-        totalArtifactsDeleted = totalArtifactsDeleted,
-        totalOrphanExecutionSnapshotsDeleted = totalOrphanExecutionSnapshotsDeleted,
-        modules = modules.map { module ->
-            com.sbrf.lt.platform.ui.model.RunHistoryCleanupModuleResponse(
-                moduleCode = module.moduleCode,
-                totalRunsToDelete = module.totalRunsToDelete,
-                oldestRequestedAt = module.oldestRequestedAt,
-                newestRequestedAt = module.newestRequestedAt,
-            )
-        },
-    )

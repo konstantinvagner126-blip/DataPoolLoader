@@ -9,7 +9,6 @@ import com.sbrf.lt.platform.ui.model.SaveResultResponse
 import com.sbrf.lt.platform.ui.model.DatabaseRunHistoryCleanupRequest
 import com.sbrf.lt.platform.ui.model.SyncOneModuleRequest
 import com.sbrf.lt.platform.ui.model.SyncSelectedModulesRequest
-import com.sbrf.lt.platform.ui.model.toDiagnosticsResponse
 import io.ktor.server.application.call
 import io.ktor.server.request.receive
 import io.ktor.server.request.receiveText
@@ -33,23 +32,15 @@ internal fun Route.registerDatabaseRoutes(
     }
 
     get("/api/db/run-history/cleanup/preview") {
-        val runtimeContext = context.currentRuntimeContext()
-        context.requireDatabaseMaintenanceIsInactive()
-        context.requireDatabaseMode(runtimeContext)
-        val cleanupService = requireNotNull(context.currentDatabaseRunHistoryCleanupService()) {
-            "Сервис cleanup истории запусков для режима базы данных не настроен."
-        }
+        val runtimeContext = context.requireDatabaseRuntimeContext(requireMaintenanceInactive = true)
+        val cleanupService = context.requireDatabaseRouteCleanupService(runtimeContext)
         val disableSafeguard = context.includeHiddenQueryParam(call.request.queryParameters["disableSafeguard"])
         call.respond(cleanupService.previewCleanup(disableSafeguard = disableSafeguard))
     }
 
     post("/api/db/run-history/cleanup") {
-        val runtimeContext = context.currentRuntimeContext()
-        context.requireDatabaseMaintenanceIsInactive()
-        context.requireDatabaseMode(runtimeContext)
-        val cleanupService = requireNotNull(context.currentDatabaseRunHistoryCleanupService()) {
-            "Сервис cleanup истории запусков для режима базы данных не настроен."
-        }
+        val runtimeContext = context.requireDatabaseRuntimeContext(requireMaintenanceInactive = true)
+        val cleanupService = context.requireDatabaseRouteCleanupService(runtimeContext)
         val payload = call.receiveText()
         val request = try {
             if (payload.isBlank()) {
@@ -65,20 +56,14 @@ internal fun Route.registerDatabaseRoutes(
     }
 
     get("/api/db/sync/runs") {
-        val runtimeContext = context.currentRuntimeContext()
-        context.requireDatabaseMode(runtimeContext)
-        val syncService = requireNotNull(context.currentModuleSyncService()) {
-            "Сервис импорта модулей в базу данных не настроен."
-        }
+        val runtimeContext = context.requireDatabaseRuntimeContext()
+        val syncService = context.requireDatabaseRouteSyncService(runtimeContext)
         call.respond(mapOf("runs" to syncService.listSyncRuns(context.parseLimit(call.request.queryParameters["limit"]))))
     }
 
     get("/api/db/sync/runs/{syncRunId}") {
-        val runtimeContext = context.currentRuntimeContext()
-        context.requireDatabaseMode(runtimeContext)
-        val syncService = requireNotNull(context.currentModuleSyncService()) {
-            "Сервис импорта модулей в базу данных не настроен."
-        }
+        val runtimeContext = context.requireDatabaseRuntimeContext()
+        val syncService = context.requireDatabaseRouteSyncService(runtimeContext)
         val syncRunId = requireNotNull(call.parameters["syncRunId"])
         val details = requireNotNull(syncService.loadSyncRunDetails(syncRunId)) {
             "История импорта '$syncRunId' не найдена."
@@ -87,39 +72,13 @@ internal fun Route.registerDatabaseRoutes(
     }
 
     get("/api/db/modules/catalog") {
-        context.requireDatabaseMaintenanceIsInactive()
-        val runtimeContext = context.currentRuntimeContext()
-        val store = context.currentDatabaseModuleStore()
         val includeHidden = context.includeHiddenQueryParam(call.request.queryParameters["includeHidden"])
-        val modules = if (runtimeContext.effectiveMode == com.sbrf.lt.platform.ui.config.UiModuleStoreMode.DATABASE && store != null) {
-            val activeModuleCodes = runCatching {
-                context.currentDatabaseModuleRunService()?.activeModuleCodes().orEmpty()
-            }.getOrDefault(emptySet())
-            context.currentDatabaseModuleBackend()
-                ?.listModules(includeHidden = includeHidden)
-                ?.map { module ->
-                    module.copy(hasActiveRun = module.id in activeModuleCodes)
-                }
-                .orEmpty()
-        } else {
-            emptyList()
-        }
-        call.respond(
-            DatabaseModulesCatalogResponse(
-                runtimeContext = runtimeContext,
-                diagnostics = modules.toDiagnosticsResponse(),
-                modules = modules,
-            ),
-        )
+        call.respond(context.buildDatabaseModulesCatalogResponse(includeHidden))
     }
 
     get("/api/db/modules/{id}") {
-        context.requireDatabaseMaintenanceIsInactive()
-        val runtimeContext = context.currentRuntimeContext()
-        context.requireDatabaseMode(runtimeContext)
-        val backend = requireNotNull(context.currentDatabaseModuleBackend()) {
-            "Сервис работы с модулями из базы данных не настроен."
-        }
+        val runtimeContext = context.requireDatabaseRuntimeContext(requireMaintenanceInactive = true)
+        val backend = context.requireDatabaseRouteBackend(runtimeContext)
         call.respond(
             backend.loadModule(
                 moduleId = requireNotNull(call.parameters["id"]),
@@ -129,22 +88,14 @@ internal fun Route.registerDatabaseRoutes(
     }
 
     get("/api/db/modules/{id}/runs") {
-        context.requireDatabaseMaintenanceIsInactive()
-        val runtimeContext = context.currentRuntimeContext()
-        context.requireDatabaseMode(runtimeContext)
-        val runService = requireNotNull(context.currentDatabaseModuleRunService()) {
-            "Сервис истории запусков для режима базы данных не настроен."
-        }
+        val runtimeContext = context.requireDatabaseRuntimeContext(requireMaintenanceInactive = true)
+        val runService = context.requireDatabaseRouteRunService(runtimeContext)
         call.respond(runService.listRuns(requireNotNull(call.parameters["id"])))
     }
 
     get("/api/db/modules/{id}/runs/{runId}") {
-        context.requireDatabaseMaintenanceIsInactive()
-        val runtimeContext = context.currentRuntimeContext()
-        context.requireDatabaseMode(runtimeContext)
-        val runService = requireNotNull(context.currentDatabaseModuleRunService()) {
-            "Сервис истории запусков для режима базы данных не настроен."
-        }
+        val runtimeContext = context.requireDatabaseRuntimeContext(requireMaintenanceInactive = true)
+        val runService = context.requireDatabaseRouteRunService(runtimeContext)
         call.respond(
             runService.loadRunDetails(
                 moduleCode = requireNotNull(call.parameters["id"]),
@@ -154,14 +105,10 @@ internal fun Route.registerDatabaseRoutes(
     }
 
     post("/api/db/modules/{id}/save") {
-        context.requireDatabaseMaintenanceIsInactive()
-        val runtimeContext = context.currentRuntimeContext()
-        context.requireDatabaseMode(runtimeContext)
+        val runtimeContext = context.requireDatabaseRuntimeContext(requireMaintenanceInactive = true)
         val moduleCode = requireNotNull(call.parameters["id"])
         context.requireDatabaseModuleIsNotSyncing(moduleCode)
-        val backend = requireNotNull(context.currentDatabaseModuleBackend()) {
-            "Сервис работы с модулями из базы данных не настроен."
-        }
+        val backend = context.requireDatabaseRouteBackend(runtimeContext)
         backend.saveModule(
             moduleId = moduleCode,
             request = call.receive<SaveModuleRequest>(),
@@ -171,36 +118,30 @@ internal fun Route.registerDatabaseRoutes(
     }
 
     post("/api/db/modules/{id}/discard-working-copy") {
-        context.requireDatabaseMaintenanceIsInactive()
-        val runtimeContext = context.currentRuntimeContext()
-        context.requireDatabaseMode(runtimeContext)
+        val runtimeContext = context.requireDatabaseRuntimeContext(requireMaintenanceInactive = true)
         val moduleCode = requireNotNull(call.parameters["id"])
         context.requireDatabaseModuleIsNotSyncing(moduleCode)
-        val store = requireNotNull(context.currentDatabaseModuleStore()) {
-            "Хранилище модулей из базы данных не настроено."
-        }
+        val store = context.requireDatabaseRouteStore(runtimeContext)
+        val actor = context.requireDatabaseRouteActor(runtimeContext)
         store.discardWorkingCopy(
             moduleCode = moduleCode,
-            actorId = context.requireDatabaseActorId(runtimeContext),
-            actorSource = context.requireDatabaseActorSource(runtimeContext),
+            actorId = actor.actorId,
+            actorSource = actor.actorSource,
         )
         call.respond(SaveResultResponse("Личный черновик удалён."))
     }
 
     post("/api/db/modules/{id}/publish") {
-        context.requireDatabaseMaintenanceIsInactive()
-        val runtimeContext = context.currentRuntimeContext()
-        context.requireDatabaseMode(runtimeContext)
+        val runtimeContext = context.requireDatabaseRuntimeContext(requireMaintenanceInactive = true)
         val moduleCode = requireNotNull(call.parameters["id"])
         context.requireDatabaseModuleIsNotSyncing(moduleCode)
-        val store = requireNotNull(context.currentDatabaseModuleStore()) {
-            "Хранилище модулей из базы данных не настроено."
-        }
+        val store = context.requireDatabaseRouteStore(runtimeContext)
+        val actor = context.requireDatabaseRouteActor(runtimeContext)
         val result = store.publishWorkingCopy(
             moduleCode = moduleCode,
-            actorId = context.requireDatabaseActorId(runtimeContext),
-            actorSource = context.requireDatabaseActorSource(runtimeContext),
-            actorDisplayName = runtimeContext.actor.actorDisplayName,
+            actorId = actor.actorId,
+            actorSource = actor.actorSource,
+            actorDisplayName = actor.actorDisplayName,
         )
         call.respond(
             mapOf(
@@ -213,38 +154,32 @@ internal fun Route.registerDatabaseRoutes(
     }
 
     post("/api/db/modules/{id}/run") {
-        context.requireDatabaseMaintenanceIsInactive()
-        val runtimeContext = context.currentRuntimeContext()
-        context.requireDatabaseMode(runtimeContext)
+        val runtimeContext = context.requireDatabaseRuntimeContext(requireMaintenanceInactive = true)
         val moduleCode = requireNotNull(call.parameters["id"])
         context.requireDatabaseModuleIsNotSyncing(moduleCode)
-        val runService = requireNotNull(context.currentDatabaseModuleRunService()) {
-            "Сервис запуска модулей из базы данных не настроен."
-        }
+        val runService = context.requireDatabaseRouteRunService(runtimeContext)
+        val actor = context.requireDatabaseRouteActor(runtimeContext)
         call.receive<DatabaseRunStartRequest>()
         call.respond(
             runService.startRun(
                 moduleCode = moduleCode,
-                actorId = context.requireDatabaseActorId(runtimeContext),
-                actorSource = context.requireDatabaseActorSource(runtimeContext),
-                actorDisplayName = runtimeContext.actor.actorDisplayName,
+                actorId = actor.actorId,
+                actorSource = actor.actorSource,
+                actorDisplayName = actor.actorDisplayName,
             ),
         )
     }
 
     post("/api/db/modules") {
-        context.requireDatabaseMaintenanceIsInactive()
-        val runtimeContext = context.currentRuntimeContext()
-        context.requireDatabaseMode(runtimeContext)
-        val store = requireNotNull(context.currentDatabaseModuleStore()) {
-            "Хранилище модулей из базы данных не настроено."
-        }
+        val runtimeContext = context.requireDatabaseRuntimeContext(requireMaintenanceInactive = true)
+        val store = context.requireDatabaseRouteStore(runtimeContext)
+        val actor = context.requireDatabaseRouteActor(runtimeContext)
         val request = call.receive<CreateDbModuleRequest>()
         val result = store.createModule(
             moduleCode = request.moduleCode,
-            actorId = context.requireDatabaseActorId(runtimeContext),
-            actorSource = context.requireDatabaseActorSource(runtimeContext),
-            actorDisplayName = runtimeContext.actor.actorDisplayName,
+            actorId = actor.actorId,
+            actorSource = actor.actorSource,
+            actorDisplayName = actor.actorDisplayName,
             request = com.sbrf.lt.platform.ui.module.CreateModuleRequest(
                 title = request.title,
                 description = request.description,
@@ -265,17 +200,14 @@ internal fun Route.registerDatabaseRoutes(
     }
 
     delete("/api/db/modules/{id}") {
-        context.requireDatabaseMaintenanceIsInactive()
-        val runtimeContext = context.currentRuntimeContext()
-        context.requireDatabaseMode(runtimeContext)
+        val runtimeContext = context.requireDatabaseRuntimeContext(requireMaintenanceInactive = true)
         val moduleCode = requireNotNull(call.parameters["id"])
         context.requireDatabaseModuleIsNotSyncing(moduleCode)
-        val store = requireNotNull(context.currentDatabaseModuleStore()) {
-            "Хранилище модулей из базы данных не настроено."
-        }
+        val store = context.requireDatabaseRouteStore(runtimeContext)
+        val actor = context.requireDatabaseRouteActor(runtimeContext)
         val result = store.deleteModule(
             moduleCode = moduleCode,
-            actorId = context.requireDatabaseActorId(runtimeContext),
+            actorId = actor.actorId,
         )
         call.respond(
             mapOf(
@@ -287,28 +219,24 @@ internal fun Route.registerDatabaseRoutes(
     }
 
     post("/api/db/sync/one") {
-        val runtimeContext = context.currentRuntimeContext()
-        context.requireDatabaseMode(runtimeContext)
-        val syncService = requireNotNull(context.currentModuleSyncService()) {
-            "Сервис импорта модулей в базу данных не настроен."
-        }
+        val runtimeContext = context.requireDatabaseRuntimeContext()
+        val syncService = context.requireDatabaseRouteSyncService(runtimeContext)
+        val actor = context.requireDatabaseRouteSyncActor(runtimeContext)
         val request = call.receive<SyncOneModuleRequest>()
         val result = syncService.syncOneFromFiles(
             moduleCode = request.moduleCode,
             appsRoot = context.currentAppsRootOrFail(),
-            actorId = context.requireDatabaseActorId(runtimeContext),
-            actorSource = runtimeContext.actor.actorSource ?: "OS_LOGIN",
-            actorDisplayName = runtimeContext.actor.actorDisplayName,
+            actorId = actor.actorId,
+            actorSource = actor.actorSource,
+            actorDisplayName = actor.actorDisplayName,
         )
         call.respond(result)
     }
 
     post("/api/db/sync/selected") {
-        val runtimeContext = context.currentRuntimeContext()
-        context.requireDatabaseMode(runtimeContext)
-        val syncService = requireNotNull(context.currentModuleSyncService()) {
-            "Сервис импорта модулей в базу данных не настроен."
-        }
+        val runtimeContext = context.requireDatabaseRuntimeContext()
+        val syncService = context.requireDatabaseRouteSyncService(runtimeContext)
+        val actor = context.requireDatabaseRouteSyncActor(runtimeContext)
         val payload = call.receiveText()
         val request = try {
             mapper.readValue(payload, SyncSelectedModulesRequest::class.java)
@@ -319,24 +247,22 @@ internal fun Route.registerDatabaseRoutes(
         val result = syncService.syncSelectedFromFiles(
             moduleCodes = request.moduleCodes,
             appsRoot = context.currentAppsRootOrFail(),
-            actorId = context.requireDatabaseActorId(runtimeContext),
-            actorSource = runtimeContext.actor.actorSource ?: "OS_LOGIN",
-            actorDisplayName = runtimeContext.actor.actorDisplayName,
+            actorId = actor.actorId,
+            actorSource = actor.actorSource,
+            actorDisplayName = actor.actorDisplayName,
         )
         call.respond(result)
     }
 
     post("/api/db/sync/all") {
-        val runtimeContext = context.currentRuntimeContext()
-        context.requireDatabaseMode(runtimeContext)
-        val syncService = requireNotNull(context.currentModuleSyncService()) {
-            "Сервис импорта модулей в базу данных не настроен."
-        }
+        val runtimeContext = context.requireDatabaseRuntimeContext()
+        val syncService = context.requireDatabaseRouteSyncService(runtimeContext)
+        val actor = context.requireDatabaseRouteSyncActor(runtimeContext)
         val result = syncService.syncAllFromFiles(
             appsRoot = context.currentAppsRootOrFail(),
-            actorId = context.requireDatabaseActorId(runtimeContext),
-            actorSource = runtimeContext.actor.actorSource ?: "OS_LOGIN",
-            actorDisplayName = runtimeContext.actor.actorDisplayName,
+            actorId = actor.actorId,
+            actorSource = actor.actorSource,
+            actorDisplayName = actor.actorDisplayName,
         )
         call.respond(result)
     }
