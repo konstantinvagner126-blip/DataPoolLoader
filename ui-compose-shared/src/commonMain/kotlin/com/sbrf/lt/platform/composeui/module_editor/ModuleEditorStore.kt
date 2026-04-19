@@ -1,188 +1,34 @@
 package com.sbrf.lt.platform.composeui.module_editor
 
-import com.sbrf.lt.platform.composeui.model.DatabaseModulesCatalogResponse
-import com.sbrf.lt.platform.composeui.model.ModuleCatalogDiagnostics
-import com.sbrf.lt.platform.composeui.model.ModuleStoreMode
-import com.sbrf.lt.platform.composeui.model.RuntimeContext
 
 class ModuleEditorStore(
     private val api: ModuleEditorApi,
     private val syncRoute: (storage: String, moduleId: String?, includeHidden: Boolean) -> Unit = { _, _, _ -> },
 ) {
+    private val loadingSupport = ModuleEditorStoreLoadingSupport(api, syncRoute)
+    private val actionSupport = ModuleEditorStoreActionSupport(api, loadingSupport)
+
     fun clearSuccessMessage(current: ModuleEditorPageState): ModuleEditorPageState =
         current.copy(successMessage = null)
 
     fun clearErrorMessage(current: ModuleEditorPageState): ModuleEditorPageState =
         current.copy(errorMessage = null)
 
-    suspend fun load(route: ModuleEditorRouteState): ModuleEditorPageState {
-        return runCatching {
-            if (route.storage == "database") {
-                val catalog = api.loadDatabaseCatalog(route.includeHidden)
-                val selectedModuleId = resolveSelectedModuleId(route.moduleId, catalog.modules.map { it.id })
-                val session = selectedModuleId?.let { moduleId -> api.loadDatabaseSession(moduleId) }
-                val configForm = session?.let { loadConfigFormSnapshot(it.module.configText) }
-                syncRoute(route.storage, selectedModuleId, route.includeHidden)
-                ModuleEditorPageState(
-                    loading = false,
-                    errorMessage = null,
-                    successMessage = null,
-                    actionInProgress = null,
-                    databaseCatalog = catalog,
-                    selectedModuleId = selectedModuleId,
-                    session = session,
-                    selectedSqlPath = session?.module?.sqlFiles?.firstOrNull()?.path,
-                    configTextDraft = session?.module?.configText.orEmpty(),
-                    sqlContentsDraft = session?.module?.sqlFiles?.associate { it.path to it.content }.orEmpty(),
-                    metadataDraft = session?.module?.let(::toMetadataDraft) ?: ModuleMetadataDraft(),
-                    configFormState = configForm?.state,
-                    configFormError = configForm?.errorMessage,
-                    configFormSourceText = if (configForm?.state != null) session?.module?.configText.orEmpty() else "",
-                )
-            } else {
-                val catalog = api.loadFilesCatalog()
-                val selectedModuleId = resolveSelectedModuleId(route.moduleId, catalog.modules.map { it.id })
-                val session = selectedModuleId?.let { moduleId -> api.loadFilesSession(moduleId) }
-                val configForm = session?.let { loadConfigFormSnapshot(it.module.configText) }
-                syncRoute(route.storage, selectedModuleId, route.includeHidden)
-                ModuleEditorPageState(
-                    loading = false,
-                    errorMessage = null,
-                    successMessage = null,
-                    actionInProgress = null,
-                    filesCatalog = catalog,
-                    selectedModuleId = selectedModuleId,
-                    session = session,
-                    selectedSqlPath = session?.module?.sqlFiles?.firstOrNull()?.path,
-                    configTextDraft = session?.module?.configText.orEmpty(),
-                    sqlContentsDraft = session?.module?.sqlFiles?.associate { it.path to it.content }.orEmpty(),
-                    metadataDraft = session?.module?.let(::toMetadataDraft) ?: ModuleMetadataDraft(),
-                    configFormState = configForm?.state,
-                    configFormError = configForm?.errorMessage,
-                    configFormSourceText = if (configForm?.state != null) session?.module?.configText.orEmpty() else "",
-                )
-            }
-        }.recoverCatching { error ->
-            loadDatabaseFallbackState()
-                ?: throw error
-        }.getOrElse { error ->
-            ModuleEditorPageState(
-                loading = false,
-                errorMessage = error.message ?: "Не удалось загрузить редактор модуля.",
-            )
-        }
-    }
+    suspend fun load(route: ModuleEditorRouteState): ModuleEditorPageState =
+        loadingSupport.load(route)
 
     suspend fun selectModule(
         current: ModuleEditorPageState,
         route: ModuleEditorRouteState,
         moduleId: String,
-    ): ModuleEditorPageState {
-        return runCatching {
-            val session = if (route.storage == "database") {
-                api.loadDatabaseSession(moduleId)
-            } else {
-                api.loadFilesSession(moduleId)
-            }
-            val configForm = loadConfigFormSnapshot(session.module.configText)
-            syncRoute(route.storage, moduleId, route.includeHidden)
-            current.copy(
-                loading = false,
-                errorMessage = null,
-                successMessage = null,
-                actionInProgress = null,
-                selectedModuleId = moduleId,
-                session = session,
-                selectedSqlPath = session.module.sqlFiles.firstOrNull()?.path,
-                configTextDraft = session.module.configText,
-                sqlContentsDraft = session.module.sqlFiles.associate { it.path to it.content },
-                metadataDraft = toMetadataDraft(session.module),
-                configFormState = configForm.state,
-                configFormError = configForm.errorMessage,
-                configFormSourceText = if (configForm.state != null) session.module.configText else "",
-            )
-        }.getOrElse { error ->
-            current.copy(
-                loading = false,
-                errorMessage = error.message ?: "Не удалось загрузить выбранный модуль.",
-            )
-        }.let { nextState ->
-            if (route.storage != "database" || nextState.session != null || nextState.errorMessage == null) {
-                nextState
-            } else {
-                loadDatabaseFallbackState(nextState) ?: nextState
-            }
-        }
-    }
+    ): ModuleEditorPageState =
+        loadingSupport.selectModule(current, route, moduleId)
 
     suspend fun refreshCatalog(
         current: ModuleEditorPageState,
         route: ModuleEditorRouteState,
     ): ModuleEditorPageState =
-        runCatching {
-            if (route.storage == "database") {
-                val catalog = api.loadDatabaseCatalog(route.includeHidden)
-                val selectedModuleId = current.selectedModuleId
-                    ?.takeIf { moduleId -> catalog.modules.any { it.id == moduleId } }
-                    ?: catalog.modules.firstOrNull()?.id
-                current.copy(
-                    loading = false,
-                    databaseCatalog = catalog,
-                    selectedModuleId = selectedModuleId,
-                )
-            } else {
-                val catalog = api.loadFilesCatalog()
-                val selectedModuleId = current.selectedModuleId
-                    ?.takeIf { moduleId -> catalog.modules.any { it.id == moduleId } }
-                    ?: catalog.modules.firstOrNull()?.id
-                current.copy(
-                    loading = false,
-                    filesCatalog = catalog,
-                    selectedModuleId = selectedModuleId,
-                )
-            }
-        }.getOrElse {
-            if (route.storage == "database") {
-                loadDatabaseFallbackState(current) ?: current
-            } else {
-                current
-            }
-        }
-
-    private suspend fun loadDatabaseFallbackState(current: ModuleEditorPageState? = null): ModuleEditorPageState? {
-        val runtimeContext = runCatching { api.loadRuntimeContext() }.getOrNull() ?: return null
-        if (runtimeContext.requestedMode != ModuleStoreMode.DATABASE || runtimeContext.effectiveMode == ModuleStoreMode.DATABASE) {
-            return null
-        }
-        return createDatabaseFallbackState(runtimeContext, current)
-    }
-
-    private fun createDatabaseFallbackState(
-        runtimeContext: RuntimeContext,
-        current: ModuleEditorPageState?,
-    ): ModuleEditorPageState =
-        (current ?: ModuleEditorPageState()).copy(
-            loading = false,
-            errorMessage = null,
-            successMessage = null,
-            actionInProgress = null,
-            databaseCatalog = DatabaseModulesCatalogResponse(
-                runtimeContext = runtimeContext,
-                diagnostics = current?.databaseCatalog?.diagnostics ?: ModuleCatalogDiagnostics(),
-                modules = emptyList(),
-            ),
-            selectedModuleId = null,
-            session = null,
-            selectedSqlPath = null,
-            configTextDraft = "",
-            sqlContentsDraft = emptyMap(),
-            metadataDraft = ModuleMetadataDraft(),
-            configFormState = null,
-            configFormLoading = false,
-            configFormError = null,
-            configFormSourceText = "",
-            createModuleDialogOpen = false,
-        )
+        loadingSupport.refreshCatalog(current, route)
 
     fun selectTab(
         current: ModuleEditorPageState,
@@ -401,202 +247,44 @@ class ModuleEditorStore(
     suspend fun saveFilesModule(
         current: ModuleEditorPageState,
         route: ModuleEditorRouteState,
-    ): ModuleEditorPageState {
-        val moduleId = current.selectedModuleId ?: return current
-        val session = current.session ?: return current
-        return runCatching {
-            val response = api.saveFilesModule(moduleId, current.toSaveRequest(session))
-            refreshSelectedModule(current, route, response.message)
-        }.getOrElse { error ->
-            current.copy(
-                actionInProgress = null,
-                errorMessage = error.message ?: "Не удалось сохранить модуль.",
-            )
-        }
-    }
+    ): ModuleEditorPageState =
+        actionSupport.saveFilesModule(current, route)
 
     suspend fun saveDatabaseWorkingCopy(
         current: ModuleEditorPageState,
         route: ModuleEditorRouteState,
-    ): ModuleEditorPageState {
-        val moduleId = current.selectedModuleId ?: return current
-        val session = current.session ?: return current
-        return runCatching {
-            val response = api.saveDatabaseWorkingCopy(moduleId, current.toSaveRequest(session))
-            refreshSelectedModule(current, route, response.message)
-        }.getOrElse { error ->
-            current.copy(
-                actionInProgress = null,
-                errorMessage = error.message ?: "Не удалось сохранить черновик.",
-            )
-        }
-    }
+    ): ModuleEditorPageState =
+        actionSupport.saveDatabaseWorkingCopy(current, route)
 
     suspend fun discardDatabaseWorkingCopy(
         current: ModuleEditorPageState,
         route: ModuleEditorRouteState,
-    ): ModuleEditorPageState {
-        val moduleId = current.selectedModuleId ?: return current
-        return runCatching {
-            val response = api.discardDatabaseWorkingCopy(moduleId)
-            refreshSelectedModule(current, route, response.message)
-        }.getOrElse { error ->
-            current.copy(
-                actionInProgress = null,
-                errorMessage = error.message ?: "Не удалось сбросить черновик.",
-            )
-        }
-    }
+    ): ModuleEditorPageState =
+        actionSupport.discardDatabaseWorkingCopy(current, route)
 
     suspend fun publishDatabaseWorkingCopy(
         current: ModuleEditorPageState,
         route: ModuleEditorRouteState,
-    ): ModuleEditorPageState {
-        val moduleId = current.selectedModuleId ?: return current
-        return runCatching {
-            val response = api.publishDatabaseWorkingCopy(moduleId)
-            refreshSelectedModule(current, route, response.message)
-        }.getOrElse { error ->
-            current.copy(
-                actionInProgress = null,
-                errorMessage = error.message ?: "Не удалось опубликовать черновик.",
-            )
-        }
-    }
+    ): ModuleEditorPageState =
+        actionSupport.publishDatabaseWorkingCopy(current, route)
 
-    suspend fun runFilesModule(current: ModuleEditorPageState): ModuleEditorPageState {
-        val moduleId = current.selectedModuleId ?: return current
-        return runCatching {
-            api.startFilesRun(
-                StartRunRequestDto(
-                    moduleId = moduleId,
-                    configText = current.configTextDraft,
-                    sqlFiles = current.sqlContentsDraft,
-                ),
-            )
-            current.copy(
-                actionInProgress = null,
-                errorMessage = null,
-                successMessage = null,
-            )
-        }.getOrElse { error ->
-            current.copy(
-                actionInProgress = null,
-                errorMessage = error.message ?: "Не удалось запустить модуль.",
-            )
-        }
-    }
+    suspend fun runFilesModule(current: ModuleEditorPageState): ModuleEditorPageState =
+        actionSupport.runFilesModule(current)
 
-    suspend fun runDatabaseModule(current: ModuleEditorPageState): ModuleEditorPageState {
-        val moduleId = current.selectedModuleId ?: return current
-        return runCatching {
-            api.startDatabaseRun(moduleId)
-            current.copy(
-                actionInProgress = null,
-                errorMessage = null,
-                successMessage = null,
-            )
-        }.getOrElse { error ->
-            current.copy(
-                actionInProgress = null,
-                errorMessage = error.message ?: "Не удалось запустить модуль из базы данных.",
-            )
-        }
-    }
+    suspend fun runDatabaseModule(current: ModuleEditorPageState): ModuleEditorPageState =
+        actionSupport.runDatabaseModule(current)
 
     suspend fun createDatabaseModule(
         current: ModuleEditorPageState,
         route: ModuleEditorRouteState,
-    ): ModuleEditorPageState {
-        val draft = current.createModuleDraft
-        if (draft.moduleCode.isBlank()) {
-            return current.copy(
-                actionInProgress = null,
-                errorMessage = "Укажи код модуля.",
-            )
-        }
-        if (draft.title.isBlank()) {
-            return current.copy(
-                actionInProgress = null,
-                errorMessage = "Укажи название модуля.",
-            )
-        }
-        if (draft.configText.isBlank()) {
-            return current.copy(
-                actionInProgress = null,
-                errorMessage = "Стартовый application.yml не должен быть пустым.",
-            )
-        }
-        return runCatching {
-            val response = api.createDatabaseModule(
-                CreateDbModuleRequestDto(
-                    moduleCode = draft.moduleCode.trim(),
-                    title = draft.title.trim(),
-                    description = draft.description.trim().ifBlank { null },
-                    tags = parseTags(draft.tagsText),
-                    configText = draft.configText,
-                    hiddenFromUi = draft.hiddenFromUi,
-                ),
-            )
-            val nextRoute = route.copy(
-                moduleId = response.moduleCode,
-                includeHidden = route.includeHidden || draft.hiddenFromUi,
-            )
-            val loaded = load(nextRoute)
-            loaded.copy(
-                loading = false,
-                actionInProgress = null,
-                errorMessage = null,
-                successMessage = response.message,
-                activeTab = ModuleEditorTab.SETTINGS,
-                createModuleDialogOpen = false,
-                createModuleDraft = CreateModuleDraft(),
-            )
-        }.getOrElse { error ->
-            current.copy(
-                actionInProgress = null,
-                errorMessage = error.message ?: "Не удалось создать модуль.",
-            )
-        }
-    }
+    ): ModuleEditorPageState =
+        actionSupport.createDatabaseModule(current, route)
 
     suspend fun deleteDatabaseModule(
         current: ModuleEditorPageState,
         route: ModuleEditorRouteState,
-    ): ModuleEditorPageState {
-        val moduleId = current.selectedModuleId ?: return current
-        return runCatching {
-            val response = api.deleteDatabaseModule(moduleId)
-            val catalog = api.loadDatabaseCatalog(route.includeHidden)
-            val nextSelectedModuleId = catalog.modules.firstOrNull()?.id
-            val session = nextSelectedModuleId?.let { api.loadDatabaseSession(it) }
-            val configForm = session?.let { loadConfigFormSnapshot(it.module.configText) }
-            syncRoute(route.storage, nextSelectedModuleId, route.includeHidden)
-            ModuleEditorPageState(
-                loading = false,
-                errorMessage = null,
-                successMessage = response.message,
-                actionInProgress = null,
-                databaseCatalog = catalog,
-                selectedModuleId = nextSelectedModuleId,
-                session = session,
-                selectedSqlPath = session?.module?.sqlFiles?.firstOrNull()?.path,
-                configTextDraft = session?.module?.configText.orEmpty(),
-                sqlContentsDraft = session?.module?.sqlFiles?.associate { it.path to it.content }.orEmpty(),
-                metadataDraft = session?.module?.let(::toMetadataDraft) ?: ModuleMetadataDraft(),
-                createModuleDialogOpen = false,
-                createModuleDraft = CreateModuleDraft(),
-                configFormState = configForm?.state,
-                configFormError = configForm?.errorMessage,
-                configFormSourceText = if (configForm?.state != null) session?.module?.configText.orEmpty() else "",
-            )
-        }.getOrElse { error ->
-            current.copy(
-                actionInProgress = null,
-                errorMessage = error.message ?: "Не удалось удалить модуль.",
-            )
-        }
-    }
+    ): ModuleEditorPageState =
+        actionSupport.deleteDatabaseModule(current, route)
 
     fun updateConfigFormLocally(
         current: ModuleEditorPageState,
@@ -654,74 +342,6 @@ class ModuleEditorStore(
 
     fun startConfigFormSync(current: ModuleEditorPageState): ModuleEditorPageState =
         current.copy(configFormLoading = true, configFormError = null)
-
-    private fun resolveSelectedModuleId(
-        preferredId: String?,
-        moduleIds: List<String>,
-    ): String? =
-        when {
-            preferredId != null && moduleIds.contains(preferredId) -> preferredId
-            else -> moduleIds.firstOrNull()
-        }
-
-    private suspend fun refreshSelectedModule(
-        current: ModuleEditorPageState,
-        route: ModuleEditorRouteState,
-        successMessage: String,
-    ): ModuleEditorPageState {
-        val moduleId = current.selectedModuleId ?: return current
-        val refreshed = selectModule(
-            current.copy(
-                loading = false,
-                actionInProgress = null,
-                errorMessage = null,
-                successMessage = successMessage,
-            ),
-            route,
-            moduleId,
-        )
-        return refreshed.copy(
-            activeTab = current.activeTab,
-            successMessage = successMessage,
-        )
-    }
-
-    private fun ModuleEditorPageState.toSaveRequest(session: ModuleEditorSessionResponse): SaveModuleRequestDto =
-        SaveModuleRequestDto(
-            configText = configTextDraft,
-            sqlFiles = sqlContentsDraft,
-            title = metadataDraft.title,
-            description = metadataDraft.description.ifBlank { null },
-            tags = metadataDraft.tags,
-            hiddenFromUi = metadataDraft.hiddenFromUi,
-        )
-
-    private fun toMetadataDraft(module: ModuleDetailsResponse): ModuleMetadataDraft =
-        ModuleMetadataDraft(
-            title = module.title,
-            description = module.description ?: "",
-            tags = module.tags,
-            hiddenFromUi = module.hiddenFromUi,
-        )
-
-    private suspend fun loadConfigFormSnapshot(configText: String): ConfigFormSnapshot =
-        runCatching {
-            ConfigFormSnapshot(
-                state = api.parseConfigForm(configText),
-                errorMessage = null,
-            )
-        }.getOrElse { error ->
-            ConfigFormSnapshot(
-                state = null,
-                errorMessage = error.message ?: "Не удалось собрать визуальную форму.",
-            )
-        }
-
-    private fun parseTags(rawValue: String): List<String> =
-        rawValue.split(',')
-            .map { it.trim() }
-            .filter { it.isNotEmpty() }
-            .distinct()
 
     private fun sqlResourceUsedByForm(
         formState: ConfigFormStateDto,
@@ -802,9 +422,4 @@ class ModuleEditorStore(
         sqlContents.entries
             .sortedBy { it.key }
             .associateTo(LinkedHashMap()) { it.toPair() }
-
-    private data class ConfigFormSnapshot(
-        val state: ConfigFormStateDto?,
-        val errorMessage: String?,
-    )
 }

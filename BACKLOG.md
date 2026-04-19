@@ -327,6 +327,11 @@
   - [HomePageSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/home/HomePageSections.kt)
   - [HomePageSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/home/HomePageSupport.kt);
 - [HomePage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/home/HomePage.kt) сокращен до shell/wiring-слоя и перестал держать hero/card/helper реализацию в одном файле.
+- после page-layer начат распил тяжелых shared store-файлов:
+  - loading/fallback/session assembly вынесены из [ModuleEditorStore.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStore.kt) в [ModuleEditorStoreLoadingSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreLoadingSupport.kt)
+  - action/mutation flow вынесен в [ModuleEditorStoreActionSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreActionSupport.kt)
+  - loading и sync action flow вынесены из [ModuleSyncStore.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncStore.kt) в [ModuleSyncStoreLoadingSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncStoreLoadingSupport.kt) и [ModuleSyncStoreActionSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncStoreActionSupport.kt);
+- `P0.3` перешел из чисто page-level декомпозиции в следующий слой: store/support separation без возврата orchestration обратно в page/store giant-файлы.
 
 Критерий завершения:
 
