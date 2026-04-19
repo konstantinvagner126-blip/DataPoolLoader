@@ -66,7 +66,10 @@
 - DB route layer больше не держится на одном смешанном support-файле:
   - cleanup flow вынесен в [DatabaseCleanupRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseCleanupRouteSupport.kt)
   - sync/import flow вынесен в [DatabaseSyncRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseSyncRouteSupport.kt)
-  - module flow вынесен в [DatabaseModuleRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseModuleRouteSupport.kt);
+  - module flow вынесен в отдельные support-слои:
+    - [DatabaseModuleRouteContexts.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseModuleRouteContexts.kt)
+    - [DatabaseModuleServiceRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseModuleServiceRouteSupport.kt)
+    - [DatabaseModulesCatalogRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseModulesCatalogRouteSupport.kt);
 - [DatabaseRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseRoutes.kt) теперь агрегирует отдельные route groups:
   - [DatabaseCleanupRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseCleanupRoutes.kt)
   - [DatabaseSyncRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseSyncRoutes.kt)
@@ -77,7 +80,9 @@
 - SQL-console route support больше не смешивает metadata, export и async execution lifecycle в одном файле:
   - [SqlConsoleMetadataRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/SqlConsoleMetadataRouteSupport.kt)
   - [SqlConsoleExportRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/SqlConsoleExportRouteSupport.kt)
-  - [SqlConsoleExecutionRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/SqlConsoleExecutionRouteSupport.kt);
+  - execution flow дополнительно разрезан на:
+    - [SqlConsoleExecutionPathSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/SqlConsoleExecutionPathSupport.kt)
+    - [SqlConsoleExecutionActionSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/SqlConsoleExecutionActionSupport.kt);
 - [SqlConsoleRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/SqlConsoleRoutes.kt) теперь только агрегирует отдельные route groups:
   - [SqlConsoleStateRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/SqlConsoleStateRoutes.kt)
   - [SqlConsoleMetadataRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/SqlConsoleMetadataRoutes.kt)
@@ -102,7 +107,9 @@
   - [CommonFilesRunRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/CommonFilesRunRoutes.kt)
   - [CommonMaintenanceRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/CommonMaintenanceRoutes.kt);
 - общий route support больше не смешивает разные ответственности в одном файле:
-  - maintenance flow вынесен в [CommonMaintenanceRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/CommonMaintenanceRouteSupport.kt)
+  - maintenance flow вынесен в отдельные support-слои:
+    - [CommonRunHistoryCleanupRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/CommonRunHistoryCleanupRouteSupport.kt)
+    - [CommonOutputRetentionRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/CommonOutputRetentionRouteSupport.kt)
   - config/module flow вынесен в [CommonConfigRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/CommonConfigRouteSupport.kt)
   - credentials upload вынесен в [CommonCredentialsRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/CommonCredentialsRouteSupport.kt);
 - [ModuleRunRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/ModuleRunRoutes.kt) больше не держит вручную path parsing и service resolution;

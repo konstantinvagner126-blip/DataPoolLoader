@@ -6,9 +6,6 @@ import com.sbrf.lt.platform.ui.config.UiRuntimeContext
 import com.sbrf.lt.platform.ui.model.RunHistoryCleanupPreviewResponse
 import com.sbrf.lt.platform.ui.model.RunHistoryCleanupRequest
 import com.sbrf.lt.platform.ui.model.RunHistoryCleanupResultResponse
-import com.sbrf.lt.platform.ui.model.output.OutputRetentionPreviewResponse
-import com.sbrf.lt.platform.ui.model.output.OutputRetentionRequest
-import com.sbrf.lt.platform.ui.model.output.OutputRetentionResultResponse
 
 internal fun UiServerContext.previewCommonRunHistoryCleanup(
     runtimeContext: UiRuntimeContext,
@@ -21,7 +18,7 @@ internal fun UiServerContext.previewCommonRunHistoryCleanup(
             requireDatabaseMode(runtimeContext)
             requireNotNull(currentDatabaseRunHistoryCleanupService()) {
                 "Сервис cleanup истории запусков для режима базы данных не настроен."
-            }.previewCleanup(disableSafeguard).toCommonResponse()
+            }.previewCleanup(disableSafeguard).toCommonRunHistoryCleanupResponse()
         }
     }
 
@@ -36,37 +33,7 @@ internal fun UiServerContext.executeCommonRunHistoryCleanup(
             requireDatabaseMode(runtimeContext)
             requireNotNull(currentDatabaseRunHistoryCleanupService()) {
                 "Сервис cleanup истории запусков для режима базы данных не настроен."
-            }.executeCleanup(disableSafeguard).toCommonResponse()
-        }
-    }
-
-internal fun UiServerContext.previewCommonOutputRetention(
-    runtimeContext: UiRuntimeContext,
-    disableSafeguard: Boolean,
-): OutputRetentionPreviewResponse =
-    when (runtimeContext.requestedMode) {
-        UiModuleStoreMode.FILES -> currentFilesOutputRetentionService().previewCleanup(disableSafeguard)
-        UiModuleStoreMode.DATABASE -> {
-            requireDatabaseMaintenanceIsInactive()
-            requireDatabaseMode(runtimeContext)
-            requireNotNull(currentDatabaseOutputRetentionService()) {
-                "Сервис retention output-каталогов для режима базы данных не настроен."
-            }.previewCleanup(disableSafeguard)
-        }
-    }
-
-internal fun UiServerContext.executeCommonOutputRetention(
-    runtimeContext: UiRuntimeContext,
-    disableSafeguard: Boolean,
-): OutputRetentionResultResponse =
-    when (runtimeContext.requestedMode) {
-        UiModuleStoreMode.FILES -> currentFilesOutputRetentionService().executeCleanup(disableSafeguard)
-        UiModuleStoreMode.DATABASE -> {
-            requireDatabaseMaintenanceIsInactive()
-            requireDatabaseMode(runtimeContext)
-            requireNotNull(currentDatabaseOutputRetentionService()) {
-                "Сервис retention output-каталогов для режима базы данных не настроен."
-            }.executeCleanup(disableSafeguard)
+            }.executeCleanup(disableSafeguard).toCommonRunHistoryCleanupResponse()
         }
     }
 
@@ -84,21 +51,7 @@ internal fun UiServerContext.parseCommonRunHistoryCleanupRequest(
         badRequest("Некорректные данные для cleanup истории запусков.")
     }
 
-internal fun UiServerContext.parseCommonOutputRetentionRequest(
-    mapper: ObjectMapper,
-    payload: String,
-): OutputRetentionRequest =
-    try {
-        if (payload.isBlank()) {
-            OutputRetentionRequest()
-        } else {
-            mapper.readValue(payload, OutputRetentionRequest::class.java)
-        }
-    } catch (_: Exception) {
-        badRequest("Некорректные данные для retention output-каталогов.")
-    }
-
-private fun com.sbrf.lt.platform.ui.model.DatabaseRunHistoryCleanupPreviewResponse.toCommonResponse(): RunHistoryCleanupPreviewResponse =
+private fun com.sbrf.lt.platform.ui.model.DatabaseRunHistoryCleanupPreviewResponse.toCommonRunHistoryCleanupResponse(): RunHistoryCleanupPreviewResponse =
     RunHistoryCleanupPreviewResponse(
         storageMode = "DATABASE",
         safeguardEnabled = safeguardEnabled,
@@ -137,7 +90,7 @@ private fun com.sbrf.lt.platform.ui.model.DatabaseRunHistoryCleanupPreviewRespon
         },
     )
 
-private fun com.sbrf.lt.platform.ui.model.DatabaseRunHistoryCleanupResultResponse.toCommonResponse(): RunHistoryCleanupResultResponse =
+private fun com.sbrf.lt.platform.ui.model.DatabaseRunHistoryCleanupResultResponse.toCommonRunHistoryCleanupResponse(): RunHistoryCleanupResultResponse =
     RunHistoryCleanupResultResponse(
         storageMode = "DATABASE",
         safeguardEnabled = safeguardEnabled,
