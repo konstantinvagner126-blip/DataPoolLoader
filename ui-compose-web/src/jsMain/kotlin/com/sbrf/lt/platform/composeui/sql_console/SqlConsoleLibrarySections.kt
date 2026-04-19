@@ -214,36 +214,36 @@ internal fun SqlFavoriteObjectsBlock(
                         }
                     }
                     Div({ classes("d-flex", "flex-wrap", "gap-2") }) {
-                        Button(attrs = {
-                            classes("btn", "btn-outline-dark", "btn-sm")
-                            attr("type", "button")
-                            onClick { onInsert(favorite) }
-                        }) { Text("Вставить") }
-                        Button(attrs = {
-                            classes("btn", "btn-dark", "btn-sm")
-                            attr("type", "button")
-                            onClick { onInsertSelect(favorite) }
-                        }) { Text(if (supportsFavoriteRowPreview(favorite)) "SELECT *" else "В SQL") }
-                        if (supportsFavoriteRowPreview(favorite)) {
-                            Button(attrs = {
-                                classes("btn", "btn-outline-dark", "btn-sm")
-                                attr("type", "button")
-                                onClick { onInsertCount(favorite) }
-                            }) { Text("COUNT(*)") }
+                        SqlFavoriteObjectActionButton("Вставить", "btn-outline-dark") { onInsert(favorite) }
+                        SqlFavoriteObjectActionButton(
+                            if (supportsFavoriteRowPreview(favorite)) "SELECT *" else "В SQL",
+                            "btn-dark",
+                        ) {
+                            onInsertSelect(favorite)
                         }
-                        Button(attrs = {
-                            classes("btn", "btn-outline-secondary", "btn-sm")
-                            attr("type", "button")
-                            onClick { onOpenMetadata(favorite) }
-                        }) { Text("Метаданные") }
-                        Button(attrs = {
-                            classes("btn", "btn-outline-danger", "btn-sm")
-                            attr("type", "button")
-                            onClick { onRemove(favorite) }
-                        }) { Text("Убрать") }
+                        if (supportsFavoriteRowPreview(favorite)) {
+                            SqlFavoriteObjectActionButton("COUNT(*)", "btn-outline-dark") { onInsertCount(favorite) }
+                        }
+                        SqlFavoriteObjectActionButton("Метаданные", "btn-outline-secondary") { onOpenMetadata(favorite) }
+                        SqlFavoriteObjectActionButton("Убрать", "btn-outline-danger") { onRemove(favorite) }
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun SqlFavoriteObjectActionButton(
+    label: String,
+    toneClass: String,
+    onClick: () -> Unit,
+) {
+    Button(attrs = {
+        classes("btn", toneClass, "btn-sm")
+        attr("type", "button")
+        onClick { onClick() }
+    }) {
+        Text(label)
     }
 }

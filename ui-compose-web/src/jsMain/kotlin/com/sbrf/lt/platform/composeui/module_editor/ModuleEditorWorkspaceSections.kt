@@ -32,30 +32,9 @@ internal fun CreateModulePanel(
                 }
             }
             Div({ classes("d-flex", "flex-wrap", "gap-2") }) {
-                Button(attrs = {
-                    classes("btn", "btn-outline-secondary")
-                    attr("type", "button")
-                    if (actionBusy) {
-                        disabled()
-                    }
-                    onClick { onRestoreTemplate() }
-                }) { Text("Восстановить шаблон") }
-                Button(attrs = {
-                    classes("btn", "btn-outline-secondary")
-                    attr("type", "button")
-                    if (actionBusy) {
-                        disabled()
-                    }
-                    onClick { onCancel() }
-                }) { Text("Отмена") }
-                Button(attrs = {
-                    classes("btn", "btn-primary")
-                    attr("type", "button")
-                    if (actionBusy) {
-                        disabled()
-                    }
-                    onClick { onCreate() }
-                }) { Text("Создать модуль") }
+                WorkspaceActionButton("Восстановить шаблон", "btn-outline-secondary", disabled = actionBusy) { onRestoreTemplate() }
+                WorkspaceActionButton("Отмена", "btn-outline-secondary", disabled = actionBusy) { onCancel() }
+                WorkspaceActionButton("Создать модуль", "btn-primary", disabled = actionBusy) { onCreate() }
             }
         }
 
@@ -144,9 +123,9 @@ internal fun SqlPreview(
                         Div({ classes("sql-catalog-note") }) { Text("Создание, переименование и удаление SQL выполняется здесь. Изменения сохраняются основным действием редактора.") }
                     }
                     Div({ classes("d-flex", "flex-wrap", "gap-2") }) {
-                        SqlCatalogActionButton("Создать SQL", "btn-outline-primary") { onCreateSql() }
-                        SqlCatalogActionButton("Переименовать", "btn-outline-secondary", enabled = selectedSql != null) { onRenameSql() }
-                        SqlCatalogActionButton("Удалить", "btn-outline-danger", enabled = selectedSql != null) { onDeleteSql() }
+                        WorkspaceActionButton("Создать SQL", "btn-outline-primary", small = true) { onCreateSql() }
+                        WorkspaceActionButton("Переименовать", "btn-outline-secondary", disabled = selectedSql == null, small = true) { onRenameSql() }
+                        WorkspaceActionButton("Удалить", "btn-outline-danger", disabled = selectedSql == null, small = true) { onDeleteSql() }
                     }
                 }
                 Div({ classes("sql-catalog-list") }) {
@@ -221,16 +200,20 @@ internal fun ConfigPreview(
 }
 
 @Composable
-private fun SqlCatalogActionButton(
+private fun WorkspaceActionButton(
     label: String,
     toneClass: String,
-    enabled: Boolean = true,
+    disabled: Boolean = false,
+    small: Boolean = false,
     onClick: () -> Unit,
 ) {
     Button(attrs = {
-        classes("btn", toneClass, "btn-sm")
+        classes("btn", toneClass)
+        if (small) {
+            classes("btn-sm")
+        }
         attr("type", "button")
-        if (!enabled) {
+        if (disabled) {
             disabled()
         }
         onClick { onClick() }

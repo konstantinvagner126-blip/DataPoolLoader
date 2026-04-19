@@ -48,76 +48,61 @@ internal fun SourcesSection(
         }
         formState.sources.forEachIndexed { index, source ->
             val sourceSqlState = buildSourceSqlState(source, sqlResources)
-            Div({ classes("config-form-card", "mb-3") }) {
-                Div({ classes("config-form-card-body") }) {
-                    Div({ classes("d-flex", "justify-content-between", "align-items-center", "mb-3", "gap-2") }) {
-                        Div {
-                            Div({ classes("config-form-card-title") }) {
-                                Text(source.name.ifBlank { "Источник ${index + 1}" })
-                            }
-                            if (!source.jdbcUrl.isBlank()) {
-                                Div({ classes("config-form-help") }) {
-                                    Text(source.jdbcUrl)
-                                }
-                            }
-                        }
-                        ConfigCollectionActionButton(
-                            label = "Удалить",
-                            toneClass = "btn-outline-danger",
-                            disabled = disabled,
-                        ) {
-                            onCommit(formState.copy(sources = formState.sources.filterIndexed { sourceIndex, _ -> sourceIndex != index }))
-                        }
-                    }
-                    Div({ classes("config-form-fields") }) {
-                        CommitTextField(
-                            label = "Название",
-                            value = source.name,
-                            disabled = disabled,
-                            helpText = "Идентификатор источника в конфиге.",
-                        ) { onCommit(updateSource(formState, index) { copy(name = it) }) }
-                        CommitTextField(
-                            label = "JDBC URL",
-                            value = source.jdbcUrl,
-                            disabled = disabled,
-                            helpText = "Поддерживаются placeholders из credential.properties.",
-                        ) { onCommit(updateSource(formState, index) { copy(jdbcUrl = it) }) }
-                        CommitTextField(
-                            label = "Пользователь",
-                            value = source.username,
-                            disabled = disabled,
-                            helpText = "Можно использовать placeholders.",
-                        ) { onCommit(updateSource(formState, index) { copy(username = it) }) }
-                        CommitTextField(
-                            label = "Пароль",
-                            value = source.password,
-                            disabled = disabled,
-                            helpText = "Можно использовать placeholders.",
-                        ) { onCommit(updateSource(formState, index) { copy(password = it) }) }
-                        CommitSelectField(
-                            label = "Источник SQL",
-                            value = sourceSqlState.mode,
-                            options = buildSourceSqlModeOptions(sourceSqlState),
-                            disabled = disabled,
-                            helpText = sourceSqlState.summary,
-                        ) { mode ->
-                            onCommit(applySourceSqlMode(formState, index, mode, sqlResources))
-                        }
-                        CommitSqlModeFields(
-                            mode = sourceSqlState.mode,
-                            inlineText = sourceSqlState.inlineText,
-                            catalogPath = sourceSqlState.catalogPath,
-                            externalRef = sourceSqlState.externalRef,
-                            sqlResources = sqlResources,
-                            disabled = disabled,
-                            storageMode = storageMode,
-                            inlineRowsCount = 5,
-                            inlineHelpText = "Если задан, перекрывает SQL по умолчанию.",
-                            onInlineCommit = { onCommit(updateSource(formState, index) { copy(sql = it, sqlFile = null) }) },
-                            onCatalogCommit = { onCommit(updateSource(formState, index) { copy(sql = null, sqlFile = it.ifBlank { null }) }) },
-                        )
-                    }
+            ConfigCollectionCard(
+                title = source.name.ifBlank { "Источник ${index + 1}" },
+                note = source.jdbcUrl.ifBlank { null },
+                removeLabel = "Удалить",
+                disabled = disabled,
+                onRemove = {
+                    onCommit(formState.copy(sources = formState.sources.filterIndexed { sourceIndex, _ -> sourceIndex != index }))
+                },
+            ) {
+                CommitTextField(
+                    label = "Название",
+                    value = source.name,
+                    disabled = disabled,
+                    helpText = "Идентификатор источника в конфиге.",
+                ) { onCommit(updateSource(formState, index) { copy(name = it) }) }
+                CommitTextField(
+                    label = "JDBC URL",
+                    value = source.jdbcUrl,
+                    disabled = disabled,
+                    helpText = "Поддерживаются placeholders из credential.properties.",
+                ) { onCommit(updateSource(formState, index) { copy(jdbcUrl = it) }) }
+                CommitTextField(
+                    label = "Пользователь",
+                    value = source.username,
+                    disabled = disabled,
+                    helpText = "Можно использовать placeholders.",
+                ) { onCommit(updateSource(formState, index) { copy(username = it) }) }
+                CommitTextField(
+                    label = "Пароль",
+                    value = source.password,
+                    disabled = disabled,
+                    helpText = "Можно использовать placeholders.",
+                ) { onCommit(updateSource(formState, index) { copy(password = it) }) }
+                CommitSelectField(
+                    label = "Источник SQL",
+                    value = sourceSqlState.mode,
+                    options = buildSourceSqlModeOptions(sourceSqlState),
+                    disabled = disabled,
+                    helpText = sourceSqlState.summary,
+                ) { mode ->
+                    onCommit(applySourceSqlMode(formState, index, mode, sqlResources))
                 }
+                CommitSqlModeFields(
+                    mode = sourceSqlState.mode,
+                    inlineText = sourceSqlState.inlineText,
+                    catalogPath = sourceSqlState.catalogPath,
+                    externalRef = sourceSqlState.externalRef,
+                    sqlResources = sqlResources,
+                    disabled = disabled,
+                    storageMode = storageMode,
+                    inlineRowsCount = 5,
+                    inlineHelpText = "Если задан, перекрывает SQL по умолчанию.",
+                    onInlineCommit = { onCommit(updateSource(formState, index) { copy(sql = it, sqlFile = null) }) },
+                    onCatalogCommit = { onCommit(updateSource(formState, index) { copy(sql = null, sqlFile = it.ifBlank { null }) }) },
+                )
             }
         }
     }
@@ -152,35 +137,63 @@ internal fun QuotasSection(
             P({ classes("text-secondary", "mb-0") }) { Text("Квоты не заданы.") }
         }
         formState.quotas.forEachIndexed { index, quota ->
-            Div({ classes("config-form-card", "mb-3") }) {
-                Div({ classes("config-form-card-body") }) {
-                    Div({ classes("d-flex", "justify-content-between", "align-items-center", "mb-3", "gap-2") }) {
-                        Div({ classes("config-form-card-title") }) {
-                            Text(quota.source.ifBlank { "Квота ${index + 1}" })
-                        }
-                        ConfigCollectionActionButton(
-                            label = "Удалить",
-                            toneClass = "btn-outline-danger",
-                            disabled = disabled,
-                        ) {
-                            onCommit(formState.copy(quotas = formState.quotas.filterIndexed { quotaIndex, _ -> quotaIndex != index }))
-                        }
+            ConfigCollectionCard(
+                title = quota.source.ifBlank { "Квота ${index + 1}" },
+                removeLabel = "Удалить",
+                disabled = disabled,
+                onRemove = {
+                    onCommit(formState.copy(quotas = formState.quotas.filterIndexed { quotaIndex, _ -> quotaIndex != index }))
+                },
+            ) {
+                CommitTextField(
+                    label = "Источник",
+                    value = quota.source,
+                    disabled = disabled,
+                    helpText = "Код источника из списка app.sources.",
+                ) { onCommit(updateQuota(formState, index) { copy(source = it) }) }
+                CommitOptionalDoubleField(
+                    label = "Процент",
+                    value = quota.percent,
+                    disabled = disabled,
+                    helpText = "Можно оставить пустым.",
+                ) { onCommit(updateQuota(formState, index) { copy(percent = it) }) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ConfigCollectionCard(
+    title: String,
+    note: String? = null,
+    removeLabel: String,
+    disabled: Boolean,
+    onRemove: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    Div({ classes("config-form-card", "mb-3") }) {
+        Div({ classes("config-form-card-body") }) {
+            Div({ classes("d-flex", "justify-content-between", "align-items-center", "mb-3", "gap-2") }) {
+                Div {
+                    Div({ classes("config-form-card-title") }) {
+                        Text(title)
                     }
-                    Div({ classes("config-form-fields") }) {
-                        CommitTextField(
-                            label = "Источник",
-                            value = quota.source,
-                            disabled = disabled,
-                            helpText = "Код источника из списка app.sources.",
-                        ) { onCommit(updateQuota(formState, index) { copy(source = it) }) }
-                        CommitOptionalDoubleField(
-                            label = "Процент",
-                            value = quota.percent,
-                            disabled = disabled,
-                            helpText = "Можно оставить пустым.",
-                        ) { onCommit(updateQuota(formState, index) { copy(percent = it) }) }
+                    if (!note.isNullOrBlank()) {
+                        Div({ classes("config-form-help") }) {
+                            Text(note)
+                        }
                     }
                 }
+                ConfigCollectionActionButton(
+                    label = removeLabel,
+                    toneClass = "btn-outline-danger",
+                    disabled = disabled,
+                ) {
+                    onRemove()
+                }
+            }
+            Div({ classes("config-form-fields") }) {
+                content()
             }
         }
     }

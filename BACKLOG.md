@@ -619,6 +619,15 @@
 - sql_console objects hero nav cleanup:
   - повторяющиеся hero navigation button-ы сведены к локальному `ObjectsNavActionButton(...)` в [SqlConsoleObjectsPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectsPage.kt)
   - экран объектов БД больше не держит три отдельные `btn/anchor/button` ветки для одного и того же navigation pattern.
+- module_editor collection card cleanup:
+  - повторяющийся shell `config-form-card/config-form-card-body/config-form-fields` для `sources/quotas` сведен к локальному `ConfigCollectionCard(...)` в [ModuleEditorConfigFormSourceSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorConfigFormSourceSections.kt)
+  - source/quota sections больше не держат две параллельные card-header/remove/content ветки с одинаковым layout.
+- sql_console favorite action cleanup:
+  - action-button strip в `Избранных объектах` сведен к локальному `SqlFavoriteObjectActionButton(...)` в [SqlConsoleLibrarySections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleLibrarySections.kt)
+  - favorite object cards больше не повторяют пять одинаковых `btn + type=button + onClick` веток вручную.
+- module_editor workspace action cleanup:
+  - create-panel actions и SQL-catalog toolbar actions сведены к одному `WorkspaceActionButton(...)` в [ModuleEditorWorkspaceSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorWorkspaceSections.kt)
+  - workspace слой больше не держит два разных helper-а для одного и того же button pattern с различием только в `btn-sm` и disabled-state.
 
 Критерий завершения:
 
