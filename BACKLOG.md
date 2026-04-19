@@ -664,6 +664,15 @@
 - sql_console source-result panel cleanup:
   - panel header и muted text для результатов по source сведены к `SqlObjectSourceResultPanel(...)` и `SqlObjectSourceMutedText(...)` в [SqlConsoleObjectsPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectsPage.kt)
   - source result list больше не держит повторяющиеся header/summary/empty-state shell-ветки на каждом source.
+- sql_console objects control cleanup:
+  - source selection checkbox и search action сведены к `SqlObjectSourceCheckbox(...)` и `SqlObjectSearchButton(...)` в [SqlConsoleObjectsPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectsPage.kt)
+  - object browser больше не держит inline checkbox/search button markup внутри основного экранного файла.
+- module_editor run status cleanup:
+  - muted status text и validation severity badge сведены к `EditorRunMutedText(...)` и `ValidationSeverityBadge(...)` в [ModuleEditorRunSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorRunSections.kt)
+  - run panel больше не держит повторяющиеся `text-secondary small` и `severity badge` ветки в loading/empty/validation paths.
+- sql_console toolbar action cleanup:
+  - основная toolbar action-strip сведен к `SqlToolbarActionButton(...)` в [SqlConsolePage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsolePage.kt)
+  - workspace toolbar больше не повторяет восемь почти одинаковых `btn + type=button + disabled + onClick` веток для run/stop/commit/export действий.
 
 Критерий завершения:
 

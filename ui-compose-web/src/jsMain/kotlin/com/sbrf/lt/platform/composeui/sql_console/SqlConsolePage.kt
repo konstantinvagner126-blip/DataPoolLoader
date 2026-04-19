@@ -581,134 +581,114 @@ fun ComposeSqlConsolePage(
                                 }
                             }
                             Div({ classes("d-flex", "flex-wrap", "align-items-center", "gap-2") }) {
-                                Button(attrs = {
-                                    classes("btn", "btn-outline-dark")
-                                    attr("type", "button")
-                                    onClick { formatSqlAction?.invoke() }
-                                }) {
+                                SqlToolbarActionButton(
+                                    toneClass = "btn-outline-dark",
+                                    onClick = { formatSqlAction?.invoke() },
+                                ) {
                                     Text("Форматировать")
                                 }
-                                Button(attrs = {
-                                    classes("btn", "btn-outline-dark")
-                                    attr("type", "button")
-                                    if (
+                                SqlToolbarActionButton(
+                                    toneClass = "btn-outline-dark",
+                                    disabled = (
                                         state.actionInProgress == "run-current-query" ||
-                                        state.info?.configured != true ||
-                                        pendingManualTransaction ||
-                                        currentOutlineItem == null
-                                    ) {
-                                        disabled()
-                                    }
-                                    onClick { runCurrentAction?.invoke() }
-                                }) {
+                                            state.info?.configured != true ||
+                                            pendingManualTransaction ||
+                                            currentOutlineItem == null
+                                        ),
+                                    onClick = { runCurrentAction?.invoke() },
+                                ) {
                                     Text("Текущий")
                                 }
-                                Button(attrs = {
-                                    classes("btn", runButtonClass, "sql-action-button", "sql-action-button-run")
-                                    attr("type", "button")
-                                    if (state.actionInProgress == "run-query" || state.info?.configured != true || pendingManualTransaction) {
-                                        disabled()
-                                    }
-                                    onClick { runAllAction?.invoke() }
-                                }) {
+                                SqlToolbarActionButton(
+                                    toneClass = runButtonClass,
+                                    disabled = state.actionInProgress == "run-query" || state.info?.configured != true || pendingManualTransaction,
+                                    extraClasses = arrayOf("sql-action-button", "sql-action-button-run"),
+                                    onClick = { runAllAction?.invoke() },
+                                ) {
                                     Span({ classes("sql-action-icon", "sql-action-icon-play") })
                                 }
-                                Button(attrs = {
-                                    classes("btn", "btn-danger", "sql-action-button", "sql-action-button-stop")
-                                    attr("type", "button")
-                                    if (!isRunning || state.actionInProgress == "cancel-query") {
-                                        disabled()
-                                    }
-                                    onClick { stopAction?.invoke() }
-                                }) {
+                                SqlToolbarActionButton(
+                                    toneClass = "btn-danger",
+                                    disabled = !isRunning || state.actionInProgress == "cancel-query",
+                                    extraClasses = arrayOf("sql-action-button", "sql-action-button-stop"),
+                                    onClick = { stopAction?.invoke() },
+                                ) {
                                     Span({ classes("sql-action-icon", "sql-action-icon-stop") })
                                 }
-                                Button(attrs = {
-                                    classes("btn", "btn-success")
-                                    attr("type", "button")
-                                    if (!pendingManualTransaction || state.actionInProgress == "commit-query") {
-                                        disabled()
+                                SqlToolbarActionButton(
+                                    toneClass = "btn-success",
+                                    disabled = !pendingManualTransaction || state.actionInProgress == "commit-query",
+                                    onClick = {
+                                    scope.launch {
+                                        state = store.beginAction(state, "commit-query")
+                                        state = store.commitExecution(state)
                                     }
-                                    onClick {
-                                        scope.launch {
-                                            state = store.beginAction(state, "commit-query")
-                                            state = store.commitExecution(state)
-                                        }
-                                    }
-                                }) {
+                                },
+                                ) {
                                     Text("Commit")
                                 }
-                                Button(attrs = {
-                                    classes("btn", "btn-outline-danger")
-                                    attr("type", "button")
-                                    if (!pendingManualTransaction || state.actionInProgress == "rollback-query") {
-                                        disabled()
+                                SqlToolbarActionButton(
+                                    toneClass = "btn-outline-danger",
+                                    disabled = !pendingManualTransaction || state.actionInProgress == "rollback-query",
+                                    onClick = {
+                                    scope.launch {
+                                        state = store.beginAction(state, "rollback-query")
+                                        state = store.rollbackExecution(state)
                                     }
-                                    onClick {
-                                        scope.launch {
-                                            state = store.beginAction(state, "rollback-query")
-                                            state = store.rollbackExecution(state)
-                                        }
-                                    }
-                                }) {
+                                },
+                                ) {
                                     Text("Rollback")
                                 }
-                                Button(attrs = {
-                                    classes("btn", "btn-outline-secondary")
-                                    attr("type", "button")
-                                    if (activeExportShard == null) {
-                                        disabled()
-                                    }
-                                    onClick {
-                                        val result = exportableResult ?: return@onClick
-                                        val shardName = activeExportShard ?: return@onClick
-                                        scope.launch {
-                                            runCatching {
-                                                httpClient.downloadPostJson(
-                                                    path = "/api/sql-console/export/source-csv",
-                                                    payload = SqlConsoleExportRequest(
-                                                        result = result,
-                                                        shardName = shardName,
-                                                    ),
-                                                    serializer = SqlConsoleExportRequest.serializer(),
-                                                    fallbackFileName = "$shardName.csv",
-                                                )
-                                            }.onFailure { error ->
-                                                state = state.copy(
-                                                    errorMessage = error.message ?: "Не удалось скачать CSV.",
-                                                    successMessage = null,
-                                                )
-                                            }
+                                SqlToolbarActionButton(
+                                    toneClass = "btn-outline-secondary",
+                                    disabled = activeExportShard == null,
+                                    onClick = {
+                                    val result = exportableResult ?: return@SqlToolbarActionButton
+                                    val shardName = activeExportShard ?: return@SqlToolbarActionButton
+                                    scope.launch {
+                                        runCatching {
+                                            httpClient.downloadPostJson(
+                                                path = "/api/sql-console/export/source-csv",
+                                                payload = SqlConsoleExportRequest(
+                                                    result = result,
+                                                    shardName = shardName,
+                                                ),
+                                                serializer = SqlConsoleExportRequest.serializer(),
+                                                fallbackFileName = "$shardName.csv",
+                                            )
+                                        }.onFailure { error ->
+                                            state = state.copy(
+                                                errorMessage = error.message ?: "Не удалось скачать CSV.",
+                                                successMessage = null,
+                                            )
                                         }
                                     }
-                                }) {
+                                },
+                                ) {
                                     Text("Скачать CSV")
                                 }
-                                Button(attrs = {
-                                    classes("btn", "btn-outline-secondary")
-                                    attr("type", "button")
-                                    if (exportableResult?.statementType != "RESULT_SET") {
-                                        disabled()
-                                    }
-                                    onClick {
-                                        val result = exportableResult ?: return@onClick
-                                        scope.launch {
-                                            runCatching {
-                                                httpClient.downloadPostJson(
-                                                    path = "/api/sql-console/export/all-zip",
-                                                    payload = SqlConsoleExportRequest(result = result),
-                                                    serializer = SqlConsoleExportRequest.serializer(),
-                                                    fallbackFileName = "sql-console-results.zip",
-                                                )
-                                            }.onFailure { error ->
-                                                state = state.copy(
-                                                    errorMessage = error.message ?: "Не удалось скачать ZIP.",
-                                                    successMessage = null,
-                                                )
-                                            }
+                                SqlToolbarActionButton(
+                                    toneClass = "btn-outline-secondary",
+                                    disabled = exportableResult?.statementType != "RESULT_SET",
+                                    onClick = {
+                                    val result = exportableResult ?: return@SqlToolbarActionButton
+                                    scope.launch {
+                                        runCatching {
+                                            httpClient.downloadPostJson(
+                                                path = "/api/sql-console/export/all-zip",
+                                                payload = SqlConsoleExportRequest(result = result),
+                                                serializer = SqlConsoleExportRequest.serializer(),
+                                                fallbackFileName = "sql-console-results.zip",
+                                            )
+                                        }.onFailure { error ->
+                                            state = state.copy(
+                                                errorMessage = error.message ?: "Не удалось скачать ZIP.",
+                                                successMessage = null,
+                                            )
                                         }
                                     }
-                                }) {
+                                },
+                                ) {
                                     Text("Скачать ZIP")
                                 }
                             }
@@ -747,4 +727,24 @@ fun ComposeSqlConsolePage(
             }
         },
     )
+}
+
+@Composable
+private fun SqlToolbarActionButton(
+    toneClass: String,
+    disabled: Boolean = false,
+    extraClasses: Array<String> = emptyArray(),
+    onClick: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    Button(attrs = {
+        classes("btn", toneClass, *extraClasses)
+        attr("type", "button")
+        if (disabled) {
+            disabled()
+        }
+        onClick { onClick() }
+    }) {
+        content()
+    }
 }

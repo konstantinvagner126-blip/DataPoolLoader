@@ -56,15 +56,11 @@ internal fun EditorRunOverviewPanel(
 
         when {
             state.loading && history == null -> {
-                Div({ classes("text-secondary", "small") }) {
-                    Text("Загружаю информацию о запусках модуля.")
-                }
+                EditorRunMutedText("Загружаю информацию о запусках модуля.")
             }
 
             history == null || history.runs.isEmpty() || state.selectedRunDetails == null -> {
-                Div({ classes("text-secondary", "small") }) {
-                    Text("Активного запуска сейчас нет. Детали прошлых запусков открываются на отдельном экране.")
-                }
+                EditorRunMutedText("Активного запуска сейчас нет. Детали прошлых запусков открываются на отдельном экране.")
             }
 
             else -> {
@@ -163,22 +159,41 @@ internal fun ValidationAlert(session: ModuleEditorSessionResponse) {
         Ul({ classes("module-validation-list", "mb-0") }) {
             issues.forEach { issue ->
                 Li {
-                    Span({
-                        classes(
-                            "module-validation-severity",
-                            if (issue.severity.equals("ERROR", ignoreCase = true)) {
-                                "module-validation-severity-error"
-                            } else {
-                                "module-validation-severity-warning"
-                            },
-                        )
-                    }) {
-                        Text(if (issue.severity.equals("ERROR", ignoreCase = true)) "Ошибка" else "Предупреждение")
-                    }
+                    ValidationSeverityBadge(issue.severity)
                     Text(issue.message)
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun EditorRunMutedText(
+    text: String,
+    extraClassName: String = "",
+) {
+    Div({
+        classes("text-secondary", "small")
+        if (extraClassName.isNotBlank()) {
+            classes(extraClassName)
+        }
+    }) {
+        Text(text)
+    }
+}
+
+@Composable
+private fun ValidationSeverityBadge(
+    severity: String,
+) {
+    val isError = severity.equals("ERROR", ignoreCase = true)
+    Span({
+        classes(
+            "module-validation-severity",
+            if (isError) "module-validation-severity-error" else "module-validation-severity-warning",
+        )
+    }) {
+        Text(if (isError) "Ошибка" else "Предупреждение")
     }
 }
 
@@ -239,9 +254,7 @@ internal fun CredentialsPanel(
             }
 
             if (!selectedFileName.isNullOrBlank()) {
-                Div({ classes("text-secondary", "small", "mt-2") }) {
-                    Text("Выбран файл: $selectedFileName")
-                }
+                EditorRunMutedText("Выбран файл: $selectedFileName", "mt-2")
             }
 
             if (!uploadMessage.isNullOrBlank()) {

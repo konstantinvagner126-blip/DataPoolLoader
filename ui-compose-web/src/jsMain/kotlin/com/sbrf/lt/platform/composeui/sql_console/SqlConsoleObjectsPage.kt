@@ -164,22 +164,11 @@ fun ComposeSqlConsoleObjectsPage(
                     ) {
                         state.info?.sourceNames?.forEach { sourceName ->
                             val selected = sourceName in state.selectedSourceNames
-                            Label(attrs = {
-                                classes("sql-object-source-checkbox")
-                                if (selected) {
-                                    classes("sql-object-source-checkbox-selected")
-                                }
-                            }) {
-                                Input(type = org.jetbrains.compose.web.attributes.InputType.Checkbox, attrs = {
-                                    if (selected) {
-                                        attr("checked", "checked")
-                                    }
-                                    onClick {
-                                        state = store.updateSelectedSources(state, sourceName, !selected)
-                                    }
-                                })
-                                Span { Text(sourceName) }
-                            }
+                            SqlObjectSourceCheckbox(
+                                sourceName = sourceName,
+                                selected = selected,
+                                onToggle = { state = store.updateSelectedSources(state, sourceName, !selected) },
+                            )
                         }
                     }
                 }
@@ -197,20 +186,14 @@ fun ComposeSqlConsoleObjectsPage(
                                 value(state.query)
                                 onInput { state = store.updateQuery(state, it.value?.toString().orEmpty()) }
                             })
-                            Button(attrs = {
-                                classes("btn", "btn-dark")
-                                attr("type", "button")
-                                if (state.actionInProgress == "search" || state.selectedSourceNames.isEmpty()) {
-                                    disabled()
+                            SqlObjectSearchButton(
+                                loading = state.actionInProgress == "search",
+                                enabled = state.selectedSourceNames.isNotEmpty(),
+                            ) {
+                                scope.launch {
+                                    state = store.beginAction(state, "search")
+                                    state = store.search(state)
                                 }
-                                onClick {
-                                    scope.launch {
-                                        state = store.beginAction(state, "search")
-                                        state = store.search(state)
-                                    }
-                                }
-                            }) {
-                                Text(if (state.actionInProgress == "search") "Поиск..." else "Искать")
                             }
                         }
                     }
@@ -365,6 +348,46 @@ private fun SqlObjectOverviewCard(
         Div({ classes("eyebrow") }) { Text(label) }
         Div({ classes("sql-object-overview-value") }) { Text(value) }
         Div({ classes("small", "text-secondary") }) { Text(note) }
+    }
+}
+
+@Composable
+private fun SqlObjectSourceCheckbox(
+    sourceName: String,
+    selected: Boolean,
+    onToggle: () -> Unit,
+) {
+    Label(attrs = {
+        classes("sql-object-source-checkbox")
+        if (selected) {
+            classes("sql-object-source-checkbox-selected")
+        }
+    }) {
+        Input(type = org.jetbrains.compose.web.attributes.InputType.Checkbox, attrs = {
+            if (selected) {
+                attr("checked", "checked")
+            }
+            onClick { onToggle() }
+        })
+        Span { Text(sourceName) }
+    }
+}
+
+@Composable
+private fun SqlObjectSearchButton(
+    loading: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    Button(attrs = {
+        classes("btn", "btn-dark")
+        attr("type", "button")
+        if (loading || !enabled) {
+            disabled()
+        }
+        onClick { onClick() }
+    }) {
+        Text(if (loading) "Поиск..." else "Искать")
     }
 }
 
