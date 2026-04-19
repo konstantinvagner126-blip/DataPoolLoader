@@ -825,7 +825,7 @@ class ServerTest {
             contentType(ContentType.Application.Json)
             setBody("""{"sql":"delete from demo_again","selectedSourceNames":["shard1"]}""")
         }
-        assertEquals(HttpStatusCode.BadRequest, duplicateStart.status)
+        assertEquals(HttpStatusCode.Conflict, duplicateStart.status)
         assertTrue(duplicateStart.bodyAsText().contains("уже выполняется запрос"))
 
         val cancelled = client.post("/api/sql-console/query/$executionId/cancel").bodyAsText()
@@ -1169,6 +1169,38 @@ class ServerTest {
         assertTrue(detailsBody.contains("\"targetStatus\":\"SUCCESS\""))
         assertTrue(detailsBody.contains("\"targetTableName\":\"public.demo_target\""))
         assertTrue(detailsBody.contains("\"targetRowsLoaded\":1"))
+    }
+
+    @Test
+    fun `module runs api returns not found for missing files run`() = testApplication {
+        val root = createProject()
+        val registry = ModuleRegistry(appsRoot = root.resolve("apps"))
+        val uiConfig = UiAppConfig(
+            storageDir = Files.createTempDirectory("ui-runs-api-files-not-found-state-").toString(),
+            moduleStore = UiModuleStoreConfig(mode = UiModuleStoreMode.FILES),
+            sqlConsole = SqlConsoleConfig(),
+        )
+        val runManager = RunManager(
+            moduleRegistry = registry,
+            uiConfig = uiConfig,
+        )
+
+        application {
+            uiModule(
+                uiConfig = uiConfig,
+                moduleRegistry = registry,
+                runManager = runManager,
+                runtimeContextService = object : UiRuntimeContextService() {
+                    override fun resolve(uiConfig: UiAppConfig): UiRuntimeContext =
+                        testRuntimeContext(UiModuleStoreMode.FILES)
+                },
+            )
+        }
+
+        val detailsResponse = client.get("/api/module-runs/files/demo-app/runs/missing-run")
+
+        assertEquals(HttpStatusCode.NotFound, detailsResponse.status)
+        assertTrue(detailsResponse.bodyAsText().contains("Запуск 'missing-run' для модуля 'demo-app' не найден."))
     }
 
     @Test
@@ -1742,16 +1774,16 @@ class ServerTest {
             setBody("""{"disableSafeguard":false}""")
         }
 
-        assertEquals(HttpStatusCode.BadRequest, cleanupPreview.status)
+        assertEquals(HttpStatusCode.ServiceUnavailable, cleanupPreview.status)
         assertTrue(cleanupPreview.bodyAsText().contains("Режим базы данных сейчас недоступен."))
 
-        assertEquals(HttpStatusCode.BadRequest, cleanupExecute.status)
+        assertEquals(HttpStatusCode.ServiceUnavailable, cleanupExecute.status)
         assertTrue(cleanupExecute.bodyAsText().contains("Режим базы данных сейчас недоступен."))
 
-        assertEquals(HttpStatusCode.BadRequest, outputPreview.status)
+        assertEquals(HttpStatusCode.ServiceUnavailable, outputPreview.status)
         assertTrue(outputPreview.bodyAsText().contains("Режим базы данных сейчас недоступен."))
 
-        assertEquals(HttpStatusCode.BadRequest, outputExecute.status)
+        assertEquals(HttpStatusCode.ServiceUnavailable, outputExecute.status)
         assertTrue(outputExecute.bodyAsText().contains("Режим базы данных сейчас недоступен."))
     }
 
@@ -2051,7 +2083,7 @@ class ServerTest {
         assertEquals(HttpStatusCode.OK, syncStateResponse.status)
         assertTrue(syncStateResponse.bodyAsText().contains("\"maintenanceMode\":true"))
         assertTrue(syncStateResponse.bodyAsText().contains("\"scope\":\"ALL\""))
-        assertEquals(HttpStatusCode.BadRequest, catalogResponse.status)
+        assertEquals(HttpStatusCode.Conflict, catalogResponse.status)
         assertTrue(catalogResponse.bodyAsText().contains("идет массовый импорт модулей в БД"))
     }
 
@@ -2151,7 +2183,7 @@ class ServerTest {
 
         assertEquals(HttpStatusCode.OK, syncStateResponse.status)
         assertTrue(syncStateResponse.bodyAsText().contains("\"moduleCode\":\"db-demo\""))
-        assertEquals(HttpStatusCode.BadRequest, saveResponse.status)
+        assertEquals(HttpStatusCode.Conflict, saveResponse.status)
         assertTrue(saveResponse.bodyAsText().contains("Импорт модуля 'db-demo' уже выполняется"))
     }
 
@@ -2793,6 +2825,40 @@ class ServerTest {
     }
 
     @Test
+    fun `db module details endpoint returns not found for unknown module`() = testApplication {
+        val uiConfig = UiAppConfig(
+            moduleStore = UiModuleStoreConfig(mode = UiModuleStoreMode.DATABASE),
+            storageDir = Files.createTempDirectory("ui-db-module-details-not-found-state-").toString(),
+            sqlConsole = SqlConsoleConfig(),
+        )
+        val runtimeContextService = object : UiRuntimeContextService() {
+            override fun resolve(uiConfig: UiAppConfig): UiRuntimeContext =
+                testRuntimeContext(UiModuleStoreMode.DATABASE)
+        }
+        val databaseModuleStore = object : DatabaseModuleStore(
+            connectionProvider = DatabaseConnectionProvider { error("connection must not be requested") },
+        ) {
+            override fun loadModuleDetails(
+                moduleCode: String,
+                actorId: String,
+                actorSource: String,
+            ): DatabaseEditableModule = throw com.sbrf.lt.platform.ui.module.DatabaseModuleNotFoundException(moduleCode)
+        }
+        application {
+            uiModule(
+                uiConfig = uiConfig,
+                runtimeContextService = runtimeContextService,
+                databaseModuleStore = databaseModuleStore,
+            )
+        }
+
+        val detailsResponse = client.get("/api/db/modules/unknown")
+
+        assertEquals(HttpStatusCode.NotFound, detailsResponse.status)
+        assertTrue(detailsResponse.bodyAsText().contains("DB-модуль 'unknown' не найден."))
+    }
+
+    @Test
     fun `db module create endpoint forwards full draft including hidden flag`() = testApplication {
         val uiConfig = UiAppConfig(
             moduleStore = UiModuleStoreConfig(mode = UiModuleStoreMode.DATABASE),
@@ -3314,7 +3380,7 @@ class ServerTest {
         assertTrue(runResponse.bodyAsText().contains("\"moduleId\":\"demo-app\""))
 
         val invalidModuleResponse = client.get("/api/modules/unknown")
-        assertEquals(HttpStatusCode.BadRequest, invalidModuleResponse.status)
+        assertEquals(HttpStatusCode.NotFound, invalidModuleResponse.status)
         assertTrue(invalidModuleResponse.bodyAsText().contains("не найден"))
 
         val invalidExportResponse = client.post("/api/sql-console/export/source-csv") {

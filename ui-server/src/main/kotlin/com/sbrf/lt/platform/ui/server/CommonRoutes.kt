@@ -102,7 +102,7 @@ internal fun Route.registerCommonRoutes(
                 .lastOrNull()
                 ?.message
                 ?.takeIf { it.isNotBlank() }
-            throw IllegalArgumentException(
+            badRequest(
                 buildString {
                     append("Некорректные данные формы настроек.")
                     if (!rootCauseMessage.isNullOrBlank()) {
@@ -156,7 +156,7 @@ internal fun Route.registerCommonRoutes(
                 mapper.readValue(payload, RunHistoryCleanupRequest::class.java)
             }
         } catch (_: Exception) {
-            throw IllegalArgumentException("Некорректные данные для cleanup истории запусков.")
+            badRequest("Некорректные данные для cleanup истории запусков.")
         }
         val response = when (runtimeContext.requestedMode) {
             com.sbrf.lt.platform.ui.config.UiModuleStoreMode.FILES -> {
@@ -203,7 +203,7 @@ internal fun Route.registerCommonRoutes(
                 mapper.readValue(payload, OutputRetentionRequest::class.java)
             }
         } catch (_: Exception) {
-            throw IllegalArgumentException("Некорректные данные для retention output-каталогов.")
+            badRequest("Некорректные данные для retention output-каталогов.")
         }
         val response = when (runtimeContext.requestedMode) {
             com.sbrf.lt.platform.ui.config.UiModuleStoreMode.FILES -> {
@@ -236,7 +236,9 @@ internal fun Route.registerCommonRoutes(
             }
             part.dispose.invoke()
         }
-        require(!content.isNullOrBlank()) { "Не удалось прочитать содержимое credential.properties." }
+        if (content.isNullOrBlank()) {
+            badRequest("Не удалось прочитать содержимое credential.properties.")
+        }
         call.respond(context.filesRunService.uploadCredentials(fileName, requireNotNull(content)))
     }
 

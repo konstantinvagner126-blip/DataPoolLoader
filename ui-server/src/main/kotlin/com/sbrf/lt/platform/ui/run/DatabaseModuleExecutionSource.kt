@@ -14,6 +14,7 @@ import com.sbrf.lt.datapool.db.registry.sql.normalizeRegistrySchemaName
 import com.sbrf.lt.platform.ui.config.UiModuleStorePostgresConfig
 import com.sbrf.lt.platform.ui.config.schemaName
 import com.sbrf.lt.platform.ui.model.ModuleFileContent
+import com.sbrf.lt.platform.ui.module.DatabaseModuleNotFoundException
 import java.security.MessageDigest
 import java.sql.Connection
 import java.util.UUID
@@ -103,7 +104,7 @@ class DatabaseModuleExecutionSource(
             stmt.setString(3, moduleCode)
             stmt.executeQuery().use { rs ->
                 if (!rs.next()) {
-                    error("DB-модуль '$moduleCode' не найден.")
+                    throw DatabaseModuleNotFoundException(moduleCode)
                 }
                 return DatabaseExecutionSourceRow(
                     moduleId = rs.getString("module_id"),

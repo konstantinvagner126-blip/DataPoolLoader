@@ -2,7 +2,7 @@
 
 Текущий backlog сформирован после ревизии всех `.md`-документов проекта.
 
-Исторические планы, roadmap и черновики схлопнуты в этот backlog. В рабочем виде оставлены только:
+Исторические планы, roadmap, черновики и отдельный review-документ схлопнуты в этот backlog и архитектурные правила. В рабочем виде оставлены только:
 
 - архитектурные правила;
 - архитектурный review;
@@ -20,7 +20,6 @@
 Связанные документы:
 
 - [ARCHITECTURE_RULES.md](/Users/kwdev/DataPoolLoader/ARCHITECTURE_RULES.md)
-- [PROJECT_ARCHITECTURE_REVIEW.md](/Users/kwdev/DataPoolLoader/PROJECT_ARCHITECTURE_REVIEW.md)
 - [BACKLOG_HISTORY.md](/Users/kwdev/DataPoolLoader/BACKLOG_HISTORY.md)
 - [SQL_CONSOLE_FAILURE_SCENARIOS.md](/Users/kwdev/DataPoolLoader/SQL_CONSOLE_FAILURE_SCENARIOS.md)
 - [SQL_CONSOLE_MONACO_AUTOCOMPLETE.md](/Users/kwdev/DataPoolLoader/SQL_CONSOLE_MONACO_AUTOCOMPLETE.md)
@@ -38,7 +37,7 @@
 
 Статус:
 
-- не реализовано
+- частично реализовано
 
 Цель:
 
@@ -56,6 +55,15 @@
 - вынести или сократить knowledge-rich runtime branching там, где это возможно;
 - продолжить замещение concrete-связок контрактами и support-слоями.
 
+Что уже сделано:
+
+- transport-конфигурация `ui-server` больше не живет целиком в [Server.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/Server.kt);
+- JSON mapper, Ktor plugins и route wiring вынесены в отдельные support-файлы:
+  - [UiServerObjectMapper.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/UiServerObjectMapper.kt)
+  - [UiServerPlugins.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/UiServerPlugins.kt)
+  - [UiServerRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/UiServerRoutes.kt);
+- [Server.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/Server.kt) стал ближе к composition root, а не к transport-свалке.
+
 Критерий завершения:
 
 - `ui-server` снова выглядит как boundary/orchestration слой, а не как второй `core`;
@@ -65,7 +73,7 @@
 
 Статус:
 
-- не реализовано
+- частично реализовано
 
 Цель:
 
@@ -82,6 +90,13 @@
 - привести transport-слой к понятным и стабильным ответам;
 - убрать места, где UI не может понять, это ошибка сценария или баг сервера.
 
+Что уже сделано:
+
+- transport-слой больше не маскирует все исключения под `400`;
+- введены осмысленные `404 / 409 / 503 / 500` для ключевых server-path’ов;
+- появились доменные not-found/conflict исключения вне `server`-пакета;
+- ключевые сценарии FILES / DB / SQL-console закреплены серверными тестами.
+
 Критерий завершения:
 
 - сервер перестает маскировать внутренние дефекты под пользовательские ошибки;
@@ -91,7 +106,7 @@
 
 Статус:
 
-- не реализовано
+- частично реализовано
 
 Цель:
 
@@ -114,6 +129,19 @@
   - run state;
   - cleanup/retention state;
   - runtime mode/config state.
+
+Что уже сделано:
+
+- начат cleanup persisted state файлового run-layer;
+- `run-state.json` больше не хранит uploaded credentials;
+- credentials вынесены в отдельный `credentials-state.json` с legacy-миграцией из старого `run-state.json`;
+- это покрыто тестами на separation и migration;
+- SQL console persisted state больше не живет одним mixed-файлом;
+- `sql-console-state.json` переведен в legacy migration-only формат;
+- рабочее состояние SQL-консоли разделено на:
+  - `sql-console-workspace-state.json`
+  - `sql-console-preferences-state.json`;
+- сервис SQL-консоли теперь собирает единый response из двух отдельных source-of-truth.
 
 Критерий завершения:
 
@@ -364,14 +392,19 @@
 Что уже есть:
 
 - [ARCHITECTURE_RULES.md](/Users/kwdev/DataPoolLoader/ARCHITECTURE_RULES.md)
-- [PROJECT_ARCHITECTURE_REVIEW.md](/Users/kwdev/DataPoolLoader/PROJECT_ARCHITECTURE_REVIEW.md)
 - [AGENTS.md](/Users/kwdev/DataPoolLoader/AGENTS.md)
 
 Что нужно сделать:
 
-- продолжать обновлять эти документы при изменении архитектурных инвариантов;
+- держать архитектурные требования в [ARCHITECTURE_RULES.md](/Users/kwdev/DataPoolLoader/ARCHITECTURE_RULES.md) как в едином живом документе;
+- закрепить обязательную code-quality дисциплину на уровне правил разработки:
+  - смотреть на код sonar-like взглядом;
+  - не пропускать дублирование;
+  - не тащить мертвый код и legacy-хвосты;
+  - отслеживать file/method/class size, сложность и скрытую связанность;
 - не допускать расхождения между кодом и repo-level правилами;
-- при заметных архитектурных изменениях обновлять документацию в том же change set.
+- при заметных архитектурных изменениях обновлять документацию в том же change set;
+- после каждого большого этапа backlog выполнять отдельный архитектурный review и по его итогам корректировать backlog и правила.
 
 ## P2
 

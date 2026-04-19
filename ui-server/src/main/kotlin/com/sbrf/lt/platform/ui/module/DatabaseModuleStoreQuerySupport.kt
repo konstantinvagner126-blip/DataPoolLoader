@@ -46,7 +46,7 @@ internal class DatabaseModuleStoreQuerySupport(
                 statement.setString(3, moduleCode)
                 statement.executeQuery().use { resultSet ->
                     if (!resultSet.next()) {
-                        error("DB-модуль '$moduleCode' не найден.")
+                        throw DatabaseModuleNotFoundException(moduleCode)
                     }
                     support.editableModuleRow(resultSet)
                 }

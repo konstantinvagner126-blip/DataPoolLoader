@@ -1,6 +1,7 @@
 package com.sbrf.lt.platform.ui.run
 
 import com.sbrf.lt.datapool.model.ExecutionStatus
+import com.sbrf.lt.platform.ui.error.UiStateConflictException
 import com.sbrf.lt.platform.ui.model.CredentialsStatusResponse
 import com.sbrf.lt.platform.ui.model.ModuleDescriptor
 import com.sbrf.lt.platform.ui.model.StartRunRequest
@@ -17,8 +18,8 @@ internal class RunManagerStartSupport(
         credentialProperties: Map<String, String>,
         credentialsStatus: CredentialsStatusResponse,
     ): RunManagerStartContext {
-        require(snapshots.none { it.status != ExecutionStatus.SUCCESS && it.status != ExecutionStatus.FAILED }) {
-            "Уже выполняется другой запуск. Дождитесь его завершения."
+        if (snapshots.any { it.status != ExecutionStatus.SUCCESS && it.status != ExecutionStatus.FAILED }) {
+            throw UiStateConflictException("Уже выполняется другой запуск. Дождитесь его завершения.")
         }
         stateSupport.validateCredentialsBeforeRun(
             configText = request.configText,

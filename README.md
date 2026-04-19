@@ -16,7 +16,6 @@
 Перед архитектурно заметными изменениями нужно читать:
 
 - [ARCHITECTURE_RULES.md](/Users/kwdev/DataPoolLoader/ARCHITECTURE_RULES.md)
-- [PROJECT_ARCHITECTURE_REVIEW.md](/Users/kwdev/DataPoolLoader/PROJECT_ARCHITECTURE_REVIEW.md)
 
 ## Состав проекта
 
@@ -777,4 +776,3 @@ Task:
 - `BACKLOG.md`
 - `BACKLOG_HISTORY.md`
 - `ARCHITECTURE_RULES.md`
-- `PROJECT_ARCHITECTURE_REVIEW.md`

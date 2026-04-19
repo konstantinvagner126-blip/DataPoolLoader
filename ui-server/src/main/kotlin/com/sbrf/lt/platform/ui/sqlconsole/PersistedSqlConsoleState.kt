@@ -3,7 +3,8 @@ package com.sbrf.lt.platform.ui.sqlconsole
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 
 /**
- * Сохраняемое состояние SQL-консоли: черновик запроса, история и выбранные источники.
+ * Legacy combined state SQL-консоли.
+ * Оставлен только для чтения старого `sql-console-state.json` при миграции на раздельные state-файлы.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 data class PersistedSqlConsoleState(
@@ -54,6 +55,22 @@ data class PersistedSqlConsoleState(
         )
     }
 }
+
+internal fun PersistedSqlConsoleState.toWorkspaceState(): PersistedSqlConsoleWorkspaceState =
+    PersistedSqlConsoleWorkspaceState(
+        draftSql = draftSql,
+        selectedSourceNames = selectedSourceNames,
+    ).normalized()
+
+internal fun PersistedSqlConsoleState.toPreferencesState(): PersistedSqlConsolePreferencesState =
+    PersistedSqlConsolePreferencesState(
+        recentQueries = recentQueries,
+        favoriteQueries = favoriteQueries,
+        favoriteObjects = favoriteObjects,
+        pageSize = pageSize,
+        strictSafetyEnabled = strictSafetyEnabled,
+        transactionMode = transactionMode,
+    ).normalized()
 
 data class PersistedSqlConsoleFavoriteObject(
     val sourceName: String,

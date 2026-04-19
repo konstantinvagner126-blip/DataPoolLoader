@@ -166,7 +166,7 @@ internal class UiServerContext(
 
     fun requireDatabaseMaintenanceIsInactive() {
         if (readSyncStateSafely().maintenanceMode) {
-            error("Работа с DB-модулями временно недоступна: идет массовый импорт модулей в БД.")
+            conflict("Работа с DB-модулями временно недоступна: идет массовый импорт модулей в БД.")
         }
     }
 
@@ -175,7 +175,7 @@ internal class UiServerContext(
         if (activeSync != null) {
             val startedBy = activeSync.startedByActorDisplayName ?: activeSync.startedByActorId
             val startedAt = activeSync.startedAt
-            error(
+            conflict(
                 buildString {
                     append("Импорт модуля '$moduleCode' уже выполняется")
                     if (!startedBy.isNullOrBlank()) {
@@ -197,20 +197,16 @@ internal class UiServerContext(
         }
 
     fun requireDatabaseMode(runtimeContext: UiRuntimeContext) {
-        require(runtimeContext.effectiveMode == UiModuleStoreMode.DATABASE) {
-            databaseModeUnavailableMessage(runtimeContext)
+        if (runtimeContext.effectiveMode != UiModuleStoreMode.DATABASE) {
+            serviceUnavailable(databaseModeUnavailableMessage(runtimeContext))
         }
     }
 
     fun requireDatabaseActorId(runtimeContext: UiRuntimeContext): String =
-        requireNotNull(runtimeContext.actor.actorId) {
-            "Не удалось определить пользователя для режима базы данных."
-        }
+        runtimeContext.actor.actorId ?: conflict("Не удалось определить пользователя для режима базы данных.")
 
     fun requireDatabaseActorSource(runtimeContext: UiRuntimeContext): String =
-        requireNotNull(runtimeContext.actor.actorSource) {
-            "Не удалось определить источник пользователя для режима базы данных."
-        }
+        runtimeContext.actor.actorSource ?: conflict("Не удалось определить источник пользователя для режима базы данных.")
 
     fun requireDatabaseActor(runtimeContext: UiRuntimeContext): ModuleActor =
         ModuleActor(
@@ -231,8 +227,8 @@ internal class UiServerContext(
     ): Pair<ModuleRunHistoryService, ModuleActor?> =
         when (storageMode.lowercase()) {
             "files" -> {
-                require(runtimeContext.effectiveMode == UiModuleStoreMode.FILES) {
-                    "Страница файловых модулей доступна только в режиме Файлы."
+                if (runtimeContext.effectiveMode != UiModuleStoreMode.FILES) {
+                    conflict("Страница файловых модулей доступна только в режиме Файлы.")
                 }
                 filesModuleRunHistoryService to null
             }
@@ -244,11 +240,9 @@ internal class UiServerContext(
                 }
                 service to requireDatabaseActor(runtimeContext)
             }
-            else -> error("Неизвестный режим хранения '$storageMode'.")
+            else -> badRequest("Неизвестный режим хранения '$storageMode'.")
         }
 
     fun currentAppsRootOrFail(): java.nio.file.Path =
-        requireNotNull(currentRuntimeUiConfig().appsRootPath()) {
-            "Путь к каталогу apps не настроен."
-        }
+        currentRuntimeUiConfig().appsRootPath() ?: serviceUnavailable("Путь к каталогу apps не настроен.")
 }

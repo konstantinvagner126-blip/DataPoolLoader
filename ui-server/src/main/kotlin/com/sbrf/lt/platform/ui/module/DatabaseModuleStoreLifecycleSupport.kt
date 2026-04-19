@@ -22,7 +22,7 @@ internal class DatabaseModuleStoreLifecycleSupport(
             statement.setString(3, moduleCode)
             statement.executeQuery().use { resultSet ->
                 if (!resultSet.next()) {
-                    error("DB-модуль '$moduleCode' не найден.")
+                    throw DatabaseModuleNotFoundException(moduleCode)
                 }
                 return DatabaseModuleForSave(
                     moduleId = resultSet.getString("module_id"),
@@ -70,7 +70,7 @@ internal class DatabaseModuleStoreLifecycleSupport(
             stmt.setString(2, actorSource)
             stmt.setString(3, moduleCode)
             stmt.executeQuery().use { rs ->
-                if (!rs.next()) error("DB-модуль '$moduleCode' не найден.")
+                if (!rs.next()) throw DatabaseModuleNotFoundException(moduleCode)
                 return ModuleForPublish(
                     moduleId = rs.getString("module_id"),
                     currentRevisionId = rs.getString("current_revision_id"),
@@ -125,7 +125,7 @@ internal class DatabaseModuleStoreLifecycleSupport(
         ).use { stmt ->
             stmt.setString(1, moduleCode)
             stmt.executeQuery().use { rs ->
-                if (!rs.next()) error("DB-модуль '$moduleCode' не найден.")
+                if (!rs.next()) throw DatabaseModuleNotFoundException(moduleCode)
                 moduleId = rs.getString("module_id")
             }
         }

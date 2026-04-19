@@ -8,7 +8,6 @@ import java.time.Instant
  * Состояние run-history UI, сохраняемое на диск между перезапусками приложения.
  */
 data class PersistedRunState(
-    val uploadedCredentials: PersistedUploadedCredentials? = null,
     val history: List<UiRunSnapshot> = emptyList(),
 ) {
     fun withRecoveredInterruptedRuns(now: Instant = Instant.now()): PersistedRunState {

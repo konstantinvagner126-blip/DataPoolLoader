@@ -15,6 +15,8 @@ class SqlConsoleStateStore(
 ) {
     private val stateFile: Path = storageDir.resolve("sql-console-state.json")
 
+    fun exists(): Boolean = stateFile.exists()
+
     fun load(): PersistedSqlConsoleState {
         if (!stateFile.exists()) {
             return PersistedSqlConsoleState()

@@ -5,6 +5,8 @@ import com.sbrf.lt.datapool.sqlconsole.SqlConsoleExecutionPolicy
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleTransactionMode
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleOperations
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleTransactionalOperations
+import com.sbrf.lt.platform.ui.error.UiEntityNotFoundException
+import com.sbrf.lt.platform.ui.error.UiStateConflictException
 import java.nio.file.Path
 import java.time.Instant
 import java.util.UUID
@@ -37,11 +39,11 @@ class SqlConsoleQueryManager(
         cleanupDir: Path?,
     ): SqlConsoleExecutionSnapshot {
         val execution = synchronized(lock) {
-            require(activeExecution?.snapshot?.status != SqlConsoleExecutionStatus.RUNNING) {
-                "В SQL-консоли уже выполняется запрос. Дождись завершения или отмени его."
+            if (activeExecution?.snapshot?.status == SqlConsoleExecutionStatus.RUNNING) {
+                throw UiStateConflictException("В SQL-консоли уже выполняется запрос. Дождись завершения или отмени его.")
             }
-            require(activeExecution?.snapshot?.transactionState != SqlConsoleExecutionTransactionState.PENDING_COMMIT) {
-                "Есть незавершенная транзакция SQL-консоли. Сначала выполни коммит или роллбек."
+            if (activeExecution?.snapshot?.transactionState == SqlConsoleExecutionTransactionState.PENDING_COMMIT) {
+                throw UiStateConflictException("Есть незавершенная транзакция SQL-консоли. Сначала выполни коммит или роллбек.")
             }
             ActiveExecution(
                 snapshot = SqlConsoleExecutionSnapshot(
@@ -81,8 +83,8 @@ class SqlConsoleQueryManager(
     override fun snapshot(executionId: String): SqlConsoleExecutionSnapshot {
         return synchronized(lock) {
             val execution = activeExecution
-            require(execution != null && execution.snapshot.id == executionId) {
-                "Запуск SQL-консоли $executionId не найден."
+            if (execution == null || execution.snapshot.id != executionId) {
+                throw UiEntityNotFoundException("Запуск SQL-консоли $executionId не найден.")
             }
             execution.snapshot
         }
@@ -91,11 +93,11 @@ class SqlConsoleQueryManager(
     override fun cancel(executionId: String): SqlConsoleExecutionSnapshot {
         val execution = synchronized(lock) {
             val current = activeExecution
-            require(current != null && current.snapshot.id == executionId) {
-                "Запуск SQL-консоли $executionId не найден."
+            if (current == null || current.snapshot.id != executionId) {
+                throw UiEntityNotFoundException("Запуск SQL-консоли $executionId не найден.")
             }
-            require(current.snapshot.status == SqlConsoleExecutionStatus.RUNNING) {
-                "Запрос SQL-консоли уже завершен."
+            if (current.snapshot.status != SqlConsoleExecutionStatus.RUNNING) {
+                throw UiStateConflictException("Запрос SQL-консоли уже завершен.")
             }
             current.control.cancel()
             val updated = current.copy(snapshot = current.snapshot.copy(cancelRequested = true))
@@ -126,11 +128,11 @@ class SqlConsoleQueryManager(
     ): SqlConsoleExecutionSnapshot {
         return synchronized(lock) {
             val current = activeExecution
-            require(current != null && current.snapshot.id == executionId) {
-                "Запуск SQL-консоли $executionId не найден."
+            if (current == null || current.snapshot.id != executionId) {
+                throw UiEntityNotFoundException("Запуск SQL-консоли $executionId не найден.")
             }
-            require(current.snapshot.transactionState == SqlConsoleExecutionTransactionState.PENDING_COMMIT) {
-                "Для этого запуска нет незавершенной транзакции."
+            if (current.snapshot.transactionState != SqlConsoleExecutionTransactionState.PENDING_COMMIT) {
+                throw UiStateConflictException("Для этого запуска нет незавершенной транзакции.")
             }
             val pendingTransaction = requireNotNull(current.pendingTransaction)
             action(pendingTransaction)

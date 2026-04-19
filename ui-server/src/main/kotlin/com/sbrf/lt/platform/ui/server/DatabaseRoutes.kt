@@ -59,7 +59,7 @@ internal fun Route.registerDatabaseRoutes(
             }
         } catch (error: Exception) {
             logger.warn("Некорректный payload для /api/db/run-history/cleanup: {}", payload.take(4_000), error)
-            throw IllegalArgumentException("Некорректные данные для cleanup истории запусков.")
+            badRequest("Некорректные данные для cleanup истории запусков.")
         }
         call.respond(cleanupService.executeCleanup(disableSafeguard = request.disableSafeguard))
     }
@@ -314,7 +314,7 @@ internal fun Route.registerDatabaseRoutes(
             mapper.readValue(payload, SyncSelectedModulesRequest::class.java)
         } catch (error: Exception) {
             logger.warn("Некорректный payload для /api/db/sync/selected: {}", payload.take(4_000), error)
-            throw IllegalArgumentException("Некорректные данные для выборочной синхронизации.")
+            badRequest("Некорректные данные для выборочной синхронизации.")
         }
         val result = syncService.syncSelectedFromFiles(
             moduleCodes = request.moduleCodes,

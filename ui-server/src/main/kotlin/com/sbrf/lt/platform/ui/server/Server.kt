@@ -1,10 +1,5 @@
 package com.sbrf.lt.platform.ui.server
 
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.databind.DeserializationFeature
-import com.fasterxml.jackson.databind.SerializationFeature
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
-import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleOperations
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleService
 import com.sbrf.lt.platform.ui.config.UiAppConfig
@@ -14,28 +9,7 @@ import com.sbrf.lt.platform.ui.config.UiRuntimeConfigResolver
 import com.sbrf.lt.platform.ui.config.UiRuntimeContext
 import com.sbrf.lt.platform.ui.config.UiRuntimeContextService
 import com.sbrf.lt.platform.ui.config.appsRootPath
-import com.sbrf.lt.platform.ui.config.UiModuleStoreMode
-import com.sbrf.lt.platform.ui.config.isConfigured
-import com.sbrf.lt.platform.ui.config.schemaName
 import com.sbrf.lt.platform.ui.config.storageDirPath
-import com.sbrf.lt.platform.ui.model.ConfigFormParseRequest
-import com.sbrf.lt.platform.ui.model.ConfigFormUpdateRequest
-import com.sbrf.lt.platform.ui.model.DatabaseModulesCatalogResponse
-import com.sbrf.lt.platform.ui.model.DatabaseRunStartRequest
-import com.sbrf.lt.platform.ui.model.ModulesCatalogResponse
-import com.sbrf.lt.platform.ui.model.SaveModuleRequest
-import com.sbrf.lt.platform.ui.model.SaveResultResponse
-import com.sbrf.lt.platform.ui.model.UiRuntimeModeUpdateRequest
-import com.sbrf.lt.platform.ui.model.UiRuntimeModeUpdateResponse
-import com.sbrf.lt.platform.ui.model.SqlConsoleExportRequest
-import com.sbrf.lt.platform.ui.model.SqlConsoleSettingsUpdateRequest
-import com.sbrf.lt.platform.ui.model.SqlConsoleQueryRequest
-import com.sbrf.lt.platform.ui.model.StartRunRequest
-import com.sbrf.lt.platform.ui.model.CreateDbModuleRequest
-import com.sbrf.lt.platform.ui.model.SyncOneModuleRequest
-import com.sbrf.lt.platform.ui.model.toDiagnosticsResponse
-import com.sbrf.lt.platform.ui.model.toResponse
-import com.sbrf.lt.platform.ui.model.toStartResponse
 import com.sbrf.lt.platform.ui.module.ConfigFormService
 import com.sbrf.lt.platform.ui.module.DatabaseModuleRegistryOperations
 import com.sbrf.lt.platform.ui.module.ModuleRegistry
@@ -56,49 +30,23 @@ import com.sbrf.lt.platform.ui.run.history.FilesModuleRunHistoryService
 import com.sbrf.lt.platform.ui.run.history.ModuleRunHistoryService
 import com.sbrf.lt.datapool.db.registry.DriverManagerDatabaseConnectionProvider
 import com.sbrf.lt.datapool.module.sync.ModuleSyncService
-import com.sbrf.lt.datapool.module.sync.ModuleSyncState
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleExportService
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleAsyncQueryOperations
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleQueryManager
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleStateService
-import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleStateStore
 import com.sbrf.lt.platform.ui.sync.DatabaseModuleSyncImporter
-import io.ktor.http.ContentDisposition
-import io.ktor.http.ContentType
-import io.ktor.http.HttpHeaders
-import io.ktor.http.HttpStatusCode
-import io.ktor.http.content.PartData
-import io.ktor.serialization.jackson.jackson
 import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationStarted
-import io.ktor.server.application.call
 import io.ktor.server.application.install
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.http.content.staticResources
 import io.ktor.server.netty.Netty
-import io.ktor.server.plugins.calllogging.CallLogging
-import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.server.plugins.statuspages.StatusPages
-import io.ktor.server.plugins.statuspages.exception
-import io.ktor.server.request.receiveMultipart
-import io.ktor.server.request.receive
-import io.ktor.server.response.respond
-import io.ktor.server.response.respondBytes
 import io.ktor.server.response.respondRedirect
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
-import io.ktor.server.routing.delete
-import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
-import io.ktor.server.websocket.WebSockets
-import io.ktor.server.websocket.webSocket
-import io.ktor.websocket.Frame
-import io.ktor.utils.io.readRemaining
-import io.ktor.utils.io.core.readText
-import kotlinx.coroutines.flow.collect
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import org.slf4j.event.Level
 
 fun interface UiServerStarter {
     fun start(port: Int, module: Application.() -> Unit)
@@ -209,7 +157,7 @@ fun Application.uiModule(
     sqlConsoleService: SqlConsoleOperations = SqlConsoleService(runtimeUiConfig.sqlConsole),
     sqlConsoleQueryManager: SqlConsoleAsyncQueryOperations = SqlConsoleQueryManager(sqlConsoleService),
     sqlConsoleExportService: SqlConsoleExportService = SqlConsoleExportService(),
-    sqlConsoleStateService: SqlConsoleStateService = SqlConsoleStateService(SqlConsoleStateStore(uiConfig.storageDirPath())),
+    sqlConsoleStateService: SqlConsoleStateService = SqlConsoleStateService(uiConfig.storageDirPath()),
     uiConfigPersistenceService: UiConfigPersistenceService = UiConfigPersistenceService(),
     moduleSyncService: ModuleSyncService? = null,
     databaseModuleRunService: DatabaseModuleRunOperations? = null,
@@ -219,29 +167,9 @@ fun Application.uiModule(
     filesModuleRunHistoryService: ModuleRunHistoryService = FilesModuleRunHistoryService(moduleRegistry, runManager),
     databaseModuleRunHistoryService: ModuleRunHistoryService? = null,
 ) {
-    val mapper = ObjectMapper()
-        .registerKotlinModule()
-        .registerModule(JavaTimeModule())
-        .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
-        .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
-
-    install(CallLogging) {
-        level = Level.INFO
-    }
-    install(WebSockets)
-    install(ContentNegotiation) {
-        jackson {
-            registerKotlinModule()
-            registerModule(JavaTimeModule())
-            configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
-            disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
-        }
-    }
-    install(StatusPages) {
-        exception<Throwable> { call, cause ->
-            call.respond(HttpStatusCode.BadRequest, mapOf("error" to (cause.message ?: "Неизвестная ошибка")))
-        }
-    }
+    val logger = LoggerFactory.getLogger("UiServerHttp")
+    val mapper = createUiServerObjectMapper()
+    installUiServerPlugins(logger)
     val serverContext = UiServerContext(
         uiConfig = uiConfig,
         uiConfigLoader = uiConfigLoader,
@@ -271,10 +199,6 @@ fun Application.uiModule(
     )
 
     routing {
-        registerPageRoutes(serverContext)
-        registerModuleRunRoutes(serverContext)
-        registerDatabaseRoutes(serverContext, mapper)
-        registerCommonRoutes(serverContext, mapper)
-        registerSqlConsoleRoutes(serverContext)
+        registerUiRoutes(serverContext, mapper)
     }
 }

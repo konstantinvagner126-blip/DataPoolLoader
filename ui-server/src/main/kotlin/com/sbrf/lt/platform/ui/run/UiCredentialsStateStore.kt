@@ -25,13 +25,11 @@ class UiCredentialsStateStore(
                 return configLoader.objectMapper().readValue(it, PersistedCredentialsState::class.java)
             }
         }
-        if (legacyRunStateFile.exists()) {
-            legacyRunStateFile.inputStream().bufferedReader().use {
-                val legacyState = configLoader.objectMapper().readValue(it, PersistedRunState::class.java)
-                return PersistedCredentialsState(uploadedCredentials = legacyState.uploadedCredentials)
-            }
+        val migratedState = loadLegacyState()
+        if (migratedState.uploadedCredentials != null) {
+            save(migratedState)
         }
-        return PersistedCredentialsState()
+        return migratedState
     }
 
     fun save(state: PersistedCredentialsState) {
@@ -46,5 +44,24 @@ class UiCredentialsStateStore(
             StandardCopyOption.REPLACE_EXISTING,
             StandardCopyOption.ATOMIC_MOVE,
         )
+    }
+
+    private fun loadLegacyState(): PersistedCredentialsState {
+        if (!legacyRunStateFile.exists()) {
+            return PersistedCredentialsState()
+        }
+        legacyRunStateFile.inputStream().bufferedReader().use { reader ->
+            val legacyRoot = configLoader.objectMapper().readTree(reader)
+            val uploadedNode = legacyRoot.path("uploadedCredentials")
+            if (uploadedNode == null || uploadedNode.isMissingNode || uploadedNode.isNull) {
+                return PersistedCredentialsState()
+            }
+            return PersistedCredentialsState(
+                uploadedCredentials = configLoader.objectMapper().treeToValue(
+                    uploadedNode,
+                    PersistedUploadedCredentials::class.java,
+                ),
+            )
+        }
     }
 }

@@ -89,7 +89,7 @@ class ModuleRegistry(
 
     fun getModule(moduleId: String): ModuleDescriptor =
         listModules(includeHidden = true).firstOrNull { it.id == moduleId }
-            ?: error("Модуль '$moduleId' не найден.")
+            ?: throw ModuleNotFoundException(moduleId)
 
     fun loadModuleDetails(moduleId: String): ModuleDetailsResponse {
         val module = getModule(moduleId)

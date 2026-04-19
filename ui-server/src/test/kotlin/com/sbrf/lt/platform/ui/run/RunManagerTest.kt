@@ -4,6 +4,7 @@ import com.sbrf.lt.datapool.app.ApplicationRunner
 import com.sbrf.lt.datapool.db.PostgresSourceExporter
 import com.sbrf.lt.datapool.model.ExecutionStatus
 import com.sbrf.lt.platform.ui.config.UiAppConfig
+import com.sbrf.lt.platform.ui.error.UiStateConflictException
 import com.sbrf.lt.platform.ui.model.StartRunRequest
 import com.sbrf.lt.platform.ui.module.ModuleRegistry
 import java.lang.reflect.Proxy
@@ -15,6 +16,7 @@ import java.sql.Statement
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlin.io.path.createTempDirectory
+import kotlin.io.path.exists
 import kotlin.io.path.readText
 import kotlin.io.path.writeText
 import kotlin.test.Test
@@ -91,6 +93,44 @@ class RunManagerTest {
         assertTrue(restoredState.history.isNotEmpty())
         assertEquals(ExecutionStatus.SUCCESS, restoredState.history.first().status)
         assertTrue(restoredState.history.first().events.isNotEmpty())
+    }
+
+    @Test
+    fun `run history state no longer stores uploaded credentials`() {
+        val projectRoot = createProject()
+        val storageDir = createTempDirectory("datapool-ui-storage-")
+        val registry = ModuleRegistry(appsRoot = projectRoot.resolve("apps"))
+        val uiConfig = UiAppConfig(storageDir = storageDir.toString())
+        val runManager = RunManager(
+            moduleRegistry = registry,
+            applicationRunner = ApplicationRunner(
+                exporter = PostgresSourceExporter { _, _, _ ->
+                    exportConnection(
+                        columns = listOf("id"),
+                        rows = listOf(listOf(1)),
+                    )
+                },
+            ),
+            uiConfig = uiConfig,
+        )
+
+        runManager.uploadCredentials("uploaded.properties", "DB1_USERNAME=uploaded")
+        runManager.startRun(
+            StartRunRequest(
+                moduleId = "demo-app",
+                configText = registry.loadModuleDetails("demo-app").configText,
+                sqlFiles = mapOf("classpath:sql/common.sql" to "select 1"),
+            ),
+        )
+        waitForCompletion(runManager)
+
+        val runStateFile = storageDir.resolve("run-state.json")
+        val credentialsStateFile = storageDir.resolve("credentials-state.json")
+
+        assertTrue(runStateFile.exists())
+        assertTrue(credentialsStateFile.exists())
+        assertFalse(runStateFile.readText().contains("uploadedCredentials"))
+        assertTrue(credentialsStateFile.readText().contains("uploaded.properties"))
     }
 
     @Test
@@ -382,7 +422,7 @@ class RunManagerTest {
             ),
         )
 
-        val concurrentError = assertFailsWith<IllegalArgumentException> {
+        val concurrentError = assertFailsWith<UiStateConflictException> {
             runManager.startRun(
                 StartRunRequest(
                     moduleId = "demo-app",

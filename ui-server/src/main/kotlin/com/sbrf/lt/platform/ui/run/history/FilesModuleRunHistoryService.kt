@@ -5,6 +5,7 @@ import com.sbrf.lt.platform.ui.model.ModuleRunHistoryResponse
 import com.sbrf.lt.platform.ui.model.ModuleRunPageSessionResponse
 import com.sbrf.lt.platform.ui.model.ModuleRunSummaryResponse
 import com.sbrf.lt.platform.ui.model.UiRunSnapshot
+import com.sbrf.lt.platform.ui.error.UiEntityNotFoundException
 import com.sbrf.lt.platform.ui.module.ModuleRegistry
 import com.sbrf.lt.platform.ui.module.backend.ModuleActor
 import com.sbrf.lt.platform.ui.run.FilesModuleRunOperations
@@ -55,7 +56,7 @@ class FilesModuleRunHistoryService(
     private fun findRun(moduleId: String, runId: String): UiRunSnapshot =
         runManager.currentState().history
             .firstOrNull { it.moduleId == moduleId && it.id == runId }
-            ?: error("Запуск '$runId' для модуля '$moduleId' не найден.")
+            ?: throw UiEntityNotFoundException("Запуск '$runId' для модуля '$moduleId' не найден.")
 }
 
 private fun UiRunSnapshot.toCommonSummary(): ModuleRunSummaryResponse {

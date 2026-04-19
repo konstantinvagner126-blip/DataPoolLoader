@@ -3,6 +3,7 @@ package com.sbrf.lt.platform.ui.run
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.sbrf.lt.datapool.db.registry.DatabaseConnectionProvider
 import com.sbrf.lt.datapool.db.registry.sql.RunHistorySql
+import com.sbrf.lt.platform.ui.error.UiEntityNotFoundException
 import com.sbrf.lt.platform.ui.model.DatabaseModuleRunDetailsResponse
 import com.sbrf.lt.platform.ui.model.DatabaseRunArtifactResponse
 import com.sbrf.lt.platform.ui.model.DatabaseRunEventResponse
@@ -33,8 +34,8 @@ internal class DatabaseRunStoreRunDetailsSupport(
                 }
             }
 
-            requireNotNull(summary) {
-                "История запуска '$runId' для DB-модуля '$moduleCode' не найдена."
+            if (summary == null) {
+                throw UiEntityNotFoundException("История запуска '$runId' для DB-модуля '$moduleCode' не найдена.")
             }
 
             val sourceResults = connection.prepareStatement(RunHistorySql.listRunSourceResults(normalizedSchema)).use { stmt ->
@@ -107,4 +108,3 @@ internal class DatabaseRunStoreRunDetailsSupport(
         }
     }
 }
-
