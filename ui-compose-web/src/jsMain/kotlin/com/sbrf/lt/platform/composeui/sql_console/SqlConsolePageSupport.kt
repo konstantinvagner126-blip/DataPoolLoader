@@ -1,18 +1,10 @@
 package com.sbrf.lt.platform.composeui.sql_console
 
 import com.sbrf.lt.platform.composeui.foundation.http.ComposeHttpClient
-import com.sbrf.lt.platform.composeui.foundation.runtime.buildRuntimeModeFallbackMessage
 import com.sbrf.lt.platform.composeui.model.CredentialsStatusResponse
 import kotlinx.browser.window
 import org.w3c.files.File
 import org.w3c.xhr.FormData
-
-internal fun buildSqlConsoleFallbackWarning(runtimeContext: com.sbrf.lt.platform.composeui.model.RuntimeContext): String {
-    return buildRuntimeModeFallbackMessage(
-        runtimeContext,
-        suffix = "SQL-консоль доступна, однако экраны модулей работают по текущему runtime-context.",
-    )
-}
 
 internal suspend fun loadCredentialsStatus(
     httpClient: ComposeHttpClient,

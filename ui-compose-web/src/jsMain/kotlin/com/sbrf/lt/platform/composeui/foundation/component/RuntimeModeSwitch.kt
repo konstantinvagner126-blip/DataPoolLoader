@@ -2,6 +2,8 @@ package com.sbrf.lt.platform.composeui.foundation.component
 
 import androidx.compose.runtime.Composable
 import com.sbrf.lt.platform.composeui.foundation.dom.classes
+import com.sbrf.lt.platform.composeui.model.ModuleStoreMode
+import com.sbrf.lt.platform.composeui.model.label
 import org.jetbrains.compose.web.attributes.InputType
 import org.jetbrains.compose.web.attributes.disabled
 import org.jetbrains.compose.web.dom.Input
@@ -19,7 +21,7 @@ fun RuntimeModeSwitch(
         classes("runtime-mode-switch")
         attr("aria-label", "Переключатель режима UI")
     }) {
-        Span({ classes("runtime-mode-switch-label") }) { Text("Файлы") }
+        Span({ classes("runtime-mode-switch-label") }) { Text(ModuleStoreMode.FILES.label) }
         Input(
             type = InputType.Checkbox,
             attrs = {
@@ -37,6 +39,6 @@ fun RuntimeModeSwitch(
             },
         )
         Span({ classes("runtime-mode-switch-track") })
-        Span({ classes("runtime-mode-switch-label") }) { Text("База данных") }
+        Span({ classes("runtime-mode-switch-label") }) { Text(ModuleStoreMode.DATABASE.label) }
     }
 }

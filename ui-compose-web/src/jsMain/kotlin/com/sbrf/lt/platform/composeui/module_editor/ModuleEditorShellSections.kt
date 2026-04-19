@@ -2,6 +2,7 @@ package com.sbrf.lt.platform.composeui.module_editor
 
 import androidx.compose.runtime.Composable
 import com.sbrf.lt.platform.composeui.foundation.dom.classes
+import com.sbrf.lt.platform.composeui.foundation.runtime.buildDatabaseModeUnavailableMessage
 import com.sbrf.lt.platform.composeui.model.ModuleStoreMode
 import org.jetbrains.compose.web.attributes.disabled
 import org.jetbrains.compose.web.attributes.href
@@ -73,8 +74,10 @@ internal fun DatabaseModeAlert(
             Text("Режим базы данных недоступен")
         }
         Text(
-            runtimeContext.fallbackReason
-                ?: "Для работы с модулями из базы данных нужно переключить режим на «База данных» и убедиться, что PostgreSQL доступен.",
+            buildDatabaseModeUnavailableMessage(
+                runtimeContext.fallbackReason,
+                "Для работы с модулями из базы данных нужно переключить режим на «База данных» и убедиться, что PostgreSQL доступен.",
+            ),
         )
     }
 }

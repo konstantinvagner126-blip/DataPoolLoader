@@ -12,6 +12,8 @@ import com.sbrf.lt.platform.composeui.foundation.format.formatDateTime
 import com.sbrf.lt.platform.composeui.foundation.format.formatDuration
 import com.sbrf.lt.platform.composeui.foundation.format.formatNumber
 import com.sbrf.lt.platform.composeui.foundation.format.statusTone
+import com.sbrf.lt.platform.composeui.model.ModuleStoreMode
+import com.sbrf.lt.platform.composeui.model.label
 import kotlinx.serialization.encodeToString
 import org.jetbrains.compose.web.attributes.InputType
 import org.jetbrains.compose.web.attributes.href
@@ -534,7 +536,7 @@ internal fun ModuleRunsOverviewStrip(
     details: ModuleRunDetailsResponse?,
     state: ModuleRunsPageState,
 ) {
-    val storageLabel = if (route.storage == "database") "База данных" else "Файлы"
+    val storageLabel = if (route.storage == "database") ModuleStoreMode.DATABASE.label else ModuleStoreMode.FILES.label
     val transportLabel = if (route.storage == "database") "Polling" else "WebSocket"
     val runsCount = history?.runs?.size ?: 0
     val selectedRunLabel = details?.run?.let { "${translateRunStatus(it.status)} · ${it.runId}" }

@@ -10,6 +10,7 @@ import androidx.compose.runtime.setValue
 import com.sbrf.lt.platform.composeui.foundation.component.AlertBanner
 import com.sbrf.lt.platform.composeui.foundation.component.PageScaffold
 import com.sbrf.lt.platform.composeui.foundation.dom.classes
+import com.sbrf.lt.platform.composeui.foundation.runtime.buildRuntimeModeFallbackMessage
 import com.sbrf.lt.platform.composeui.foundation.runtime.hasModeFallback
 import kotlinx.browser.window
 import kotlinx.coroutines.launch
@@ -57,7 +58,10 @@ fun ComposeRunHistoryCleanupPage(
         content = {
             runtimeContext?.takeIf { it.hasModeFallback() }?.let { fallbackContext ->
                 AlertBanner(
-                    buildFallbackWarning(fallbackContext),
+                    buildRuntimeModeFallbackMessage(
+                        fallbackContext,
+                        suffix = "Экран показывает состояние выбранного режима, а операции для БД будут недоступны до восстановления подключения.",
+                    ),
                     "warning",
                 )
             }

@@ -442,6 +442,11 @@
   - общая подпись режима хранения вынесена из `home`-пакета в [ModuleStoreModeLabels.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/model/ModuleStoreModeLabels.kt)
   - runtime fallback warning и mode-mismatch predicate вынесены в [RuntimeContextUiSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/foundation/runtime/RuntimeContextUiSupport.kt)
   - `SqlConsolePage`, `SqlConsoleObjectsPage`, `ModuleRunsPage` и `RunHistoryCleanupPage` больше не держат локальные дубли строковой сборки fallback-warning.
+- mode/fallback dedup cleanup продолжен:
+  - DB-unavailable тексты переведены на общий helper в [RuntimeContextUiSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/foundation/runtime/RuntimeContextUiSupport.kt)
+  - `ModuleEditorShellSections` / `ModuleSyncPageSections` / `ModuleRunsPage` больше не держат локальные `fallbackReason ?: ...` ветки
+  - `RuntimeModeSwitch`, `ModuleRunsPage`, `ModuleRunsPageSections` и `RunHistoryCleanupPageSections` больше не держат ручные `Файлы/База данных` label-ветки там, где уже есть общий `ModuleStoreMode.label`
+  - одноразовые wrapper-функции `buildSqlConsoleFallbackWarning` и `buildFallbackWarning` удалены, экраны используют общий runtime fallback builder напрямую.
 - SQL store cleanup:
   - общее переключение `selectedSourceNames` вынесено в [SqlConsoleStateSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleStateSupport.kt)
   - `SqlConsoleStore` и `SqlConsoleObjectsStore` больше не держат одинаковые локальные реализации toggle-логики.

@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import com.sbrf.lt.platform.composeui.foundation.component.SectionCard
 import com.sbrf.lt.platform.composeui.foundation.dom.classes
 import com.sbrf.lt.platform.composeui.model.ModuleStoreMode
+import com.sbrf.lt.platform.composeui.model.label
 import org.jetbrains.compose.web.attributes.InputType
 import org.jetbrains.compose.web.attributes.disabled
 import org.jetbrains.compose.web.attributes.type
@@ -27,11 +28,7 @@ internal fun CleanupSection(
     val canExecute = state.actionInProgress == null &&
         preview != null &&
         (preview.totalRunsToDelete > 0 || preview.totalOrphanExecutionSnapshotsToDelete > 0)
-    val storageLabel = when (state.runtimeContext?.requestedMode) {
-        ModuleStoreMode.DATABASE -> "База данных"
-        ModuleStoreMode.FILES -> "Файлы"
-        null -> "Загрузка..."
-    }
+    val storageLabel = state.runtimeContext?.requestedMode?.label ?: "Загрузка..."
 
     SectionCard(
         title = "Выбранный режим: $storageLabel",

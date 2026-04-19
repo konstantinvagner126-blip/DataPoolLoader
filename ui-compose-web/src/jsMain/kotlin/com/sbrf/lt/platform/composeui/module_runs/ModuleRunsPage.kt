@@ -13,9 +13,11 @@ import com.sbrf.lt.platform.composeui.foundation.component.LoadingStateCard
 import com.sbrf.lt.platform.composeui.foundation.component.PageScaffold
 import com.sbrf.lt.platform.composeui.foundation.component.SectionCard
 import com.sbrf.lt.platform.composeui.foundation.dom.classes
+import com.sbrf.lt.platform.composeui.foundation.runtime.buildDatabaseModeUnavailableMessage
 import com.sbrf.lt.platform.composeui.foundation.runtime.buildRuntimeModeFallbackMessage
 import com.sbrf.lt.platform.composeui.foundation.runtime.hasModeFallback
 import com.sbrf.lt.platform.composeui.model.ModuleStoreMode
+import com.sbrf.lt.platform.composeui.model.label
 import com.sbrf.lt.platform.composeui.foundation.updates.PollingEffect
 import com.sbrf.lt.platform.composeui.foundation.updates.WebSocketEffect
 import kotlinx.coroutines.launch
@@ -102,7 +104,11 @@ fun ComposeModuleRunsPage(
     )
 
     PageScaffold(
-        eyebrow = if (route.storage == "database") "История запусков · База данных" else "История запусков · Файлы",
+        eyebrow = if (route.storage == "database") {
+            "История запусков · ${ModuleStoreMode.DATABASE.label}"
+        } else {
+            "История запусков · ${ModuleStoreMode.FILES.label}"
+        },
         title = "История и результаты",
         subtitle = if (route.storage == "database") {
             "Полная история DB-запусков, подробный ход выполнения, результаты по источникам и итоговые артефакты."
@@ -153,8 +159,10 @@ fun ComposeModuleRunsPage(
                 if (databaseFallbackActive) {
                     EmptyStateCard(
                         title = "История запусков БД недоступна",
-                        text = runtimeContext?.fallbackReason
-                            ?: "Режим базы данных сейчас недоступен. История DB-запусков временно недоступна.",
+                        text = buildDatabaseModeUnavailableMessage(
+                            runtimeContext?.fallbackReason,
+                            "Режим базы данных сейчас недоступен. История DB-запусков временно недоступна.",
+                        ),
                     )
                 } else if (history == null || history.runs.isEmpty()) {
                     EmptyStateCard(

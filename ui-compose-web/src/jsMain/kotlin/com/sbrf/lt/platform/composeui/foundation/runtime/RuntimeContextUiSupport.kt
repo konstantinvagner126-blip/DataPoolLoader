@@ -21,3 +21,9 @@ fun buildRuntimeModeFallbackMessage(
         .orEmpty()
     return "Запрошен режим «${runtimeContext.requestedMode.label}», но сейчас активен «${runtimeContext.effectiveMode.label}».$reason$extra".trim()
 }
+
+fun buildDatabaseModeUnavailableMessage(
+    fallbackReason: String?,
+    defaultMessage: String,
+): String =
+    fallbackReason?.takeIf { it.isNotBlank() } ?: defaultMessage

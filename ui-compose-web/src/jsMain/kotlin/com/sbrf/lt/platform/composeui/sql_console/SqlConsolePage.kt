@@ -17,6 +17,7 @@ import com.sbrf.lt.platform.composeui.foundation.format.formatDateTime
 import com.sbrf.lt.platform.composeui.foundation.format.formatDuration
 import com.sbrf.lt.platform.composeui.foundation.format.formatDurationMillis
 import com.sbrf.lt.platform.composeui.foundation.http.ComposeHttpClient
+import com.sbrf.lt.platform.composeui.foundation.runtime.buildRuntimeModeFallbackMessage
 import com.sbrf.lt.platform.composeui.foundation.runtime.hasModeFallback
 import com.sbrf.lt.platform.composeui.foundation.updates.PollingEffect
 import com.sbrf.lt.platform.composeui.model.CredentialsStatusResponse
@@ -260,7 +261,13 @@ fun ComposeSqlConsolePage(
                 AlertBanner(state.successMessage ?: "", "success")
             }
             runtimeContext?.takeIf { it.hasModeFallback() }?.let { fallbackContext ->
-                AlertBanner(buildSqlConsoleFallbackWarning(fallbackContext), "warning")
+                AlertBanner(
+                    buildRuntimeModeFallbackMessage(
+                        fallbackContext,
+                        suffix = "SQL-консоль доступна, однако экраны модулей работают по текущему runtime-context.",
+                    ),
+                    "warning",
+                )
             }
 
             if (state.loading && state.info == null) {

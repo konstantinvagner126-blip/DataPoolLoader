@@ -1,8 +1,6 @@
 package com.sbrf.lt.platform.composeui.run_history_cleanup
 
-import com.sbrf.lt.platform.composeui.foundation.runtime.buildRuntimeModeFallbackMessage
 import com.sbrf.lt.platform.composeui.model.ModuleStoreMode
-import com.sbrf.lt.platform.composeui.model.RuntimeContext
 
 internal fun buildSubtitle(storageMode: ModuleStoreMode?): String =
     when (storageMode) {
@@ -13,12 +11,6 @@ internal fun buildSubtitle(storageMode: ModuleStoreMode?): String =
         null ->
             "Очистка истории запусков и output-каталогов в зависимости от выбранного режима UI."
     }
-
-internal fun buildFallbackWarning(runtimeContext: RuntimeContext): String =
-    buildRuntimeModeFallbackMessage(
-        runtimeContext,
-        suffix = "Экран показывает состояние выбранного режима, а операции для БД будут недоступны до восстановления подключения.",
-    )
 
 internal fun buildSafeguardLabel(storageMode: ModuleStoreMode?): String =
     when (storageMode) {

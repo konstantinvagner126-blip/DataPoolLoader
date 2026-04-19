@@ -6,6 +6,7 @@ import com.sbrf.lt.platform.composeui.foundation.component.EmptyStateCard
 import com.sbrf.lt.platform.composeui.foundation.component.LoadingStateCard
 import com.sbrf.lt.platform.composeui.foundation.component.SectionCard
 import com.sbrf.lt.platform.composeui.foundation.dom.classes
+import com.sbrf.lt.platform.composeui.foundation.runtime.buildDatabaseModeUnavailableMessage
 import com.sbrf.lt.platform.composeui.model.ModuleStoreMode
 import kotlinx.browser.window
 import org.jetbrains.compose.web.attributes.InputType
@@ -32,7 +33,10 @@ internal fun RuntimeAlert(state: ModuleSyncPageState) {
         runtimeContext == null -> return
         runtimeContext.effectiveMode != ModuleStoreMode.DATABASE -> {
             AlertBanner(
-                runtimeContext.fallbackReason ?: "Для импорта нужен активный режим «База данных».",
+                buildDatabaseModeUnavailableMessage(
+                    runtimeContext.fallbackReason,
+                    "Для импорта нужен активный режим «База данных».",
+                ),
                 "warning",
             )
         }
