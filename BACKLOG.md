@@ -252,8 +252,9 @@
   - [10-config-editor.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/10-config-editor.css)
   - [20-sql-console.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/20-sql-console.css)
   - [30-run-history.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/30-run-history.css)
+  - [35-sync-maintenance.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/35-sync-maintenance.css)
   - [40-sql-results.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/40-sql-results.css);
-- из split CSS уже убраны первые дублирующиеся selector-блоки, а foundation/home-help слой теперь физически разделен по разным файлам;
+- из split CSS уже убраны первые дублирующиеся selector-блоки, foundation/home-help слой физически разделен, а maintenance/sync экран больше не живет в foundation и unrelated result-styles;
 - ресурсы проходят packaging и попадают в `ui-server` bundle.
 
 Критерий завершения:

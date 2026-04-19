@@ -18,19 +18,19 @@ import io.ktor.server.routing.get
  */
 internal fun Route.registerPageRoutes(context: UiServerContext) {
     get("/") {
-        call.respondRedirect(composeBundleLocation(call.request.queryParameters.toQueryParametersMap()), permanent = false)
+        call.redirectToComposeBundle(call.request.queryParameters.toQueryParametersMap())
     }
     get("/modules") {
-        if (context.currentRuntimeContext().effectiveMode != UiModuleStoreMode.FILES) {
-            call.respondRedirect(composeBundleLocation(mapOf("modeAccessError" to listOf("modules"))), permanent = false)
+        if (!context.requirePageModeOrRedirect(call, UiModuleStoreMode.FILES, "modules")) {
             return@get
         }
-        val params = linkedMapOf<String, List<String>>(
-            "screen" to listOf("module-editor"),
-            "storage" to listOf("files"),
+        call.redirectToComposeBundle(
+            call.composeQueryParameters(
+                "screen" to "module-editor",
+                "storage" to "files",
+                forwardedParams = listOf("module"),
+            ),
         )
-        call.request.queryParameters["module"]?.let { params["module"] = listOf(it) }
-        call.respondRedirect(composeBundleLocation(params), permanent = false)
     }
     get("/help") {
         call.respondText(loadStaticText("static/help.html"), io.ktor.http.ContentType.Text.Html)
@@ -39,135 +39,105 @@ internal fun Route.registerPageRoutes(context: UiServerContext) {
         call.respondText(loadStaticText("static/help-api.html"), io.ktor.http.ContentType.Text.Html)
     }
     get("/compose-runs") {
-        val params = linkedMapOf<String, List<String>>("screen" to listOf("module-runs"))
-        call.request.queryParameters["storage"]?.let { params["storage"] = listOf(it) }
-        call.request.queryParameters["module"]?.let { params["module"] = listOf(it) }
-        call.respondRedirect(composeBundleLocation(params), permanent = false)
+        call.redirectToComposeBundle(
+            call.composeQueryParameters(
+                "screen" to "module-runs",
+                forwardedParams = listOf("storage", "module"),
+            ),
+        )
     }
     get("/compose-editor") {
-        val params = linkedMapOf<String, List<String>>("screen" to listOf("module-editor"))
-        call.request.queryParameters["storage"]?.let { params["storage"] = listOf(it) }
-        call.request.queryParameters["module"]?.let { params["module"] = listOf(it) }
-        call.request.queryParameters["includeHidden"]?.let { params["includeHidden"] = listOf(it) }
-        call.request.queryParameters["openCreate"]?.let { params["openCreate"] = listOf(it) }
-        call.respondRedirect(composeBundleLocation(params), permanent = false)
+        call.redirectToComposeBundle(
+            call.composeQueryParameters(
+                "screen" to "module-editor",
+                forwardedParams = listOf("storage", "module", "includeHidden", "openCreate"),
+            ),
+        )
     }
     get("/compose-sync") {
-        call.respondRedirect(
-            composeBundleLocation(linkedMapOf("screen" to listOf("module-sync"))),
-            permanent = false,
-        )
+        call.redirectToComposeBundle(call.composeQueryParameters("screen" to "module-sync"))
     }
     get("/compose-run-history-cleanup") {
-        call.respondRedirect(
-            composeBundleLocation(linkedMapOf("screen" to listOf("run-history-cleanup"))),
-            permanent = false,
-        )
+        call.redirectToComposeBundle(call.composeQueryParameters("screen" to "run-history-cleanup"))
     }
     get("/compose-sql-console") {
-        call.respondRedirect(
-            composeBundleLocation(linkedMapOf("screen" to listOf("sql-console"))),
-            permanent = false,
-        )
+        call.redirectToComposeBundle(call.composeQueryParameters("screen" to "sql-console"))
     }
     get("/compose-sql-console-objects") {
-        val params = linkedMapOf<String, List<String>>("screen" to listOf("sql-console-objects"))
-        call.request.queryParameters["query"]?.let { params["query"] = listOf(it) }
-        call.request.queryParameters["source"]?.let { params["source"] = listOf(it) }
-        call.request.queryParameters["schema"]?.let { params["schema"] = listOf(it) }
-        call.request.queryParameters["object"]?.let { params["object"] = listOf(it) }
-        call.request.queryParameters["type"]?.let { params["type"] = listOf(it) }
-        call.respondRedirect(
-            composeBundleLocation(params),
-            permanent = false,
+        call.redirectToComposeBundle(
+            call.composeQueryParameters(
+                "screen" to "sql-console-objects",
+                forwardedParams = listOf("query", "source", "schema", "object", "type"),
+            ),
         )
     }
     get("/module-runs") {
         when (call.request.queryParameters["storage"]?.lowercase()) {
             "files" -> {
-                if (context.currentRuntimeContext().effectiveMode != UiModuleStoreMode.FILES) {
-                    call.respondRedirect(composeBundleLocation(mapOf("modeAccessError" to listOf("modules"))), permanent = false)
+                if (!context.requirePageModeOrRedirect(call, UiModuleStoreMode.FILES, "modules")) {
                     return@get
                 }
             }
             "database" -> {
-                if (context.currentRuntimeContext().effectiveMode != UiModuleStoreMode.DATABASE) {
-                    call.respondRedirect(composeBundleLocation(mapOf("modeAccessError" to listOf("db-modules"))), permanent = false)
+                if (!context.requirePageModeOrRedirect(call, UiModuleStoreMode.DATABASE, "db-modules")) {
                     return@get
                 }
             }
             else -> {
-                call.respondRedirect(composeBundleLocation(), permanent = false)
+                call.redirectToComposeBundle()
                 return@get
             }
         }
-        val params = linkedMapOf<String, List<String>>("screen" to listOf("module-runs"))
-        call.request.queryParameters["storage"]?.let { params["storage"] = listOf(it) }
-        call.request.queryParameters["module"]?.let { params["module"] = listOf(it) }
-        call.respondRedirect(composeBundleLocation(params), permanent = false)
-    }
-    get("/sql-console") {
-        call.respondRedirect(
-            composeBundleLocation(linkedMapOf("screen" to listOf("sql-console"))),
-            permanent = false,
+        call.redirectToComposeBundle(
+            call.composeQueryParameters(
+                "screen" to "module-runs",
+                forwardedParams = listOf("storage", "module"),
+            ),
         )
     }
+    get("/sql-console") {
+        call.redirectToComposeBundle(call.composeQueryParameters("screen" to "sql-console"))
+    }
     get("/sql-console-objects") {
-        val params = linkedMapOf<String, List<String>>("screen" to listOf("sql-console-objects"))
-        call.request.queryParameters["query"]?.let { params["query"] = listOf(it) }
-        call.request.queryParameters["source"]?.let { params["source"] = listOf(it) }
-        call.request.queryParameters["schema"]?.let { params["schema"] = listOf(it) }
-        call.request.queryParameters["object"]?.let { params["object"] = listOf(it) }
-        call.request.queryParameters["type"]?.let { params["type"] = listOf(it) }
-        call.respondRedirect(
-            composeBundleLocation(params),
-            permanent = false,
+        call.redirectToComposeBundle(
+            call.composeQueryParameters(
+                "screen" to "sql-console-objects",
+                forwardedParams = listOf("query", "source", "schema", "object", "type"),
+            ),
         )
     }
     get("/db-modules") {
-        if (context.currentRuntimeContext().effectiveMode != UiModuleStoreMode.DATABASE) {
-            call.respondRedirect(composeBundleLocation(mapOf("modeAccessError" to listOf("db-modules"))), permanent = false)
+        if (!context.requirePageModeOrRedirect(call, UiModuleStoreMode.DATABASE, "db-modules")) {
             return@get
         }
-        val params = linkedMapOf<String, List<String>>(
-            "screen" to listOf("module-editor"),
-            "storage" to listOf("database"),
+        call.redirectToComposeBundle(
+            call.composeQueryParameters(
+                "screen" to "module-editor",
+                "storage" to "database",
+                forwardedParams = listOf("module", "includeHidden"),
+            ),
         )
-        call.request.queryParameters["module"]?.let { params["module"] = listOf(it) }
-        call.request.queryParameters["includeHidden"]?.let { params["includeHidden"] = listOf(it) }
-        call.respondRedirect(composeBundleLocation(params), permanent = false)
     }
     get("/db-modules/new") {
-        if (context.currentRuntimeContext().effectiveMode != UiModuleStoreMode.DATABASE) {
-            call.respondRedirect(composeBundleLocation(mapOf("modeAccessError" to listOf("db-modules"))), permanent = false)
+        if (!context.requirePageModeOrRedirect(call, UiModuleStoreMode.DATABASE, "db-modules")) {
             return@get
         }
-        call.respondRedirect(
-            composeBundleLocation(
-                linkedMapOf(
-                    "screen" to listOf("module-editor"),
-                    "storage" to listOf("database"),
-                    "openCreate" to listOf("true"),
-                ),
+        call.redirectToComposeBundle(
+            call.composeQueryParameters(
+                "screen" to "module-editor",
+                "storage" to "database",
+                "openCreate" to "true",
             ),
-            permanent = false,
         )
     }
     get("/db-sync") {
-        if (context.currentRuntimeContext().effectiveMode != UiModuleStoreMode.DATABASE) {
-            call.respondRedirect(composeBundleLocation(mapOf("modeAccessError" to listOf("db-sync"))), permanent = false)
+        if (!context.requirePageModeOrRedirect(call, UiModuleStoreMode.DATABASE, "db-sync")) {
             return@get
         }
-        call.respondRedirect(
-            composeBundleLocation(linkedMapOf("screen" to listOf("module-sync"))),
-            permanent = false,
-        )
+        call.redirectToComposeBundle(call.composeQueryParameters("screen" to "module-sync"))
     }
     get("/run-history-cleanup") {
-        call.respondRedirect(
-            composeBundleLocation(linkedMapOf("screen" to listOf("run-history-cleanup"))),
-            permanent = false,
-        )
+        call.redirectToComposeBundle(call.composeQueryParameters("screen" to "run-history-cleanup"))
     }
     get("/static/{resourcePath...}") {
         val path = call.parameters.getAll("resourcePath").orEmpty().joinToString("/")
@@ -206,19 +176,6 @@ internal fun Route.registerPageRoutes(context: UiServerContext) {
 
 private fun io.ktor.http.Parameters.toQueryParametersMap(): Map<String, List<String>> =
     names().associateWith { name -> getAll(name).orEmpty() }
-
-private fun composeBundleLocation(
-    queryParameters: Map<String, List<String>> = emptyMap(),
-): String {
-    val query = queryParameters
-        .flatMap { (key, values) -> values.map { key to it } }
-        .formUrlEncode()
-    return if (query.isBlank()) {
-        "/static/compose-app/index.html"
-    } else {
-        "/static/compose-app/index.html?$query"
-    }
-}
 
 private fun loadStaticBytes(
     resourcePath: String,

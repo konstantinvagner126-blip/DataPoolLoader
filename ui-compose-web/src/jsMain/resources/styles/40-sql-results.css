@@ -334,17 +334,14 @@
     width: 100%;
   }
 
-  .module-sync-toolbar-row,
   .module-editor-toolbar-row {
     justify-content: stretch;
   }
 
-  .module-sync-toolbar .module-editor-toolbar-group,
   .module-editor-toolbar-group {
     width: 100%;
   }
 
-  .module-sync-toolbar .module-editor-toolbar-group .btn,
   .module-editor-toolbar-group .btn {
     width: 100%;
     min-width: 0;
