@@ -693,6 +693,15 @@
 - module_editor content pane cleanup:
   - правая content-ветка вынесена из [ModuleEditorPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPage.kt) в `ModuleEditorContentPane(...)`
   - loading/empty/session/credentials/tabs/create-module/dialog flow больше не смешивается в основном page-shell.
+- sql_console page file split cleanup:
+  - screen subflows вынесены из [SqlConsolePage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsolePage.kt) в [SqlConsolePageShellSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsolePageShellSections.kt)
+  - `SqlConsolePage.kt` сокращен до shell/wiring-слоя, а sidebar/workspace/toolbar flow больше не держится внутри одного page-файла.
+- module_editor page file split cleanup:
+  - hero/content subflows вынесены из [ModuleEditorPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPage.kt) в [ModuleEditorPageShellSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPageShellSections.kt)
+  - сам page-файл больше не держит крупный content flow и hero-art реализацию inline.
+- module_editor catalog file split cleanup:
+  - catalog/sidebar list flow вынесен из [ModuleEditorPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPage.kt) в [ModuleEditorCatalogSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorCatalogSections.kt)
+  - catalog actions/body/item rendering теперь живут отдельным срезом, а не внутри основного page-файла.
 
 Критерий завершения:
 
