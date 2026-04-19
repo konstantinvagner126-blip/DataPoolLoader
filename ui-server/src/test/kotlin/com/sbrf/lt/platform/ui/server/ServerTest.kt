@@ -172,6 +172,7 @@ class ServerTest {
             storageDir = Files.createTempDirectory("ui-server-state-").toString(),
             sqlConsole = SqlConsoleConfig(),
         )
+        val runtimeContext = buildUiServerStartupRuntime(uiConfig, UiRuntimeContextService()).runtimeContext
         val runManager = RunManager(moduleRegistry = registry, uiConfig = uiConfig)
         val wsClient = createClient {
             install(WebSockets)
@@ -180,6 +181,7 @@ class ServerTest {
             uiStartupModule(
                 uiConfig = uiConfig,
                 logger = NOPLogger.NOP_LOGGER,
+                runtimeContext = runtimeContext,
                 moduleInstaller = {
                     uiModule(
                         uiConfig = uiConfig,

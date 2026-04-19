@@ -2,12 +2,7 @@ package com.sbrf.lt.platform.ui.server
 
 import com.sbrf.lt.platform.ui.config.UiAppConfig
 import com.sbrf.lt.platform.ui.config.UiConfigLoader
-import com.sbrf.lt.platform.ui.config.UiRuntimeConfigResolver
-import com.sbrf.lt.platform.ui.config.UiRuntimeContext
 import com.sbrf.lt.platform.ui.config.UiRuntimeContextService
-import com.sbrf.lt.platform.ui.config.appsRootPath
-import com.sbrf.lt.platform.ui.config.storageDirPath
-import com.sbrf.lt.platform.ui.run.UiCredentialsService
 import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationStarted
 import io.ktor.server.engine.embeddedServer
@@ -25,8 +20,7 @@ internal fun defaultUiServerStarter(): UiServerStarter = UiServerStarter { port,
 internal fun uiStartupModule(
     uiConfig: UiAppConfig,
     logger: Logger,
-    runtimeConfigResolver: UiRuntimeConfigResolver = UiRuntimeConfigResolver(),
-    runtimeContext: UiRuntimeContext = UiRuntimeContextService().resolve(runtimeConfigResolver.resolve(uiConfig)),
+    runtimeContext: com.sbrf.lt.platform.ui.config.UiRuntimeContext,
     moduleInstaller: Application.() -> Unit = {
         uiModule(
             uiConfig = uiConfig,
@@ -47,45 +41,21 @@ fun startUiServer(
     starter: UiServerStarter = defaultUiServerStarter(),
     runtimeContextService: UiRuntimeContextService = UiRuntimeContextService(),
 ) {
-    val port = uiConfig.port
-    val appsRoot = uiConfig.appsRootPath()
-    val storageDir = uiConfig.storageDirPath()
-    val uiConfigLoader = UiConfigLoader()
-    val credentialsService = UiCredentialsService(
-        uiConfigProvider = { runCatching { uiConfigLoader.load() }.getOrDefault(uiConfig) },
-    )
-    val runtimeConfigResolver = UiRuntimeConfigResolver(credentialsService)
-    val runtimeContext = runtimeContextService.resolve(runtimeConfigResolver.resolve(uiConfig))
-    if (appsRoot != null) {
-        logger.info("Apps root определен: {}", appsRoot)
-    } else {
-        logger.warn("Apps root не определен. Список app-модулей будет пустым, пока не задан ui.appsRoot.")
-    }
-    logger.info("Каталог состояния UI: {}", storageDir)
-    logger.info(
-        "Runtime context UI: requestedMode={}, effectiveMode={}, dbConfigured={}, dbAvailable={}",
-        runtimeContext.requestedMode,
-        runtimeContext.effectiveMode,
-        runtimeContext.database.configured,
-        runtimeContext.database.available,
-    )
-    runtimeContext.fallbackReason?.let { reason ->
-        logger.warn("Режим UI переведен в FILES: {}", reason)
-    }
+    val startupRuntime = buildUiServerStartupRuntime(uiConfig, runtimeContextService)
+    logUiStartupRuntime(logger, uiConfig, startupRuntime.runtimeContext)
     starter.start(
-        port,
+        uiConfig.port,
         uiStartupModule(
             uiConfig = uiConfig,
             logger = logger,
-            runtimeConfigResolver = runtimeConfigResolver,
-            runtimeContext = runtimeContext,
+            runtimeContext = startupRuntime.runtimeContext,
             moduleInstaller = {
                 uiModule(
                     uiConfig = uiConfig,
-                    uiConfigLoader = uiConfigLoader,
-                    credentialsService = credentialsService,
-                    runtimeConfigResolver = runtimeConfigResolver,
-                    runtimeContext = runtimeContext,
+                    uiConfigLoader = startupRuntime.uiConfigLoader,
+                    credentialsService = startupRuntime.credentialsService,
+                    runtimeConfigResolver = startupRuntime.runtimeConfigResolver,
+                    runtimeContext = startupRuntime.runtimeContext,
                 )
             },
         ),

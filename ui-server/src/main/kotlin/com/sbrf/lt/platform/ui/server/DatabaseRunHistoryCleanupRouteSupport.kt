@@ -1,9 +1,7 @@
 package com.sbrf.lt.platform.ui.server
 
-import com.sbrf.lt.platform.ui.model.CurrentStorageModuleResponse
 import com.sbrf.lt.platform.ui.model.DatabaseRunHistoryCleanupPreviewResponse
 import com.sbrf.lt.platform.ui.model.DatabaseRunHistoryCleanupResultResponse
-import com.sbrf.lt.platform.ui.model.RunHistoryCleanupModuleResponse
 import com.sbrf.lt.platform.ui.model.RunHistoryCleanupPreviewResponse
 import com.sbrf.lt.platform.ui.model.RunHistoryCleanupResultResponse
 
@@ -19,16 +17,7 @@ internal fun DatabaseRunHistoryCleanupPreviewResponse.toCommonDatabaseRunHistory
         currentStorageBytes = currentStorageBytes,
         currentOldestRequestedAt = currentOldestRequestedAt,
         currentNewestRequestedAt = currentNewestRequestedAt,
-        currentTopModules = currentTopModules.map { module ->
-            CurrentStorageModuleResponse(
-                moduleCode = module.moduleCode,
-                currentRunsCount = module.currentRunsCount,
-                currentStorageBytes = module.currentStorageBytes,
-                currentOutputDirs = module.currentOutputDirs,
-                oldestRequestedAt = module.oldestRequestedAt,
-                newestRequestedAt = module.newestRequestedAt,
-            )
-        },
+        currentTopModules = toCommonCurrentStorageModules(),
         estimatedBytesToFree = estimatedBytesToFree,
         totalModulesAffected = totalModulesAffected,
         totalRunsToDelete = totalRunsToDelete,
@@ -36,14 +25,7 @@ internal fun DatabaseRunHistoryCleanupPreviewResponse.toCommonDatabaseRunHistory
         totalEventsToDelete = totalEventsToDelete,
         totalArtifactsToDelete = totalArtifactsToDelete,
         totalOrphanExecutionSnapshotsToDelete = totalOrphanExecutionSnapshotsToDelete,
-        modules = modules.map { module ->
-            RunHistoryCleanupModuleResponse(
-                moduleCode = module.moduleCode,
-                totalRunsToDelete = module.totalRunsToDelete,
-                oldestRequestedAt = module.oldestRequestedAt,
-                newestRequestedAt = module.newestRequestedAt,
-            )
-        },
+        modules = toCommonCleanupModules(),
     )
 
 internal fun DatabaseRunHistoryCleanupResultResponse.toCommonDatabaseRunHistoryCleanupResultResponse(): RunHistoryCleanupResultResponse =
@@ -60,12 +42,5 @@ internal fun DatabaseRunHistoryCleanupResultResponse.toCommonDatabaseRunHistoryC
         totalEventsDeleted = totalEventsDeleted,
         totalArtifactsDeleted = totalArtifactsDeleted,
         totalOrphanExecutionSnapshotsDeleted = totalOrphanExecutionSnapshotsDeleted,
-        modules = modules.map { module ->
-            RunHistoryCleanupModuleResponse(
-                moduleCode = module.moduleCode,
-                totalRunsToDelete = module.totalRunsToDelete,
-                oldestRequestedAt = module.oldestRequestedAt,
-                newestRequestedAt = module.newestRequestedAt,
-            )
-        },
+        modules = toCommonCleanupModules(),
     )
