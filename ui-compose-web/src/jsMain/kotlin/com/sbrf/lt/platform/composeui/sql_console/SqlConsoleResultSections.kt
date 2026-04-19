@@ -159,39 +159,27 @@ internal fun SelectResultPane(
     onSelectShard: (String) -> Unit,
     onSelectPage: (Int) -> Unit,
 ) {
-    if (execution == null) {
-        Div({ classes("text-secondary", "small", "mb-3") }) {
-            Text("Пока нет данных для отображения.")
-        }
+    if (
+        RenderExecutionResultPlaceholder(
+            execution = execution,
+            result = result,
+            emptyText = "Пока нет данных для отображения.",
+            pendingText = "Выполни запрос, чтобы увидеть данные со всех shard/source.",
+            resultPendingLeadText = "Выполняется запрос...",
+        )
+    ) {
+        return
+    }
+    val readyResult = requireNotNull(result)
+
+    if (readyResult.statementType != "RESULT_SET") {
         Div({ classes("sql-result-placeholder") }) {
-            Text("Выполни запрос, чтобы увидеть данные со всех shard/source.")
+            Text("Команда ${readyResult.statementKeyword} не возвращает табличные данные. Смотри вкладку «Статусы».")
         }
         return
     }
 
-    if (result == null) {
-        val message = execution.errorMessage?.takeIf { it.isNotBlank() }
-        if (message != null) {
-            AlertBanner(message, "danger")
-        } else {
-            Div({ classes("text-secondary", "small", "mb-3") }) {
-                Text("Выполняется запрос...")
-            }
-            Div({ classes("sql-result-placeholder") }) {
-                Text("Ожидается завершение запроса.")
-            }
-        }
-        return
-    }
-
-    if (result.statementType != "RESULT_SET") {
-        Div({ classes("sql-result-placeholder") }) {
-            Text("Команда ${result.statementKeyword} не возвращает табличные данные. Смотри вкладку «Статусы».")
-        }
-        return
-    }
-
-    val successfulShards = result.shardResults.filter { it.status.equals("SUCCESS", ignoreCase = true) && it.rows.isNotEmpty() }
+    val successfulShards = readyResult.shardResults.filter { it.status.equals("SUCCESS", ignoreCase = true) && it.rows.isNotEmpty() }
     if (successfulShards.isEmpty()) {
         Div({ classes("sql-result-placeholder") }) {
             Text("Ни один source не вернул данные для отображения.")
@@ -207,7 +195,7 @@ internal fun SelectResultPane(
     val visibleRows = activeShard.rows.drop(startIndex).take(pageSize)
 
     Div({ classes("text-secondary", "small", "mb-3") }) {
-        Text("Данные показываются отдельно по каждому source. Лимит на source: ${result.maxRowsPerShard}.")
+        Text("Данные показываются отдельно по каждому source. Лимит на source: ${readyResult.maxRowsPerShard}.")
     }
     Ul({ classes("nav", "nav-tabs", "sql-result-tabs", "mb-3") }) {
         successfulShards.forEach { shard ->
@@ -229,7 +217,7 @@ internal fun SelectResultPane(
         Text(
             buildResultPageSummary(
                 shard = activeShard,
-                result = result,
+                result = readyResult,
                 startIndex = startIndex,
                 endIndexExclusive = endIndexExclusive,
                 normalizedPage = normalizedPage,
@@ -286,29 +274,23 @@ internal fun StatusResultPane(
     execution: SqlConsoleExecutionResponse?,
     result: SqlConsoleQueryResult?,
 ) {
-    if (execution == null) {
-        Div({ classes("sql-result-placeholder") }) {
-            Text("Пока нет результатов для отображения.")
-        }
+    if (
+        RenderExecutionResultPlaceholder(
+            execution = execution,
+            result = result,
+            emptyText = "Пока нет результатов для отображения.",
+            pendingText = "Ожидается завершение запроса.",
+        )
+    ) {
         return
     }
-
-    if (result == null) {
-        val message = execution.errorMessage?.takeIf { it.isNotBlank() }
-        if (message != null) {
-            AlertBanner(message, "danger")
-        } else {
-            Div({ classes("sql-result-placeholder") }) {
-                Text("Ожидается завершение запроса.")
-            }
-        }
-        return
-    }
+    val readyExecution = requireNotNull(execution)
+    val readyResult = requireNotNull(result)
 
     Div({ classes("text-secondary", "small", "mb-3") }) {
-        Text(buildResultStatusSummary(execution, result))
+        Text(buildResultStatusSummary(readyExecution, readyResult))
     }
-    if (result.shardResults.isEmpty()) {
+    if (readyResult.shardResults.isEmpty()) {
         EmptyStateCard(
             title = "Результаты",
             text = "Сервер не вернул результатов по выбранным shard/source.",
@@ -330,7 +312,7 @@ internal fun StatusResultPane(
                 }
             }
             Tbody {
-                result.shardResults.forEach { shard ->
+                readyResult.shardResults.forEach { shard ->
                     Tr {
                         Td { org.jetbrains.compose.web.dom.B { Text(shard.shardName) } }
                         Td {
@@ -351,7 +333,7 @@ internal fun StatusResultPane(
         }
     }
     Div({ classes("sql-shard-card-grid") }) {
-        result.shardResults.forEach { shard ->
+        readyResult.shardResults.forEach { shard ->
             Div({ classes("sql-shard-card", "status-${sourceStatusSuffix(shard.status)}") }) {
                 Div({ classes("d-flex", "justify-content-between", "align-items-start", "gap-3") }) {
                     Div {
@@ -380,4 +362,37 @@ internal fun StatusResultPane(
             }
         }
     }
+}
+
+@Composable
+private fun RenderExecutionResultPlaceholder(
+    execution: SqlConsoleExecutionResponse?,
+    result: SqlConsoleQueryResult?,
+    emptyText: String,
+    pendingText: String,
+    resultPendingLeadText: String? = null,
+): Boolean {
+    if (execution == null) {
+        Div({ classes("sql-result-placeholder") }) {
+            Text(emptyText)
+        }
+        return true
+    }
+    if (result == null) {
+        val message = execution.errorMessage?.takeIf { it.isNotBlank() }
+        if (message != null) {
+            AlertBanner(message, "danger")
+        } else {
+            resultPendingLeadText?.let { leadText ->
+                Div({ classes("text-secondary", "small", "mb-3") }) {
+                    Text(leadText)
+                }
+            }
+            Div({ classes("sql-result-placeholder") }) {
+                Text(pendingText)
+            }
+        }
+        return true
+    }
+    return false
 }

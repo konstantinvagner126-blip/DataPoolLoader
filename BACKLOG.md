@@ -510,6 +510,10 @@
   - `SqlConsoleLibrarySections.kt` больше не держит две параллельные реализации query picker-блоков; общий локальный `SqlConsoleQueryPickerBlock(...)` закрывает recent/favorite queries
   - `ModuleEditorShellSections.kt` больше не повторяет вручную `module-editor-toolbar-group` markup; toolbar-группы сведены к локальному `EditorToolbarGroup(...)`
   - editor секции больше не дублируют кнопку `Свернуть/Развернуть`; общий `SectionExpandToggleButton(...)` вынесен в [ModuleEditorSectionStateSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorSectionStateSupport.kt) и используется в config/run слоях.
+- feature-local cleanup продолжен:
+  - `SqlConsoleResultSections.kt` больше не держит две параллельные placeholder-ветки для `execution/result == null`; общий локальный `RenderExecutionResultPlaceholder(...)` закрывает pending/error empty-states для data/status tabs
+  - `SqlConsoleObjectsPage.kt` больше не дублирует object identity markup между navigation target, favorites и object cards; общий локальный `SqlObjectIdentityBlock(...)` собирает name/context/detail presentation в одном месте
+  - `ModuleEditorConfigFormSourceSections.kt` больше не повторяет add/remove action-button markup для sources/quotas; общий локальный `ConfigCollectionActionButton(...)` закрывает эти collection actions.
 - credentials upload helper cleanup:
   - duplicate `uploadCredentialsFile(...)` больше не живет параллельно в `module_editor` и `sql_console`
   - общий web-only helper вынесен в [CredentialsHttpSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/foundation/http/CredentialsHttpSupport.kt)

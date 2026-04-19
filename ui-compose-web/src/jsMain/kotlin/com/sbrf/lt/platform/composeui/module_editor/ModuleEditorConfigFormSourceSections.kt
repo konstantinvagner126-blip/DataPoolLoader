@@ -23,26 +23,21 @@ internal fun SourcesSection(
         sectionStateKey = sectionStateKey,
         defaultExpanded = false,
         actions = {
-            Button(attrs = {
-                classes("btn", "btn-outline-secondary", "btn-sm")
-                attr("type", "button")
-                if (disabled) {
-                    disabled()
-                }
-                onClick {
-                    onCommit(
-                        formState.copy(
-                            sources = formState.sources + ConfigFormSourceStateDto(
-                                name = "",
-                                jdbcUrl = "",
-                                username = "",
-                                password = "",
-                            ),
+            ConfigCollectionActionButton(
+                label = "Добавить источник",
+                toneClass = "btn-outline-secondary",
+                disabled = disabled,
+            ) {
+                onCommit(
+                    formState.copy(
+                        sources = formState.sources + ConfigFormSourceStateDto(
+                            name = "",
+                            jdbcUrl = "",
+                            username = "",
+                            password = "",
                         ),
-                    )
-                }
-            }) {
-                Text("Добавить источник")
+                    ),
+                )
             }
         },
     ) {
@@ -66,17 +61,12 @@ internal fun SourcesSection(
                                 }
                             }
                         }
-                        Button(attrs = {
-                            classes("btn", "btn-outline-danger", "btn-sm")
-                            attr("type", "button")
-                            if (disabled) {
-                                disabled()
-                            }
-                            onClick {
-                                onCommit(formState.copy(sources = formState.sources.filterIndexed { sourceIndex, _ -> sourceIndex != index }))
-                            }
-                        }) {
-                            Text("Удалить")
+                        ConfigCollectionActionButton(
+                            label = "Удалить",
+                            toneClass = "btn-outline-danger",
+                            disabled = disabled,
+                        ) {
+                            onCommit(formState.copy(sources = formState.sources.filterIndexed { sourceIndex, _ -> sourceIndex != index }))
                         }
                     }
                     Div({ classes("config-form-fields") }) {
@@ -151,21 +141,16 @@ internal fun QuotasSection(
         subtitle = "Используются в режиме quota.",
         sectionStateKey = sectionStateKey,
         actions = {
-            Button(attrs = {
-                classes("btn", "btn-outline-secondary", "btn-sm")
-                attr("type", "button")
-                if (disabled) {
-                    disabled()
-                }
-                onClick {
-                    onCommit(
-                        formState.copy(
-                            quotas = formState.quotas + ConfigFormQuotaStateDto(source = "", percent = null),
-                        ),
-                    )
-                }
-            }) {
-                Text("Добавить квоту")
+            ConfigCollectionActionButton(
+                label = "Добавить квоту",
+                toneClass = "btn-outline-secondary",
+                disabled = disabled,
+            ) {
+                onCommit(
+                    formState.copy(
+                        quotas = formState.quotas + ConfigFormQuotaStateDto(source = "", percent = null),
+                    ),
+                )
             }
         },
     ) {
@@ -179,16 +164,13 @@ internal fun QuotasSection(
                         Div({ classes("config-form-card-title") }) {
                             Text(quota.source.ifBlank { "Квота ${index + 1}" })
                         }
-                        Button(attrs = {
-                            classes("btn", "btn-outline-danger", "btn-sm")
-                            attr("type", "button")
-                            if (disabled) {
-                                disabled()
-                            }
-                            onClick {
-                                onCommit(formState.copy(quotas = formState.quotas.filterIndexed { quotaIndex, _ -> quotaIndex != index }))
-                            }
-                        }) { Text("Удалить") }
+                        ConfigCollectionActionButton(
+                            label = "Удалить",
+                            toneClass = "btn-outline-danger",
+                            disabled = disabled,
+                        ) {
+                            onCommit(formState.copy(quotas = formState.quotas.filterIndexed { quotaIndex, _ -> quotaIndex != index }))
+                        }
                     }
                     Div({ classes("config-form-fields") }) {
                         CommitTextField(
@@ -207,5 +189,24 @@ internal fun QuotasSection(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ConfigCollectionActionButton(
+    label: String,
+    toneClass: String,
+    disabled: Boolean,
+    onClick: () -> Unit,
+) {
+    Button(attrs = {
+        classes("btn", toneClass, "btn-sm")
+        attr("type", "button")
+        if (disabled) {
+            disabled()
+        }
+        onClick { onClick() }
+    }) {
+        Text(label)
     }
 }

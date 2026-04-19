@@ -12,6 +12,7 @@ import com.sbrf.lt.platform.composeui.foundation.component.EmptyStateCard
 import com.sbrf.lt.platform.composeui.foundation.component.LoadingStateCard
 import com.sbrf.lt.platform.composeui.foundation.component.PageScaffold
 import com.sbrf.lt.platform.composeui.foundation.dom.classes
+import com.sbrf.lt.platform.composeui.foundation.dom.classesFromString
 import com.sbrf.lt.platform.composeui.foundation.runtime.buildRuntimeModeFallbackMessage
 import com.sbrf.lt.platform.composeui.foundation.runtime.hasModeFallback
 import kotlinx.browser.window
@@ -134,12 +135,11 @@ fun ComposeSqlConsoleObjectsPage(
             navigationTarget?.let { target ->
                 Div({ classes("sql-object-target-card", "mb-4") }) {
                     Div({ classes("panel-title", "mb-2") }) { Text("Текущий объект") }
-                    Div({ classes("sql-object-target-name") }) {
-                        Text(target.qualifiedName())
-                    }
-                    Div({ classes("small", "text-secondary") }) {
-                        Text(target.contextLabel())
-                    }
+                    SqlObjectIdentityBlock(
+                        name = target.qualifiedName(),
+                        note = target.contextLabel(),
+                        nameClass = "sql-object-target-name",
+                    )
                 }
             }
 
@@ -152,14 +152,13 @@ fun ComposeSqlConsoleObjectsPage(
                     Div({ classes("sql-favorite-objects-grid") }) {
                         state.favoriteObjects.forEach { favorite ->
                             Div({ classes("sql-favorite-object-card") }) {
-                                Div({ classes("sql-favorite-object-meta") }) {
-                                    Div({ classes("sql-favorite-object-name") }) {
-                                        Text(favorite.qualifiedName())
-                                    }
-                                    Div({ classes("sql-favorite-object-note") }) {
-                                        Text(favorite.contextLabel())
-                                    }
-                                }
+                                SqlObjectIdentityBlock(
+                                    name = favorite.qualifiedName(),
+                                    note = favorite.contextLabel(),
+                                    wrapperClass = "sql-favorite-object-meta",
+                                    nameClass = "sql-favorite-object-name",
+                                    noteClass = "sql-favorite-object-note",
+                                )
                             }
                         }
                     }
@@ -359,24 +358,12 @@ private fun SqlConsoleObjectCard(
         }
     }) {
         Div({ classes("d-flex", "justify-content-between", "align-items-start", "gap-3", "mb-2") }) {
-            Div {
-                Div({ classes("sql-object-name") }) {
-                    Text(dbObject.qualifiedName())
-                }
-                Div({ classes("small", "text-secondary") }) {
-                    Text(dbObject.contextLabel(sourceName))
-                }
-                if (isSelectedObject) {
-                    Div({ classes("sql-object-selected-note") }) {
-                        Text("Точное совпадение по deep-link")
-                    }
-                }
-                dbObject.tableReferenceLabel()?.let { tableReference ->
-                    Div({ classes("small", "text-secondary") }) {
-                        Text(tableReference)
-                    }
-                }
-            }
+            SqlObjectIdentityBlock(
+                name = dbObject.qualifiedName(),
+                note = dbObject.contextLabel(sourceName),
+                selectedNote = if (isSelectedObject) "Точное совпадение по deep-link" else null,
+                detailNote = dbObject.tableReferenceLabel(),
+            )
             Button(attrs = {
                 classes("btn", if (isFavorite) "btn-outline-danger" else "btn-outline-dark", "btn-sm")
                 attr("type", "button")
@@ -435,6 +422,38 @@ private fun SqlConsoleObjectCard(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SqlObjectIdentityBlock(
+    name: String,
+    note: String,
+    wrapperClass: String? = null,
+    nameClass: String = "sql-object-name",
+    noteClass: String = "small text-secondary",
+    selectedNote: String? = null,
+    detailNote: String? = null,
+) {
+    Div({
+        wrapperClass?.let(::classesFromString)
+    }) {
+        Div({ classes(nameClass) }) {
+            Text(name)
+        }
+        Div({ classesFromString(noteClass) }) {
+            Text(note)
+        }
+        if (!selectedNote.isNullOrBlank()) {
+            Div({ classes("sql-object-selected-note") }) {
+                Text(selectedNote)
+            }
+        }
+        if (!detailNote.isNullOrBlank()) {
+            Div({ classes("small", "text-secondary") }) {
+                Text(detailNote)
             }
         }
     }
