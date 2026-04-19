@@ -127,9 +127,14 @@
   - server-layer и `DatabaseModuleRunHistoryService` теперь зависят от контракта, а не от concrete `DatabaseModuleRunService`
 - `DatabaseModuleRunService` начал отделять orchestration DB-запуска от event/history логики:
   - [DatabaseModuleRunEventSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleRunEventSupport.kt)
+  - [DatabaseModuleRunArtifactSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleRunArtifactSupport.kt)
+  - [DatabaseModuleRunEventLogSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleRunEventLogSupport.kt)
+  - [DatabaseModuleRunCompletionSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleRunCompletionSupport.kt)
+  - [DatabaseModuleRunSourceEventSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleRunSourceEventSupport.kt)
+  - [DatabaseModuleRunMergeTargetEventSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleRunMergeTargetEventSupport.kt)
   - [DatabaseModuleRunStartSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleRunStartSupport.kt)
   - [DatabaseModuleRunExecutionSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleRunExecutionSupport.kt)
-  - [DatabaseModuleRunService.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleRunService.kt) теперь не держит в себе обработку всех `ExecutionEvent`, artifact bookkeeping, fail-run recovery и сам фоновый `ApplicationRunner` execution-code
+  - [DatabaseModuleRunService.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleRunService.kt) теперь не держит в себе обработку всех `ExecutionEvent`, artifact bookkeeping, source/merge/target lifecycle, event logging, fail-run recovery и сам фоновый `ApplicationRunner` execution-code
   - `DatabaseModuleRunService` также перестал держать validation/recover-orphan/context-assembly стартового lifecycle
 - `SqlConsoleService` начал распиливаться на отдельные support-компоненты:
   - [SqlConsoleModels.kt](/Users/kwdev/DataPoolLoader/core/src/main/kotlin/com/sbrf/lt/datapool/sqlconsole/SqlConsoleModels.kt)
@@ -157,8 +162,16 @@
   - `DatabaseModuleRunService`, cleanup и retention теперь зависят от узких контрактов, а не от одного concrete `DatabaseRunStore`
   - внутренняя логика самого store вынесена в support-компоненты:
     - [DatabaseRunStoreExecutionSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreExecutionSupport.kt)
+    - [DatabaseRunStoreRunLifecycleSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreRunLifecycleSupport.kt)
+    - [DatabaseRunStoreEventArtifactSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreEventArtifactSupport.kt)
+    - [DatabaseRunStoreProgressUpdateSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreProgressUpdateSupport.kt)
     - [DatabaseRunStoreQuerySupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreQuerySupport.kt)
+    - [DatabaseRunStoreRunOverviewSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreRunOverviewSupport.kt)
+    - [DatabaseRunStoreRunDetailsSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreRunDetailsSupport.kt)
     - [DatabaseRunStoreMaintenanceSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreMaintenanceSupport.kt)
+    - [DatabaseRunStoreCleanupPlanningSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreCleanupPlanningSupport.kt)
+    - [DatabaseRunStoreCleanupExecutionSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreCleanupExecutionSupport.kt)
+    - [DatabaseRunStoreHistoryUsageSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreHistoryUsageSupport.kt)
     - [DatabaseRunStore.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStore.kt) теперь остался тонким фасадом над этими слоями
 - `RunManager` тоже начал отделять orchestration от persisted history:
   - [RunManagerStartSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/RunManagerStartSupport.kt)
