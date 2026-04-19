@@ -10,28 +10,18 @@ import io.ktor.server.routing.get
  */
 internal fun Route.registerModuleRunRoutes(context: UiServerContext) {
     get("/api/module-runs/{storage}/{id}") {
-        val runtimeContext = context.currentRuntimeContext()
-        val storageMode = requireNotNull(call.parameters["storage"])
-        val moduleId = requireNotNull(call.parameters["id"])
-        val (service, actor) = context.requireRunHistoryService(storageMode, runtimeContext)
-        call.respond(service.loadSession(moduleId, actor))
+        val routeContext = context.requireModuleRunRouteContext(call)
+        call.respond(routeContext.service.loadSession(routeContext.moduleId, routeContext.actor))
     }
 
     get("/api/module-runs/{storage}/{id}/runs") {
-        val runtimeContext = context.currentRuntimeContext()
-        val storageMode = requireNotNull(call.parameters["storage"])
-        val moduleId = requireNotNull(call.parameters["id"])
+        val routeContext = context.requireModuleRunRouteContext(call)
         val limit = context.parseLimit(call.request.queryParameters["limit"])
-        val (service, actor) = context.requireRunHistoryService(storageMode, runtimeContext)
-        call.respond(service.listRuns(moduleId, actor, limit))
+        call.respond(routeContext.service.listRuns(routeContext.moduleId, routeContext.actor, limit))
     }
 
     get("/api/module-runs/{storage}/{id}/runs/{runId}") {
-        val runtimeContext = context.currentRuntimeContext()
-        val storageMode = requireNotNull(call.parameters["storage"])
-        val moduleId = requireNotNull(call.parameters["id"])
-        val runId = requireNotNull(call.parameters["runId"])
-        val (service, actor) = context.requireRunHistoryService(storageMode, runtimeContext)
-        call.respond(service.loadRunDetails(moduleId, runId, actor))
+        val routeContext = context.requireModuleRunDetailsRouteContext(call)
+        call.respond(routeContext.service.loadRunDetails(routeContext.moduleId, routeContext.runId, routeContext.actor))
     }
 }

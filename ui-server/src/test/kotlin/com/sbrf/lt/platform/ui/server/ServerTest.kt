@@ -1204,6 +1204,38 @@ class ServerTest {
     }
 
     @Test
+    fun `module runs api returns bad request for unknown storage mode`() = testApplication {
+        val root = createProject()
+        val registry = ModuleRegistry(appsRoot = root.resolve("apps"))
+        val uiConfig = UiAppConfig(
+            storageDir = Files.createTempDirectory("ui-runs-api-invalid-storage-state-").toString(),
+            moduleStore = UiModuleStoreConfig(mode = UiModuleStoreMode.FILES),
+            sqlConsole = SqlConsoleConfig(),
+        )
+        val runManager = RunManager(
+            moduleRegistry = registry,
+            uiConfig = uiConfig,
+        )
+
+        application {
+            uiModule(
+                uiConfig = uiConfig,
+                moduleRegistry = registry,
+                runManager = runManager,
+                runtimeContextService = object : UiRuntimeContextService() {
+                    override fun resolve(uiConfig: UiAppConfig): UiRuntimeContext =
+                        testRuntimeContext(UiModuleStoreMode.FILES)
+                },
+            )
+        }
+
+        val sessionResponse = client.get("/api/module-runs/legacy/demo-app")
+
+        assertEquals(HttpStatusCode.BadRequest, sessionResponse.status)
+        assertTrue(sessionResponse.bodyAsText().contains("Неизвестный режим хранения 'legacy'."))
+    }
+
+    @Test
     fun `module runs api returns live files details for active run`() = testApplication {
         val root = createProject()
         val registry = ModuleRegistry(appsRoot = root.resolve("apps"))

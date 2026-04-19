@@ -7,7 +7,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties
  * Оставлен только для чтения старого `sql-console-state.json` при миграции на раздельные state-файлы.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-data class PersistedSqlConsoleState(
+data class LegacySqlConsoleState(
     val draftSql: String = "select 1 as check_value",
     val recentQueries: List<String> = emptyList(),
     val favoriteQueries: List<String> = emptyList(),
@@ -18,7 +18,7 @@ data class PersistedSqlConsoleState(
     val executionPolicy: String = "STOP_ON_FIRST_ERROR",
     val transactionMode: String = "AUTO_COMMIT",
 ) {
-    fun normalized(): PersistedSqlConsoleState {
+    fun normalized(): LegacySqlConsoleState {
         val normalizedQueries = recentQueries
             .map { it.trim() }
             .filter { it.isNotEmpty() }
@@ -56,20 +56,20 @@ data class PersistedSqlConsoleState(
     }
 }
 
-internal fun PersistedSqlConsoleState.toWorkspaceState(): PersistedSqlConsoleWorkspaceState =
+internal fun LegacySqlConsoleState.toWorkspaceState(): PersistedSqlConsoleWorkspaceState =
     PersistedSqlConsoleWorkspaceState(
         draftSql = draftSql,
         selectedSourceNames = selectedSourceNames,
     ).normalized()
 
-internal fun PersistedSqlConsoleState.toPreferencesState(): PersistedSqlConsolePreferencesState =
+internal fun LegacySqlConsoleState.toPreferencesState(): PersistedSqlConsolePreferencesState =
     PersistedSqlConsolePreferencesState(
         pageSize = pageSize,
         strictSafetyEnabled = strictSafetyEnabled,
         transactionMode = transactionMode,
     ).normalized()
 
-internal fun PersistedSqlConsoleState.toLibraryState(): PersistedSqlConsoleLibraryState =
+internal fun LegacySqlConsoleState.toLibraryState(): PersistedSqlConsoleLibraryState =
     PersistedSqlConsoleLibraryState(
         recentQueries = recentQueries,
         favoriteQueries = favoriteQueries,

@@ -12,8 +12,8 @@ class SqlConsoleStateStoreTest {
     @Test
     fun `migrates legacy combined sql console state into workspace library and preferences stores`() {
         val storageDir = Files.createTempDirectory("sql-console-state")
-        SqlConsoleStateStore(storageDir).save(
-            PersistedSqlConsoleState(
+        LegacySqlConsoleStateStore(storageDir).save(
+            LegacySqlConsoleState(
                 draftSql = "select * from demo",
                 recentQueries = listOf("select * from demo", "select * from demo", "select 1"),
                 favoriteQueries = listOf("select * from demo", "select 2", "select 2"),

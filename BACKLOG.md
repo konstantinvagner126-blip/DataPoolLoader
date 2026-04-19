@@ -68,6 +68,9 @@
   - [CommonRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/CommonRouteSupport.kt)
   - [DatabaseRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseRouteSupport.kt);
 - `CommonRoutes` и `DatabaseRoutes` уже меньше знают о mode-specific maintenance flow, actor wiring и service resolution.
+- [ModuleRunRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/ModuleRunRoutes.kt) больше не держит вручную path parsing и service resolution;
+- для экрана `История и результаты` появился отдельный support-слой:
+  - [ModuleRunRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/ModuleRunRouteSupport.kt).
 
 Критерий завершения:
 
@@ -100,6 +103,7 @@
 - transport-слой больше не маскирует все исключения под `400`;
 - введены осмысленные `404 / 409 / 503 / 500` для ключевых server-path’ов;
 - появились доменные not-found/conflict исключения вне `server`-пакета;
+- для DB sync-run details и SQL-console export добавлены отдельные not-found сценарии вместо `500`;
 - ключевые сценарии FILES / DB / SQL-console закреплены серверными тестами.
 
 Критерий завершения:
@@ -153,6 +157,9 @@
 - пользовательский query/object content вынесен в отдельный `sql-console-library-state.json` с миграцией:
   - из legacy `sql-console-state.json`
   - из старого расширенного `sql-console-preferences-state.json`.
+- legacy combined SQL-console state больше не маскируется под рабочий store:
+  - [SqlConsoleStateStore.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/sqlconsole/SqlConsoleStateStore.kt) теперь держит явную legacy-only роль через `LegacySqlConsoleStateStore`;
+  - [PersistedSqlConsoleState.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/sqlconsole/PersistedSqlConsoleState.kt) теперь моделирует именно `LegacySqlConsoleState`.
 
 Критерий завершения:
 
@@ -240,11 +247,13 @@
 
 - giant [styles.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles.css) переведен в import-manifest;
 - порядок каскада сохранен через ordered CSS-chunks:
-  - [00-foundation-home.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/00-foundation-home.css)
+  - [00-foundation.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/00-foundation.css)
+  - [05-home-help.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/05-home-help.css)
   - [10-config-editor.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/10-config-editor.css)
   - [20-sql-console.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/20-sql-console.css)
   - [30-run-history.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/30-run-history.css)
   - [40-sql-results.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/40-sql-results.css);
+- из split CSS уже убраны первые дублирующиеся selector-блоки, а foundation/home-help слой теперь физически разделен по разным файлам;
 - ресурсы проходят packaging и попадают в `ui-server` bundle.
 
 Критерий завершения:

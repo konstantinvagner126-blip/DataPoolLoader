@@ -12,7 +12,7 @@ import kotlin.io.path.outputStream
 class SqlConsoleLibraryStateStore(
     private val storageDir: Path,
     private val configLoader: ConfigLoader = ConfigLoader(),
-    private val legacyStateStore: SqlConsoleStateStore = SqlConsoleStateStore(storageDir, configLoader),
+    private val legacyStateStore: LegacySqlConsoleStateStore = LegacySqlConsoleStateStore(storageDir, configLoader),
 ) {
     private val stateFile: Path = storageDir.resolve("sql-console-library-state.json")
     private val legacyPreferencesFile: Path = storageDir.resolve("sql-console-preferences-state.json")
@@ -59,7 +59,7 @@ class SqlConsoleLibraryStateStore(
         return try {
             legacyPreferencesFile.inputStream().bufferedReader().use {
                 configLoader.objectMapper()
-                    .readValue(it, PersistedSqlConsoleState::class.java)
+                    .readValue(it, LegacySqlConsoleState::class.java)
                     .toLibraryState()
             }
         } catch (_: Exception) {

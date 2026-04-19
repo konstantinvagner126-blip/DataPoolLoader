@@ -12,7 +12,7 @@ import kotlin.io.path.outputStream
 class SqlConsoleWorkspaceStateStore(
     private val storageDir: Path,
     private val configLoader: ConfigLoader = ConfigLoader(),
-    private val legacyStateStore: SqlConsoleStateStore = SqlConsoleStateStore(storageDir, configLoader),
+    private val legacyStateStore: LegacySqlConsoleStateStore = LegacySqlConsoleStateStore(storageDir, configLoader),
 ) {
     private val stateFile: Path = storageDir.resolve("sql-console-workspace-state.json")
 

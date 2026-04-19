@@ -1,4 +1,5 @@
-@import url("./styles/00-foundation-home.css?v=20260419a");
+@import url("./styles/00-foundation.css?v=20260419a");
+@import url("./styles/05-home-help.css?v=20260419a");
 @import url("./styles/10-config-editor.css?v=20260419a");
 @import url("./styles/20-sql-console.css?v=20260419a");
 @import url("./styles/30-run-history.css?v=20260419a");

@@ -9,7 +9,7 @@ import kotlin.io.path.exists
 import kotlin.io.path.inputStream
 import kotlin.io.path.outputStream
 
-class SqlConsoleStateStore(
+class LegacySqlConsoleStateStore(
     private val storageDir: Path,
     private val configLoader: ConfigLoader = ConfigLoader(),
 ) {
@@ -17,22 +17,22 @@ class SqlConsoleStateStore(
 
     fun exists(): Boolean = stateFile.exists()
 
-    fun load(): PersistedSqlConsoleState {
+    fun load(): LegacySqlConsoleState {
         if (!stateFile.exists()) {
-            return PersistedSqlConsoleState()
+            return LegacySqlConsoleState()
         }
         return try {
             stateFile.inputStream().bufferedReader().use {
                 configLoader.objectMapper()
-                    .readValue(it, PersistedSqlConsoleState::class.java)
+                    .readValue(it, LegacySqlConsoleState::class.java)
                     .normalized()
             }
         } catch (_: Exception) {
-            PersistedSqlConsoleState()
+            LegacySqlConsoleState()
         }
     }
 
-    fun save(state: PersistedSqlConsoleState) {
+    fun save(state: LegacySqlConsoleState) {
         storageDir.createDirectories()
         val normalized = state.normalized()
         val tempFile = storageDir.resolve("sql-console-state.json.tmp")
