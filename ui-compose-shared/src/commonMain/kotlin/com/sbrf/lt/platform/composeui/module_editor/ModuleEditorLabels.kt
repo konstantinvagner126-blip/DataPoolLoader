@@ -99,3 +99,10 @@ fun translateValidationStatus(validationStatus: String): String =
         "WARNING" -> "Есть предупреждения"
         else -> "Есть ошибки"
     }
+
+fun validationBadgeClass(validationStatus: String): String =
+    when (validationStatus.uppercase()) {
+        "VALID" -> "module-validation-badge-valid"
+        "WARNING" -> "module-validation-badge-warning"
+        else -> "module-validation-badge-invalid"
+    }

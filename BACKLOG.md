@@ -521,10 +521,20 @@
   - route URL builder-ы вынесены из page support в [ModuleEditorRoute.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorRoute.kt)
   - `formatEditorTimeoutSeconds(...)` заменен на общий foundation helper `formatTimeoutSeconds(...)`
   - остаточный [ModuleEditorPageSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPageSupport.kt) удален, а одноразовый `validationBadgeClass(...)` локализован в [ModuleEditorPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPage.kt).
+- module_editor config form cleanup:
+  - mixed [ModuleEditorConfigFormSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorConfigFormSupport.kt) разрезан по ответственности
+  - mutation helper-ы вынесены в [ModuleEditorConfigFormMutationSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorConfigFormMutationSupport.kt)
+  - SQL mode state/apply helper-ы вынесены в [ModuleEditorConfigFormSqlModeSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorConfigFormSqlModeSupport.kt).
+- module_editor validation label cleanup:
+  - `validationBadgeClass(...)` вынесен из [ModuleEditorPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPage.kt) в shared [ModuleEditorLabels.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorLabels.kt) рядом с `translateValidationStatus(...)`
+  - page больше не держит локальный validation helper, который уже является частью общей presentation-модели редактора.
 - sql_console object SQL cleanup:
   - object/favorite SQL builder-ы и object-type label helper-ы вынесены из mixed [SqlConsolePageSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsolePageSupport.kt) в focused [SqlConsoleObjectSqlSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectSqlSupport.kt)
   - [SqlConsoleLibrarySections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleLibrarySections.kt) и [SqlConsoleObjectsPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectsPage.kt) используют общий object SQL helper-слой вместо локальных private-дублей
   - `SqlConsolePageSupport.kt` больше не смешивает editor outline/editor actions и object metadata/favorite SQL generation в одном файле.
+- sql_console navigation cleanup:
+  - `SqlObjectNavigationTarget` и `matches(...)` вынесены из [SqlConsoleObjectsPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectsPage.kt) в focused [SqlConsoleObjectNavigationSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectNavigationSupport.kt)
+  - objects page больше не держит локальный navigation matching helper внутри экранного файла.
 - sql_console script/editor cleanup:
   - script outline и SQL formatting вынесены в [SqlConsoleScriptSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleScriptSupport.kt)
   - Monaco/editor interaction helper-ы вынесены в [SqlConsoleEditorInteractionSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleEditorInteractionSupport.kt)

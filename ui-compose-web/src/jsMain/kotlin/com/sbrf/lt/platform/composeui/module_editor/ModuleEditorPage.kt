@@ -32,6 +32,7 @@ import com.sbrf.lt.platform.composeui.module_editor.buildCredentialsWarningText
 import com.sbrf.lt.platform.composeui.module_editor.buildDraftStatusText
 import com.sbrf.lt.platform.composeui.module_editor.translateSourceKind
 import com.sbrf.lt.platform.composeui.module_editor.translateValidationStatus
+import com.sbrf.lt.platform.composeui.module_editor.validationBadgeClass
 import kotlinx.browser.window
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -673,10 +674,3 @@ fun ComposeModuleEditorPage(
         },
     )
 }
-
-private fun validationBadgeClass(validationStatus: String): String =
-    when (validationStatus.uppercase()) {
-        "VALID" -> "module-validation-badge-valid"
-        "WARNING" -> "module-validation-badge-warning"
-        else -> "module-validation-badge-invalid"
-    }
