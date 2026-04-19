@@ -144,27 +144,9 @@ internal fun SqlPreview(
                         Div({ classes("sql-catalog-note") }) { Text("Создание, переименование и удаление SQL выполняется здесь. Изменения сохраняются основным действием редактора.") }
                     }
                     Div({ classes("d-flex", "flex-wrap", "gap-2") }) {
-                        Button(attrs = {
-                            classes("btn", "btn-outline-primary", "btn-sm")
-                            attr("type", "button")
-                            onClick { onCreateSql() }
-                        }) { Text("Создать SQL") }
-                        Button(attrs = {
-                            classes("btn", "btn-outline-secondary", "btn-sm")
-                            attr("type", "button")
-                            if (selectedSql == null) {
-                                disabled()
-                            }
-                            onClick { onRenameSql() }
-                        }) { Text("Переименовать") }
-                        Button(attrs = {
-                            classes("btn", "btn-outline-danger", "btn-sm")
-                            attr("type", "button")
-                            if (selectedSql == null) {
-                                disabled()
-                            }
-                            onClick { onDeleteSql() }
-                        }) { Text("Удалить") }
+                        SqlCatalogActionButton("Создать SQL", "btn-outline-primary") { onCreateSql() }
+                        SqlCatalogActionButton("Переименовать", "btn-outline-secondary", enabled = selectedSql != null) { onRenameSql() }
+                        SqlCatalogActionButton("Удалить", "btn-outline-danger", enabled = selectedSql != null) { onDeleteSql() }
                     }
                 }
                 Div({ classes("sql-catalog-list") }) {
@@ -236,4 +218,21 @@ internal fun ConfigPreview(
         value = configText,
         onValueChange = onConfigChange,
     )
+}
+
+@Composable
+private fun SqlCatalogActionButton(
+    label: String,
+    toneClass: String,
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+) {
+    Button(attrs = {
+        classes("btn", toneClass, "btn-sm")
+        attr("type", "button")
+        if (!enabled) {
+            disabled()
+        }
+        onClick { onClick() }
+    }) { Text(label) }
 }

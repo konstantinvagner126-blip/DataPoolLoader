@@ -316,12 +316,7 @@ internal fun StatusResultPane(
                 readyResult.shardResults.forEach { shard ->
                     Tr {
                         Td { org.jetbrains.compose.web.dom.B { Text(shard.shardName) } }
-                        Td {
-                            StatusBadge(
-                                text = translateSourceStatus(shard.status),
-                                tone = sourceStatusBadgeTone(shard.status),
-                            )
-                        }
+                        Td { ShardStatusBadge(shard.status) }
                         Td { Text(formatDateTime(shard.startedAt)) }
                         Td { Text(formatDateTime(shard.finishedAt)) }
                         Td { Text(formatDuration(shard.startedAt, shard.finishedAt, running = shard.status.equals("RUNNING", ignoreCase = true))) }
@@ -343,10 +338,7 @@ internal fun StatusResultPane(
                             Text(buildShardStatusSummary(shard))
                         }
                     }
-                    StatusBadge(
-                        text = translateSourceStatus(shard.status),
-                        tone = sourceStatusBadgeTone(shard.status),
-                    )
+                    ShardStatusBadge(shard.status)
                 }
                 if (!shard.errorMessage.isNullOrBlank()) {
                     AlertBanner(shard.errorMessage ?: "", "danger")
@@ -363,6 +355,14 @@ internal fun StatusResultPane(
             }
         }
     }
+}
+
+@Composable
+private fun ShardStatusBadge(status: String) {
+    StatusBadge(
+        text = translateSourceStatus(status),
+        tone = sourceStatusBadgeTone(status),
+    )
 }
 
 @Composable

@@ -518,6 +518,10 @@
   - `ModuleEditorConfigFormSettingsSections.kt` и `ModuleEditorConfigFormSourceSections.kt` больше не держат две параллельные `when (sqlState.mode)` ветки; общий `CommitSqlModeFields(...)` в [ModuleEditorConfigFormFieldSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorConfigFormFieldSupport.kt) собирает `INLINE/CATALOG/EXTERNAL` UI в одном месте
   - `SqlConsoleResultSections.kt` больше не токенизирует class-string вручную через `split(\" \")`; status strip переведен на общий DOM helper `classesFromString(...)`
   - `SqlConsoleEditorSections.kt` больше не токенизирует class-string вручную через `split(\" \")`; `CommandGuardrail` и `StatementRiskBadge` используют общий DOM helper `classesFromString(...)`.
+- metadata/workspace/result cleanup продолжен:
+  - `SqlConsoleResultSections.kt` больше не дублирует shard status badge markup между table/card presentation; общий локальный `ShardStatusBadge(...)` закрывает этот статусный фрагмент
+  - `ModuleEditorMetadataSections.kt` больше не повторяет editable row-shell для text/textarea полей; общий локальный `MetadataEditableRow(...)` держит label/help/value layout в одном месте
+  - `ModuleEditorWorkspaceSections.kt` больше не повторяет action-button markup в SQL catalog toolbar; общий локальный `SqlCatalogActionButton(...)` закрывает `Создать / Переименовать / Удалить`.
 - credentials upload helper cleanup:
   - duplicate `uploadCredentialsFile(...)` больше не живет параллельно в `module_editor` и `sql_console`
   - общий web-only helper вынесен в [CredentialsHttpSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/foundation/http/CredentialsHttpSupport.kt)

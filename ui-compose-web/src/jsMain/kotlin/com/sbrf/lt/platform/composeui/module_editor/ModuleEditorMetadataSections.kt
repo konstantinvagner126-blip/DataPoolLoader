@@ -121,19 +121,13 @@ internal fun MetadataTextField(
     onCommit: (String) -> Unit,
 ) {
     var draft by remember(value) { mutableStateOf(value) }
-    Label(attrs = { classes("module-metadata-row") }) {
-        Div({ classes("module-metadata-label") }) { Text(label) }
-        Div({ classes("module-metadata-value") }) {
-            if (helpText.isNotBlank()) {
-                Div({ classes("config-form-help", "mb-1") }) { Text(helpText) }
-            }
+    MetadataEditableRow(label, helpText) {
             Input(type = org.jetbrains.compose.web.attributes.InputType.Text, attrs = {
                 classes("form-control")
                 value(draft)
                 onInput { draft = it.value }
                 onChange { if (draft != value) onCommit(draft) }
             })
-        }
     }
 }
 
@@ -146,19 +140,13 @@ internal fun MetadataTextareaField(
     onCommit: (String) -> Unit,
 ) {
     var draft by remember(value) { mutableStateOf(value) }
-    Label(attrs = { classes("module-metadata-row") }) {
-        Div({ classes("module-metadata-label") }) { Text(label) }
-        Div({ classes("module-metadata-value") }) {
-            if (helpText.isNotBlank()) {
-                Div({ classes("config-form-help", "mb-1") }) { Text(helpText) }
-            }
+    MetadataEditableRow(label, helpText) {
             TextArea(value = draft, attrs = {
                 classes("form-control")
                 rows(rowsCount)
                 onInput { draft = it.value }
                 onChange { if (draft != value) onCommit(draft) }
             })
-        }
     }
 }
 
@@ -185,6 +173,23 @@ internal fun MetadataCheckboxField(
             if (helpText.isNotBlank()) {
                 Div({ classes("config-form-help", "mt-1") }) { Text(helpText) }
             }
+        }
+    }
+}
+
+@Composable
+private fun MetadataEditableRow(
+    label: String,
+    helpText: String,
+    content: @Composable () -> Unit,
+) {
+    Label(attrs = { classes("module-metadata-row") }) {
+        Div({ classes("module-metadata-label") }) { Text(label) }
+        Div({ classes("module-metadata-value") }) {
+            if (helpText.isNotBlank()) {
+                Div({ classes("config-form-help", "mb-1") }) { Text(helpText) }
+            }
+            content()
         }
     }
 }
