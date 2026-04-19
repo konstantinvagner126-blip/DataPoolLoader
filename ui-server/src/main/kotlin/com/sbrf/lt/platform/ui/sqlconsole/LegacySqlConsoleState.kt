@@ -15,7 +15,6 @@ data class LegacySqlConsoleState(
     val selectedSourceNames: List<String> = emptyList(),
     val pageSize: Int = 50,
     val strictSafetyEnabled: Boolean = false,
-    val executionPolicy: String = "STOP_ON_FIRST_ERROR",
     val transactionMode: String = "AUTO_COMMIT",
 ) {
     fun normalized(): LegacySqlConsoleState {
@@ -50,7 +49,6 @@ data class LegacySqlConsoleState(
             favoriteObjects = normalizedFavoriteObjects,
             selectedSourceNames = normalizedSelectedSources,
             pageSize = normalizedPageSize,
-            executionPolicy = "STOP_ON_FIRST_ERROR",
             transactionMode = normalizedTransactionMode,
         )
     }

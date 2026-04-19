@@ -1,5 +1,6 @@
 package com.sbrf.lt.platform.ui.sqlconsole
 
+import com.sbrf.lt.datapool.config.ConfigLoader
 import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -12,20 +13,21 @@ class LegacySqlConsoleStateStoreTest {
     @Test
     fun `migrates legacy combined sql console state into workspace library and preferences stores`() {
         val storageDir = Files.createTempDirectory("sql-console-state")
-        LegacySqlConsoleStateStore(storageDir).save(
-            LegacySqlConsoleState(
-                draftSql = "select * from demo",
-                recentQueries = listOf("select * from demo", "select * from demo", "select 1"),
-                favoriteQueries = listOf("select * from demo", "select 2", "select 2"),
-                favoriteObjects = listOf(
-                    PersistedSqlConsoleFavoriteObject("shard1", "public", "offer", "table"),
-                    PersistedSqlConsoleFavoriteObject("shard1", "public", "offer", "TABLE"),
-                    PersistedSqlConsoleFavoriteObject("shard2", "public", "offer_idx", "index", tableName = "offer"),
-                ),
-                selectedSourceNames = listOf("db1", "db1", "db2"),
-                pageSize = 100,
-                strictSafetyEnabled = true,
-            )
+        val legacyState = LegacySqlConsoleState(
+            draftSql = "select * from demo",
+            recentQueries = listOf("select * from demo", "select * from demo", "select 1"),
+            favoriteQueries = listOf("select * from demo", "select 2", "select 2"),
+            favoriteObjects = listOf(
+                PersistedSqlConsoleFavoriteObject("shard1", "public", "offer", "table"),
+                PersistedSqlConsoleFavoriteObject("shard1", "public", "offer", "TABLE"),
+                PersistedSqlConsoleFavoriteObject("shard2", "public", "offer_idx", "index", tableName = "offer"),
+            ),
+            selectedSourceNames = listOf("db1", "db1", "db2"),
+            pageSize = 100,
+            strictSafetyEnabled = true,
+        )
+        storageDir.resolve("sql-console-state.json").writeText(
+            ConfigLoader().objectMapper().writerWithDefaultPrettyPrinter().writeValueAsString(legacyState),
         )
 
         val workspace = SqlConsoleWorkspaceStateStore(storageDir).load()

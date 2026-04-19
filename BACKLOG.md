@@ -77,7 +77,6 @@
     - [DatabaseSyncRouteContexts.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseSyncRouteContexts.kt)
     - [DatabaseSyncRoutePayloadSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseSyncRoutePayloadSupport.kt)
     - [DatabaseSyncRouteActions.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseSyncRouteActions.kt)
-    - [DatabaseSyncRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseSyncRouteSupport.kt) остался совместимым thin-слоем
   - module flow вынесен в отдельные support-слои:
     - [DatabaseModuleRouteContexts.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseModuleRouteContexts.kt)
     - [DatabaseModuleServiceRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseModuleServiceRouteSupport.kt)
@@ -357,7 +356,7 @@
 
 Статус:
 
-- не реализовано
+- частично реализовано
 
 Цель:
 
@@ -374,6 +373,16 @@
   - старые route / API ветки;
   - лишние support-слои, если они больше не дают ценности;
 - cleanup делать только после явного анализа, а не слепым удалением.
+
+Что уже сделано:
+
+- удален пустой переходный sync-layer [DatabaseSyncRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseSyncRouteSupport.kt), который после распила DB sync flow деградировал до одного `typealias`;
+- `LegacySqlConsoleStateStore` приведен к реальной migration-only роли:
+  - production-store больше не содержит write-path для `sql-console-state.json`;
+  - запись legacy state перенесена в тестовый код, а не остается внутри runtime-слоя.
+- из `LegacySqlConsoleState` удален мертвый legacy-хвост `executionPolicy`:
+  - поле больше не участвует в миграции;
+  - фиксированная политика `STOP_ON_FIRST_ERROR` обеспечивается рабочими SQL-console слоями, а не legacy-state моделью.
 
 Критерий завершения:
 
