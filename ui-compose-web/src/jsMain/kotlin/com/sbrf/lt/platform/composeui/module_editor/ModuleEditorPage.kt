@@ -21,6 +21,7 @@ import com.sbrf.lt.platform.composeui.foundation.format.formatDateTime
 import com.sbrf.lt.platform.composeui.foundation.format.formatDuration
 import com.sbrf.lt.platform.composeui.foundation.format.formatNumber
 import com.sbrf.lt.platform.composeui.foundation.http.ComposeHttpClient
+import com.sbrf.lt.platform.composeui.foundation.http.uploadCredentialsFile
 import com.sbrf.lt.platform.composeui.foundation.updates.PollingEffect
 import com.sbrf.lt.platform.composeui.foundation.updates.WebSocketEffect
 import com.sbrf.lt.platform.composeui.foundation.updates.buildWebSocketUrl
@@ -53,7 +54,6 @@ import org.jetbrains.compose.web.dom.TextArea
 import org.jetbrains.compose.web.dom.Ul
 import org.w3c.dom.HTMLInputElement
 import org.w3c.files.File
-import org.w3c.xhr.FormData
 import com.sbrf.lt.platform.composeui.module_runs.ModuleRunDetailsResponse
 import com.sbrf.lt.platform.composeui.module_runs.ModuleRunsApiClient
 import com.sbrf.lt.platform.composeui.module_runs.ModuleRunsPageState

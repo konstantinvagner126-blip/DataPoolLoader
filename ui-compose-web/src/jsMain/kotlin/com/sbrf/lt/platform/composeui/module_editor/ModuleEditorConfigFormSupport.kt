@@ -1,27 +1,5 @@
 package com.sbrf.lt.platform.composeui.module_editor
 
-import kotlinx.browser.window
-
-internal fun loadConfigSectionExpanded(
-    sectionStateKey: String?,
-    defaultExpanded: Boolean,
-): Boolean {
-    if (sectionStateKey == null) {
-        return defaultExpanded
-    }
-    return runCatching { window.localStorage.getItem(sectionStateKey) }
-        .getOrNull()
-        ?.let { storedValue -> storedValue == "true" }
-        ?: defaultExpanded
-}
-
-internal fun saveConfigSectionExpanded(
-    sectionStateKey: String,
-    expanded: Boolean,
-) {
-    runCatching { window.localStorage.setItem(sectionStateKey, expanded.toString()) }
-}
-
 internal fun updateSource(
     formState: ConfigFormStateDto,
     index: Int,

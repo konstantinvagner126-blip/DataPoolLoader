@@ -31,7 +31,7 @@ internal fun ConfigSectionCard(
     content: @Composable () -> Unit,
 ) {
     var expanded by remember(sectionStateKey) {
-        mutableStateOf(loadConfigSectionExpanded(sectionStateKey, defaultExpanded))
+        mutableStateOf(loadSectionExpanded(sectionStateKey, defaultExpanded))
     }
     SectionCard(
         title = title,
@@ -47,7 +47,7 @@ internal fun ConfigSectionCard(
                     onClick {
                         val nextValue = !expanded
                         expanded = nextValue
-                        saveConfigSectionExpanded(sectionStateKey, nextValue)
+                        saveSectionExpanded(sectionStateKey, nextValue)
                     }
                 }) {
                     Text(if (expanded) "Свернуть" else "Развернуть")

@@ -194,7 +194,7 @@ internal fun CredentialsPanel(
 ) {
     val status = module.credentialsStatus
     var expanded by remember(sectionStateKey) {
-        mutableStateOf(loadEditorSectionExpanded(sectionStateKey, defaultExpanded = true))
+        mutableStateOf(loadSectionExpanded(sectionStateKey, defaultExpanded = true))
     }
     val warningClass = when {
         !module.requiresCredentials -> "alert alert-light mb-0"
@@ -212,7 +212,7 @@ internal fun CredentialsPanel(
                 onClick {
                     val nextValue = !expanded
                     expanded = nextValue
-                    saveEditorSectionExpanded(sectionStateKey, nextValue)
+                    saveSectionExpanded(sectionStateKey, nextValue)
                 }
             }) {
                 Text(if (expanded) "Свернуть" else "Развернуть")

@@ -44,12 +44,12 @@ internal fun RuntimeAlert(state: ModuleSyncPageState) {
         }
 
         syncState?.maintenanceMode == true -> {
-            AlertBanner(buildMaintenanceMessage(syncState), "warning")
+            AlertBanner(buildMaintenanceMessage(syncState, ::formatDateTime), "warning")
         }
 
         syncState?.activeSingleSyncs?.isNotEmpty() == true -> {
             AlertBanner(
-                buildActiveSingleSyncSummary(syncState.activeSingleSyncs),
+                buildActiveSingleSyncSummary(syncState.activeSingleSyncs, ::formatDateTime),
                 "info",
             )
         }
@@ -128,8 +128,8 @@ internal fun SyncOverviewPanel(state: ModuleSyncPageState) {
         else -> "Ожидание"
     }
     val syncNote = when {
-        syncState?.maintenanceMode == true -> buildMaintenanceMessage(syncState)
-        !syncState?.activeSingleSyncs.isNullOrEmpty() -> buildActiveSingleSyncSummary(syncState.activeSingleSyncs)
+        syncState?.maintenanceMode == true -> buildMaintenanceMessage(syncState, ::formatDateTime)
+        !syncState?.activeSingleSyncs.isNullOrEmpty() -> buildActiveSingleSyncSummary(syncState.activeSingleSyncs, ::formatDateTime)
         else -> syncState?.message?.takeIf { it.isNotBlank() } ?: "Новых операций синхронизации сейчас нет."
     }
 
@@ -345,7 +345,7 @@ internal fun SyncRunsHistoryPanel(
                                 )
                             }
                             Div({ classes("run-history-meta") }) {
-                                Text(syncRunMeta(run))
+                                Text(syncRunMeta(run, ::formatDateTime))
                             }
                         }
                     }

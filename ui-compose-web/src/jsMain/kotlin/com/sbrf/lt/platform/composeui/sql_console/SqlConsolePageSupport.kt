@@ -3,8 +3,6 @@ package com.sbrf.lt.platform.composeui.sql_console
 import com.sbrf.lt.platform.composeui.foundation.http.ComposeHttpClient
 import com.sbrf.lt.platform.composeui.model.CredentialsStatusResponse
 import kotlinx.browser.window
-import org.w3c.files.File
-import org.w3c.xhr.FormData
 
 internal suspend fun loadCredentialsStatus(
     httpClient: ComposeHttpClient,
@@ -12,19 +10,6 @@ internal suspend fun loadCredentialsStatus(
     runCatching {
         httpClient.get("/api/credentials", CredentialsStatusResponse.serializer())
     }.getOrNull()
-
-internal suspend fun uploadCredentialsFile(
-    httpClient: ComposeHttpClient,
-    file: File,
-): CredentialsStatusResponse {
-    val formData = FormData()
-    formData.append("file", file, file.name)
-    return httpClient.postFormData(
-        path = "/api/credentials/upload",
-        formData = formData,
-        deserializer = CredentialsStatusResponse.serializer(),
-    )
-}
 
 @kotlinx.serialization.Serializable
 internal data class SqlConsoleExportRequest(
