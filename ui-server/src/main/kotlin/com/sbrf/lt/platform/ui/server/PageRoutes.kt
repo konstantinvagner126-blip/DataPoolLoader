@@ -70,6 +70,18 @@ internal fun Route.registerPageRoutes(context: UiServerContext) {
             permanent = false,
         )
     }
+    get("/compose-sql-console-objects") {
+        val params = linkedMapOf<String, List<String>>("screen" to listOf("sql-console-objects"))
+        call.request.queryParameters["query"]?.let { params["query"] = listOf(it) }
+        call.request.queryParameters["source"]?.let { params["source"] = listOf(it) }
+        call.request.queryParameters["schema"]?.let { params["schema"] = listOf(it) }
+        call.request.queryParameters["object"]?.let { params["object"] = listOf(it) }
+        call.request.queryParameters["type"]?.let { params["type"] = listOf(it) }
+        call.respondRedirect(
+            composeBundleLocation(params),
+            permanent = false,
+        )
+    }
     get("/module-runs") {
         when (call.request.queryParameters["storage"]?.lowercase()) {
             "files" -> {
@@ -97,6 +109,18 @@ internal fun Route.registerPageRoutes(context: UiServerContext) {
     get("/sql-console") {
         call.respondRedirect(
             composeBundleLocation(linkedMapOf("screen" to listOf("sql-console"))),
+            permanent = false,
+        )
+    }
+    get("/sql-console-objects") {
+        val params = linkedMapOf<String, List<String>>("screen" to listOf("sql-console-objects"))
+        call.request.queryParameters["query"]?.let { params["query"] = listOf(it) }
+        call.request.queryParameters["source"]?.let { params["source"] = listOf(it) }
+        call.request.queryParameters["schema"]?.let { params["schema"] = listOf(it) }
+        call.request.queryParameters["object"]?.let { params["object"] = listOf(it) }
+        call.request.queryParameters["type"]?.let { params["type"] = listOf(it) }
+        call.respondRedirect(
+            composeBundleLocation(params),
             permanent = false,
         )
     }

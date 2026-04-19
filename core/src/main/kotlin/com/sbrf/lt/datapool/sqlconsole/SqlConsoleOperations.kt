@@ -25,4 +25,21 @@ interface SqlConsoleOperations {
         credentialsPath: Path?,
         selectedSourceNames: List<String> = emptyList(),
     ): SqlConsoleConnectionCheckResult
+
+    fun searchObjects(
+        rawQuery: String,
+        credentialsPath: Path?,
+        selectedSourceNames: List<String> = emptyList(),
+        maxObjectsPerSource: Int = 30,
+    ): SqlConsoleDatabaseObjectSearchResult
+}
+
+interface SqlConsoleTransactionalOperations {
+    fun executeQueryRun(
+        rawSql: String,
+        credentialsPath: Path?,
+        selectedSourceNames: List<String> = emptyList(),
+        autoCommitEnabled: Boolean = true,
+        executionControl: SqlConsoleExecutionControl = SqlConsoleExecutionControl(),
+    ): SqlConsoleExecutionRun
 }

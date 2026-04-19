@@ -19,4 +19,8 @@ interface SqlConsoleAsyncQueryOperations {
     fun snapshot(executionId: String): SqlConsoleExecutionSnapshot
 
     fun cancel(executionId: String): SqlConsoleExecutionSnapshot
+
+    fun commit(executionId: String): SqlConsoleExecutionSnapshot
+
+    fun rollback(executionId: String): SqlConsoleExecutionSnapshot
 }

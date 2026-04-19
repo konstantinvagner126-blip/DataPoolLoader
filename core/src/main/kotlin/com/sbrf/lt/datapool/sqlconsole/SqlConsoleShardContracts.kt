@@ -24,9 +24,47 @@ interface ShardSqlScriptExecutor {
     ): List<RawShardExecutionResult>
 }
 
+interface ShardSqlTransactionalExecutor {
+    fun executeScriptInTransaction(
+        shard: ResolvedSqlConsoleShardConfig,
+        statements: List<SqlConsoleStatement>,
+        fetchSize: Int,
+        maxRows: Int,
+        queryTimeoutSec: Int?,
+        executionPolicy: SqlConsoleExecutionPolicy,
+        executionControl: SqlConsoleExecutionControl,
+    ): TransactionalShardScriptExecution
+}
+
+data class TransactionalShardScriptExecution(
+    val results: List<RawShardExecutionResult>,
+    val pendingTransaction: PendingShardTransaction? = null,
+)
+
+interface PendingShardTransaction {
+    val shardName: String
+
+    fun commit()
+
+    fun rollback()
+}
+
 fun interface ShardConnectionChecker {
     fun check(
         shard: ResolvedSqlConsoleShardConfig,
         queryTimeoutSec: Int?,
     ): RawShardConnectionCheckResult
 }
+
+fun interface ShardSqlObjectSearcher {
+    fun searchObjects(
+        shard: ResolvedSqlConsoleShardConfig,
+        rawQuery: String,
+        maxObjects: Int,
+    ): ShardSqlObjectSearchResult
+}
+
+data class ShardSqlObjectSearchResult(
+    val objects: List<SqlConsoleDatabaseObject>,
+    val truncated: Boolean = false,
+)

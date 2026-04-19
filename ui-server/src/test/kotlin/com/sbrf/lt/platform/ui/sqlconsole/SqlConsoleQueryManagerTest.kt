@@ -8,11 +8,13 @@ import com.sbrf.lt.datapool.sqlconsole.SqlConsoleExecutionCancelledException
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleExecutionControl
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleExecutionPolicy
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleTransactionMode
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleExecutionRun
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleInfo
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleOperations
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleQueryResult
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleService
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleSourceConfig
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleTransactionalOperations
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.Test
@@ -106,10 +108,10 @@ class SqlConsoleQueryManagerTest {
     }
 
     @Test
-    fun `passes execution policy to sql console service`() {
+    fun `forces stop on first error policy for sql console service`() {
         var observedPolicy: SqlConsoleExecutionPolicy? = null
         val manager = SqlConsoleQueryManager(
-            sqlConsoleService = object : SqlConsoleOperations {
+            sqlConsoleService = object : SqlConsoleOperations, SqlConsoleTransactionalOperations {
                 override fun info(): SqlConsoleInfo = SqlConsoleInfo(
                     configured = true,
                     sourceNames = listOf("db1"),
@@ -143,10 +145,43 @@ class SqlConsoleQueryManagerTest {
                     )
                 }
 
+                override fun executeQueryRun(
+                    rawSql: String,
+                    credentialsPath: Path?,
+                    selectedSourceNames: List<String>,
+                    autoCommitEnabled: Boolean,
+                    executionControl: SqlConsoleExecutionControl,
+                ): SqlConsoleExecutionRun = SqlConsoleExecutionRun(
+                    result = executeQuery(
+                        rawSql = rawSql,
+                        credentialsPath = credentialsPath,
+                        selectedSourceNames = selectedSourceNames,
+                        executionPolicy = SqlConsoleExecutionPolicy.STOP_ON_FIRST_ERROR,
+                        transactionMode = if (autoCommitEnabled) {
+                            SqlConsoleTransactionMode.AUTO_COMMIT
+                        } else {
+                            SqlConsoleTransactionMode.TRANSACTION_PER_SHARD
+                        },
+                        executionControl = executionControl,
+                    ),
+                )
+
                 override fun checkConnections(
                     credentialsPath: Path?,
                     selectedSourceNames: List<String>,
                 ): SqlConsoleConnectionCheckResult = SqlConsoleConnectionCheckResult(emptyList())
+
+                override fun searchObjects(
+                    rawQuery: String,
+                    credentialsPath: Path?,
+                    selectedSourceNames: List<String>,
+                    maxObjectsPerSource: Int,
+                ): com.sbrf.lt.datapool.sqlconsole.SqlConsoleDatabaseObjectSearchResult =
+                    com.sbrf.lt.datapool.sqlconsole.SqlConsoleDatabaseObjectSearchResult(
+                        query = rawQuery,
+                        sourceResults = emptyList(),
+                        maxObjectsPerSource = maxObjectsPerSource,
+                    )
             },
         )
 
@@ -158,7 +193,142 @@ class SqlConsoleQueryManagerTest {
         val snapshot = waitForCompletion(manager, started.id)
 
         assertEquals(SqlConsoleExecutionStatus.SUCCESS, snapshot.status)
-        assertEquals(SqlConsoleExecutionPolicy.CONTINUE_ON_ERROR, observedPolicy)
+        assertEquals(SqlConsoleExecutionPolicy.STOP_ON_FIRST_ERROR, observedPolicy)
+    }
+
+    @Test
+    fun `keeps pending transaction until commit`() {
+        val manager = SqlConsoleQueryManager(
+            sqlConsoleService = SqlConsoleService(
+                config = SqlConsoleConfig(
+                    sources = listOf(SqlConsoleSourceConfig("db1", "jdbc:test", "user", "pwd")),
+                ),
+                executor = object : ShardSqlExecutor, com.sbrf.lt.datapool.sqlconsole.ShardSqlTransactionalExecutor {
+                    override fun execute(
+                        shard: com.sbrf.lt.datapool.sqlconsole.ResolvedSqlConsoleShardConfig,
+                        statement: com.sbrf.lt.datapool.sqlconsole.SqlConsoleStatement,
+                        fetchSize: Int,
+                        maxRows: Int,
+                        queryTimeoutSec: Int?,
+                        executionControl: SqlConsoleExecutionControl,
+                    ): RawShardExecutionResult =
+                        RawShardExecutionResult(
+                            shardName = shard.name,
+                            status = "SUCCESS",
+                            columns = listOf("id"),
+                            rows = listOf(mapOf("id" to "1")),
+                        )
+
+                    override fun executeScriptInTransaction(
+                        shard: com.sbrf.lt.datapool.sqlconsole.ResolvedSqlConsoleShardConfig,
+                        statements: List<com.sbrf.lt.datapool.sqlconsole.SqlConsoleStatement>,
+                        fetchSize: Int,
+                        maxRows: Int,
+                        queryTimeoutSec: Int?,
+                        executionPolicy: SqlConsoleExecutionPolicy,
+                        executionControl: SqlConsoleExecutionControl,
+                    ): com.sbrf.lt.datapool.sqlconsole.TransactionalShardScriptExecution =
+                        com.sbrf.lt.datapool.sqlconsole.TransactionalShardScriptExecution(
+                            results = statements.map {
+                                RawShardExecutionResult(
+                                    shardName = shard.name,
+                                    status = "SUCCESS",
+                                    affectedRows = 1,
+                                    message = "ok",
+                                )
+                            },
+                            pendingTransaction = object : com.sbrf.lt.datapool.sqlconsole.PendingShardTransaction {
+                                override val shardName: String = shard.name
+
+                                override fun commit() = Unit
+
+                                override fun rollback() = Unit
+                            },
+                        )
+                },
+            ),
+        )
+
+        val started = manager.startQuery(
+            sql = "update demo set flag = true",
+            credentialsPath = null,
+            transactionMode = SqlConsoleTransactionMode.TRANSACTION_PER_SHARD,
+        )
+        val pending = waitForCompletion(manager, started.id)
+
+        assertEquals(SqlConsoleExecutionStatus.SUCCESS, pending.status)
+        assertEquals(SqlConsoleExecutionTransactionState.PENDING_COMMIT, pending.transactionState)
+
+        val committed = manager.commit(started.id)
+
+        assertEquals(SqlConsoleExecutionTransactionState.COMMITTED, committed.transactionState)
+        assertTrue(committed.transactionShardNames.isEmpty())
+    }
+
+    @Test
+    fun `does not expose pending commit for read only script when auto commit disabled`() {
+        val manager = SqlConsoleQueryManager(
+            sqlConsoleService = SqlConsoleService(
+                config = SqlConsoleConfig(
+                    sources = listOf(SqlConsoleSourceConfig("db1", "jdbc:test", "user", "pwd")),
+                ),
+                executor = object : ShardSqlExecutor, com.sbrf.lt.datapool.sqlconsole.ShardSqlTransactionalExecutor {
+                    override fun execute(
+                        shard: com.sbrf.lt.datapool.sqlconsole.ResolvedSqlConsoleShardConfig,
+                        statement: com.sbrf.lt.datapool.sqlconsole.SqlConsoleStatement,
+                        fetchSize: Int,
+                        maxRows: Int,
+                        queryTimeoutSec: Int?,
+                        executionControl: SqlConsoleExecutionControl,
+                    ): RawShardExecutionResult =
+                        RawShardExecutionResult(
+                            shardName = shard.name,
+                            status = "SUCCESS",
+                            columns = listOf("id"),
+                            rows = listOf(mapOf("id" to "1")),
+                        )
+
+                    override fun executeScriptInTransaction(
+                        shard: com.sbrf.lt.datapool.sqlconsole.ResolvedSqlConsoleShardConfig,
+                        statements: List<com.sbrf.lt.datapool.sqlconsole.SqlConsoleStatement>,
+                        fetchSize: Int,
+                        maxRows: Int,
+                        queryTimeoutSec: Int?,
+                        executionPolicy: SqlConsoleExecutionPolicy,
+                        executionControl: SqlConsoleExecutionControl,
+                    ): com.sbrf.lt.datapool.sqlconsole.TransactionalShardScriptExecution =
+                        com.sbrf.lt.datapool.sqlconsole.TransactionalShardScriptExecution(
+                            results = statements.map {
+                                RawShardExecutionResult(
+                                    shardName = shard.name,
+                                    status = "SUCCESS",
+                                    columns = listOf("id"),
+                                    rows = listOf(mapOf("id" to "1")),
+                                    message = "ok",
+                                )
+                            },
+                            pendingTransaction = object : com.sbrf.lt.datapool.sqlconsole.PendingShardTransaction {
+                                override val shardName: String = shard.name
+
+                                override fun commit() = Unit
+
+                                override fun rollback() = Unit
+                            },
+                        )
+                },
+            ),
+        )
+
+        val started = manager.startQuery(
+            sql = "select 1 as id",
+            credentialsPath = null,
+            transactionMode = SqlConsoleTransactionMode.TRANSACTION_PER_SHARD,
+        )
+        val finished = waitForCompletion(manager, started.id)
+
+        assertEquals(SqlConsoleExecutionStatus.SUCCESS, finished.status)
+        assertEquals(SqlConsoleExecutionTransactionState.NONE, finished.transactionState)
+        assertTrue(finished.transactionShardNames.isEmpty())
     }
 
     @Test

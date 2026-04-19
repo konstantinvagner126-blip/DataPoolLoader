@@ -18,6 +18,11 @@ class SqlConsoleStateStoreTest {
                 draftSql = "select * from demo",
                 recentQueries = listOf("select * from demo", "select * from demo", "select 1"),
                 favoriteQueries = listOf("select * from demo", "select 2", "select 2"),
+                favoriteObjects = listOf(
+                    PersistedSqlConsoleFavoriteObject("shard1", "public", "offer", "table"),
+                    PersistedSqlConsoleFavoriteObject("shard1", "public", "offer", "TABLE"),
+                    PersistedSqlConsoleFavoriteObject("shard2", "public", "offer_idx", "index", tableName = "offer"),
+                ),
                 selectedSourceNames = listOf("db1", "db1", "db2"),
                 pageSize = 100,
                 strictSafetyEnabled = true,
@@ -29,6 +34,13 @@ class SqlConsoleStateStoreTest {
         assertEquals("select * from demo", loaded.draftSql)
         assertEquals(listOf("select * from demo", "select 1"), loaded.recentQueries)
         assertEquals(listOf("select * from demo", "select 2"), loaded.favoriteQueries)
+        assertEquals(
+            listOf(
+                PersistedSqlConsoleFavoriteObject("shard1", "public", "offer", "TABLE"),
+                PersistedSqlConsoleFavoriteObject("shard2", "public", "offer_idx", "INDEX", tableName = "offer"),
+            ),
+            loaded.favoriteObjects,
+        )
         assertEquals(listOf("db1", "db2"), loaded.selectedSourceNames)
         assertEquals(100, loaded.pageSize)
         assertTrue(loaded.strictSafetyEnabled)
@@ -46,6 +58,7 @@ class SqlConsoleStateStoreTest {
         assertEquals("select 1 as check_value", loaded.draftSql)
         assertEquals(emptyList(), loaded.recentQueries)
         assertEquals(emptyList(), loaded.favoriteQueries)
+        assertEquals(emptyList(), loaded.favoriteObjects)
         assertEquals(emptyList(), loaded.selectedSourceNames)
         assertEquals(50, loaded.pageSize)
         assertEquals(false, loaded.strictSafetyEnabled)

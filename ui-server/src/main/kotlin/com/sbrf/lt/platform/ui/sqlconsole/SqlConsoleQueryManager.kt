@@ -4,6 +4,7 @@ import com.sbrf.lt.datapool.sqlconsole.SqlConsoleExecutionControl
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleExecutionPolicy
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleTransactionMode
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleOperations
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleTransactionalOperations
 import java.nio.file.Path
 import java.time.Instant
 import java.util.UUID
@@ -19,11 +20,13 @@ enum class SqlConsoleExecutionStatus {
 
 class SqlConsoleQueryManager(
     private val sqlConsoleService: SqlConsoleOperations,
+    private val transactionalOperations: SqlConsoleTransactionalOperations = sqlConsoleService as? SqlConsoleTransactionalOperations
+        ?: error("SQL-консоль не поддерживает транзакционные execution session."),
     private val executor: ExecutorService = Executors.newSingleThreadExecutor(),
 ) : SqlConsoleAsyncQueryOperations {
     private val lock = Any()
     private var activeExecution: ActiveExecution? = null
-    private val executionSupport = SqlConsoleQueryExecutionSupport(sqlConsoleService)
+    private val executionSupport = SqlConsoleQueryExecutionSupport(sqlConsoleService, transactionalOperations)
 
     override fun startQuery(
         sql: String,
@@ -37,29 +40,33 @@ class SqlConsoleQueryManager(
             require(activeExecution?.snapshot?.status != SqlConsoleExecutionStatus.RUNNING) {
                 "В SQL-консоли уже выполняется запрос. Дождись завершения или отмени его."
             }
+            require(activeExecution?.snapshot?.transactionState != SqlConsoleExecutionTransactionState.PENDING_COMMIT) {
+                "Есть незавершенная транзакция SQL-консоли. Сначала выполни коммит или роллбек."
+            }
             ActiveExecution(
                 snapshot = SqlConsoleExecutionSnapshot(
                     id = UUID.randomUUID().toString(),
                     status = SqlConsoleExecutionStatus.RUNNING,
                     startedAt = Instant.now(),
+                    autoCommitEnabled = transactionMode == SqlConsoleTransactionMode.AUTO_COMMIT,
                 ),
                 control = SqlConsoleExecutionControl(),
             ).also { activeExecution = it }
         }
 
         executor.submit {
-            val finalSnapshot = executionSupport.execute(
+            val finalExecution = executionSupport.execute(
                 execution = execution,
                 sql = sql,
                 credentialsPath = credentialsPath,
                 selectedSourceNames = selectedSourceNames,
-                executionPolicy = executionPolicy,
+                executionPolicy = SqlConsoleExecutionPolicy.STOP_ON_FIRST_ERROR,
                 transactionMode = transactionMode,
                 cleanupDir = cleanupDir,
             )
             synchronized(lock) {
                 if (activeExecution?.snapshot?.id == execution.snapshot.id) {
-                    activeExecution = execution.copy(snapshot = finalSnapshot)
+                    activeExecution = finalExecution
                 }
             }
         }
@@ -96,5 +103,46 @@ class SqlConsoleQueryManager(
             updated
         }
         return execution.snapshot
+    }
+
+    override fun commit(executionId: String): SqlConsoleExecutionSnapshot {
+        return finalizeTransaction(
+            executionId = executionId,
+            targetState = SqlConsoleExecutionTransactionState.COMMITTED,
+        ) { it.commit() }
+    }
+
+    override fun rollback(executionId: String): SqlConsoleExecutionSnapshot {
+        return finalizeTransaction(
+            executionId = executionId,
+            targetState = SqlConsoleExecutionTransactionState.ROLLED_BACK,
+        ) { it.rollback() }
+    }
+
+    private fun finalizeTransaction(
+        executionId: String,
+        targetState: SqlConsoleExecutionTransactionState,
+        action: (com.sbrf.lt.datapool.sqlconsole.SqlConsolePendingTransaction) -> Unit,
+    ): SqlConsoleExecutionSnapshot {
+        return synchronized(lock) {
+            val current = activeExecution
+            require(current != null && current.snapshot.id == executionId) {
+                "Запуск SQL-консоли $executionId не найден."
+            }
+            require(current.snapshot.transactionState == SqlConsoleExecutionTransactionState.PENDING_COMMIT) {
+                "Для этого запуска нет незавершенной транзакции."
+            }
+            val pendingTransaction = requireNotNull(current.pendingTransaction)
+            action(pendingTransaction)
+            val updated = current.copy(
+                snapshot = current.snapshot.copy(
+                    transactionState = targetState,
+                    transactionShardNames = emptyList(),
+                ),
+                pendingTransaction = null,
+            )
+            activeExecution = updated
+            updated.snapshot
+        }
     }
 }

@@ -10,6 +10,7 @@ data class PersistedSqlConsoleState(
     val draftSql: String = "select 1 as check_value",
     val recentQueries: List<String> = emptyList(),
     val favoriteQueries: List<String> = emptyList(),
+    val favoriteObjects: List<PersistedSqlConsoleFavoriteObject> = emptyList(),
     val selectedSourceNames: List<String> = emptyList(),
     val pageSize: Int = 50,
     val strictSafetyEnabled: Boolean = false,
@@ -27,16 +28,16 @@ data class PersistedSqlConsoleState(
             .filter { it.isNotEmpty() }
             .distinct()
             .take(15)
+        val normalizedFavoriteObjects = favoriteObjects
+            .map { it.normalized() }
+            .distinctBy { it.sourceName + "\u0001" + it.schemaName + "\u0001" + it.objectName + "\u0001" + it.objectType + "\u0001" + (it.tableName ?: "") }
+            .take(20)
         val normalizedSelectedSources = selectedSourceNames
             .map { it.trim() }
             .filter { it.isNotEmpty() }
             .distinct()
         val normalizedPageSize = pageSize.takeIf { it in setOf(25, 50, 100) } ?: 50
         val normalizedDraft = draftSql.ifBlank { "select 1 as check_value" }
-        val normalizedExecutionPolicy = when (executionPolicy.uppercase()) {
-            "CONTINUE_ON_ERROR" -> "CONTINUE_ON_ERROR"
-            else -> "STOP_ON_FIRST_ERROR"
-        }
         val normalizedTransactionMode = when (transactionMode.uppercase()) {
             "TRANSACTION_PER_SHARD" -> "TRANSACTION_PER_SHARD"
             else -> "AUTO_COMMIT"
@@ -45,17 +46,28 @@ data class PersistedSqlConsoleState(
             draftSql = normalizedDraft,
             recentQueries = normalizedQueries,
             favoriteQueries = normalizedFavorites,
+            favoriteObjects = normalizedFavoriteObjects,
             selectedSourceNames = normalizedSelectedSources,
             pageSize = normalizedPageSize,
-            executionPolicy = if (
-                normalizedTransactionMode == "TRANSACTION_PER_SHARD" &&
-                normalizedExecutionPolicy == "CONTINUE_ON_ERROR"
-            ) {
-                "STOP_ON_FIRST_ERROR"
-            } else {
-                normalizedExecutionPolicy
-            },
+            executionPolicy = "STOP_ON_FIRST_ERROR",
             transactionMode = normalizedTransactionMode,
         )
     }
+}
+
+data class PersistedSqlConsoleFavoriteObject(
+    val sourceName: String,
+    val schemaName: String,
+    val objectName: String,
+    val objectType: String,
+    val tableName: String? = null,
+) {
+    fun normalized(): PersistedSqlConsoleFavoriteObject =
+        copy(
+            sourceName = sourceName.trim(),
+            schemaName = schemaName.trim(),
+            objectName = objectName.trim(),
+            objectType = objectType.trim().uppercase(),
+            tableName = tableName?.trim()?.takeIf { it.isNotEmpty() },
+        )
 }

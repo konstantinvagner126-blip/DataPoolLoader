@@ -13,4 +13,7 @@ data class SqlConsoleShardResultResponse(
     val affectedRows: Int? = null,
     val message: String? = null,
     val errorMessage: String? = null,
+    val startedAt: java.time.Instant? = null,
+    val finishedAt: java.time.Instant? = null,
+    val durationMillis: Long? = null,
 )

@@ -11,6 +11,9 @@ data class SqlConsoleExecutionResponse(
     val startedAt: Instant,
     val finishedAt: Instant? = null,
     val cancelRequested: Boolean,
+    val autoCommitEnabled: Boolean = true,
+    val transactionState: String = "NONE",
+    val transactionShardNames: List<String> = emptyList(),
     val result: SqlConsoleQueryResponse? = null,
     val errorMessage: String? = null,
 )

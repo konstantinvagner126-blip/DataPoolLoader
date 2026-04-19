@@ -43,6 +43,14 @@ class SqlConsoleApiClient(
             deserializer = SqlConsoleConnectionCheckResponse.serializer(),
         )
 
+    override suspend fun searchObjects(request: SqlConsoleObjectSearchRequest): SqlConsoleObjectSearchResponse =
+        httpClient.postJson(
+            path = "/api/sql-console/objects/search",
+            payload = request,
+            serializer = SqlConsoleObjectSearchRequest.serializer(),
+            deserializer = SqlConsoleObjectSearchResponse.serializer(),
+        )
+
     override suspend fun startQuery(request: SqlConsoleQueryStartRequest): SqlConsoleStartQueryResponse =
         httpClient.postJson(
             path = "/api/sql-console/query/start",
@@ -57,6 +65,22 @@ class SqlConsoleApiClient(
     override suspend fun cancelExecution(executionId: String): SqlConsoleExecutionResponse =
         httpClient.postJson(
             path = "/api/sql-console/query/$executionId/cancel",
+            payload = emptyMap<String, String>(),
+            serializer = MapSerializer(String.serializer(), String.serializer()),
+            deserializer = SqlConsoleExecutionResponse.serializer(),
+        )
+
+    override suspend fun commitExecution(executionId: String): SqlConsoleExecutionResponse =
+        httpClient.postJson(
+            path = "/api/sql-console/query/$executionId/commit",
+            payload = emptyMap<String, String>(),
+            serializer = MapSerializer(String.serializer(), String.serializer()),
+            deserializer = SqlConsoleExecutionResponse.serializer(),
+        )
+
+    override suspend fun rollbackExecution(executionId: String): SqlConsoleExecutionResponse =
+        httpClient.postJson(
+            path = "/api/sql-console/query/$executionId/rollback",
             payload = emptyMap<String, String>(),
             serializer = MapSerializer(String.serializer(), String.serializer()),
             deserializer = SqlConsoleExecutionResponse.serializer(),

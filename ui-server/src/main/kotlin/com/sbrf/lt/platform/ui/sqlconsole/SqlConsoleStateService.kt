@@ -2,6 +2,7 @@ package com.sbrf.lt.platform.ui.sqlconsole
 
 import com.sbrf.lt.platform.ui.model.SqlConsoleStateResponse
 import com.sbrf.lt.platform.ui.model.SqlConsoleStateUpdateRequest
+import com.sbrf.lt.platform.ui.model.SqlConsoleFavoriteObjectResponse
 
 class SqlConsoleStateService(
     private val stateStore: SqlConsoleStateStore,
@@ -18,10 +19,19 @@ class SqlConsoleStateService(
             draftSql = request.draftSql,
             recentQueries = request.recentQueries,
             favoriteQueries = request.favoriteQueries,
+            favoriteObjects = request.favoriteObjects.map {
+                PersistedSqlConsoleFavoriteObject(
+                    sourceName = it.sourceName,
+                    schemaName = it.schemaName,
+                    objectName = it.objectName,
+                    objectType = it.objectType,
+                    tableName = it.tableName,
+                )
+            },
             selectedSourceNames = request.selectedSourceNames,
             pageSize = request.pageSize,
             strictSafetyEnabled = request.strictSafetyEnabled,
-            executionPolicy = request.executionPolicy,
+            executionPolicy = "STOP_ON_FIRST_ERROR",
             transactionMode = request.transactionMode,
         ).normalized()
         stateStore.save(state)
@@ -33,6 +43,15 @@ private fun PersistedSqlConsoleState.toResponse(): SqlConsoleStateResponse = Sql
     draftSql = draftSql,
     recentQueries = recentQueries,
     favoriteQueries = favoriteQueries,
+    favoriteObjects = favoriteObjects.map {
+        SqlConsoleFavoriteObjectResponse(
+            sourceName = it.sourceName,
+            schemaName = it.schemaName,
+            objectName = it.objectName,
+            objectType = it.objectType,
+            tableName = it.tableName,
+        )
+    },
     selectedSourceNames = selectedSourceNames,
     pageSize = pageSize,
     strictSafetyEnabled = strictSafetyEnabled,

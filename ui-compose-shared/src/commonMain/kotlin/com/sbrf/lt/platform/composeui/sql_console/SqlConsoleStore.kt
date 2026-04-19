@@ -31,10 +31,6 @@ class SqlConsoleStore(
             .filter { it in info.sourceNames }
             .ifEmpty { info.sourceNames }
         val normalizedTransactionMode = normalizeTransactionMode(persistedState.transactionMode)
-        val normalizedExecutionPolicy = normalizeExecutionPolicy(
-            persistedState.executionPolicy,
-            normalizedTransactionMode,
-        )
         return SqlConsolePageState(
             loading = false,
             runtimeContext = runtimeContext,
@@ -42,10 +38,11 @@ class SqlConsoleStore(
             draftSql = persistedState.draftSql.ifBlank { "select 1 as check_value" },
             recentQueries = persistedState.recentQueries,
             favoriteQueries = persistedState.favoriteQueries,
+            favoriteObjects = persistedState.favoriteObjects,
             selectedSourceNames = selectedSources,
             pageSize = normalizePageSize(persistedState.pageSize),
             strictSafetyEnabled = persistedState.strictSafetyEnabled,
-            executionPolicy = normalizedExecutionPolicy,
+            executionPolicy = normalizeExecutionPolicy(),
             transactionMode = normalizedTransactionMode,
             maxRowsPerShardDraft = info.maxRowsPerShard.toString(),
             queryTimeoutSecDraft = info.queryTimeoutSec?.toString().orEmpty(),
@@ -87,26 +84,14 @@ class SqlConsoleStore(
     ): SqlConsolePageState =
         current.copy(strictSafetyEnabled = enabled)
 
-    fun updateExecutionPolicy(
+    fun updateAutoCommitEnabled(
         current: SqlConsolePageState,
-        value: String,
-    ): SqlConsolePageState {
-        val normalized = normalizeExecutionPolicy(value, current.transactionMode)
-        return current.copy(
-            executionPolicy = normalized,
+        enabled: Boolean,
+    ): SqlConsolePageState =
+        current.copy(
+            transactionMode = if (enabled) "AUTO_COMMIT" else "TRANSACTION_PER_SHARD",
+            executionPolicy = normalizeExecutionPolicy(),
         )
-    }
-
-    fun updateTransactionMode(
-        current: SqlConsolePageState,
-        value: String,
-    ): SqlConsolePageState {
-        val normalized = normalizeTransactionMode(value)
-        return current.copy(
-            transactionMode = normalized,
-            executionPolicy = normalizeExecutionPolicy(current.executionPolicy, normalized),
-        )
-    }
 
     fun updateMaxRowsPerShardDraft(
         current: SqlConsolePageState,
@@ -152,6 +137,16 @@ class SqlConsoleStore(
             favoriteQueries = current.favoriteQueries.filterNot { it == value },
             errorMessage = null,
             successMessage = "Запрос убран из избранного.",
+        )
+
+    fun removeFavoriteObject(
+        current: SqlConsolePageState,
+        value: SqlConsoleFavoriteObject,
+    ): SqlConsolePageState =
+        current.copy(
+            favoriteObjects = current.favoriteObjects.filterNot { it.matches(value) },
+            errorMessage = null,
+            successMessage = "Объект убран из избранного.",
         )
 
     fun clearRecentQueries(current: SqlConsolePageState): SqlConsolePageState =
@@ -226,8 +221,12 @@ class SqlConsoleStore(
             )
         }
 
-    suspend fun startQuery(current: SqlConsolePageState): SqlConsolePageState {
-        val sql = current.draftSql.trim()
+    suspend fun startQuery(
+        current: SqlConsolePageState,
+        sqlOverride: String? = null,
+        successMessage: String = "Запрос запущен.",
+    ): SqlConsolePageState {
+        val sql = (sqlOverride ?: current.draftSql).trim()
         if (sql.isBlank()) {
             return current.copy(
                 actionInProgress = null,
@@ -248,20 +247,22 @@ class SqlConsoleStore(
                 SqlConsoleQueryStartRequest(
                     sql = sql,
                     selectedSourceNames = current.selectedSourceNames,
-                    executionPolicy = current.executionPolicy,
+                    executionPolicy = normalizeExecutionPolicy(),
                     transactionMode = current.transactionMode,
                 ),
             )
             current.copy(
                 actionInProgress = null,
                 errorMessage = null,
-                successMessage = "Запрос запущен.",
+                successMessage = successMessage,
                 currentExecutionId = started.id,
                 currentExecution = SqlConsoleExecutionResponse(
                     id = started.id,
                     status = started.status,
                     startedAt = started.startedAt,
                     cancelRequested = started.cancelRequested,
+                    autoCommitEnabled = started.autoCommitEnabled,
+                    transactionState = started.transactionState,
                 ),
                 recentQueries = rememberQuery(current.recentQueries, sql, limit = 15),
             )
@@ -312,6 +313,46 @@ class SqlConsoleStore(
         }
     }
 
+    suspend fun commitExecution(current: SqlConsolePageState): SqlConsolePageState {
+        val executionId = current.currentExecutionId ?: return current
+        return runCatching {
+            val snapshot = api.commitExecution(executionId)
+            current.copy(
+                actionInProgress = null,
+                errorMessage = null,
+                successMessage = "Транзакция зафиксирована.",
+                currentExecution = snapshot,
+                currentExecutionId = snapshot.id,
+            )
+        }.getOrElse { error ->
+            current.copy(
+                actionInProgress = null,
+                errorMessage = error.message ?: "Не удалось выполнить commit.",
+                successMessage = null,
+            )
+        }
+    }
+
+    suspend fun rollbackExecution(current: SqlConsolePageState): SqlConsolePageState {
+        val executionId = current.currentExecutionId ?: return current
+        return runCatching {
+            val snapshot = api.rollbackExecution(executionId)
+            current.copy(
+                actionInProgress = null,
+                errorMessage = null,
+                successMessage = "Транзакция откатана.",
+                currentExecution = snapshot,
+                currentExecutionId = snapshot.id,
+            )
+        }.getOrElse { error ->
+            current.copy(
+                actionInProgress = null,
+                errorMessage = error.message ?: "Не удалось выполнить rollback.",
+                successMessage = null,
+            )
+        }
+    }
+
     fun beginAction(
         current: SqlConsolePageState,
         actionName: String,
@@ -324,10 +365,11 @@ private fun SqlConsolePageState.toPersistedState(): SqlConsoleStateUpdate =
         draftSql = draftSql,
         recentQueries = recentQueries,
         favoriteQueries = favoriteQueries,
+        favoriteObjects = favoriteObjects,
         selectedSourceNames = selectedSourceNames,
         pageSize = pageSize,
         strictSafetyEnabled = strictSafetyEnabled,
-        executionPolicy = executionPolicy,
+        executionPolicy = normalizeExecutionPolicy(),
         transactionMode = transactionMode,
     )
 
@@ -344,23 +386,17 @@ private fun normalizePageSize(value: Int): Int =
         else -> 50
     }
 
-private fun normalizeExecutionPolicy(
-    value: String,
-    transactionMode: String,
-): String {
-    val normalized = when (value.uppercase()) {
-        "CONTINUE_ON_ERROR" -> "CONTINUE_ON_ERROR"
-        else -> "STOP_ON_FIRST_ERROR"
-    }
-    return if (transactionMode == "TRANSACTION_PER_SHARD" && normalized == "CONTINUE_ON_ERROR") {
-        "STOP_ON_FIRST_ERROR"
-    } else {
-        normalized
-    }
-}
+private fun normalizeExecutionPolicy(): String = "STOP_ON_FIRST_ERROR"
 
 private fun normalizeTransactionMode(value: String): String =
     when (value.uppercase()) {
         "TRANSACTION_PER_SHARD" -> "TRANSACTION_PER_SHARD"
         else -> "AUTO_COMMIT"
     }
+
+private fun SqlConsoleFavoriteObject.matches(other: SqlConsoleFavoriteObject): Boolean =
+    sourceName == other.sourceName &&
+        schemaName == other.schemaName &&
+        objectName == other.objectName &&
+        objectType == other.objectType &&
+        tableName == other.tableName

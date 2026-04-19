@@ -1,6 +1,7 @@
 package com.sbrf.lt.datapool.sqlconsole
 
 import com.fasterxml.jackson.annotation.JsonAlias
+import java.time.Instant
 
 data class SqlConsoleConfig(
     val fetchSize: Int = 1000,
@@ -39,6 +40,20 @@ enum class SqlConsoleTransactionMode {
     TRANSACTION_PER_SHARD,
 }
 
+enum class SqlConsoleTransactionState {
+    NONE,
+    PENDING_COMMIT,
+    COMMITTED,
+    ROLLED_BACK,
+}
+
+enum class SqlConsoleDatabaseObjectType {
+    TABLE,
+    VIEW,
+    MATERIALIZED_VIEW,
+    INDEX,
+}
+
 data class SqlConsoleStatement(
     val sql: String,
     val leadingKeyword: String,
@@ -53,6 +68,9 @@ data class RawShardExecutionResult(
     val affectedRows: Int? = null,
     val message: String? = null,
     val errorMessage: String? = null,
+    val startedAt: Instant? = null,
+    val finishedAt: Instant? = null,
+    val durationMillis: Long? = null,
 )
 
 data class RawShardConnectionCheckResult(
@@ -88,3 +106,46 @@ data class SqlConsoleStatementResult(
 data class SqlConsoleConnectionCheckResult(
     val sourceResults: List<RawShardConnectionCheckResult>,
 )
+
+data class SqlConsoleDatabaseObjectSearchResult(
+    val query: String,
+    val sourceResults: List<SqlConsoleDatabaseObjectSourceResult>,
+    val maxObjectsPerSource: Int,
+)
+
+data class SqlConsoleDatabaseObjectSourceResult(
+    val sourceName: String,
+    val status: String,
+    val objects: List<SqlConsoleDatabaseObject> = emptyList(),
+    val truncated: Boolean = false,
+    val errorMessage: String? = null,
+)
+
+data class SqlConsoleDatabaseObject(
+    val schemaName: String,
+    val objectName: String,
+    val objectType: SqlConsoleDatabaseObjectType,
+    val tableName: String? = null,
+    val columns: List<SqlConsoleDatabaseObjectColumn> = emptyList(),
+    val indexNames: List<String> = emptyList(),
+    val definition: String? = null,
+)
+
+data class SqlConsoleDatabaseObjectColumn(
+    val name: String,
+    val type: String,
+    val nullable: Boolean,
+)
+
+data class SqlConsoleExecutionRun(
+    val result: SqlConsoleQueryResult,
+    val pendingTransaction: SqlConsolePendingTransaction? = null,
+)
+
+interface SqlConsolePendingTransaction {
+    val shardNames: List<String>
+
+    fun commit()
+
+    fun rollback()
+}

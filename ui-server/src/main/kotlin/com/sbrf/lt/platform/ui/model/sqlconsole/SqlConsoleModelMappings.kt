@@ -3,6 +3,10 @@ package com.sbrf.lt.platform.ui.model
 import com.sbrf.lt.datapool.sqlconsole.RawShardConnectionCheckResult
 import com.sbrf.lt.datapool.sqlconsole.RawShardExecutionResult
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleConnectionCheckResult
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleDatabaseObject
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleDatabaseObjectColumn
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleDatabaseObjectSearchResult
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleDatabaseObjectSourceResult
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleInfo
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleQueryResult
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleStatementResult
@@ -26,6 +30,12 @@ fun SqlConsoleConnectionCheckResult.toResponse(configured: Boolean): SqlConsoleC
     sourceResults = sourceResults.map { it.toResponse() },
 )
 
+fun SqlConsoleDatabaseObjectSearchResult.toResponse(): SqlConsoleObjectSearchResponse = SqlConsoleObjectSearchResponse(
+    query = query,
+    maxObjectsPerSource = maxObjectsPerSource,
+    sourceResults = sourceResults.map { it.toResponse() },
+)
+
 /**
  * Преобразует синхронный результат SQL-запроса в UI DTO.
  */
@@ -46,6 +56,8 @@ fun SqlConsoleExecutionSnapshot.toStartResponse(): SqlConsoleStartQueryResponse 
     status = status.name,
     startedAt = startedAt,
     cancelRequested = cancelRequested,
+    autoCommitEnabled = autoCommitEnabled,
+    transactionState = transactionState.name,
 )
 
 /**
@@ -57,6 +69,9 @@ fun SqlConsoleExecutionSnapshot.toResponse(): SqlConsoleExecutionResponse = SqlC
     startedAt = startedAt,
     finishedAt = finishedAt,
     cancelRequested = cancelRequested,
+    autoCommitEnabled = autoCommitEnabled,
+    transactionState = transactionState.name,
+    transactionShardNames = transactionShardNames,
     result = result?.toResponse(),
     errorMessage = errorMessage,
 )
@@ -71,6 +86,9 @@ private fun RawShardExecutionResult.toResponse(): SqlConsoleShardResultResponse 
     affectedRows = affectedRows,
     message = message,
     errorMessage = errorMessage,
+    startedAt = startedAt,
+    finishedAt = finishedAt,
+    durationMillis = durationMillis,
 )
 
 private fun SqlConsoleStatementResult.toResponse(): SqlConsoleStatementResultResponse = SqlConsoleStatementResultResponse(
@@ -86,3 +104,28 @@ private fun RawShardConnectionCheckResult.toResponse(): SqlConsoleSourceConnecti
     message = message,
     errorMessage = errorMessage,
 )
+
+private fun SqlConsoleDatabaseObjectSourceResult.toResponse(): SqlConsoleObjectSourceSearchResponse = SqlConsoleObjectSourceSearchResponse(
+    sourceName = sourceName,
+    status = status,
+    objects = objects.map { it.toResponse() },
+    truncated = truncated,
+    errorMessage = errorMessage,
+)
+
+private fun SqlConsoleDatabaseObject.toResponse(): SqlConsoleDatabaseObjectResponse = SqlConsoleDatabaseObjectResponse(
+    schemaName = schemaName,
+    objectName = objectName,
+    objectType = objectType.name,
+    tableName = tableName,
+    columns = columns.map { it.toResponse() },
+    indexNames = indexNames,
+    definition = definition,
+)
+
+private fun SqlConsoleDatabaseObjectColumn.toResponse(): SqlConsoleDatabaseObjectColumnResponse =
+    SqlConsoleDatabaseObjectColumnResponse(
+        name = name,
+        type = type,
+        nullable = nullable,
+    )

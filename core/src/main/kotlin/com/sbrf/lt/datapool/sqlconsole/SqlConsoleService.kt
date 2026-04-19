@@ -7,7 +7,8 @@ class SqlConsoleService(
     config: SqlConsoleConfig,
     private val executor: ShardSqlExecutor = JdbcShardSqlExecutor(),
     private val connectionChecker: ShardConnectionChecker = JdbcShardConnectionChecker(),
-) : SqlConsoleOperations {
+    private val objectSearcher: ShardSqlObjectSearcher = JdbcShardSqlObjectSearcher(),
+) : SqlConsoleOperations, SqlConsoleTransactionalOperations {
     private val logger = LoggerFactory.getLogger(javaClass)
     private val configSupport = SqlConsoleConfigSupport()
     private val stateSupport = SqlConsoleStateSupport()
@@ -16,6 +17,10 @@ class SqlConsoleService(
         executor = executor,
         connectionChecker = connectionChecker,
         logger = logger,
+    )
+    private val metadataSupport = SqlConsoleMetadataSupport(
+        configSupport = configSupport,
+        objectSearcher = objectSearcher,
     )
     @Volatile
     private var currentConfig: SqlConsoleConfig = config
@@ -56,6 +61,22 @@ class SqlConsoleService(
             executionControl = executionControl,
         )
 
+    override fun executeQueryRun(
+        rawSql: String,
+        credentialsPath: Path?,
+        selectedSourceNames: List<String>,
+        autoCommitEnabled: Boolean,
+        executionControl: SqlConsoleExecutionControl,
+    ): SqlConsoleExecutionRun =
+        executionSupport.executeQueryRun(
+            config = currentConfig,
+            rawSql = rawSql,
+            credentialsPath = credentialsPath,
+            selectedSourceNames = selectedSourceNames,
+            autoCommitEnabled = autoCommitEnabled,
+            executionControl = executionControl,
+        )
+
     override fun checkConnections(
         credentialsPath: Path?,
         selectedSourceNames: List<String>,
@@ -64,5 +85,19 @@ class SqlConsoleService(
             config = currentConfig,
             credentialsPath = credentialsPath,
             selectedSourceNames = selectedSourceNames,
+        )
+
+    override fun searchObjects(
+        rawQuery: String,
+        credentialsPath: Path?,
+        selectedSourceNames: List<String>,
+        maxObjectsPerSource: Int,
+    ): SqlConsoleDatabaseObjectSearchResult =
+        metadataSupport.searchObjects(
+            config = currentConfig,
+            rawQuery = rawQuery,
+            credentialsPath = credentialsPath,
+            selectedSourceNames = selectedSourceNames,
+            maxObjectsPerSource = maxObjectsPerSource,
         )
 }

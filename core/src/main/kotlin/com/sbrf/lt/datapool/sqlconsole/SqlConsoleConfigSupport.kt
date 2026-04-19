@@ -66,6 +66,9 @@ internal class SqlConsoleConfigSupport {
         return statements
     }
 
+    fun requiresManualCommit(statements: List<SqlConsoleStatement>): Boolean =
+        statements.any { it.leadingKeyword !in READ_ONLY_SQL_KEYWORDS }
+
     private fun validateConfig(config: SqlConsoleConfig) {
         require(config.fetchSize > 0) { "Параметр ui.sqlConsole.fetchSize должен быть больше 0." }
         require(config.maxRowsPerShard > 0) { "Параметр ui.sqlConsole.maxRowsPerShard должен быть больше 0." }
@@ -204,3 +207,13 @@ internal class SqlConsoleConfigSupport {
         return statements
     }
 }
+
+private val READ_ONLY_SQL_KEYWORDS = setOf(
+    "SELECT",
+    "WITH",
+    "SHOW",
+    "DESCRIBE",
+    "DESC",
+    "EXPLAIN",
+    "VALUES",
+)

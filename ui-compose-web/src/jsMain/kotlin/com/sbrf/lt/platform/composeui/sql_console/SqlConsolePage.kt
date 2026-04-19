@@ -13,6 +13,9 @@ import com.sbrf.lt.platform.composeui.foundation.component.LoadingStateCard
 import com.sbrf.lt.platform.composeui.foundation.component.MonacoEditorPane
 import com.sbrf.lt.platform.composeui.foundation.component.PageScaffold
 import com.sbrf.lt.platform.composeui.foundation.dom.classes
+import com.sbrf.lt.platform.composeui.foundation.format.formatDateTime
+import com.sbrf.lt.platform.composeui.foundation.format.formatDuration
+import com.sbrf.lt.platform.composeui.foundation.format.formatDurationMillis
 import com.sbrf.lt.platform.composeui.foundation.http.ComposeHttpClient
 import com.sbrf.lt.platform.composeui.foundation.updates.PollingEffect
 import com.sbrf.lt.platform.composeui.model.CredentialsStatusResponse
@@ -65,6 +68,8 @@ fun ComposeSqlConsolePage(
     val httpClient = remember { ComposeHttpClient() }
     val scope = rememberCoroutineScope()
     var state by remember { mutableStateOf(SqlConsolePageState()) }
+    var editorInstance by remember { mutableStateOf<dynamic>(null) }
+    var editorCursorLine by remember { mutableStateOf(1) }
     var selectedRecentQuery by remember { mutableStateOf("") }
     var selectedFavoriteQuery by remember { mutableStateOf("") }
     var credentialsStatus by remember { mutableStateOf<CredentialsStatusResponse?>(null) }
@@ -76,12 +81,17 @@ fun ComposeSqlConsolePage(
     var selectedStatementIndex by remember { mutableStateOf(0) }
     var selectedResultShard by remember { mutableStateOf<String?>(null) }
     var currentDataPage by remember { mutableStateOf(1) }
+    var runningClockTick by remember { mutableStateOf(0) }
     val currentExecution = state.currentExecution
     val currentResult = currentExecution?.result
     val statementResults = currentResult.statementResultsOrSelf()
     val activeStatementResult = statementResults.getOrNull(selectedStatementIndex)
     val statementAnalysis = analyzeSqlStatement(state.draftSql)
+    val scriptOutline = remember(state.draftSql) { parseSqlScriptOutline(state.draftSql) }
+    val currentOutlineItem = scriptOutline.firstOrNull { editorCursorLine in it.startLine..it.endLine }
+        ?: scriptOutline.lastOrNull { editorCursorLine >= it.startLine }
     val isRunning = currentExecution?.status.equals("RUNNING", ignoreCase = true)
+    val pendingManualTransaction = currentExecution?.transactionState == "PENDING_COMMIT"
     val runButtonClass = buildRunButtonClass(statementAnalysis, state.strictSafetyEnabled)
     val runtimeContext = state.runtimeContext
     val connectionStatusBySource = state.connectionCheck?.sourceResults?.associateBy { it.sourceName }.orEmpty()
@@ -91,6 +101,10 @@ fun ComposeSqlConsolePage(
         ?.shardResults
         ?.firstOrNull { it.shardName == selectedResultShard && it.status.equals("SUCCESS", ignoreCase = true) && it.rows.isNotEmpty() }
         ?.shardName
+    var runAllAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var runCurrentAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var formatSqlAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var stopAction by remember { mutableStateOf<(() -> Unit)?>(null) }
 
     LaunchedEffect(store) {
         state = store.startLoading(state)
@@ -137,6 +151,9 @@ fun ComposeSqlConsolePage(
         state.strictSafetyEnabled,
         state.recentQueries.joinToString("\u0001"),
         state.favoriteQueries.joinToString("\u0001"),
+        state.favoriteObjects.joinToString("\u0001") { favorite ->
+            favorite.sourceName + "|" + favorite.schemaName + "|" + favorite.objectName + "|" + favorite.objectType + "|" + (favorite.tableName ?: "")
+        },
     ) {
         if (state.loading || state.info == null) {
             return@LaunchedEffect
@@ -153,6 +170,61 @@ fun ComposeSqlConsolePage(
         },
     )
 
+    LaunchedEffect(isRunning, currentExecution?.startedAt) {
+        if (!isRunning) {
+            runningClockTick = 0
+            return@LaunchedEffect
+        }
+        while (true) {
+            runningClockTick += 1
+            delay(1000)
+        }
+    }
+
+    runAllAction = {
+        if (state.actionInProgress != "run-query" && state.info?.configured.orFalse() && !pendingManualTransaction) {
+            scope.launch {
+                state = store.beginAction(state, "run-query")
+                state = store.startQuery(state)
+            }
+        }
+    }
+    runCurrentAction = {
+        val statementSql = currentOutlineItem?.sql?.trim().orEmpty()
+        if (
+            statementSql.isNotBlank() &&
+            state.actionInProgress != "run-current-query" &&
+            state.info?.configured.orFalse() &&
+            !pendingManualTransaction
+        ) {
+            scope.launch {
+                state = store.beginAction(state, "run-current-query")
+                state = store.startQuery(
+                    current = state,
+                    sqlOverride = statementSql,
+                    successMessage = "Текущий statement запущен.",
+                )
+            }
+        }
+    }
+    formatSqlAction = {
+        val formattedSql = formatSqlScript(state.draftSql)
+        if (formattedSql != state.draftSql) {
+            state = store.updateDraftSql(
+                state.copy(errorMessage = null, successMessage = "SQL отформатирован."),
+                formattedSql,
+            )
+        }
+    }
+    stopAction = {
+        if (isRunning && state.actionInProgress != "cancel-query") {
+            scope.launch {
+                state = store.beginAction(state, "cancel-query")
+                state = store.cancelExecution(state)
+            }
+        }
+    }
+
     PageScaffold(
         eyebrow = "Load Testing Data Platform",
         title = "SQL-консоль по источникам",
@@ -165,6 +237,10 @@ fun ComposeSqlConsolePage(
                     classes("btn", "btn-outline-secondary")
                     href("/")
                 }) { Text("На главную") }
+                A(attrs = {
+                    classes("btn", "btn-outline-secondary")
+                    href("/sql-console-objects")
+                }) { Text("Объекты БД") }
                 Button(attrs = {
                     classes("btn", "btn-dark")
                     attr("type", "button")
@@ -190,11 +266,6 @@ fun ComposeSqlConsolePage(
                 LoadingStateCard(title = "SQL-консоль", text = "Конфигурация SQL-консоли загружается.")
                 return@PageScaffold
             }
-
-            SqlConsoleOverviewStrip(
-                state = state,
-                connectionStatusText = state.connectionCheck?.let(::buildConnectionCheckStatusText),
-            )
 
             Div({ classes("row", "g-4") }) {
                 Div({ classes("col-12", "col-xl-3") }) {
@@ -400,11 +471,58 @@ fun ComposeSqlConsolePage(
                             onStrictSafetyToggle = {
                                 state = store.updateStrictSafety(state, !state.strictSafetyEnabled)
                             },
-                            onExecutionPolicyChange = {
-                                state = store.updateExecutionPolicy(state, it)
+                            onAutoCommitToggle = {
+                                state = store.updateAutoCommitEnabled(state, it)
                             },
-                            onTransactionModeChange = {
-                                state = store.updateTransactionMode(state, it)
+                        )
+
+                        SqlFavoriteObjectsBlock(
+                            favorites = state.favoriteObjects,
+                            onInsert = { favorite ->
+                                insertSqlText(
+                                    editor = editorInstance,
+                                    text = favorite.qualifiedName(),
+                                    currentValue = state.draftSql,
+                                    onFallback = { nextSql ->
+                                        state = store.updateDraftSql(state, nextSql)
+                                    },
+                                )
+                            },
+                            onInsertSelect = { favorite ->
+                                insertSqlText(
+                                    editor = editorInstance,
+                                    text = buildFavoritePreviewSql(favorite),
+                                    currentValue = state.draftSql,
+                                    onFallback = { nextSql ->
+                                        state = store.updateDraftSql(state, nextSql)
+                                    },
+                                )
+                            },
+                            onInsertCount = { favorite ->
+                                insertSqlText(
+                                    editor = editorInstance,
+                                    text = buildFavoriteCountSql(favorite),
+                                    currentValue = state.draftSql,
+                                    onFallback = { nextSql ->
+                                        state = store.updateDraftSql(state, nextSql)
+                                    },
+                                )
+                            },
+                            onOpenMetadata = { favorite ->
+                                window.location.href = buildFavoriteMetadataHref(favorite)
+                            },
+                            onRemove = { favorite ->
+                                state = store.removeFavoriteObject(state, favorite)
+                            },
+                        )
+
+                        SqlEditorIdeBlock(
+                            outlineItems = scriptOutline,
+                            currentLine = editorCursorLine,
+                            currentItem = currentOutlineItem,
+                            selectedSourceCount = state.selectedSourceNames.size,
+                            onJumpToLine = { lineNumber ->
+                                focusEditorLine(editorInstance, lineNumber)
                             },
                         )
 
@@ -413,6 +531,19 @@ fun ComposeSqlConsolePage(
                             language = "sql",
                             value = state.draftSql,
                             classNames = listOf("editor-frame", "sql-editor-frame"),
+                            onEditorReady = { editor ->
+                                editorInstance = editor
+                                editor.onDidChangeCursorPosition { event ->
+                                    editorCursorLine = event.position.lineNumber as Int
+                                }
+                                registerSqlConsoleEditorShortcuts(
+                                    editor = editor,
+                                    onRun = { runAllAction?.invoke() },
+                                    onRunCurrent = { runCurrentAction?.invoke() },
+                                    onFormat = { formatSqlAction?.invoke() },
+                                    onStop = { stopAction?.invoke() },
+                                )
+                            },
                             onValueChange = { next ->
                                 state = store.updateDraftSql(state, next)
                             },
@@ -444,17 +575,34 @@ fun ComposeSqlConsolePage(
                             }
                             Div({ classes("d-flex", "flex-wrap", "align-items-center", "gap-2") }) {
                                 Button(attrs = {
-                                    classes("btn", runButtonClass, "sql-action-button", "sql-action-button-run")
+                                    classes("btn", "btn-outline-dark")
                                     attr("type", "button")
-                                    if (state.actionInProgress == "run-query" || !state.info?.configured.orFalse()) {
+                                    onClick { formatSqlAction?.invoke() }
+                                }) {
+                                    Text("Форматировать")
+                                }
+                                Button(attrs = {
+                                    classes("btn", "btn-outline-dark")
+                                    attr("type", "button")
+                                    if (
+                                        state.actionInProgress == "run-current-query" ||
+                                        !state.info?.configured.orFalse() ||
+                                        pendingManualTransaction ||
+                                        currentOutlineItem == null
+                                    ) {
                                         disabled()
                                     }
-                                    onClick {
-                                        scope.launch {
-                                            state = store.beginAction(state, "run-query")
-                                            state = store.startQuery(state)
-                                        }
+                                    onClick { runCurrentAction?.invoke() }
+                                }) {
+                                    Text("Текущий")
+                                }
+                                Button(attrs = {
+                                    classes("btn", runButtonClass, "sql-action-button", "sql-action-button-run")
+                                    attr("type", "button")
+                                    if (state.actionInProgress == "run-query" || !state.info?.configured.orFalse() || pendingManualTransaction) {
+                                        disabled()
                                     }
+                                    onClick { runAllAction?.invoke() }
                                 }) {
                                     Span({ classes("sql-action-icon", "sql-action-icon-play") })
                                 }
@@ -464,14 +612,39 @@ fun ComposeSqlConsolePage(
                                     if (!isRunning || state.actionInProgress == "cancel-query") {
                                         disabled()
                                     }
+                                    onClick { stopAction?.invoke() }
+                                }) {
+                                    Span({ classes("sql-action-icon", "sql-action-icon-stop") })
+                                }
+                                Button(attrs = {
+                                    classes("btn", "btn-success")
+                                    attr("type", "button")
+                                    if (!pendingManualTransaction || state.actionInProgress == "commit-query") {
+                                        disabled()
+                                    }
                                     onClick {
                                         scope.launch {
-                                            state = store.beginAction(state, "cancel-query")
-                                            state = store.cancelExecution(state)
+                                            state = store.beginAction(state, "commit-query")
+                                            state = store.commitExecution(state)
                                         }
                                     }
                                 }) {
-                                    Span({ classes("sql-action-icon", "sql-action-icon-stop") })
+                                    Text("Commit")
+                                }
+                                Button(attrs = {
+                                    classes("btn", "btn-outline-danger")
+                                    attr("type", "button")
+                                    if (!pendingManualTransaction || state.actionInProgress == "rollback-query") {
+                                        disabled()
+                                    }
+                                    onClick {
+                                        scope.launch {
+                                            state = store.beginAction(state, "rollback-query")
+                                            state = store.rollbackExecution(state)
+                                        }
+                                    }
+                                }) {
+                                    Text("Rollback")
                                 }
                                 Button(attrs = {
                                     classes("btn", "btn-outline-secondary")
@@ -535,7 +708,7 @@ fun ComposeSqlConsolePage(
                         }
 
                         CommandGuardrail(analysis = statementAnalysis, strictSafetyEnabled = state.strictSafetyEnabled)
-                        ExecutionStatusStrip(currentExecution)
+                        ExecutionStatusStrip(currentExecution, runningClockTick)
 
                         Div({ classes("sql-output-panel") }) {
                             StatementSelectionBlock(
@@ -574,87 +747,6 @@ private fun buildSqlConsoleFallbackWarning(runtimeContext: com.sbrf.lt.platform.
     val effectiveLabel = if (runtimeContext.effectiveMode == ModuleStoreMode.DATABASE) "База данных" else "Файлы"
     val reason = runtimeContext.fallbackReason?.takeIf { it.isNotBlank() }?.let { " $it" }.orEmpty()
     return "Запрошен режим «$requestedLabel», но сейчас активен «$effectiveLabel». SQL-консоль доступна, однако экраны модулей работают по текущему runtime-context.$reason"
-}
-
-@Composable
-private fun SqlConsoleOverviewStrip(
-    state: SqlConsolePageState,
-    connectionStatusText: String?,
-) {
-    val execution = state.currentExecution
-    val selectedSourcesCount = state.selectedSourceNames.size
-    val executionLabel = when {
-        execution == null -> "Запусков еще не было"
-        execution.status.equals("RUNNING", ignoreCase = true) -> "Выполняется"
-        execution.status.equals("SUCCESS", ignoreCase = true) -> "Успешно"
-        execution.status.equals("FAILED", ignoreCase = true) -> "Ошибка"
-        execution.status.equals("CANCELLED", ignoreCase = true) -> "Остановлен"
-        else -> execution.status
-    }
-    val safetyLabel = if (state.strictSafetyEnabled) "Только read-only" else "Разрешены mutating SQL"
-    val executionPolicyLabel = if (state.executionPolicy == "CONTINUE_ON_ERROR") {
-        "Продолжать после ошибки"
-    } else {
-        "Останавливать shard после ошибки"
-    }
-    val transactionModeLabel = if (state.transactionMode == "TRANSACTION_PER_SHARD") {
-        "Одна транзакция на shard"
-    } else {
-        "Авто-коммит"
-    }
-
-    Div({ classes("sql-console-overview-grid", "mb-4") }) {
-        SqlConsoleOverviewCard(
-            label = "Выбрано sources",
-            value = selectedSourcesCount.toString(),
-            note = state.selectedSourceNames.joinToString(", ").ifBlank { "Ни один источник пока не выбран." },
-        )
-        SqlConsoleOverviewCard(
-            label = "Guardrail",
-            value = safetyLabel,
-            note = if (state.strictSafetyEnabled) {
-                "Опасные и mutating-команды будут блокироваться до отключения строгой защиты."
-            } else {
-                "UI предупреждает о mutating и dangerous SQL, но не блокирует их автоматически."
-            },
-        )
-        SqlConsoleOverviewCard(
-            label = "Последний запуск",
-            value = executionLabel,
-            note = connectionStatusText ?: "Проверка подключений еще не выполнялась.",
-        )
-        SqlConsoleOverviewCard(
-            label = "Скрипт policy",
-            value = executionPolicyLabel,
-            note = if (state.executionPolicy == "CONTINUE_ON_ERROR") {
-                "Следующие statement-ы продолжают выполняться даже после ошибки на shard."
-            } else {
-                "После ошибки на shard последующие statement-ы для него помечаются как SKIPPED."
-            },
-        )
-        SqlConsoleOverviewCard(
-            label = "Транзакции",
-            value = transactionModeLabel,
-            note = if (state.transactionMode == "TRANSACTION_PER_SHARD") {
-                "Все statement-ы для одного shard выполняются в одной JDBC-транзакции и откатываются при первой ошибке."
-            } else {
-                "Каждый statement выполняется в своем обычном auto-commit цикле."
-            },
-        )
-    }
-}
-
-@Composable
-private fun SqlConsoleOverviewCard(
-    label: String,
-    value: String,
-    note: String,
-) {
-    Div({ classes("sql-console-overview-card") }) {
-        Div({ classes("sync-overview-label") }) { Text(label) }
-        Div({ classes("sync-overview-value") }) { Text(value) }
-        Div({ classes("sync-overview-note") }) { Text(note) }
-    }
 }
 
 @Composable
@@ -704,8 +796,7 @@ private fun QueryLibraryBlock(
     onRemoveFavorite: () -> Unit,
     onClearRecent: () -> Unit,
     onStrictSafetyToggle: () -> Unit,
-    onExecutionPolicyChange: (String) -> Unit,
-    onTransactionModeChange: (String) -> Unit,
+    onAutoCommitToggle: (Boolean) -> Unit,
 ) {
     Div({ classes("sql-query-library", "mb-3") }) {
         Div({ classes("sql-query-library-row") }) {
@@ -793,49 +884,84 @@ private fun QueryLibraryBlock(
                     }
                     onClick { onStrictSafetyToggle() }
                 })
-                Span { Text("Строгая защита: разрешать только read-only запросы") }
+                Span { Text("Read-only") }
             }
         }
         Div({ classes("sql-query-library-block") }) {
-            Label(attrs = {
-                classes("small", "text-secondary", "mb-1")
-                attr("for", "composeExecutionPolicy")
-            }) { Text("Политика выполнения скрипта") }
-            Select(attrs = {
-                id("composeExecutionPolicy")
-                classes("form-select", "form-select-sm", "sql-recent-query-select")
-                onChange { onExecutionPolicyChange(it.value ?: "STOP_ON_FIRST_ERROR") }
-            }) {
-                Option(value = "STOP_ON_FIRST_ERROR", attrs = {
-                    if (state.executionPolicy == "STOP_ON_FIRST_ERROR") selected()
-                }) { Text("Остановить shard после ошибки") }
-                Option(value = "CONTINUE_ON_ERROR", attrs = {
-                    if (state.executionPolicy == "CONTINUE_ON_ERROR") selected()
-                    if (state.transactionMode == "TRANSACTION_PER_SHARD") disabled()
-                }) { Text("Продолжать несмотря на ошибки") }
+            Label(attrs = { classes("d-flex", "align-items-center", "gap-2", "small", "text-secondary", "mb-0") }) {
+                Input(type = InputType.Checkbox, attrs = {
+                    classes("form-check-input")
+                    if (state.transactionMode == "AUTO_COMMIT") {
+                        attr("checked", "checked")
+                    }
+                    onClick { onAutoCommitToggle(state.transactionMode != "AUTO_COMMIT") }
+                })
+                Span { Text("Autocommit") }
             }
-            if (state.transactionMode == "TRANSACTION_PER_SHARD") {
-                Div({ classes("small", "text-secondary", "mt-1") }) {
-                    Text("В транзакционном режиме доступна только политика «Остановить shard после ошибки».")
+        }
+    }
+}
+
+@Composable
+private fun SqlFavoriteObjectsBlock(
+    favorites: List<SqlConsoleFavoriteObject>,
+    onInsert: (SqlConsoleFavoriteObject) -> Unit,
+    onInsertSelect: (SqlConsoleFavoriteObject) -> Unit,
+    onInsertCount: (SqlConsoleFavoriteObject) -> Unit,
+    onOpenMetadata: (SqlConsoleFavoriteObject) -> Unit,
+    onRemove: (SqlConsoleFavoriteObject) -> Unit,
+) {
+    if (favorites.isEmpty()) {
+        return
+    }
+    Div({ classes("sql-query-library", "mb-3") }) {
+        Div({ classes("d-flex", "align-items-center", "justify-content-between", "gap-3", "mb-2") }) {
+            Div({ classes("panel-title", "mb-0") }) { Text("Избранные объекты") }
+            Div({ classes("small", "text-secondary") }) {
+                Text("Быстрая вставка имен и готовых SQL-шаблонов в редактор.")
+            }
+        }
+        Div({ classes("sql-favorite-objects-grid") }) {
+            favorites.forEach { favorite ->
+                Div({ classes("sql-favorite-object-card") }) {
+                    Div({ classes("sql-favorite-object-meta") }) {
+                        Div({ classes("sql-favorite-object-name") }) {
+                            Text(favorite.qualifiedName())
+                        }
+                        Div({ classes("sql-favorite-object-note") }) {
+                            Text("${favorite.sourceName} • ${translateFavoriteObjectType(favorite.objectType)}")
+                        }
+                    }
+                    Div({ classes("d-flex", "flex-wrap", "gap-2") }) {
+                        Button(attrs = {
+                            classes("btn", "btn-outline-dark", "btn-sm")
+                            attr("type", "button")
+                            onClick { onInsert(favorite) }
+                        }) { Text("Вставить") }
+                        Button(attrs = {
+                            classes("btn", "btn-dark", "btn-sm")
+                            attr("type", "button")
+                            onClick { onInsertSelect(favorite) }
+                        }) { Text(if (supportsFavoriteRowPreview(favorite)) "SELECT *" else "В SQL") }
+                        if (supportsFavoriteRowPreview(favorite)) {
+                            Button(attrs = {
+                                classes("btn", "btn-outline-dark", "btn-sm")
+                                attr("type", "button")
+                                onClick { onInsertCount(favorite) }
+                            }) { Text("COUNT(*)") }
+                        }
+                        Button(attrs = {
+                            classes("btn", "btn-outline-secondary", "btn-sm")
+                            attr("type", "button")
+                            onClick { onOpenMetadata(favorite) }
+                        }) { Text("Метаданные") }
+                        Button(attrs = {
+                            classes("btn", "btn-outline-danger", "btn-sm")
+                            attr("type", "button")
+                            onClick { onRemove(favorite) }
+                        }) { Text("Убрать") }
+                    }
                 }
-            }
-        }
-        Div({ classes("sql-query-library-block") }) {
-            Label(attrs = {
-                classes("small", "text-secondary", "mb-1")
-                attr("for", "composeTransactionMode")
-            }) { Text("Режим транзакций") }
-            Select(attrs = {
-                id("composeTransactionMode")
-                classes("form-select", "form-select-sm", "sql-recent-query-select")
-                onChange { onTransactionModeChange(it.value ?: "AUTO_COMMIT") }
-            }) {
-                Option(value = "AUTO_COMMIT", attrs = {
-                    if (state.transactionMode == "AUTO_COMMIT") selected()
-                }) { Text("Авто-коммит") }
-                Option(value = "TRANSACTION_PER_SHARD", attrs = {
-                    if (state.transactionMode == "TRANSACTION_PER_SHARD") selected()
-                }) { Text("Одна транзакция на shard") }
             }
         }
     }
@@ -864,6 +990,116 @@ private fun CommandGuardrail(
         Text(text)
     }
 }
+
+@Composable
+private fun SqlEditorIdeBlock(
+    outlineItems: List<SqlScriptOutlineItem>,
+    currentLine: Int,
+    currentItem: SqlScriptOutlineItem?,
+    selectedSourceCount: Int,
+    onJumpToLine: (Int) -> Unit,
+) {
+    Div({ classes("sql-query-library", "mb-3") }) {
+        Div({ classes("sql-query-library-block") }) {
+            Div({ classes("small", "text-secondary", "mb-1") }) { Text("Горячие клавиши") }
+            Div({ classes("sql-ide-hotkeys") }) {
+                Span({ classes("sql-ide-hotkey-chip") }) { Text("Cmd/Ctrl + Enter -> Запустить") }
+                Span({ classes("sql-ide-hotkey-chip") }) { Text("Shift + Alt + F -> Форматировать") }
+                Span({ classes("sql-ide-hotkey-chip") }) { Text("Esc -> Остановить") }
+            }
+        }
+        Div({ classes("sql-query-library-block") }) {
+            Div({ classes("small", "text-secondary", "mb-2") }) { Text("Текущий statement") }
+            if (currentItem == null) {
+                Div({ classes("sql-current-statement-card") }) {
+                    Div({ classes("small", "text-secondary") }) {
+                        Text("Поставь курсор внутрь statement-а, чтобы UI показал, что именно запустит action `Текущий`.")
+                    }
+                }
+            } else {
+                Div({ classes("sql-current-statement-card") }) {
+                    Div({ classes("d-flex", "justify-content-between", "align-items-start", "gap-3", "mb-2") }) {
+                        Div {
+                            Div({ classes("sql-current-statement-title") }) {
+                                Text("${currentItem.keyword} · строки ${currentItem.startLine}-${currentItem.endLine}")
+                            }
+                            Div({ classes("sql-current-statement-meta") }) {
+                                Text("Источников: $selectedSourceCount • Категория: ${statementCategoryText(currentItem)}")
+                            }
+                        }
+                        Div({ classes("d-flex", "flex-wrap", "gap-2") }) {
+                            StatementRiskBadge(currentItem)
+                        }
+                    }
+                    Div({ classes("sql-current-statement-preview") }) {
+                        Text(currentItem.preview)
+                    }
+                }
+            }
+        }
+        Div({ classes("sql-query-library-block") }) {
+            Div({ classes("d-flex", "justify-content-between", "align-items-center", "gap-3", "mb-2") }) {
+                Div({ classes("small", "text-secondary") }) { Text("Script outline") }
+                Div({ classes("small", "text-secondary") }) { Text("Statement-ов: ${outlineItems.size}") }
+            }
+            if (outlineItems.isEmpty()) {
+                Div({ classes("small", "text-secondary") }) {
+                    Text("Введи SQL, чтобы получить карту statement-ов и быстро прыгать по строкам.")
+                }
+            } else {
+                Div({ classes("sql-script-outline") }) {
+                    outlineItems.forEach { item ->
+                        Button(attrs = {
+                            classes(
+                                "btn",
+                                "btn-sm",
+                                "sql-script-outline-item",
+                                if (currentLine in item.startLine..item.endLine) "btn-dark" else "btn-outline-secondary",
+                            )
+                            attr("type", "button")
+                            onClick { onJumpToLine(item.startLine) }
+                        }) {
+                            Div({ classes("d-flex", "justify-content-between", "align-items-start", "gap-3", "w-100") }) {
+                                Span({ classes("sql-script-outline-item-main") }) {
+                                    Text("#${item.index} ${item.keyword} · строки ${item.startLine}-${item.endLine}")
+                                }
+                                StatementRiskBadge(item)
+                            }
+                            Span({ classes("sql-script-outline-item-preview") }) {
+                                Text(item.preview)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatementRiskBadge(item: SqlScriptOutlineItem) {
+    val cssClass = when {
+        item.keyword == "SQL" -> "sql-statement-risk-badge sql-statement-risk-neutral"
+        item.dangerous -> "sql-statement-risk-badge sql-statement-risk-danger"
+        !item.readOnly -> "sql-statement-risk-badge sql-statement-risk-warning"
+        else -> "sql-statement-risk-badge sql-statement-risk-safe"
+    }
+    val text = when {
+        item.keyword == "SQL" -> "SQL"
+        item.dangerous -> "Опасно"
+        !item.readOnly -> "Меняет данные"
+        else -> "Read-only"
+    }
+    Span({ classes(*cssClass.split(" ").toTypedArray()) }) { Text(text) }
+}
+
+private fun statementCategoryText(item: SqlScriptOutlineItem): String =
+    when {
+        item.keyword == "SQL" -> "SQL"
+        item.dangerous -> "Опасно"
+        !item.readOnly -> "Меняет данные"
+        else -> "Read-only"
+    }
 
 @Composable
 private fun StatementSelectionBlock(
@@ -898,7 +1134,12 @@ private fun StatementSelectionBlock(
 }
 
 @Composable
-private fun ExecutionStatusStrip(execution: SqlConsoleExecutionResponse?) {
+private fun ExecutionStatusStrip(
+    execution: SqlConsoleExecutionResponse?,
+    runningClockTick: Int,
+) {
+    val isRunning = execution?.status.equals("RUNNING", ignoreCase = true)
+    val showLiveDuration = isRunning && runningClockTick >= 0
     val cssClass = when {
         execution == null -> "sql-status-strip"
         execution.status.equals("FAILED", ignoreCase = true) -> "sql-status-strip sql-status-strip-failed"
@@ -911,7 +1152,13 @@ private fun ExecutionStatusStrip(execution: SqlConsoleExecutionResponse?) {
         execution.status.equals("RUNNING", ignoreCase = true) && execution.cancelRequested ->
             "Запрос выполняется, отправлена команда на остановку."
         execution.status.equals("RUNNING", ignoreCase = true) ->
-            "Запрос выполняется с ${execution.startedAt}."
+            "Сценарий выполняется."
+        execution.transactionState == "PENDING_COMMIT" ->
+            "Сценарий выполнен и ждет команды Коммит или Роллбек."
+        execution.transactionState == "COMMITTED" ->
+            "Транзакция зафиксирована."
+        execution.transactionState == "ROLLED_BACK" ->
+            "Транзакция откатана."
         execution.status.equals("SUCCESS", ignoreCase = true) ->
             "Запрос завершен успешно."
         execution.status.equals("FAILED", ignoreCase = true) ->
@@ -921,7 +1168,53 @@ private fun ExecutionStatusStrip(execution: SqlConsoleExecutionResponse?) {
         else -> "Статус запроса: ${execution.status}."
     }
     Div({ classes(*cssClass.split(" ").toTypedArray()) }) {
-        Text(text)
+        Div({ classes("sql-status-strip-content") }) {
+            if (isRunning && execution != null) {
+                Div({ classes("run-progress-status-wrap") }) {
+                    Div({ classes("run-progress-spinner-arrows") }) {
+                        Span({ classes("run-progress-spinner-arrow", "run-progress-spinner-arrow-forward") }) { Text("↻") }
+                        Span({ classes("run-progress-spinner-arrow", "run-progress-spinner-arrow-backward") }) { Text("↺") }
+                    }
+                    Div({ classes("sql-status-strip-copy") }) {
+                        Div({ classes("sql-status-strip-title") }) { Text(text) }
+                        Div({ classes("sql-status-strip-meta") }) {
+                            Text(
+                                buildString {
+                                    append("Старт: ")
+                                    append(formatDateTime(execution.startedAt))
+                                    append(" • Прошло: ")
+                                    append(formatDuration(execution.startedAt, execution.finishedAt, running = showLiveDuration))
+                                },
+                            )
+                        }
+                    }
+                }
+            } else {
+                Div({ classes("sql-status-strip-copy") }) {
+                    Div({ classes("sql-status-strip-title") }) { Text(text) }
+                    if (execution != null) {
+                        Div({ classes("sql-status-strip-meta") }) {
+                            Text(
+                                buildString {
+                                    append("Старт: ")
+                                    append(formatDateTime(execution.startedAt))
+                                    if (execution.transactionState == "PENDING_COMMIT" && execution.transactionShardNames.isNotEmpty()) {
+                                        append(" • Открытых транзакций: ")
+                                        append(execution.transactionShardNames.joinToString(", "))
+                                    }
+                                    if (!execution.finishedAt.isNullOrBlank()) {
+                                        append(" • Завершение: ")
+                                        append(formatDateTime(execution.finishedAt))
+                                        append(" • Длительность: ")
+                                        append(formatDuration(execution.startedAt, execution.finishedAt))
+                                    }
+                                },
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -1203,6 +1496,9 @@ private fun StatusResultPane(
                 Tr {
                     Th { Text("Source") }
                     Th { Text("Статус") }
+                    Th { Text("Старт") }
+                    Th { Text("Финиш") }
+                    Th { Text("Длительность") }
                     Th { Text("Затронуто строк") }
                     Th { Text("Сообщение") }
                     Th { Text("Ошибка") }
@@ -1215,6 +1511,9 @@ private fun StatusResultPane(
                             org.jetbrains.compose.web.dom.B { Text(shard.shardName) }
                         }
                         Td { StatusBadge(shard.status) }
+                        Td { Text(formatDateTime(shard.startedAt)) }
+                        Td { Text(formatDateTime(shard.finishedAt)) }
+                        Td { Text(formatDuration(shard.startedAt, shard.finishedAt, running = shard.status.equals("RUNNING", ignoreCase = true))) }
                         Td { Text(shard.affectedRows?.toString() ?: "-") }
                         Td { Text(shard.message ?: "-") }
                         Td { Text(shard.errorMessage ?: "-") }
@@ -1242,6 +1541,13 @@ private fun StatusResultPane(
                                     append(" • rows: ")
                                     append(shard.rowCount)
                                 }
+                                if (shard.durationMillis != null) {
+                                    append(" • длительность: ")
+                                    append(formatDurationMillis(shard.durationMillis))
+                                } else if (!shard.startedAt.isNullOrBlank()) {
+                                    append(" • старт: ")
+                                    append(formatDateTime(shard.startedAt))
+                                }
                                 if (shard.truncated) {
                                     append(" • результат усечен")
                                 }
@@ -1256,6 +1562,25 @@ private fun StatusResultPane(
             } else if (!shard.message.isNullOrBlank()) {
                 Div({ classes("alert", "alert-secondary", "mt-3", "mb-0") }) {
                     Text(shard.message ?: "")
+                }
+            }
+            Div({ classes("sql-shard-card-timings") }) {
+                Div { Text("Старт: ${formatDateTime(shard.startedAt)}") }
+                Div { Text("Финиш: ${formatDateTime(shard.finishedAt)}") }
+                Div {
+                    Text(
+                        "Длительность: ${
+                            if (shard.durationMillis != null) {
+                                formatDurationMillis(shard.durationMillis)
+                            } else {
+                                formatDuration(
+                                    shard.startedAt,
+                                    shard.finishedAt,
+                                    running = shard.status.equals("RUNNING", ignoreCase = true),
+                                )
+                            }
+                        }",
+                    )
                 }
             }
         }
@@ -1336,6 +1661,327 @@ private fun SqlConsoleQueryResult?.statementResultsOrSelf(): List<SqlConsoleStat
             )
         )
     }
+
+private data class SqlScriptOutlineItem(
+    val index: Int,
+    val keyword: String,
+    val readOnly: Boolean,
+    val dangerous: Boolean,
+    val startLine: Int,
+    val endLine: Int,
+    val sql: String,
+    val preview: String,
+)
+
+private fun parseSqlScriptOutline(sql: String): List<SqlScriptOutlineItem> {
+    val items = mutableListOf<SqlScriptOutlineItem>()
+    val current = StringBuilder()
+    var index = 0
+    var line = 1
+    var statementStartLine = 1
+    var inSingleQuote = false
+    var inDoubleQuote = false
+    var inLineComment = false
+    var inBlockComment = false
+
+    fun flushCurrent() {
+        val raw = current.toString().trim()
+        if (raw.isNotBlank()) {
+            val analysis = analyzeSqlStatement(raw)
+            val preview = raw.lineSequence()
+                .map { it.trim() }
+                .firstOrNull { it.isNotBlank() }
+                ?.take(120)
+                .orEmpty()
+            items += SqlScriptOutlineItem(
+                index = items.size + 1,
+                keyword = analysis.keyword,
+                readOnly = analysis.readOnly,
+                dangerous = analysis.dangerous,
+                startLine = statementStartLine,
+                endLine = line.coerceAtLeast(statementStartLine),
+                sql = raw,
+                preview = preview,
+            )
+        }
+        current.clear()
+    }
+
+    while (index < sql.length) {
+        val char = sql[index]
+        val next = sql.getOrNull(index + 1)
+
+        when {
+            inLineComment -> {
+                current.append(char)
+                if (char == '\n') {
+                    inLineComment = false
+                }
+            }
+
+            inBlockComment -> {
+                current.append(char)
+                if (char == '*' && next == '/') {
+                    current.append(next)
+                    index++
+                    inBlockComment = false
+                }
+            }
+
+            inSingleQuote -> {
+                current.append(char)
+                if (char == '\'' && next == '\'') {
+                    current.append(next)
+                    index++
+                } else if (char == '\'') {
+                    inSingleQuote = false
+                }
+            }
+
+            inDoubleQuote -> {
+                current.append(char)
+                if (char == '"' && next == '"') {
+                    current.append(next)
+                    index++
+                } else if (char == '"') {
+                    inDoubleQuote = false
+                }
+            }
+
+            char == '-' && next == '-' -> {
+                current.append(char).append(next)
+                index++
+                inLineComment = true
+            }
+
+            char == '/' && next == '*' -> {
+                current.append(char).append(next)
+                index++
+                inBlockComment = true
+            }
+
+            char == '\'' -> {
+                current.append(char)
+                inSingleQuote = true
+            }
+
+            char == '"' -> {
+                current.append(char)
+                inDoubleQuote = true
+            }
+
+            char == ';' -> {
+                flushCurrent()
+                statementStartLine = line
+            }
+
+            else -> current.append(char)
+        }
+
+        if (char == '\n') {
+            line += 1
+            if (current.isEmpty()) {
+                statementStartLine = line
+            }
+        }
+        index++
+    }
+
+    flushCurrent()
+    return items
+}
+
+private fun focusEditorLine(
+    editor: dynamic,
+    lineNumber: Int,
+) {
+    if (editor == null) {
+        return
+    }
+    editor.revealLineInCenter(lineNumber)
+    val position = js("{}")
+    position.lineNumber = lineNumber
+    position.column = 1
+    editor.setPosition(position)
+    editor.focus()
+}
+
+private fun insertSqlText(
+    editor: dynamic,
+    text: String,
+    currentValue: String,
+    onFallback: (String) -> Unit,
+) {
+    if (editor == null || editor.executeEdits == undefined) {
+        onFallback(appendSqlText(currentValue, text))
+        return
+    }
+    val edit = js("{}")
+    edit.range = editor.getSelection()
+    edit.text = text
+    edit.forceMoveMarkers = true
+    editor.executeEdits("compose-sql-console-favorites", arrayOf(edit))
+    editor.focus()
+}
+
+private fun appendSqlText(
+    currentValue: String,
+    text: String,
+): String =
+    when {
+        currentValue.isBlank() -> text
+        currentValue.last().isWhitespace() -> currentValue + text
+        else -> "$currentValue $text"
+    }
+
+private fun registerSqlConsoleEditorShortcuts(
+    editor: dynamic,
+    onRun: () -> Unit,
+    onRunCurrent: () -> Unit,
+    onFormat: () -> Unit,
+    onStop: () -> Unit,
+) {
+    val monaco = window.asDynamic().monaco ?: return
+    val ctrlEnter = (monaco.KeyMod.CtrlCmd as Int) or (monaco.KeyCode.Enter as Int)
+    val ctrlShiftEnter = (monaco.KeyMod.CtrlCmd as Int) or (monaco.KeyMod.Shift as Int) or (monaco.KeyCode.Enter as Int)
+    val shiftAltF = (monaco.KeyMod.Shift as Int) or (monaco.KeyMod.Alt as Int) or (monaco.KeyCode.KeyF as Int)
+    val escape = monaco.KeyCode.Escape as Int
+    editor.addCommand(ctrlEnter) {
+        onRun()
+    }
+    editor.addCommand(ctrlShiftEnter) {
+        onRunCurrent()
+    }
+    editor.addCommand(shiftAltF) {
+        onFormat()
+    }
+    editor.addCommand(escape) {
+        onStop()
+    }
+}
+
+private fun SqlConsoleFavoriteObject.qualifiedName(): String = "${schemaName}.${objectName}"
+
+private fun supportsFavoriteRowPreview(favorite: SqlConsoleFavoriteObject): Boolean =
+    when (favorite.objectType.uppercase()) {
+        "TABLE", "VIEW", "MATERIALIZED_VIEW" -> true
+        else -> false
+    }
+
+private fun buildFavoritePreviewSql(favorite: SqlConsoleFavoriteObject): String {
+    val qualifiedName = sqlQualifiedName(favorite.schemaName, favorite.objectName)
+    return if (supportsFavoriteRowPreview(favorite)) {
+        """
+        select *
+        from $qualifiedName
+        limit 100;
+        """.trimIndent()
+    } else {
+        """
+        select schemaname,
+               tablename,
+               indexname,
+               indexdef
+        from pg_catalog.pg_indexes
+        where schemaname = ${sqlLiteral(favorite.schemaName)}
+          and indexname = ${sqlLiteral(favorite.objectName)};
+        """.trimIndent()
+    }
+}
+
+private fun buildFavoriteCountSql(favorite: SqlConsoleFavoriteObject): String {
+    val qualifiedName = sqlQualifiedName(favorite.schemaName, favorite.objectName)
+    return """
+        select count(*) as total_rows
+        from $qualifiedName;
+    """.trimIndent()
+}
+
+private fun buildFavoriteMetadataHref(favorite: SqlConsoleFavoriteObject): String =
+    "/sql-console-objects?query=${urlEncode(favorite.objectName)}&source=${urlEncode(favorite.sourceName)}&schema=${urlEncode(favorite.schemaName)}&object=${urlEncode(favorite.objectName)}&type=${urlEncode(favorite.objectType)}"
+
+private fun sqlQualifiedName(
+    schemaName: String,
+    objectName: String,
+): String = "${sqlIdentifier(schemaName)}.${sqlIdentifier(objectName)}"
+
+private fun sqlIdentifier(value: String): String = "\"${value.replace("\"", "\"\"")}\""
+
+private fun sqlLiteral(value: String): String = "'${value.replace("'", "''")}'"
+
+private fun urlEncode(value: String): String = js("encodeURIComponent(value)") as String
+
+private fun translateFavoriteObjectType(type: String): String =
+    when (type.uppercase()) {
+        "TABLE" -> "Таблица"
+        "VIEW" -> "Представление"
+        "MATERIALIZED_VIEW" -> "Материализованное представление"
+        "INDEX" -> "Индекс"
+        else -> type
+    }
+
+private fun formatSqlScript(sql: String): String {
+    val outline = parseSqlScriptOutline(sql)
+    if (outline.isEmpty()) {
+        return sql.trim()
+    }
+    return outline.joinToString(separator = ";\n\n") { formatSqlStatement(it.sql) }.trim() +
+        if (sql.trimEnd().endsWith(";")) ";" else ""
+}
+
+private fun formatSqlStatement(sql: String): String {
+    val whitespaceNormalized = sql
+        .trim()
+        .replace(Regex("\\s+"), " ")
+
+    if (whitespaceNormalized.isBlank()) {
+        return ""
+    }
+
+    var formatted = whitespaceNormalized
+    listOf(
+        "WITH",
+        "SELECT",
+        "FROM",
+        "WHERE",
+        "GROUP BY",
+        "ORDER BY",
+        "HAVING",
+        "LIMIT",
+        "OFFSET",
+        "INSERT INTO",
+        "UPDATE",
+        "DELETE FROM",
+        "VALUES",
+        "SET",
+        "RETURNING",
+        "UNION ALL",
+        "UNION",
+        "LEFT JOIN",
+        "RIGHT JOIN",
+        "FULL JOIN",
+        "INNER JOIN",
+        "CROSS JOIN",
+        "JOIN",
+        "ON",
+    ).forEachIndexed { index, keyword ->
+        val prefix = if (index == 0) Regex("(?i)\\b$keyword\\b") else Regex("(?i)\\s+\\b$keyword\\b")
+        formatted = formatted.replace(prefix, "\n${keyword.uppercase()}")
+    }
+    formatted = formatted
+        .replace(Regex("\n+"), "\n")
+        .lines()
+        .joinToString("\n") { line ->
+            val trimmed = line.trim()
+            when {
+                trimmed.startsWith("ON ") -> "    $trimmed"
+                trimmed.startsWith("AND ") || trimmed.startsWith("OR ") -> "    $trimmed"
+                else -> trimmed
+            }
+        }
+        .trim()
+    return formatted
+}
 
 private fun SqlConsoleStatementResult.toStandaloneQueryResult(source: SqlConsoleQueryResult?): SqlConsoleQueryResult =
     SqlConsoleQueryResult(

@@ -24,6 +24,7 @@ fun MonacoEditorPane(
     value: String,
     readOnly: Boolean = false,
     classNames: List<String> = listOf("editor-frame"),
+    onEditorReady: ((dynamic) -> Unit)? = null,
     onValueChange: (String) -> Unit = {},
 ) {
     val elementId = remember(instanceKey) {
@@ -54,6 +55,7 @@ fun MonacoEditorPane(
                     editor.onDidChangeModelContent {
                         onValueChange(editor.getValue() as String)
                     }
+                    onEditorReady?.invoke(editor)
                     editorRef = editor
                 }
             }

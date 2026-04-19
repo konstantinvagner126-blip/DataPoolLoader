@@ -10,4 +10,6 @@ data class SqlConsoleStartQueryResponse(
     val status: String,
     val startedAt: Instant,
     val cancelRequested: Boolean,
+    val autoCommitEnabled: Boolean = true,
+    val transactionState: String = "NONE",
 )

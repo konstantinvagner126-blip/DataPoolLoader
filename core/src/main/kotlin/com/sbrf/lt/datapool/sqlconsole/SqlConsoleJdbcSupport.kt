@@ -4,10 +4,11 @@ import java.sql.Connection
 import java.sql.DriverManager
 import java.sql.SQLException
 import java.sql.Statement
+import java.time.Instant
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicBoolean
 
-class JdbcShardSqlExecutor : ShardSqlExecutor, ShardSqlScriptExecutor {
+class JdbcShardSqlExecutor : ShardSqlExecutor, ShardSqlScriptExecutor, ShardSqlTransactionalExecutor {
     override fun execute(
         shard: ResolvedSqlConsoleShardConfig,
         statement: SqlConsoleStatement,
@@ -38,46 +39,76 @@ class JdbcShardSqlExecutor : ShardSqlExecutor, ShardSqlScriptExecutor {
             "TRANSACTION_PER_SHARD поддерживает только STOP_ON_FIRST_ERROR."
         }
 
-        DriverManager.getConnection(shard.jdbcUrl, shard.username, shard.password).use { connection ->
-            connection.autoCommit = false
-            val results = mutableListOf<RawShardExecutionResult>()
-            try {
-                statements.forEachIndexed { index, statement ->
-                    if (executionControl.isCancelled()) {
-                        throw SqlConsoleExecutionCancelledException("Запрос отменен пользователем.")
+        return executeScriptInTransaction(
+            shard = shard,
+            statements = statements,
+            fetchSize = fetchSize,
+            maxRows = maxRows,
+            queryTimeoutSec = queryTimeoutSec,
+            executionPolicy = executionPolicy,
+            executionControl = executionControl,
+        ).let { execution ->
+            execution.pendingTransaction?.commit()
+            execution.results
+        }
+    }
+
+    override fun executeScriptInTransaction(
+        shard: ResolvedSqlConsoleShardConfig,
+        statements: List<SqlConsoleStatement>,
+        fetchSize: Int,
+        maxRows: Int,
+        queryTimeoutSec: Int?,
+        executionPolicy: SqlConsoleExecutionPolicy,
+        executionControl: SqlConsoleExecutionControl,
+    ): TransactionalShardScriptExecution {
+        require(executionPolicy == SqlConsoleExecutionPolicy.STOP_ON_FIRST_ERROR) {
+            "TRANSACTION_PER_SHARD поддерживает только STOP_ON_FIRST_ERROR."
+        }
+        val connection = DriverManager.getConnection(shard.jdbcUrl, shard.username, shard.password)
+        connection.autoCommit = false
+        val results = mutableListOf<RawShardExecutionResult>()
+        try {
+            statements.forEachIndexed { index, statement ->
+                if (executionControl.isCancelled()) {
+                    throw SqlConsoleExecutionCancelledException("Запрос отменен пользователем.")
+                }
+                val result = runCatching {
+                    executeSql(connection, shard, statement, fetchSize, maxRows, queryTimeoutSec, executionControl)
+                }.getOrElse { ex ->
+                    if (ex is SqlConsoleExecutionCancelledException) {
+                        throw ex
                     }
-                    val result = runCatching {
-                        executeSql(connection, shard, statement, fetchSize, maxRows, queryTimeoutSec, executionControl)
-                    }.getOrElse { ex ->
-                        if (ex is SqlConsoleExecutionCancelledException) {
-                            throw ex
-                        }
-                        rollbackQuietly(connection)
+                    rollbackQuietly(connection)
+                    runCatching { connection.close() }
+                    results += RawShardExecutionResult(
+                        shardName = shard.name,
+                        status = "FAILED",
+                        errorMessage = ex.message ?: "Неизвестная ошибка",
+                    )
+                    repeat(statements.lastIndex - index) {
                         results += RawShardExecutionResult(
                             shardName = shard.name,
-                            status = "FAILED",
-                            errorMessage = ex.message ?: "Неизвестная ошибка",
+                            status = "SKIPPED",
+                            message = "Statement пропущен из-за rollback после ошибки в транзакции.",
                         )
-                        repeat(statements.lastIndex - index) {
-                            results += RawShardExecutionResult(
-                                shardName = shard.name,
-                                status = "SKIPPED",
-                                message = "Statement пропущен из-за rollback после ошибки в транзакции.",
-                            )
-                        }
-                        return results
                     }
-                    results += result
+                    return TransactionalShardScriptExecution(results = results)
                 }
-                connection.commit()
-                return results
-            } catch (ex: SqlConsoleExecutionCancelledException) {
-                rollbackQuietly(connection)
-                throw ex
-            } catch (ex: Exception) {
-                rollbackQuietly(connection)
-                throw ex
+                results += result
             }
+            return TransactionalShardScriptExecution(
+                results = results,
+                pendingTransaction = JdbcPendingShardTransaction(shard.name, connection),
+            )
+        } catch (ex: SqlConsoleExecutionCancelledException) {
+            rollbackQuietly(connection)
+            runCatching { connection.close() }
+            throw ex
+        } catch (ex: Exception) {
+            rollbackQuietly(connection)
+            runCatching { connection.close() }
+            throw ex
         }
     }
 
@@ -90,6 +121,7 @@ class JdbcShardSqlExecutor : ShardSqlExecutor, ShardSqlScriptExecutor {
         queryTimeoutSec: Int?,
         executionControl: SqlConsoleExecutionControl,
     ): RawShardExecutionResult {
+        val startedAt = Instant.now()
         connection.createStatement().use { jdbcStatement ->
             executionControl.register(jdbcStatement)
             try {
@@ -114,6 +146,7 @@ class JdbcShardSqlExecutor : ShardSqlExecutor, ShardSqlScriptExecutor {
                                 }
                             }
                         }
+                        val finishedAt = Instant.now()
                         return RawShardExecutionResult(
                             shardName = shard.name,
                             status = "SUCCESS",
@@ -125,14 +158,21 @@ class JdbcShardSqlExecutor : ShardSqlExecutor, ShardSqlScriptExecutor {
                             } else {
                                 "Данные получены успешно."
                             },
+                            startedAt = startedAt,
+                            finishedAt = finishedAt,
+                            durationMillis = (finishedAt.toEpochMilli() - startedAt.toEpochMilli()).coerceAtLeast(0L),
                         )
                     }
                 }
+                val finishedAt = Instant.now()
                 return RawShardExecutionResult(
                     shardName = shard.name,
                     status = "SUCCESS",
                     affectedRows = jdbcStatement.updateCount.takeIf { it >= 0 },
                     message = "${statement.leadingKeyword} выполнен успешно.",
+                    startedAt = startedAt,
+                    finishedAt = finishedAt,
+                    durationMillis = (finishedAt.toEpochMilli() - startedAt.toEpochMilli()).coerceAtLeast(0L),
                 )
             } catch (ex: SQLException) {
                 if (executionControl.isCancelled()) {
@@ -147,6 +187,31 @@ class JdbcShardSqlExecutor : ShardSqlExecutor, ShardSqlScriptExecutor {
 
     private fun rollbackQuietly(connection: Connection) {
         runCatching { connection.rollback() }
+    }
+
+    private class JdbcPendingShardTransaction(
+        override val shardName: String,
+        private val connection: Connection,
+    ) : PendingShardTransaction {
+        private val closed = AtomicBoolean(false)
+
+        override fun commit() {
+            if (closed.compareAndSet(false, true)) {
+                runCatching { connection.commit() }
+                    .onFailure {
+                        runCatching { connection.close() }
+                    }
+                    .getOrThrow()
+                connection.close()
+            }
+        }
+
+        override fun rollback() {
+            if (closed.compareAndSet(false, true)) {
+                runCatching { connection.rollback() }
+                connection.close()
+            }
+        }
     }
 }
 

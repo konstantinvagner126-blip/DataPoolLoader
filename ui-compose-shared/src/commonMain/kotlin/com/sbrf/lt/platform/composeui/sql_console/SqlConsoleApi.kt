@@ -15,9 +15,15 @@ interface SqlConsoleApi {
 
     suspend fun checkConnections(): SqlConsoleConnectionCheckResponse
 
+    suspend fun searchObjects(request: SqlConsoleObjectSearchRequest): SqlConsoleObjectSearchResponse
+
     suspend fun startQuery(request: SqlConsoleQueryStartRequest): SqlConsoleStartQueryResponse
 
     suspend fun loadExecution(executionId: String): SqlConsoleExecutionResponse
 
     suspend fun cancelExecution(executionId: String): SqlConsoleExecutionResponse
+
+    suspend fun commitExecution(executionId: String): SqlConsoleExecutionResponse
+
+    suspend fun rollbackExecution(executionId: String): SqlConsoleExecutionResponse
 }

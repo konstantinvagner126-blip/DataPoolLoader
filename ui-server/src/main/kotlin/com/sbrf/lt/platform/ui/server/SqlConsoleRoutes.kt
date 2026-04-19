@@ -2,6 +2,7 @@ package com.sbrf.lt.platform.ui.server
 
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleExecutionPolicy
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleTransactionMode
+import com.sbrf.lt.platform.ui.model.SqlConsoleObjectSearchRequest
 import com.sbrf.lt.platform.ui.model.SqlConsoleExportRequest
 import com.sbrf.lt.platform.ui.model.SqlConsoleQueryRequest
 import com.sbrf.lt.platform.ui.model.SqlConsoleSettingsUpdateRequest
@@ -62,6 +63,24 @@ internal fun Route.registerSqlConsoleRoutes(context: UiServerContext) {
         }
     }
 
+    post("/api/sql-console/objects/search") {
+        val request = call.receive<SqlConsoleObjectSearchRequest>()
+        val tempDir = kotlin.io.path.createTempDirectory("datapool-ui-sql-console-objects-")
+        try {
+            val credentialsPath = context.filesRunService.materializeCredentialsFile(tempDir)
+            call.respond(
+                context.sqlConsoleService.searchObjects(
+                    rawQuery = request.query,
+                    credentialsPath = credentialsPath,
+                    selectedSourceNames = request.selectedSourceNames,
+                    maxObjectsPerSource = request.maxObjectsPerSource,
+                ).toResponse(),
+            )
+        } finally {
+            tempDir.toFile().deleteRecursively()
+        }
+    }
+
     post("/api/sql-console/query") {
         val request = call.receive<SqlConsoleQueryRequest>()
         val tempDir = kotlin.io.path.createTempDirectory("datapool-ui-sql-console-")
@@ -72,7 +91,7 @@ internal fun Route.registerSqlConsoleRoutes(context: UiServerContext) {
                     rawSql = request.sql,
                     credentialsPath = credentialsPath,
                     selectedSourceNames = request.selectedSourceNames,
-                    executionPolicy = request.toExecutionPolicy(),
+                    executionPolicy = SqlConsoleExecutionPolicy.STOP_ON_FIRST_ERROR,
                     transactionMode = request.toTransactionMode(),
                 ).toResponse(),
             )
@@ -125,7 +144,7 @@ internal fun Route.registerSqlConsoleRoutes(context: UiServerContext) {
                     sql = request.sql,
                     credentialsPath = credentialsPath,
                     selectedSourceNames = request.selectedSourceNames,
-                    executionPolicy = request.toExecutionPolicy(),
+                    executionPolicy = SqlConsoleExecutionPolicy.STOP_ON_FIRST_ERROR,
                     transactionMode = request.toTransactionMode(),
                     cleanupDir = tempDir,
                 ).toStartResponse(),
@@ -143,11 +162,15 @@ internal fun Route.registerSqlConsoleRoutes(context: UiServerContext) {
     post("/api/sql-console/query/{id}/cancel") {
         call.respond(context.sqlConsoleQueryManager.cancel(requireNotNull(call.parameters["id"])).toResponse())
     }
-}
 
-private fun SqlConsoleQueryRequest.toExecutionPolicy(): SqlConsoleExecutionPolicy =
-    runCatching { SqlConsoleExecutionPolicy.valueOf(executionPolicy.uppercase()) }
-        .getOrDefault(SqlConsoleExecutionPolicy.STOP_ON_FIRST_ERROR)
+    post("/api/sql-console/query/{id}/commit") {
+        call.respond(context.sqlConsoleQueryManager.commit(requireNotNull(call.parameters["id"])).toResponse())
+    }
+
+    post("/api/sql-console/query/{id}/rollback") {
+        call.respond(context.sqlConsoleQueryManager.rollback(requireNotNull(call.parameters["id"])).toResponse())
+    }
+}
 
 private fun SqlConsoleQueryRequest.toTransactionMode(): SqlConsoleTransactionMode =
     runCatching { SqlConsoleTransactionMode.valueOf(transactionMode.uppercase()) }

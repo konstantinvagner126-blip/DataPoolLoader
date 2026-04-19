@@ -6,8 +6,13 @@ import io.ktor.client.plugins.websocket.webSocketSession
 import com.sbrf.lt.datapool.sqlconsole.RawShardExecutionResult
 import com.sbrf.lt.datapool.sqlconsole.RawShardConnectionCheckResult
 import com.sbrf.lt.datapool.sqlconsole.ShardConnectionChecker
+import com.sbrf.lt.datapool.sqlconsole.ShardSqlObjectSearchResult
+import com.sbrf.lt.datapool.sqlconsole.ShardSqlObjectSearcher
 import com.sbrf.lt.datapool.sqlconsole.ShardSqlExecutor
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleConfig
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleDatabaseObject
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleDatabaseObjectColumn
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleDatabaseObjectType
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleExecutionCancelledException
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleSourceConfig
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleService
@@ -256,6 +261,26 @@ class ServerTest {
                     message = "Подключение установлено.",
                 )
             },
+            objectSearcher = ShardSqlObjectSearcher { shard, rawQuery, _ ->
+                assertEquals("offer", rawQuery)
+                ShardSqlObjectSearchResult(
+                    objects = listOf(
+                        SqlConsoleDatabaseObject(
+                            schemaName = "public",
+                            objectName = "${shard.name}_offer",
+                            objectType = SqlConsoleDatabaseObjectType.TABLE,
+                            columns = listOf(
+                                SqlConsoleDatabaseObjectColumn(
+                                    name = "id",
+                                    type = "bigint",
+                                    nullable = false,
+                                ),
+                            ),
+                            indexNames = listOf("${shard.name}_offer_idx"),
+                        ),
+                    ),
+                )
+            },
         )
         var savedMaxRows: Int? = null
         var savedTimeout: Int? = null
@@ -323,6 +348,13 @@ class ServerTest {
             composeSqlConsoleRedirect.headers[HttpHeaders.Location]
         )
 
+        val composeSqlConsoleObjectsRedirect = noRedirectClient.get("/compose-sql-console-objects")
+        assertEquals(HttpStatusCode.Found, composeSqlConsoleObjectsRedirect.status)
+        assertEquals(
+            "/static/compose-app/index.html?screen=sql-console-objects",
+            composeSqlConsoleObjectsRedirect.headers[HttpHeaders.Location]
+        )
+
         val modulesRedirect = noRedirectClient.get("/modules")
         assertEquals(HttpStatusCode.Found, modulesRedirect.status)
         assertEquals(
@@ -341,6 +373,13 @@ class ServerTest {
         assertEquals(
             "/static/compose-app/index.html?screen=sql-console",
             sqlConsoleRedirect.headers[HttpHeaders.Location],
+        )
+
+        val sqlConsoleObjectsRedirect = noRedirectClient.get("/sql-console-objects")
+        assertEquals(HttpStatusCode.Found, sqlConsoleObjectsRedirect.status)
+        assertEquals(
+            "/static/compose-app/index.html?screen=sql-console-objects",
+            sqlConsoleObjectsRedirect.headers[HttpHeaders.Location],
         )
 
         val modules = client.get("/api/modules").bodyAsText()
@@ -381,8 +420,17 @@ class ServerTest {
                 {
                   "draftSql":"select * from demo",
                   "recentQueries":["select * from demo"],
+                  "favoriteObjects":[
+                    {
+                      "sourceName":"shard1",
+                      "schemaName":"public",
+                      "objectName":"offer",
+                      "objectType":"TABLE"
+                    }
+                  ],
                   "selectedSourceNames":["shard1"],
-                  "pageSize":100
+                  "pageSize":100,
+                  "executionPolicy":"CONTINUE_ON_ERROR"
                 }
                 """.trimIndent()
             )
@@ -391,6 +439,8 @@ class ServerTest {
         val savedStateBody = savedState.bodyAsText()
         assertTrue(savedStateBody.contains("\"draftSql\":\"select * from demo\""))
         assertTrue(savedStateBody.contains("\"pageSize\":100"))
+        assertTrue(savedStateBody.contains("\"executionPolicy\":\"STOP_ON_FIRST_ERROR\""))
+        assertTrue(savedStateBody.contains("\"favoriteObjects\":[{\"sourceName\":\"shard1\""))
 
         val settings = client.post("/api/sql-console/settings") {
             contentType(ContentType.Application.Json)
@@ -408,6 +458,15 @@ class ServerTest {
         assertTrue(connections.contains("\"sourceName\":\"shard1\""))
         assertTrue(connections.contains("\"status\":\"SUCCESS\""))
 
+        val objects = client.post("/api/sql-console/objects/search") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"query":"offer","selectedSourceNames":["shard1"],"maxObjectsPerSource":30}""")
+        }.bodyAsText()
+        assertTrue(objects.contains("\"query\":\"offer\""))
+        assertTrue(objects.contains("\"sourceName\":\"shard1\""))
+        assertTrue(objects.contains("\"objectName\":\"shard1_offer\""))
+        assertTrue(objects.contains("\"indexNames\":[\"shard1_offer_idx\"]"))
+
         val queryResponse = client.post("/api/sql-console/query") {
             contentType(ContentType.Application.Json)
             setBody("""{"sql":"select 1 as id","selectedSourceNames":["shard1"]}""")
@@ -418,6 +477,8 @@ class ServerTest {
         assertTrue(queryBody.contains("\"statementKeyword\":\"SELECT\""))
         assertTrue(queryBody.contains("\"shardName\":\"shard1\""))
         assertTrue(queryBody.contains("\"rows\":[{\"id\":\"1\"}]"))
+        assertTrue(queryBody.contains("\"startedAt\":"))
+        assertTrue(queryBody.contains("\"durationMillis\":"))
 
         val exportCsvResponse = client.post("/api/sql-console/export/source-csv") {
             contentType(ContentType.Application.Json)
