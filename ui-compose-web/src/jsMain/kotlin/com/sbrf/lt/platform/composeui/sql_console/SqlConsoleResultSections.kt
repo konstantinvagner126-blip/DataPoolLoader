@@ -5,6 +5,7 @@ import com.sbrf.lt.platform.composeui.foundation.component.AlertBanner
 import com.sbrf.lt.platform.composeui.foundation.component.EmptyStateCard
 import com.sbrf.lt.platform.composeui.foundation.component.StatusBadge
 import com.sbrf.lt.platform.composeui.foundation.dom.classes
+import com.sbrf.lt.platform.composeui.foundation.dom.classesFromString
 import com.sbrf.lt.platform.composeui.foundation.format.formatDateTime
 import com.sbrf.lt.platform.composeui.foundation.format.formatDuration
 import com.sbrf.lt.platform.composeui.foundation.format.formatDurationMillis
@@ -39,7 +40,7 @@ internal fun ExecutionStatusStrip(
         else -> "sql-status-strip sql-status-strip-running"
     }
     val text = buildExecutionStatusText(execution)
-    Div({ classes(*cssClass.split(" ").toTypedArray()) }) {
+    Div({ classesFromString(cssClass) }) {
         Div({ classes("sql-status-strip-content") }) {
             if (isRunning && execution != null) {
                 Div({ classes("run-progress-status-wrap") }) {

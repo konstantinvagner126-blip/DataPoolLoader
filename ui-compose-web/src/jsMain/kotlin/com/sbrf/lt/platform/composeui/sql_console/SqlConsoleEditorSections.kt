@@ -2,6 +2,7 @@ package com.sbrf.lt.platform.composeui.sql_console
 
 import androidx.compose.runtime.Composable
 import com.sbrf.lt.platform.composeui.foundation.dom.classes
+import com.sbrf.lt.platform.composeui.foundation.dom.classesFromString
 import org.jetbrains.compose.web.attributes.type
 import org.jetbrains.compose.web.dom.Button
 import org.jetbrains.compose.web.dom.Div
@@ -27,7 +28,7 @@ internal fun CommandGuardrail(
         !analysis.readOnly -> "Команда ${analysis.keyword} может изменить данные или структуру на выбранных источниках."
         else -> "Команда ${analysis.keyword} распознана как read-only."
     }
-    Div({ classes(*cssClass.split(" ").toTypedArray()) }) {
+    Div({ classesFromString(cssClass) }) {
         Text(text)
     }
 }
@@ -92,7 +93,7 @@ internal fun StatementRiskBadge(item: SqlScriptOutlineItem) {
         !item.readOnly -> "Меняет данные"
         else -> "Read-only"
     }
-    Span({ classes(*cssClass.split(" ").toTypedArray()) }) { Text(text) }
+    Span({ classesFromString(cssClass) }) { Text(text) }
 }
 
 @Composable

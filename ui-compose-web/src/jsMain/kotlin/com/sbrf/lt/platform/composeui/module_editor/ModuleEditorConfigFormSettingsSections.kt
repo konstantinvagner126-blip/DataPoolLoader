@@ -117,25 +117,19 @@ internal fun DefaultSqlSection(
             ) { mode ->
                 onCommit(applyDefaultSqlMode(formState, mode, sqlResources))
             }
-            when (sqlState.mode) {
-                "INLINE" -> CommitTextareaField(
-                    label = "Встроенный SQL",
-                    value = sqlState.inlineText,
-                    disabled = disabled,
-                    rowsCount = 6,
-                    helpText = "Этот SQL будет применяться к источникам без собственного SQL.",
-                ) { onCommit(formState.copy(commonSql = it, commonSqlFile = null)) }
-
-                "CATALOG" -> CommitSelectField(
-                    label = "SQL-ресурс",
-                    value = sqlState.catalogPath,
-                    options = sqlResources.map { it.path to catalogLabel(it) },
-                    disabled = disabled,
-                    helpText = "Выбирается из вкладки SQL.",
-                ) { onCommit(formState.copy(commonSql = "", commonSqlFile = it.ifBlank { null })) }
-
-                "EXTERNAL" -> ExternalSqlAlert(sqlState.externalRef, storageMode)
-            }
+            CommitSqlModeFields(
+                mode = sqlState.mode,
+                inlineText = sqlState.inlineText,
+                catalogPath = sqlState.catalogPath,
+                externalRef = sqlState.externalRef,
+                sqlResources = sqlResources,
+                disabled = disabled,
+                storageMode = storageMode,
+                inlineRowsCount = 6,
+                inlineHelpText = "Этот SQL будет применяться к источникам без собственного SQL.",
+                onInlineCommit = { onCommit(formState.copy(commonSql = it, commonSqlFile = null)) },
+                onCatalogCommit = { onCommit(formState.copy(commonSql = "", commonSqlFile = it.ifBlank { null })) },
+            )
         }
     }
 }

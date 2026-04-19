@@ -103,25 +103,19 @@ internal fun SourcesSection(
                         ) { mode ->
                             onCommit(applySourceSqlMode(formState, index, mode, sqlResources))
                         }
-                        when (sourceSqlState.mode) {
-                            "INLINE" -> CommitTextareaField(
-                                label = "Встроенный SQL",
-                                value = sourceSqlState.inlineText,
-                                disabled = disabled,
-                                rowsCount = 5,
-                                helpText = "Если задан, перекрывает SQL по умолчанию.",
-                            ) { onCommit(updateSource(formState, index) { copy(sql = it, sqlFile = null) }) }
-
-                            "CATALOG" -> CommitSelectField(
-                                label = "SQL-ресурс",
-                                value = sourceSqlState.catalogPath,
-                                options = sqlResources.map { it.path to catalogLabel(it) },
-                                disabled = disabled,
-                                helpText = "Выбирается из вкладки SQL.",
-                            ) { onCommit(updateSource(formState, index) { copy(sql = null, sqlFile = it.ifBlank { null }) }) }
-
-                            "EXTERNAL" -> ExternalSqlAlert(sourceSqlState.externalRef, storageMode)
-                        }
+                        CommitSqlModeFields(
+                            mode = sourceSqlState.mode,
+                            inlineText = sourceSqlState.inlineText,
+                            catalogPath = sourceSqlState.catalogPath,
+                            externalRef = sourceSqlState.externalRef,
+                            sqlResources = sqlResources,
+                            disabled = disabled,
+                            storageMode = storageMode,
+                            inlineRowsCount = 5,
+                            inlineHelpText = "Если задан, перекрывает SQL по умолчанию.",
+                            onInlineCommit = { onCommit(updateSource(formState, index) { copy(sql = it, sqlFile = null) }) },
+                            onCatalogCommit = { onCommit(updateSource(formState, index) { copy(sql = null, sqlFile = it.ifBlank { null }) }) },
+                        )
                     }
                 }
             }

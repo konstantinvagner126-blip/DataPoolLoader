@@ -514,6 +514,10 @@
   - `SqlConsoleResultSections.kt` больше не держит две параллельные placeholder-ветки для `execution/result == null`; общий локальный `RenderExecutionResultPlaceholder(...)` закрывает pending/error empty-states для data/status tabs
   - `SqlConsoleObjectsPage.kt` больше не дублирует object identity markup между navigation target, favorites и object cards; общий локальный `SqlObjectIdentityBlock(...)` собирает name/context/detail presentation в одном месте
   - `ModuleEditorConfigFormSourceSections.kt` больше не повторяет add/remove action-button markup для sources/quotas; общий локальный `ConfigCollectionActionButton(...)` закрывает эти collection actions.
+- form/result helper cleanup продолжен:
+  - `ModuleEditorConfigFormSettingsSections.kt` и `ModuleEditorConfigFormSourceSections.kt` больше не держат две параллельные `when (sqlState.mode)` ветки; общий `CommitSqlModeFields(...)` в [ModuleEditorConfigFormFieldSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorConfigFormFieldSupport.kt) собирает `INLINE/CATALOG/EXTERNAL` UI в одном месте
+  - `SqlConsoleResultSections.kt` больше не токенизирует class-string вручную через `split(\" \")`; status strip переведен на общий DOM helper `classesFromString(...)`
+  - `SqlConsoleEditorSections.kt` больше не токенизирует class-string вручную через `split(\" \")`; `CommandGuardrail` и `StatementRiskBadge` используют общий DOM helper `classesFromString(...)`.
 - credentials upload helper cleanup:
   - duplicate `uploadCredentialsFile(...)` больше не живет параллельно в `module_editor` и `sql_console`
   - общий web-only helper вынесен в [CredentialsHttpSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/foundation/http/CredentialsHttpSupport.kt)
