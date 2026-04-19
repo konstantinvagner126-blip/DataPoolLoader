@@ -302,6 +302,20 @@
   - [ModuleRunsPageSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsPageSections.kt)
   - [ModuleRunsPageSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsPageSupport.kt);
 - [ModuleRunsPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsPage.kt) сокращен до shell/wiring-слоя, а detail-pane вынесен в отдельные section-компоненты.
+- начат реальный распил [ModuleSyncPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncPage.kt);
+- sync visual sections и helper-слои вынесены в:
+  - [ModuleSyncPageSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncPageSections.kt)
+  - [ModuleSyncPageSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncPageSupport.kt);
+- [ModuleSyncPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncPage.kt) сокращен до shell/wiring-слоя.
+- начат реальный распил [RunHistoryCleanupPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/run_history_cleanup/RunHistoryCleanupPage.kt);
+- cleanup visual sections и helper-слои вынесены в:
+  - [RunHistoryCleanupPageSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/run_history_cleanup/RunHistoryCleanupPageSections.kt)
+  - [RunHistoryCleanupPageSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/run_history_cleanup/RunHistoryCleanupPageSupport.kt);
+- [RunHistoryCleanupPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/run_history_cleanup/RunHistoryCleanupPage.kt) сокращен до shell/wiring-слоя.
+- homepage visual sections и helper-слои вынесены в:
+  - [HomePageSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/home/HomePageSections.kt)
+  - [HomePageSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/home/HomePageSupport.kt);
+- [HomePage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/home/HomePage.kt) сокращен до shell/wiring-слоя и перестал держать hero/card/helper реализацию в одном файле.
 
 Критерий завершения:
 
