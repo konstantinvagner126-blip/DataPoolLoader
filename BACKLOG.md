@@ -655,6 +655,15 @@
 - module_editor catalog item cleanup:
   - rendering одного элемента каталога вынесен в `ModuleCatalogListItem(...)` в [ModuleEditorPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPage.kt)
   - module list больше не держит inline badge/title/tag rendering внутри большого sidebar-блока.
+- module_editor config-form action cleanup:
+  - action button-ы `Собрать форму заново / Перечитать из application.yml` сведены к `ConfigFormActionButton(...)` в [ModuleEditorConfigForm.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorConfigForm.kt)
+  - settings form больше не держит две отдельные button-ветки для одного и того же secondary action pattern.
+- sql_console editor block cleanup:
+  - muted text и button shell-ы для outline/statement selection сведены к `SqlEditorMutedText(...)`, `SqlEditorOutlineButton(...)` и `SqlEditorStatementButton(...)` в [SqlConsoleEditorSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleEditorSections.kt)
+  - editor sections больше не повторяют одинаковые `small text-secondary` и `btn btn-sm` ветки между outline и statement selector.
+- sql_console source-result panel cleanup:
+  - panel header и muted text для результатов по source сведены к `SqlObjectSourceResultPanel(...)` и `SqlObjectSourceMutedText(...)` в [SqlConsoleObjectsPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectsPage.kt)
+  - source result list больше не держит повторяющиеся header/summary/empty-state shell-ветки на каждом source.
 
 Критерий завершения:
 

@@ -34,16 +34,12 @@ fun ModuleEditorSettingsForm(
             title = "Настройки модуля",
             subtitle = "Форма строится из application.yml через тот же backend-контракт, что и в основном UI.",
             actions = {
-                Button(attrs = {
-                    classes("btn", "btn-outline-secondary")
-                    attr("type", "button")
-                    if (state.configFormLoading) {
-                        disabled()
-                    }
-                    onClick { onRefreshFromConfig() }
-                }) {
-                    Text("Собрать форму заново")
-                }
+                ConfigFormActionButton(
+                    label = "Собрать форму заново",
+                    toneClass = "btn-outline-secondary",
+                    disabled = state.configFormLoading,
+                    onClick = onRefreshFromConfig,
+                )
             },
         ) {
             if (!configFormError.isNullOrBlank()) {
@@ -72,16 +68,12 @@ fun ModuleEditorSettingsForm(
         subtitle = "Compose-форма использует те же parse/apply endpoint-ы, что и production UI.",
         actions = {
             if (state.configFormNeedsSync) {
-                Button(attrs = {
-                    classes("btn", "btn-outline-warning")
-                    attr("type", "button")
-                    if (state.configFormLoading) {
-                        disabled()
-                    }
-                    onClick { onRefreshFromConfig() }
-                }) {
-                    Text("Перечитать из application.yml")
-                }
+                ConfigFormActionButton(
+                    label = "Перечитать из application.yml",
+                    toneClass = "btn-outline-warning",
+                    disabled = state.configFormLoading,
+                    onClick = onRefreshFromConfig,
+                )
             }
         },
     ) {
@@ -132,5 +124,24 @@ fun ModuleEditorSettingsForm(
             disabled = state.configFormLoading,
             onCommit = onApplyFormState,
         )
+    }
+}
+
+@Composable
+private fun ConfigFormActionButton(
+    label: String,
+    toneClass: String,
+    disabled: Boolean,
+    onClick: () -> Unit,
+) {
+    Button(attrs = {
+        classes("btn", toneClass)
+        attr("type", "button")
+        if (disabled) {
+            disabled()
+        }
+        onClick { onClick() }
+    }) {
+        Text(label)
     }
 }

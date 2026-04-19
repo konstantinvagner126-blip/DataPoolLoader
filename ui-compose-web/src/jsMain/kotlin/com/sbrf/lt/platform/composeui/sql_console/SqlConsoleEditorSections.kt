@@ -42,26 +42,18 @@ internal fun SqlEditorIdeBlock(
     Div({ classes("sql-query-library", "mb-3") }) {
         Div({ classes("sql-query-library-block") }) {
             Div({ classes("d-flex", "justify-content-between", "align-items-center", "gap-3", "mb-2") }) {
-                Div({ classes("small", "text-secondary") }) { Text("Script outline") }
-                Div({ classes("small", "text-secondary") }) { Text("Statement-ов: ${outlineItems.size}") }
+                SqlEditorMutedText("Script outline")
+                SqlEditorMutedText("Statement-ов: ${outlineItems.size}")
             }
             if (outlineItems.isEmpty()) {
-                Div({ classes("small", "text-secondary") }) {
-                    Text("Введи SQL, чтобы получить карту statement-ов и быстро прыгать по строкам.")
-                }
+                SqlEditorMutedText("Введи SQL, чтобы получить карту statement-ов и быстро прыгать по строкам.")
             } else {
                 Div({ classes("sql-script-outline") }) {
                     outlineItems.forEach { item ->
-                        Button(attrs = {
-                            classes(
-                                "btn",
-                                "btn-sm",
-                                "sql-script-outline-item",
-                                if (currentLine in item.startLine..item.endLine) "btn-dark" else "btn-outline-secondary",
-                            )
-                            attr("type", "button")
-                            onClick { onJumpToLine(item.startLine) }
-                        }) {
+                        SqlEditorOutlineButton(
+                            active = currentLine in item.startLine..item.endLine,
+                            onClick = { onJumpToLine(item.startLine) },
+                        ) {
                             Div({ classes("d-flex", "justify-content-between", "align-items-start", "gap-3", "w-100") }) {
                                 Span({ classes("sql-script-outline-item-main") }) {
                                     Text("#${item.index} ${item.keyword} · строки ${item.startLine}-${item.endLine}")
@@ -107,23 +99,70 @@ internal fun StatementSelectionBlock(
     }
 
     Div({ classes("sql-query-library", "mb-3") }) {
-        Div({ classes("small", "text-secondary", "mb-2") }) {
-            Text("Скрипт содержит ${statementResults.size} statement-ов. Выбери statement, для которого показывать данные, статусы и экспорт.")
-        }
+        SqlEditorMutedText("Скрипт содержит ${statementResults.size} statement-ов. Выбери statement, для которого показывать данные, статусы и экспорт.", "mb-2")
         Div({ classes("d-flex", "flex-wrap", "gap-2") }) {
             statementResults.forEachIndexed { index, statement ->
-                Button(attrs = {
-                    classes(
-                        "btn",
-                        "btn-sm",
-                        if (index == selectedStatementIndex) "btn-dark" else "btn-outline-secondary",
-                    )
-                    attr("type", "button")
-                    onClick { onSelectStatement(index) }
-                }) {
+                SqlEditorStatementButton(
+                    active = index == selectedStatementIndex,
+                    onClick = { onSelectStatement(index) },
+                ) {
                     Text("#${index + 1} ${statement.statementKeyword}")
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun SqlEditorMutedText(
+    text: String,
+    marginClass: String = "",
+) {
+    Div({
+        classes("small", "text-secondary")
+        if (marginClass.isNotBlank()) {
+            classes(marginClass)
+        }
+    }) {
+        Text(text)
+    }
+}
+
+@Composable
+private fun SqlEditorOutlineButton(
+    active: Boolean,
+    onClick: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    Button(attrs = {
+        classes(
+            "btn",
+            "btn-sm",
+            "sql-script-outline-item",
+            if (active) "btn-dark" else "btn-outline-secondary",
+        )
+        attr("type", "button")
+        onClick { onClick() }
+    }) {
+        content()
+    }
+}
+
+@Composable
+private fun SqlEditorStatementButton(
+    active: Boolean,
+    onClick: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    Button(attrs = {
+        classes(
+            "btn",
+            "btn-sm",
+            if (active) "btn-dark" else "btn-outline-secondary",
+        )
+        attr("type", "button")
+        onClick { onClick() }
+    }) {
+        content()
     }
 }

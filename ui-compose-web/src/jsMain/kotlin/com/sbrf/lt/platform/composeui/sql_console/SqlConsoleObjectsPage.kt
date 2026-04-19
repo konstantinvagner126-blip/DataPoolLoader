@@ -233,26 +233,17 @@ fun ComposeSqlConsoleObjectsPage(
                         else -> {
                             Div({ classes("sql-object-source-results") }) {
                                 searchResponse.sourceResults.forEach { sourceResult ->
-                                    Div({ classes("panel", "sql-object-source-panel") }) {
-                                        Div({ classes("d-flex", "justify-content-between", "align-items-center", "gap-3", "mb-3") }) {
-                                            H4({ classes("panel-title", "mb-0") }) {
-                                                Text(sourceResult.sourceName)
-                                            }
-                                            Span({ classes("sql-object-source-summary") }) {
-                                                Text("Найдено: ${sourceResult.objects.size}")
-                                            }
-                                        }
+                                    SqlObjectSourceResultPanel(
+                                        sourceName = sourceResult.sourceName,
+                                        objectCount = sourceResult.objects.size,
+                                    ) {
                                         sourceResult.errorMessage?.let { errorMessage ->
                                             AlertBanner(errorMessage, "warning")
                                         } ?: if (sourceResult.objects.isEmpty()) {
-                                            Div({ classes("small", "text-secondary") }) {
-                                                Text("По этому source совпадений нет.")
-                                            }
+                                            SqlObjectSourceMutedText("По этому source совпадений нет.")
                                         } else {
                                             if (sourceResult.truncated) {
-                                                Div({ classes("small", "text-secondary", "mb-3") }) {
-                                                    Text("Показаны первые ${searchResponse.maxObjectsPerSource} объектов по source.")
-                                                }
+                                                SqlObjectSourceMutedText("Показаны первые ${searchResponse.maxObjectsPerSource} объектов по source.", "mb-3")
                                             }
                                             Div({ classes("sql-object-result-list") }) {
                                                 sourceResult.objects
@@ -374,6 +365,40 @@ private fun SqlObjectOverviewCard(
         Div({ classes("eyebrow") }) { Text(label) }
         Div({ classes("sql-object-overview-value") }) { Text(value) }
         Div({ classes("small", "text-secondary") }) { Text(note) }
+    }
+}
+
+@Composable
+private fun SqlObjectSourceResultPanel(
+    sourceName: String,
+    objectCount: Int,
+    content: @Composable () -> Unit,
+) {
+    Div({ classes("panel", "sql-object-source-panel") }) {
+        Div({ classes("d-flex", "justify-content-between", "align-items-center", "gap-3", "mb-3") }) {
+            H4({ classes("panel-title", "mb-0") }) {
+                Text(sourceName)
+            }
+            Span({ classes("sql-object-source-summary") }) {
+                Text("Найдено: $objectCount")
+            }
+        }
+        content()
+    }
+}
+
+@Composable
+private fun SqlObjectSourceMutedText(
+    text: String,
+    marginClass: String = "",
+) {
+    Div({
+        classes("small", "text-secondary")
+        if (marginClass.isNotBlank()) {
+            classes(marginClass)
+        }
+    }) {
+        Text(text)
     }
 }
 
