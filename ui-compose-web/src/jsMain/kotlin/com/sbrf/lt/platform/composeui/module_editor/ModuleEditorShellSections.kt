@@ -138,17 +138,7 @@ internal fun EditorShellHeader(
                         Div({ classes("module-editor-toolbar-group", "module-editor-toolbar-group-primary") }) {
                             Div({ classes("module-editor-toolbar-group-label") }) { Text("Выполнение") }
                             EditorActionButton("Запустить", capabilities.run && !actionBusy, EditorActionStyle.Success, onRun)
-                            A(attrs = {
-                                classes("btn", "btn-outline-secondary")
-                                if (state.selectedModuleId == null) {
-                                    classes("disabled")
-                                }
-                                if (state.selectedModuleId != null) {
-                                    href(buildRunsHref(route, state.selectedModuleId))
-                                } else {
-                                    attr("aria-disabled", "true")
-                                }
-                            }) { Text("История и результаты") }
+                            RunsHistoryLinkButton(route, state.selectedModuleId)
                         }
                         Div({ classes("module-editor-toolbar-group", "module-editor-toolbar-group-draft") }) {
                             Div({ classes("module-editor-toolbar-group-label") }) { Text("Личный черновик") }
@@ -172,17 +162,7 @@ internal fun EditorShellHeader(
                     Div({ classes("module-editor-toolbar-row") }) {
                         Div({ classes("module-editor-toolbar-group", "module-editor-toolbar-group-primary") }) {
                             Div({ classes("module-editor-toolbar-group-label") }) { Text("Выполнение") }
-                            A(attrs = {
-                                classes("btn", "btn-outline-secondary")
-                                if (state.selectedModuleId == null) {
-                                    classes("disabled")
-                                }
-                                if (state.selectedModuleId != null) {
-                                    href(buildRunsHref(route, state.selectedModuleId))
-                                } else {
-                                    attr("aria-disabled", "true")
-                                }
-                            }) { Text("История и результаты") }
+                            RunsHistoryLinkButton(route, state.selectedModuleId)
                             EditorActionButton("Запустить", capabilities.run && !actionBusy, EditorActionStyle.PrimarySolid, onRun)
                         }
                         Div({ classes("module-editor-toolbar-group", "module-editor-toolbar-group-secondary") }) {
@@ -195,6 +175,24 @@ internal fun EditorShellHeader(
             }
         }
     }
+}
+
+@Composable
+private fun RunsHistoryLinkButton(
+    route: ModuleEditorRouteState,
+    moduleId: String?,
+) {
+    A(attrs = {
+        classes("btn", "btn-outline-secondary")
+        if (moduleId == null) {
+            classes("disabled")
+        }
+        if (moduleId != null) {
+            href(buildRunsHref(route, moduleId))
+        } else {
+            attr("aria-disabled", "true")
+        }
+    }) { Text("История и результаты") }
 }
 
 @Composable

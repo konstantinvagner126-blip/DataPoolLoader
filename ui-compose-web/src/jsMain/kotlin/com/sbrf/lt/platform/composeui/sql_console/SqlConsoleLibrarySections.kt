@@ -141,29 +141,35 @@ internal fun QueryLibraryBlock(
                 }
             }
         }
-        Div({ classes("sql-query-library-block") }) {
-            Label(attrs = { classes("d-flex", "align-items-center", "gap-2", "small", "text-secondary", "mb-0") }) {
-                Input(type = InputType.Checkbox, attrs = {
-                    classes("form-check-input")
-                    if (state.strictSafetyEnabled) {
-                        attr("checked", "checked")
-                    }
-                    onClick { onStrictSafetyToggle() }
-                })
-                Span { Text("Read-only") }
-            }
-        }
-        Div({ classes("sql-query-library-block") }) {
-            Label(attrs = { classes("d-flex", "align-items-center", "gap-2", "small", "text-secondary", "mb-0") }) {
-                Input(type = InputType.Checkbox, attrs = {
-                    classes("form-check-input")
-                    if (state.transactionMode == "AUTO_COMMIT") {
-                        attr("checked", "checked")
-                    }
-                    onClick { onAutoCommitToggle(state.transactionMode != "AUTO_COMMIT") }
-                })
-                Span { Text("Autocommit") }
-            }
+        SqlConsoleSettingToggle(
+            label = "Read-only",
+            checked = state.strictSafetyEnabled,
+            onToggle = onStrictSafetyToggle,
+        )
+        SqlConsoleSettingToggle(
+            label = "Autocommit",
+            checked = state.transactionMode == "AUTO_COMMIT",
+            onToggle = { onAutoCommitToggle(state.transactionMode != "AUTO_COMMIT") },
+        )
+    }
+}
+
+@Composable
+private fun SqlConsoleSettingToggle(
+    label: String,
+    checked: Boolean,
+    onToggle: () -> Unit,
+) {
+    Div({ classes("sql-query-library-block") }) {
+        Label(attrs = { classes("d-flex", "align-items-center", "gap-2", "small", "text-secondary", "mb-0") }) {
+            Input(type = InputType.Checkbox, attrs = {
+                classes("form-check-input")
+                if (checked) {
+                    attr("checked", "checked")
+                }
+                onClick { onToggle() }
+            })
+            Span { Text(label) }
         }
     }
 }

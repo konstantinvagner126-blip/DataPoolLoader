@@ -565,6 +565,15 @@
 - module_editor external SQL alert text cleanup:
   - pure copy для внешней SQL-ссылки вынесена из web form-layer в shared [ModuleEditorLabels.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorLabels.kt)
   - [ModuleEditorConfigFormFieldSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorConfigFormFieldSupport.kt) больше не держит route/storage-specific alert text inline.
+- module_editor shell action cleanup:
+  - дублирующийся link-button `История и результаты` вынесен из двух toolbar-веток в локальный `RunsHistoryLinkButton(...)` внутри [ModuleEditorShellSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorShellSections.kt)
+  - DB/files toolbar больше не держат две одинаковые anchor-конструкции с `buildRunsHref(...)`.
+- sql_console library toggle cleanup:
+  - checkbox-блоки `Read-only` и `Autocommit` сведены к одному `SqlConsoleSettingToggle(...)` внутри [SqlConsoleLibrarySections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleLibrarySections.kt)
+  - library sections больше не держат две почти одинаковые `Label + Input(type=Checkbox)` ветки.
+- sql_console navigation support cleanup:
+  - `SqlObjectNavigationTarget` и `matches(...)` схлопнуты в общий object helper-слой [SqlConsoleObjectSqlSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectSqlSupport.kt)
+  - отдельный tiny-файл [SqlConsoleObjectNavigationSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectNavigationSupport.kt) удален как слой без самостоятельной architectural ценности.
 - module_runs support cleanup:
   - остаточный [ModuleRunsPageSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsPageSupport.kt) удален
   - `backHref` перенесен в [ModuleRunsRoute.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsRoute.kt)
