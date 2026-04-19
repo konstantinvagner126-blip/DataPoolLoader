@@ -135,28 +135,10 @@ fun ComposeSqlConsoleObjectsPage(
                 Div({ classes("sql-object-target-card", "mb-4") }) {
                     Div({ classes("panel-title", "mb-2") }) { Text("Текущий объект") }
                     Div({ classes("sql-object-target-name") }) {
-                        Text(
-                            buildString {
-                                if (target.schemaName.isNotBlank()) {
-                                    append(target.schemaName)
-                                    append(".")
-                                }
-                                append(target.objectName)
-                            },
-                        )
+                        Text(target.qualifiedName())
                     }
                     Div({ classes("small", "text-secondary") }) {
-                        Text(
-                            buildString {
-                                if (target.sourceName.isNotBlank()) {
-                                    append(target.sourceName)
-                                }
-                                if (target.objectType.isNotBlank()) {
-                                    if (isNotEmpty()) append(" • ")
-                                    append(translateSqlObjectType(target.objectType))
-                                }
-                            },
-                        )
+                        Text(target.contextLabel())
                     }
                 }
             }
@@ -172,10 +154,10 @@ fun ComposeSqlConsoleObjectsPage(
                             Div({ classes("sql-favorite-object-card") }) {
                                 Div({ classes("sql-favorite-object-meta") }) {
                                     Div({ classes("sql-favorite-object-name") }) {
-                                        Text("${favorite.schemaName}.${favorite.objectName}")
+                                        Text(favorite.qualifiedName())
                                     }
                                     Div({ classes("sql-favorite-object-note") }) {
-                                        Text("${favorite.sourceName} • ${translateSqlObjectType(favorite.objectType)}")
+                                        Text(favorite.contextLabel())
                                     }
                                 }
                             }
@@ -379,10 +361,10 @@ private fun SqlConsoleObjectCard(
         Div({ classes("d-flex", "justify-content-between", "align-items-start", "gap-3", "mb-2") }) {
             Div {
                 Div({ classes("sql-object-name") }) {
-                    Text("${dbObject.schemaName}.${dbObject.objectName}")
+                    Text(dbObject.qualifiedName())
                 }
                 Div({ classes("small", "text-secondary") }) {
-                    Text("$sourceName • ${translateSqlObjectType(dbObject.objectType)}")
+                    Text(dbObject.contextLabel(sourceName))
                 }
                 if (isSelectedObject) {
                     Div({ classes("sql-object-selected-note") }) {

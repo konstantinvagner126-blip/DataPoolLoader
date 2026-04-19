@@ -519,6 +519,7 @@
   - [ModuleEditorRunSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorRunSections.kt) и [ModuleEditorConfigFormFieldSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorConfigFormFieldSupport.kt) используют единый helper вместо двух локальных реализаций.
 - module_editor route/presentation cleanup:
   - route URL builder-ы вынесены из page support в [ModuleEditorRoute.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorRoute.kt)
+  - query string для editor route больше не собирается вручную в [ModuleEditorPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPage.kt), а живет рядом с route builder-ами в [ModuleEditorRoute.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorRoute.kt)
   - `formatEditorTimeoutSeconds(...)` заменен на общий foundation helper `formatTimeoutSeconds(...)`
   - остаточный [ModuleEditorPageSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPageSupport.kt) удален, а одноразовый `validationBadgeClass(...)` локализован в [ModuleEditorPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPage.kt).
 - module_editor config form cleanup:
@@ -535,11 +536,17 @@
 - sql_console navigation cleanup:
   - `SqlObjectNavigationTarget` и `matches(...)` вынесены из [SqlConsoleObjectsPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectsPage.kt) в focused [SqlConsoleObjectNavigationSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectNavigationSupport.kt)
   - objects page больше не держит локальный navigation matching helper внутри экранного файла.
+- sql_console object display cleanup:
+  - display helper-ы `qualifiedName()/contextLabel()` для favorite/object/navigation target сведены в общий object support-слой
+  - [SqlConsoleObjectsPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectsPage.kt) и [SqlConsoleLibrarySections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleLibrarySections.kt) больше не держат локальные `schema.object` и `source • type` string-builder ветки.
 - sql_console script/editor cleanup:
   - script outline и SQL formatting вынесены в [SqlConsoleScriptSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleScriptSupport.kt)
   - Monaco/editor interaction helper-ы вынесены в [SqlConsoleEditorInteractionSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleEditorInteractionSupport.kt)
   - data/result helper-ы вынесены в [SqlConsoleQueryResultSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleQueryResultSupport.kt)
   - остаточный mixed [SqlConsolePageSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsolePageSupport.kt) удален.
+- sql_console result text cleanup:
+  - execution/shard summary text builder-ы вынесены из [SqlConsoleResultSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleResultSections.kt) в focused [SqlConsoleResultTextSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleResultTextSupport.kt)
+  - result sections больше не держат несколько локальных `buildString`-веток для execution meta, shard status и data-page summary в одном UI-файле.
 - module_runs support cleanup:
   - остаточный [ModuleRunsPageSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsPageSupport.kt) удален
   - `backHref` перенесен в [ModuleRunsRoute.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsRoute.kt)

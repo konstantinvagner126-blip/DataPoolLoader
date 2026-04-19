@@ -37,26 +37,7 @@ internal fun ExecutionStatusStrip(
         execution.status.equals("CANCELLED", ignoreCase = true) -> "sql-status-strip sql-status-strip-warning"
         else -> "sql-status-strip sql-status-strip-running"
     }
-    val text = when {
-        execution == null -> "Запрос пока не выполнялся."
-        execution.status.equals("RUNNING", ignoreCase = true) && execution.cancelRequested ->
-            "Запрос выполняется, отправлена команда на остановку."
-        execution.status.equals("RUNNING", ignoreCase = true) ->
-            "Сценарий выполняется."
-        execution.transactionState == "PENDING_COMMIT" ->
-            "Сценарий выполнен и ждет команды Коммит или Роллбек."
-        execution.transactionState == "COMMITTED" ->
-            "Транзакция зафиксирована."
-        execution.transactionState == "ROLLED_BACK" ->
-            "Транзакция откатана."
-        execution.status.equals("SUCCESS", ignoreCase = true) ->
-            "Запрос завершен успешно."
-        execution.status.equals("FAILED", ignoreCase = true) ->
-            execution.errorMessage ?: "Запрос завершился ошибкой."
-        execution.status.equals("CANCELLED", ignoreCase = true) ->
-            "Запрос остановлен."
-        else -> "Статус запроса: ${execution.status}."
-    }
+    val text = buildExecutionStatusText(execution)
     Div({ classes(*cssClass.split(" ").toTypedArray()) }) {
         Div({ classes("sql-status-strip-content") }) {
             if (isRunning && execution != null) {
@@ -68,14 +49,7 @@ internal fun ExecutionStatusStrip(
                     Div({ classes("sql-status-strip-copy") }) {
                         Div({ classes("sql-status-strip-title") }) { Text(text) }
                         Div({ classes("sql-status-strip-meta") }) {
-                            Text(
-                                buildString {
-                                    append("Старт: ")
-                                    append(formatDateTime(execution.startedAt))
-                                    append(" • Прошло: ")
-                                    append(formatDuration(execution.startedAt, execution.finishedAt, running = showLiveDuration))
-                                },
-                            )
+                            Text(buildExecutionStatusMeta(execution, showLiveDuration))
                         }
                     }
                 }
@@ -84,22 +58,7 @@ internal fun ExecutionStatusStrip(
                     Div({ classes("sql-status-strip-title") }) { Text(text) }
                     if (execution != null) {
                         Div({ classes("sql-status-strip-meta") }) {
-                            Text(
-                                buildString {
-                                    append("Старт: ")
-                                    append(formatDateTime(execution.startedAt))
-                                    if (execution.transactionState == "PENDING_COMMIT" && execution.transactionShardNames.isNotEmpty()) {
-                                        append(" • Открытых транзакций: ")
-                                        append(execution.transactionShardNames.joinToString(", "))
-                                    }
-                                    if (!execution.finishedAt.isNullOrBlank()) {
-                                        append(" • Завершение: ")
-                                        append(formatDateTime(execution.finishedAt))
-                                        append(" • Длительность: ")
-                                        append(formatDuration(execution.startedAt, execution.finishedAt))
-                                    }
-                                },
-                            )
+                            Text(buildExecutionStatusMeta(execution, showLiveDuration = false))
                         }
                     }
                 }
@@ -267,24 +226,14 @@ internal fun SelectResultPane(
     }
     Div({ classes("small", "text-secondary", "mb-3") }) {
         Text(
-            buildString {
-                append("Source ")
-                append(activeShard.shardName)
-                append(". Показано строк: ")
-                append(if (activeShard.rowCount == 0) 0 else startIndex + 1)
-                append("-")
-                append(endIndexExclusive)
-                append(" из ")
-                append(activeShard.rowCount)
-                append(". Страница ")
-                append(normalizedPage)
-                append(" из ")
-                append(totalPages)
-                append(".")
-                if (activeShard.truncated) {
-                    append(" Результат усечен лимитом ${result.maxRowsPerShard} строк на source.")
-                }
-            },
+            buildResultPageSummary(
+                shard = activeShard,
+                result = result,
+                startIndex = startIndex,
+                endIndexExclusive = endIndexExclusive,
+                normalizedPage = normalizedPage,
+                totalPages = totalPages,
+            ),
         )
     }
     Div({ classes("table-responsive") }) {
@@ -356,20 +305,7 @@ internal fun StatusResultPane(
     }
 
     Div({ classes("text-secondary", "small", "mb-3") }) {
-        Text(
-            buildString {
-                append("Тип команды: ")
-                append(result.statementKeyword)
-                append(" • shard/source: ")
-                append(result.shardResults.size)
-                append(" • startedAt: ")
-                append(execution.startedAt)
-                if (!execution.finishedAt.isNullOrBlank()) {
-                    append(" • finishedAt: ")
-                    append(execution.finishedAt.orEmpty())
-                }
-            },
-        )
+        Text(buildResultStatusSummary(execution, result))
     }
     if (result.shardResults.isEmpty()) {
         EmptyStateCard(
@@ -415,30 +351,7 @@ internal fun StatusResultPane(
                     Div {
                         H3({ classes("h6", "mb-1") }) { Text(shard.shardName) }
                         Div({ classes("small", "text-secondary") }) {
-                            Text(
-                                buildString {
-                                    append("Статус: ")
-                                    append(shard.status)
-                                    if (shard.affectedRows != null) {
-                                        append(" • affectedRows: ")
-                                        append(shard.affectedRows)
-                                    }
-                                    if (shard.rowCount > 0) {
-                                        append(" • rows: ")
-                                        append(shard.rowCount)
-                                    }
-                                    if (shard.durationMillis != null) {
-                                        append(" • длительность: ")
-                                        append(formatDurationMillis(shard.durationMillis))
-                                    } else if (!shard.startedAt.isNullOrBlank()) {
-                                        append(" • старт: ")
-                                        append(formatDateTime(shard.startedAt))
-                                    }
-                                    if (shard.truncated) {
-                                        append(" • результат усечен")
-                                    }
-                                },
-                            )
+                            Text(buildShardStatusSummary(shard))
                         }
                     }
                     StatusBadge(shard.status)
@@ -453,21 +366,7 @@ internal fun StatusResultPane(
                 Div({ classes("sql-shard-card-timings") }) {
                     Div { Text("Старт: ${formatDateTime(shard.startedAt)}") }
                     Div { Text("Финиш: ${formatDateTime(shard.finishedAt)}") }
-                    Div {
-                        Text(
-                            "Длительность: ${
-                                if (shard.durationMillis != null) {
-                                    formatDurationMillis(shard.durationMillis)
-                                } else {
-                                    formatDuration(
-                                        shard.startedAt,
-                                        shard.finishedAt,
-                                        running = shard.status.equals("RUNNING", ignoreCase = true),
-                                    )
-                                }
-                            }",
-                        )
-                    }
+                    Div { Text("Длительность: ${buildShardDurationText(shard)}") }
                 }
             }
         }

@@ -26,7 +26,32 @@ fun buildComposeEditorUrl(
     moduleId: String?,
     includeHidden: Boolean,
 ): String {
-    val query = buildString {
+    return buildPrimaryEditorUrl(storage, buildEditorQuery(storage, moduleId, includeHidden))
+}
+
+fun buildPrimaryEditorUrl(
+    storage: String,
+    query: String,
+): String =
+    if (storage == "database") {
+        "/db-modules$query"
+    } else {
+        "/modules$query"
+    }
+
+fun buildPrimaryEditorUrl(
+    storage: String,
+    moduleId: String?,
+    includeHidden: Boolean,
+): String =
+    buildPrimaryEditorUrl(storage, buildEditorQuery(storage, moduleId, includeHidden))
+
+private fun buildEditorQuery(
+    storage: String,
+    moduleId: String?,
+    includeHidden: Boolean,
+): String =
+    buildString {
         var separator = '?'
         if (!moduleId.isNullOrBlank()) {
             append(separator)
@@ -38,16 +63,4 @@ fun buildComposeEditorUrl(
             append(separator)
             append("includeHidden=true")
         }
-    }
-    return buildPrimaryEditorUrl(storage, query)
-}
-
-fun buildPrimaryEditorUrl(
-    storage: String,
-    query: String,
-): String =
-    if (storage == "database") {
-        "/db-modules$query"
-    } else {
-        "/modules$query"
     }

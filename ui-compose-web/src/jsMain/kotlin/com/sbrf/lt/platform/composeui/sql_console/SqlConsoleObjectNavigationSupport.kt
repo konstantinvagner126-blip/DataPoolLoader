@@ -7,6 +7,26 @@ internal data class SqlObjectNavigationTarget(
     val objectType: String,
 )
 
+internal fun SqlObjectNavigationTarget.qualifiedName(): String =
+    buildString {
+        if (schemaName.isNotBlank()) {
+            append(schemaName)
+            append(".")
+        }
+        append(objectName)
+    }
+
+internal fun SqlObjectNavigationTarget.contextLabel(): String =
+    buildString {
+        if (sourceName.isNotBlank()) {
+            append(sourceName)
+        }
+        if (objectType.isNotBlank()) {
+            if (isNotEmpty()) append(" • ")
+            append(translateSqlObjectType(objectType))
+        }
+    }
+
 internal fun SqlObjectNavigationTarget.matches(
     sourceName: String,
     dbObject: SqlConsoleDatabaseObject,

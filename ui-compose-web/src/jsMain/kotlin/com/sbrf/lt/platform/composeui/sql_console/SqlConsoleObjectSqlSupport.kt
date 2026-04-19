@@ -4,6 +4,28 @@ internal fun SqlConsoleFavoriteObject.qualifiedName(): String = "${schemaName}.$
 
 internal fun SqlConsoleDatabaseObject.qualifiedName(): String = "${schemaName}.${objectName}"
 
+internal fun SqlConsoleFavoriteObject.contextLabel(): String =
+    buildString {
+        if (sourceName.isNotBlank()) {
+            append(sourceName)
+        }
+        if (objectType.isNotBlank()) {
+            if (isNotEmpty()) append(" • ")
+            append(translateSqlObjectType(objectType))
+        }
+    }
+
+internal fun SqlConsoleDatabaseObject.contextLabel(sourceName: String): String =
+    buildString {
+        if (sourceName.isNotBlank()) {
+            append(sourceName)
+        }
+        if (objectType.isNotBlank()) {
+            if (isNotEmpty()) append(" • ")
+            append(translateSqlObjectType(objectType))
+        }
+    }
+
 internal fun supportsFavoriteRowPreview(favorite: SqlConsoleFavoriteObject): Boolean =
     supportsRowPreview(favorite.objectType)
 

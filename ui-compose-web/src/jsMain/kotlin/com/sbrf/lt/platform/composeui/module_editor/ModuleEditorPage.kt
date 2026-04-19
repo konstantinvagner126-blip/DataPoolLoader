@@ -72,20 +72,7 @@ fun ComposeModuleEditorPage(
         ModuleEditorStore(
             api = api,
             syncRoute = { storage, moduleId, includeHidden ->
-                val query = buildString {
-                    var separator = '?'
-                    if (!moduleId.isNullOrBlank()) {
-                        append(separator)
-                        append("module=")
-                        append(moduleId)
-                        separator = '&'
-                    }
-                    if (storage == "database" && includeHidden) {
-                        append(separator)
-                        append("includeHidden=true")
-                    }
-                }
-                window.history.replaceState(null, "", buildPrimaryEditorUrl(storage, query))
+                window.history.replaceState(null, "", buildPrimaryEditorUrl(storage, moduleId, includeHidden))
             },
         )
     }
