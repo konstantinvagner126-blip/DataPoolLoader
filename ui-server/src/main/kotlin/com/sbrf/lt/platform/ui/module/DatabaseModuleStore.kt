@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.sbrf.lt.datapool.db.registry.DatabaseConnectionProvider
 import com.sbrf.lt.datapool.db.registry.DriverManagerDatabaseConnectionProvider
+import com.sbrf.lt.datapool.db.registry.model.RegistryModuleCreationResult
+import com.sbrf.lt.datapool.db.registry.model.RegistryModuleDraft
 import com.sbrf.lt.datapool.module.validation.ModuleValidationService
 import com.sbrf.lt.platform.ui.config.UiModuleStorePostgresConfig
 import com.sbrf.lt.platform.ui.config.schemaName
@@ -62,8 +64,8 @@ open class DatabaseModuleStore(
         actorSource: String,
         actorDisplayName: String?,
         originKind: String,
-        request: CreateModuleRequest,
-    ): CreateModuleResult = mutationSupport.createModule(
+        request: RegistryModuleDraft,
+    ): RegistryModuleCreationResult = mutationSupport.createModule(
         moduleCode = moduleCode,
         actorId = actorId,
         actorSource = actorSource,

@@ -11,6 +11,5 @@ data class SqlConsoleStateUpdateRequest(
     val selectedSourceNames: List<String> = emptyList(),
     val pageSize: Int = 50,
     val strictSafetyEnabled: Boolean = false,
-    val executionPolicy: String = "STOP_ON_FIRST_ERROR",
     val transactionMode: String = "AUTO_COMMIT",
 )

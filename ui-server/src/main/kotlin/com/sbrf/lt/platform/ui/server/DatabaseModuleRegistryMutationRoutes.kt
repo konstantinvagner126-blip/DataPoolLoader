@@ -1,5 +1,6 @@
 package com.sbrf.lt.platform.ui.server
 
+import com.sbrf.lt.datapool.db.registry.model.RegistryModuleDraft
 import com.sbrf.lt.platform.ui.model.CreateDbModuleRequest
 import io.ktor.server.application.call
 import io.ktor.server.request.receive
@@ -19,7 +20,7 @@ internal fun Route.registerDatabaseModuleRegistryMutationRoutes(context: UiServe
             actorId = actor.actorId,
             actorSource = actor.actorSource,
             actorDisplayName = actor.actorDisplayName,
-            request = com.sbrf.lt.platform.ui.module.CreateModuleRequest(
+            request = RegistryModuleDraft(
                 title = request.title,
                 description = request.description,
                 tags = request.tags,

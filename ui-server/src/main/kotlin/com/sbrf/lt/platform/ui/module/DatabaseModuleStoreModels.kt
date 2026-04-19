@@ -1,7 +1,5 @@
 package com.sbrf.lt.platform.ui.module
 
-import com.sbrf.lt.datapool.db.registry.model.RegistryModuleCreationResult
-import com.sbrf.lt.datapool.db.registry.model.RegistryModuleDraft
 import com.sbrf.lt.platform.ui.model.ModuleDetailsResponse
 import com.sbrf.lt.platform.ui.model.ModuleValidationIssueResponse
 
@@ -97,7 +95,3 @@ data class DeleteModuleResult(
     val moduleId: String,
     val deletedBy: String,
 )
-
-typealias CreateModuleRequest = RegistryModuleDraft
-
-typealias CreateModuleResult = RegistryModuleCreationResult

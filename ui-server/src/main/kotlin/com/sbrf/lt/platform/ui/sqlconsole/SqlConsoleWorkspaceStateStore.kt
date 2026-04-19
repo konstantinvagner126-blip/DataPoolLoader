@@ -31,6 +31,7 @@ class SqlConsoleWorkspaceStateStore(
         val migrated = legacyStateStore.load().toWorkspaceState()
         if (legacyStateStore.exists()) {
             save(migrated)
+            cleanupLegacyCombinedSqlConsoleStateIfMigrated(storageDir, legacyStateStore)
         }
         return migrated
     }

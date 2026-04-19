@@ -1,6 +1,8 @@
 package com.sbrf.lt.platform.ui.module
 
 import com.sbrf.lt.datapool.db.registry.DatabaseConnectionProvider
+import com.sbrf.lt.datapool.db.registry.model.RegistryModuleCreationResult
+import com.sbrf.lt.datapool.db.registry.model.RegistryModuleDraft
 import com.sbrf.lt.datapool.db.registry.sql.ModuleRegistrySql
 import com.sbrf.lt.datapool.db.registry.sql.normalizeRegistrySchemaName
 import com.sbrf.lt.platform.ui.model.SaveModuleRequest
@@ -131,8 +133,8 @@ internal class DatabaseModuleStoreMutationSupport(
         actorSource: String,
         actorDisplayName: String?,
         originKind: String,
-        request: CreateModuleRequest,
-    ): CreateModuleResult = withTransaction { connection, normalizedSchema ->
+        request: RegistryModuleDraft,
+    ): RegistryModuleCreationResult = withTransaction { connection, normalizedSchema ->
         val moduleId = UUID.randomUUID().toString()
         val revisionId = UUID.randomUUID().toString()
         val workingCopyId = UUID.randomUUID().toString()
@@ -183,7 +185,7 @@ internal class DatabaseModuleStoreMutationSupport(
             request = request,
         )
 
-        CreateModuleResult(
+        RegistryModuleCreationResult(
             moduleId = moduleId,
             moduleCode = moduleCode,
             revisionId = revisionId,

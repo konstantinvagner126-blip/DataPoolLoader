@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.sbrf.lt.datapool.config.ConfigLoader
 import com.sbrf.lt.datapool.config.sql.SqlFileReferenceExtractor
+import com.sbrf.lt.datapool.db.registry.model.RegistryModuleDraft
 import com.sbrf.lt.datapool.db.registry.sql.ModuleRegistrySql
 import com.sbrf.lt.datapool.module.validation.ModuleValidationService
 import com.sbrf.lt.datapool.model.AppConfig
@@ -81,7 +82,7 @@ internal class DatabaseModuleRevisionWriter(
         revisionId: String,
         moduleId: String,
         revisionSource: String,
-        request: CreateModuleRequest,
+        request: RegistryModuleDraft,
         actorId: String,
     ) {
         val tagsArray = objectMapper.createArrayNode()
@@ -271,7 +272,7 @@ internal class DatabaseModuleRevisionWriter(
         }
     }
 
-    fun contentHashForCreate(request: CreateModuleRequest): String {
+    fun contentHashForCreate(request: RegistryModuleDraft): String {
         val input = buildString {
             append(request.configText)
             append('\u0000')

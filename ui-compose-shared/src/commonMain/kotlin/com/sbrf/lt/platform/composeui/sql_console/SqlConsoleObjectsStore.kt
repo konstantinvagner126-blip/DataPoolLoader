@@ -193,7 +193,6 @@ private fun SqlConsoleStateSnapshot.toUpdate(
         selectedSourceNames = selectedSourceNames,
         pageSize = pageSize,
         strictSafetyEnabled = strictSafetyEnabled,
-        executionPolicy = executionPolicy,
         transactionMode = transactionMode,
     )
 

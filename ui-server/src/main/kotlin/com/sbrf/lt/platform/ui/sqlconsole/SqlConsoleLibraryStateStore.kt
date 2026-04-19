@@ -33,6 +33,7 @@ class SqlConsoleLibraryStateStore(
             ?: legacyStateStore.load().toLibraryState()
         if (legacyPreferencesFile.exists() || legacyStateStore.exists()) {
             save(migrated)
+            cleanupLegacyCombinedSqlConsoleStateIfMigrated(storageDir, legacyStateStore)
         }
         return migrated
     }

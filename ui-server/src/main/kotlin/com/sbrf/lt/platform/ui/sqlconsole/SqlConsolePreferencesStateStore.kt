@@ -31,6 +31,7 @@ class SqlConsolePreferencesStateStore(
         val migrated = legacyStateStore.load().toPreferencesState()
         if (legacyStateStore.exists()) {
             save(migrated)
+            cleanupLegacyCombinedSqlConsoleStateIfMigrated(storageDir, legacyStateStore)
         }
         return migrated
     }

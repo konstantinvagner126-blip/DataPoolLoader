@@ -20,7 +20,6 @@ data class SqlConsoleStateSnapshot(
     val selectedSourceNames: List<String> = emptyList(),
     val pageSize: Int = 50,
     val strictSafetyEnabled: Boolean = false,
-    val executionPolicy: String = "STOP_ON_FIRST_ERROR",
     val transactionMode: String = "AUTO_COMMIT",
 )
 
@@ -33,7 +32,6 @@ data class SqlConsoleStateUpdate(
     val selectedSourceNames: List<String> = emptyList(),
     val pageSize: Int = 50,
     val strictSafetyEnabled: Boolean = false,
-    val executionPolicy: String = "STOP_ON_FIRST_ERROR",
     val transactionMode: String = "AUTO_COMMIT",
 )
 
@@ -47,7 +45,6 @@ data class SqlConsoleSettingsUpdate(
 data class SqlConsoleQueryStartRequest(
     val sql: String,
     val selectedSourceNames: List<String> = emptyList(),
-    val executionPolicy: String = "STOP_ON_FIRST_ERROR",
     val transactionMode: String = "AUTO_COMMIT",
 )
 
@@ -188,7 +185,6 @@ data class SqlConsolePageState(
     val selectedSourceNames: List<String> = emptyList(),
     val pageSize: Int = 50,
     val strictSafetyEnabled: Boolean = false,
-    val executionPolicy: String = "STOP_ON_FIRST_ERROR",
     val transactionMode: String = "AUTO_COMMIT",
     val maxRowsPerShardDraft: String = "",
     val queryTimeoutSecDraft: String = "",

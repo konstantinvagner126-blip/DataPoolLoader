@@ -1,5 +1,6 @@
 package com.sbrf.lt.platform.ui.module
 
+import com.sbrf.lt.datapool.db.registry.model.RegistryModuleDraft
 import com.sbrf.lt.datapool.db.registry.sql.ModuleRegistrySql
 import com.sbrf.lt.platform.ui.model.SaveModuleRequest
 import java.sql.Connection
@@ -167,7 +168,7 @@ internal class DatabaseModuleStoreLifecycleSupport(
         actorId: String,
         actorSource: String,
         actorDisplayName: String?,
-        request: CreateModuleRequest,
+        request: RegistryModuleDraft,
     ) {
         val snapshotJson = support.buildSnapshotJson(
             configText = request.configText,

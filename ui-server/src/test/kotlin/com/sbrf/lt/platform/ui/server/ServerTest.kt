@@ -431,8 +431,7 @@ class ServerTest {
                     }
                   ],
                   "selectedSourceNames":["shard1"],
-                  "pageSize":100,
-                  "executionPolicy":"CONTINUE_ON_ERROR"
+                  "pageSize":100
                 }
                 """.trimIndent()
             )
@@ -441,7 +440,6 @@ class ServerTest {
         val savedStateBody = savedState.bodyAsText()
         assertTrue(savedStateBody.contains("\"draftSql\":\"select * from demo\""))
         assertTrue(savedStateBody.contains("\"pageSize\":100"))
-        assertTrue(savedStateBody.contains("\"executionPolicy\":\"STOP_ON_FIRST_ERROR\""))
         assertTrue(savedStateBody.contains("\"favoriteObjects\":[{\"sourceName\":\"shard1\""))
 
         val settings = client.post("/api/sql-console/settings") {

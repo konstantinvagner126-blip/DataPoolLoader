@@ -1,5 +1,7 @@
 package com.sbrf.lt.platform.ui.module
 
+import com.sbrf.lt.datapool.db.registry.model.RegistryModuleCreationResult
+import com.sbrf.lt.datapool.db.registry.model.RegistryModuleDraft
 import com.sbrf.lt.platform.ui.model.ModuleCatalogItemResponse
 import com.sbrf.lt.platform.ui.model.SaveModuleRequest
 
@@ -42,8 +44,8 @@ interface DatabaseModuleRegistryOperations {
         actorSource: String,
         actorDisplayName: String?,
         originKind: String = "CREATED_IN_UI",
-        request: CreateModuleRequest,
-    ): CreateModuleResult
+        request: RegistryModuleDraft,
+    ): RegistryModuleCreationResult
 
     fun deleteModule(
         moduleCode: String,

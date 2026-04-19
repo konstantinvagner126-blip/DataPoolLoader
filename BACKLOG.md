@@ -383,6 +383,12 @@
 - из `LegacySqlConsoleState` удален мертвый legacy-хвост `executionPolicy`:
   - поле больше не участвует в миграции;
   - фиксированная политика `STOP_ON_FIRST_ERROR` обеспечивается рабочими SQL-console слоями, а не legacy-state моделью.
+- мертвое поле `executionPolicy` удалено и из живого публичного SQL-console контракта:
+  - shared models, server DTO и store-layer больше не носят это поле через `state/update/query` payloads;
+  - фиксированная политика `STOP_ON_FIRST_ERROR` остается только во внутренних execution-слоях, где она реально используется.
+- DB registry cleanup: удалены пустые переходные `typealias` вокруг создания модулей:
+  - `CreateModuleRequest` и `CreateModuleResult` больше не маскируют `RegistryModuleDraft` и `RegistryModuleCreationResult`;
+  - `ui-server` DB registry слой теперь использует реальные registry-модели без лишней псевдо-абстракции.
 - из `core` удалены неиспользуемые deprecated aliases:
   - `PostgresExporter`
   - `PostgresImporter`
@@ -390,6 +396,9 @@
 - migration `uploadedCredentials` из `run-state.json` теперь не оставляет legacy-поле в файловом runtime-state:
   - [UiCredentialsStateStore.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/UiCredentialsStateStore.kt) после успешной миграции очищает `uploadedCredentials` из старого `run-state.json`;
   - legacy state перестает оставаться двусмысленным после первого чтения.
+- split-миграция SQL-console теперь дочищает legacy combined state до конца:
+  - `sql-console-state.json` удаляется только после того, как созданы `workspace/library/preferences` state-файлы;
+  - legacy combined state больше не остается на диске как конкурирующий источник данных после успешной полной миграции.
 - legacy-терминология убирается и из test-layer:
   - тесты exporter/importer в `core` переименованы под актуальные классы `PostgresSourceExporter` и `PostgresTargetImporter`, без сохранения старых `PostgresExporter/PostgresImporter` имен.
 

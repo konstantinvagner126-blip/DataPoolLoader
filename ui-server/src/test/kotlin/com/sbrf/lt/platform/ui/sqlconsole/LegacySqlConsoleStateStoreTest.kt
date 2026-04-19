@@ -31,7 +31,9 @@ class LegacySqlConsoleStateStoreTest {
         )
 
         val workspace = SqlConsoleWorkspaceStateStore(storageDir).load()
+        assertTrue(Files.exists(storageDir.resolve("sql-console-state.json")))
         val library = SqlConsoleLibraryStateStore(storageDir).load()
+        assertTrue(Files.exists(storageDir.resolve("sql-console-state.json")))
         val preferences = SqlConsolePreferencesStateStore(storageDir).load()
 
         assertEquals("select * from demo", workspace.draftSql)
@@ -50,6 +52,7 @@ class LegacySqlConsoleStateStoreTest {
         assertTrue(Files.exists(storageDir.resolve("sql-console-workspace-state.json")))
         assertTrue(Files.exists(storageDir.resolve("sql-console-library-state.json")))
         assertTrue(Files.exists(storageDir.resolve("sql-console-preferences-state.json")))
+        assertFalse(Files.exists(storageDir.resolve("sql-console-state.json")))
     }
 
     @Test
@@ -137,7 +140,6 @@ class LegacySqlConsoleStateStoreTest {
         assertEquals(1, updated.favoriteObjects.size)
         assertEquals(100, updated.pageSize)
         assertTrue(updated.strictSafetyEnabled)
-        assertEquals("STOP_ON_FIRST_ERROR", updated.executionPolicy)
         assertEquals("TRANSACTION_PER_SHARD", updated.transactionMode)
     }
 }

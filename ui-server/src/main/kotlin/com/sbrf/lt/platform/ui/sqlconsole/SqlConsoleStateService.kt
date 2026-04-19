@@ -70,7 +70,6 @@ class SqlConsoleStateService(
         selectedSourceNames = workspaceState.selectedSourceNames,
         pageSize = preferencesState.pageSize,
         strictSafetyEnabled = preferencesState.strictSafetyEnabled,
-        executionPolicy = "STOP_ON_FIRST_ERROR",
         transactionMode = preferencesState.transactionMode,
     )
 }

@@ -42,7 +42,6 @@ class SqlConsoleStore(
             selectedSourceNames = selectedSources,
             pageSize = normalizePageSize(persistedState.pageSize),
             strictSafetyEnabled = persistedState.strictSafetyEnabled,
-            executionPolicy = normalizeExecutionPolicy(),
             transactionMode = normalizedTransactionMode,
             maxRowsPerShardDraft = info.maxRowsPerShard.toString(),
             queryTimeoutSecDraft = info.queryTimeoutSec?.toString().orEmpty(),
@@ -90,7 +89,6 @@ class SqlConsoleStore(
     ): SqlConsolePageState =
         current.copy(
             transactionMode = if (enabled) "AUTO_COMMIT" else "TRANSACTION_PER_SHARD",
-            executionPolicy = normalizeExecutionPolicy(),
         )
 
     fun updateMaxRowsPerShardDraft(
@@ -247,7 +245,6 @@ class SqlConsoleStore(
                 SqlConsoleQueryStartRequest(
                     sql = sql,
                     selectedSourceNames = current.selectedSourceNames,
-                    executionPolicy = normalizeExecutionPolicy(),
                     transactionMode = current.transactionMode,
                 ),
             )
@@ -369,7 +366,6 @@ private fun SqlConsolePageState.toPersistedState(): SqlConsoleStateUpdate =
         selectedSourceNames = selectedSourceNames,
         pageSize = pageSize,
         strictSafetyEnabled = strictSafetyEnabled,
-        executionPolicy = normalizeExecutionPolicy(),
         transactionMode = transactionMode,
     )
 
@@ -385,8 +381,6 @@ private fun normalizePageSize(value: Int): Int =
         25, 50, 100 -> value
         else -> 50
     }
-
-private fun normalizeExecutionPolicy(): String = "STOP_ON_FIRST_ERROR"
 
 private fun normalizeTransactionMode(value: String): String =
     when (value.uppercase()) {

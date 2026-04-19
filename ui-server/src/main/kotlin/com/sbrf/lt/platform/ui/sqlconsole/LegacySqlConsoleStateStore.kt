@@ -2,6 +2,7 @@ package com.sbrf.lt.platform.ui.sqlconsole
 
 import com.sbrf.lt.datapool.config.ConfigLoader
 import java.nio.file.Path
+import kotlin.io.path.deleteIfExists
 import kotlin.io.path.exists
 import kotlin.io.path.inputStream
 
@@ -12,6 +13,10 @@ class LegacySqlConsoleStateStore(
     private val stateFile: Path = storageDir.resolve("sql-console-state.json")
 
     fun exists(): Boolean = stateFile.exists()
+
+    fun delete() {
+        stateFile.deleteIfExists()
+    }
 
     fun load(): LegacySqlConsoleState {
         if (!stateFile.exists()) {
