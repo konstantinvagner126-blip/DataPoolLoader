@@ -482,6 +482,18 @@
   - web-слой больше не дублирует shared label/status helper-ы поверх [SqlConsoleLabels.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleLabels.kt)
   - локальный duplicate-файл [SqlConsoleStatusTextSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleStatusTextSupport.kt) удален
   - `SqlConsolePage.kt` и `SqlConsoleResultSections.kt` используют shared `runButtonTone / sourceStatusTone / sourceStatusSuffix / build*Text` напрямую, без промежуточных web-wrapper-ов.
+- module_sync display helper cleanup:
+  - локальный wrapper `formatInstant(...)` удален из [ModuleSyncPageSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncPageSupport.kt)
+  - `module_sync` section-слой использует общий [Formatters.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/foundation/format/Formatters.kt) напрямую
+  - fallback `startedByActorDisplayName ?: startedByActorId` сведен к одному helper `actorLabel(...)` вместо локального дублирования в support и sections.
+- cleanup formatting cleanup:
+  - локальные `formatInstant(...)` и `formatBytes(...)` удалены из [RunHistoryCleanupPageSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/run_history_cleanup/RunHistoryCleanupPageSupport.kt)
+  - общие formatter-ы `formatCompactDateTime(...)` и `formatByteSize(...)` добавлены в [Formatters.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/foundation/format/Formatters.kt)
+  - [RunHistoryCleanupPageSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/run_history_cleanup/RunHistoryCleanupPageSections.kt) теперь использует foundation formatting напрямую, без feature-only дублирования.
+- run presentation helper cleanup:
+  - generic run-display helper-ы вынесены из [ModuleRunsPageSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsPageSupport.kt) в нейтральный foundation-слой [RunPresentationSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/foundation/run/RunPresentationSupport.kt)
+  - `ModuleRunsPageSupport.kt` больше не держит `formatStageDuration / formatTimeoutSeconds / formatRowsInterval / formatBooleanFlag / extractArtifactName`
+  - [ModuleRunsPageSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsPageSections.kt) использует foundation run-support напрямую, а в feature support остались только route-specific и diagnostics-specific части.
 - SQL store cleanup:
   - общее переключение `selectedSourceNames` вынесено в [SqlConsoleStateSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleStateSupport.kt)
   - `SqlConsoleStore` и `SqlConsoleObjectsStore` больше не держат одинаковые локальные реализации toggle-логики.

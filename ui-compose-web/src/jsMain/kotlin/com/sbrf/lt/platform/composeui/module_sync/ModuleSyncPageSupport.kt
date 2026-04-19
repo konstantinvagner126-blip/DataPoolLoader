@@ -5,7 +5,7 @@ import com.sbrf.lt.platform.composeui.model.ModuleCatalogItem
 
 internal fun buildMaintenanceMessage(syncState: ModuleSyncStateResponse): String {
     val active = syncState.activeFullSync
-    val actor = active?.startedByActorDisplayName ?: active?.startedByActorId
+    val actor = actorLabel(active?.startedByActorDisplayName, active?.startedByActorId)
     val startedAt = active?.startedAt?.let(::formatDateTime)
     return listOf(
         syncState.message,
@@ -15,7 +15,7 @@ internal fun buildMaintenanceMessage(syncState: ModuleSyncStateResponse): String
 }
 
 internal fun describeActiveSingleSync(sync: ActiveModuleSyncRunResponse): String {
-    val actor = sync.startedByActorDisplayName ?: sync.startedByActorId
+    val actor = actorLabel(sync.startedByActorDisplayName, sync.startedByActorId)
     val startedAt = formatDateTime(sync.startedAt)
     return buildString {
         append("Идет импорт модуля '${sync.moduleCode ?: "-"}'.")
@@ -39,10 +39,10 @@ internal fun filterSelectableModules(state: ModuleSyncPageState): List<ModuleCat
                 module.id.contains(query, ignoreCase = true) ||
                 module.title.contains(query, ignoreCase = true) ||
                 (!description.isNullOrBlank() && description.contains(query, ignoreCase = true))
-        }
+}
 
 internal fun syncRunMeta(run: ModuleSyncRunSummaryResponse): String {
-    val actor = run.startedByActorDisplayName ?: run.startedByActorId
+    val actor = actorLabel(run.startedByActorDisplayName, run.startedByActorId)
     val finishedAt = run.finishedAt?.let(::formatDateTime) ?: "Запуск еще выполняется"
     return listOfNotNull(
         actor?.let { "Инициатор: $it" },
@@ -68,5 +68,5 @@ internal fun syncActionBadgeClass(action: String): String =
         else -> "bg-secondary"
     }
 
-internal fun formatInstant(value: String?): String =
-    formatDateTime(value)
+internal fun actorLabel(displayName: String?, actorId: String?): String? =
+    displayName ?: actorId

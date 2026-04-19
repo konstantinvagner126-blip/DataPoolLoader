@@ -7,6 +7,7 @@ import com.sbrf.lt.platform.composeui.foundation.component.LoadingStateCard
 import com.sbrf.lt.platform.composeui.foundation.component.SectionCard
 import com.sbrf.lt.platform.composeui.foundation.dom.classes
 import com.sbrf.lt.platform.composeui.foundation.dom.classesFromString
+import com.sbrf.lt.platform.composeui.foundation.format.formatDateTime
 import com.sbrf.lt.platform.composeui.foundation.runtime.buildDatabaseModeUnavailableMessage
 import com.sbrf.lt.platform.composeui.model.ModuleStoreMode
 import kotlinx.browser.window
@@ -338,7 +339,7 @@ internal fun SyncRunsHistoryPanel(
                                     Text(translateSyncStatus(run.status))
                                 }
                             }
-                            Div({ classes("run-history-meta") }) { Text(formatInstant(run.startedAt)) }
+                            Div({ classes("run-history-meta") }) { Text(formatDateTime(run.startedAt)) }
                             Div({ classes("run-history-meta") }) {
                                 Text(
                                     "Обработано: ${run.totalProcessed} · создано: ${run.totalCreated} · " +
@@ -375,7 +376,7 @@ internal fun SyncRunDetailsPanel(state: ModuleSyncPageState) {
                         Text(syncRunTitle(run))
                     }
                     Div({ classes("run-summary-subtitle") }) {
-                        Text("${translateSyncStatus(run.status)} · ${formatInstant(run.startedAt)}")
+                        Text("${translateSyncStatus(run.status)} · ${formatDateTime(run.startedAt)}")
                     }
                 }
                 Div({ classes("run-summary-metrics") }) {
@@ -390,9 +391,9 @@ internal fun SyncRunDetailsPanel(state: ModuleSyncPageState) {
 
             Div({ classes("run-summary-list") }) {
                 SyncSummaryRow("Запуск", syncRunTitle(run))
-                SyncSummaryRow("Инициатор", run.startedByActorDisplayName ?: run.startedByActorId ?: "-")
-                SyncSummaryRow("Старт", formatInstant(run.startedAt))
-                SyncSummaryRow("Завершение", run.finishedAt?.let(::formatInstant) ?: "еще выполняется")
+                SyncSummaryRow("Инициатор", actorLabel(run.startedByActorDisplayName, run.startedByActorId) ?: "-")
+                SyncSummaryRow("Старт", formatDateTime(run.startedAt))
+                SyncSummaryRow("Завершение", run.finishedAt?.let(::formatDateTime) ?: "еще выполняется")
                 SyncSummaryRow("Идентификатор", run.syncRunId)
             }
 

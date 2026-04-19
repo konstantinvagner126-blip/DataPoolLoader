@@ -13,6 +13,9 @@ fun formatDateTime(value: String?): String {
     }
 }
 
+fun formatCompactDateTime(value: String?): String =
+    value?.replace("T", " ")?.removeSuffix("Z") ?: "—"
+
 fun formatNumber(value: Number?): String {
     if (value == null) {
         return "-"
@@ -51,6 +54,18 @@ fun formatDurationMillis(durationMillis: Long?): String {
         hours > 0L -> "${hours}ч ${minutes}м ${seconds}с"
         minutes > 0L -> "${minutes}м ${seconds}с"
         else -> "${seconds}с"
+    }
+}
+
+fun formatByteSize(value: Long?): String {
+    if (value == null) {
+        return "-"
+    }
+    return when {
+        value >= 1024L * 1024L * 1024L -> "${value / (1024L * 1024L * 1024L)} ГБ"
+        value >= 1024L * 1024L -> "${value / (1024L * 1024L)} МБ"
+        value >= 1024L -> "${value / 1024L} КБ"
+        else -> "$value Б"
     }
 }
 

@@ -1,5 +1,6 @@
 package com.sbrf.lt.platform.composeui.run_history_cleanup
 
+import com.sbrf.lt.platform.composeui.foundation.format.formatByteSize
 import com.sbrf.lt.platform.composeui.model.ModuleStoreMode
 
 internal fun buildSubtitle(storageMode: ModuleStoreMode?): String =
@@ -35,22 +36,11 @@ internal fun buildCurrentHistoryNote(preview: RunHistoryCleanupPreviewResponse):
     }
 
 internal fun buildCleanupFreedValue(preview: RunHistoryCleanupPreviewResponse): String =
-    preview.estimatedBytesToFree?.let(::formatBytes) ?: "Через VACUUM"
+    preview.estimatedBytesToFree?.let(::formatByteSize) ?: "Через VACUUM"
 
 internal fun buildCleanupFreedNote(preview: RunHistoryCleanupPreviewResponse): String =
     if (preview.storageMode == "DATABASE") {
         "DELETE уменьшит данные логически, а физическое место PostgreSQL вернет после autovacuum/VACUUM."
     } else {
         "Оценка уменьшения persisted history после cleanup preview."
-    }
-
-internal fun formatInstant(value: String?): String =
-    value?.replace("T", " ")?.removeSuffix("Z") ?: "—"
-
-internal fun formatBytes(value: Long): String =
-    when {
-        value >= 1024L * 1024L * 1024L -> "${value / (1024L * 1024L * 1024L)} ГБ"
-        value >= 1024L * 1024L -> "${value / (1024L * 1024L)} МБ"
-        value >= 1024L -> "${value / 1024L} КБ"
-        else -> "$value Б"
     }

@@ -3,6 +3,8 @@ package com.sbrf.lt.platform.composeui.run_history_cleanup
 import androidx.compose.runtime.Composable
 import com.sbrf.lt.platform.composeui.foundation.component.SectionCard
 import com.sbrf.lt.platform.composeui.foundation.dom.classes
+import com.sbrf.lt.platform.composeui.foundation.format.formatByteSize
+import com.sbrf.lt.platform.composeui.foundation.format.formatCompactDateTime
 import com.sbrf.lt.platform.composeui.model.ModuleStoreMode
 import com.sbrf.lt.platform.composeui.model.label
 import org.jetbrains.compose.web.attributes.InputType
@@ -90,18 +92,18 @@ internal fun CleanupSection(
             )
             CleanupOverviewCard(
                 label = "Текущий объем",
-                value = formatBytes(preview.currentStorageBytes),
+                value = formatByteSize(preview.currentStorageBytes),
                 note = buildCurrentHistoryNote(preview),
             )
             CleanupOverviewCard(
                 label = "Период истории",
                 value = "${preview.currentRunsCount} запусков",
-                note = "${preview.currentModulesCount} модулей · ${formatInstant(preview.currentOldestRequestedAt)} .. ${formatInstant(preview.currentNewestRequestedAt)}",
+                note = "${preview.currentModulesCount} модулей · ${formatCompactDateTime(preview.currentOldestRequestedAt)} .. ${formatCompactDateTime(preview.currentNewestRequestedAt)}",
             )
             CleanupOverviewCard(
                 label = "Кандидаты на удаление",
                 value = "${preview.totalRunsToDelete} запусков",
-                note = "${preview.totalModulesAffected} модулей · cutoff ${formatInstant(preview.cutoffTimestamp)}",
+                note = "${preview.totalModulesAffected} модулей · cutoff ${formatCompactDateTime(preview.cutoffTimestamp)}",
             )
             CleanupOverviewCard(
                 label = "Освобождение",
@@ -130,7 +132,7 @@ internal fun CleanupSection(
                         Div({ classes("module-sync-cleanup-module-meta") }) {
                             Text(
                                 "${module.totalRunsToDelete} запусков · " +
-                                    "${formatInstant(module.oldestRequestedAt)} .. ${formatInstant(module.newestRequestedAt)}",
+                                    "${formatCompactDateTime(module.oldestRequestedAt)} .. ${formatCompactDateTime(module.newestRequestedAt)}",
                             )
                         }
                     }
@@ -224,22 +226,22 @@ internal fun OutputRetentionSection(
             )
             CleanupOverviewCard(
                 label = "Текущий объем",
-                value = formatBytes(preview.currentBytes),
+                value = formatByteSize(preview.currentBytes),
                 note = "${preview.currentOutputDirs} каталогов · ${preview.currentRunsWithOutput} запусков с output.",
             )
             CleanupOverviewCard(
                 label = "Период output",
                 value = "${preview.currentModulesWithOutput} модулей",
-                note = "${formatInstant(preview.currentOldestRequestedAt)} .. ${formatInstant(preview.currentNewestRequestedAt)}",
+                note = "${formatCompactDateTime(preview.currentOldestRequestedAt)} .. ${formatCompactDateTime(preview.currentNewestRequestedAt)}",
             )
             CleanupOverviewCard(
                 label = "Каталоги",
                 value = preview.totalOutputDirsToDelete.toString(),
-                note = "${preview.totalModulesAffected} модулей · cutoff ${formatInstant(preview.cutoffTimestamp)}",
+                note = "${preview.totalModulesAffected} модулей · cutoff ${formatCompactDateTime(preview.cutoffTimestamp)}",
             )
             CleanupOverviewCard(
                 label = "Освободится",
-                value = formatBytes(preview.totalBytesToFree),
+                value = formatByteSize(preview.totalBytesToFree),
                 note = "${preview.totalRunsAffected} запусков с output-каталогами в preview.",
             )
             CleanupOverviewCard(
@@ -265,8 +267,8 @@ internal fun OutputRetentionSection(
                             Text(
                                 "${module.totalRunsAffected} запусков · " +
                                     "${module.totalOutputDirsToDelete} каталогов · " +
-                                    "${formatBytes(module.totalBytesToFree)} · " +
-                                    "${formatInstant(module.oldestRequestedAt)} .. ${formatInstant(module.newestRequestedAt)}",
+                                    "${formatByteSize(module.totalBytesToFree)} · " +
+                                    "${formatCompactDateTime(module.oldestRequestedAt)} .. ${formatCompactDateTime(module.newestRequestedAt)}",
                             )
                         }
                     }
@@ -314,9 +316,9 @@ internal fun CurrentTopModuleRow(
                 ""
             }
             Text(
-                "${formatBytes(module.currentStorageBytes)} · " +
+                "${formatByteSize(module.currentStorageBytes)} · " +
                     "${module.currentRunsCount} запусков$outputPart · " +
-                    "${formatInstant(module.oldestRequestedAt)} .. ${formatInstant(module.newestRequestedAt)}",
+                    "${formatCompactDateTime(module.oldestRequestedAt)} .. ${formatCompactDateTime(module.newestRequestedAt)}",
             )
         }
     }
