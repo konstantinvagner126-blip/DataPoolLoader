@@ -63,8 +63,17 @@
   - [UiServerPlugins.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/UiServerPlugins.kt)
   - [UiServerRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/UiServerRoutes.kt);
 - [Server.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/Server.kt) стал ближе к composition root, а не к transport-свалке.
-- route-specific transport/support-слои начали дробиться отдельно от самих handlers:
-  - [DatabaseRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseRouteSupport.kt);
+- DB route layer больше не держится на одном смешанном support-файле:
+  - cleanup flow вынесен в [DatabaseCleanupRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseCleanupRouteSupport.kt)
+  - sync/import flow вынесен в [DatabaseSyncRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseSyncRouteSupport.kt)
+  - module flow вынесен в [DatabaseModuleRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseModuleRouteSupport.kt);
+- [DatabaseRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseRoutes.kt) теперь агрегирует отдельные route groups:
+  - [DatabaseCleanupRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseCleanupRoutes.kt)
+  - [DatabaseSyncRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseSyncRoutes.kt)
+  - [DatabaseModuleRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseModuleRoutes.kt);
+- DB module route group дальше разрезан по ответственности:
+  - [DatabaseModuleLifecycleRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseModuleLifecycleRoutes.kt)
+  - [DatabaseModuleRunRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseModuleRunRoutes.kt);
 - SQL-console route support больше не смешивает metadata, export и async execution lifecycle в одном файле:
   - [SqlConsoleMetadataRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/SqlConsoleMetadataRouteSupport.kt)
   - [SqlConsoleExportRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/SqlConsoleExportRouteSupport.kt)
