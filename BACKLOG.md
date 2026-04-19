@@ -383,6 +383,15 @@
 - из `LegacySqlConsoleState` удален мертвый legacy-хвост `executionPolicy`:
   - поле больше не участвует в миграции;
   - фиксированная политика `STOP_ON_FIRST_ERROR` обеспечивается рабочими SQL-console слоями, а не legacy-state моделью.
+- из `core` удалены неиспользуемые deprecated aliases:
+  - `PostgresExporter`
+  - `PostgresImporter`
+  они не использовались внутри проекта и оставались только как исторический API-хвост.
+- migration `uploadedCredentials` из `run-state.json` теперь не оставляет legacy-поле в файловом runtime-state:
+  - [UiCredentialsStateStore.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/UiCredentialsStateStore.kt) после успешной миграции очищает `uploadedCredentials` из старого `run-state.json`;
+  - legacy state перестает оставаться двусмысленным после первого чтения.
+- legacy-терминология убирается и из test-layer:
+  - тесты exporter/importer в `core` переименованы под актуальные классы `PostgresSourceExporter` и `PostgresTargetImporter`, без сохранения старых `PostgresExporter/PostgresImporter` имен.
 
 Критерий завершения:
 

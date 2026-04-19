@@ -10,7 +10,7 @@ import kotlin.test.assertTrue
 import java.nio.file.Files
 import java.sql.SQLException
 
-class PostgresImporterTest {
+class PostgresTargetImporterTest {
     private val importer = PostgresTargetImporter()
 
     @Test

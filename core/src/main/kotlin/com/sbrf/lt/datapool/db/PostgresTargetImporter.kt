@@ -111,6 +111,3 @@ class PostgresTargetImporter(
         return "\"$identifier\""
     }
 }
-
-@Deprecated("Используй PostgresTargetImporter", ReplaceWith("PostgresTargetImporter"))
-typealias PostgresImporter = PostgresTargetImporter

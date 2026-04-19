@@ -28,6 +28,7 @@ class UiCredentialsStateStore(
         val migratedState = loadLegacyState()
         if (migratedState.uploadedCredentials != null) {
             save(migratedState)
+            clearLegacyUploadedCredentials()
         }
         return migratedState
     }
@@ -61,6 +62,34 @@ class UiCredentialsStateStore(
                     uploadedNode,
                     PersistedUploadedCredentials::class.java,
                 ),
+            )
+        }
+    }
+
+    private fun clearLegacyUploadedCredentials() {
+        if (!legacyRunStateFile.exists()) {
+            return
+        }
+        val mapper = configLoader.objectMapper()
+        legacyRunStateFile.inputStream().bufferedReader().use { reader ->
+            val root = mapper.readTree(reader)
+            if (!root.isObject) {
+                return
+            }
+            val rootObject = root.deepCopy<com.fasterxml.jackson.databind.node.ObjectNode>()
+            if (!rootObject.has("uploadedCredentials")) {
+                return
+            }
+            rootObject.remove("uploadedCredentials")
+            val tempFile = storageDir.resolve("run-state.json.tmp")
+            tempFile.outputStream().bufferedWriter().use {
+                mapper.writerWithDefaultPrettyPrinter().writeValue(it, rootObject)
+            }
+            Files.move(
+                tempFile,
+                legacyRunStateFile,
+                StandardCopyOption.REPLACE_EXISTING,
+                StandardCopyOption.ATOMIC_MOVE,
             )
         }
     }

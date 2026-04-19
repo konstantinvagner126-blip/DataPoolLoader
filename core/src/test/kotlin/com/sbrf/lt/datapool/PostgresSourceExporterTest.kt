@@ -17,7 +17,7 @@ import kotlin.test.assertNull
 import java.nio.file.Files
 import java.sql.SQLException
 
-class PostgresExporterTest {
+class PostgresSourceExporterTest {
 
     @Test
     fun `exports rows to csv and emits progress events`() {

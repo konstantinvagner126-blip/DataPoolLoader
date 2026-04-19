@@ -144,6 +144,3 @@ class PostgresSourceExporter(
         }
     }
 }
-
-@Deprecated("Используй PostgresSourceExporter", ReplaceWith("PostgresSourceExporter"))
-typealias PostgresExporter = PostgresSourceExporter

@@ -1,5 +1,6 @@
 package com.sbrf.lt.platform.ui.run
 
+import com.sbrf.lt.datapool.config.ConfigLoader
 import kotlin.io.path.createTempDirectory
 import kotlin.io.path.exists
 import kotlin.io.path.readText
@@ -37,5 +38,8 @@ class UiCredentialsStateStoreTest {
         assertTrue(dedicatedStateFile.exists())
         assertTrue(dedicatedStateFile.readText().contains("uploaded.properties"))
         assertFalse(dedicatedStateFile.readText().contains("\"history\""))
+        val legacyRunStateTree = ConfigLoader().objectMapper().readTree(legacyRunState.toFile())
+        assertFalse(legacyRunStateTree.has("uploadedCredentials"))
+        assertTrue(legacyRunStateTree.has("history"))
     }
 }
