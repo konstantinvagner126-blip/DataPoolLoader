@@ -26,6 +26,7 @@ import com.sbrf.lt.platform.composeui.foundation.updates.PollingEffect
 import com.sbrf.lt.platform.composeui.foundation.updates.WebSocketEffect
 import com.sbrf.lt.platform.composeui.foundation.updates.buildWebSocketUrl
 import com.sbrf.lt.platform.composeui.model.CredentialsStatusResponse
+import com.sbrf.lt.platform.composeui.model.ModuleCatalogItem
 import com.sbrf.lt.platform.composeui.module_editor.buildCatalogStatus
 import com.sbrf.lt.platform.composeui.module_editor.buildCredentialsStatusText
 import com.sbrf.lt.platform.composeui.module_editor.buildCredentialsWarningText
@@ -315,17 +316,11 @@ fun ComposeModuleEditorPage(
         },
         heroHeader = {
             Div({ classes("hero-actions", "mb-3") }) {
-                A(attrs = {
-                    classes("btn", "btn-outline-secondary")
-                    href("/")
-                }) { Text("На главную") }
-                Button(attrs = {
-                    classes("btn", "btn-dark")
-                    attr("type", "button")
-                    disabled()
-                }) {
-                    Text(if (currentRoute.storage == "database") "Модули из базы данных" else "Модули")
-                }
+                ModuleEditorNavActionButton("На главную", hrefValue = "/")
+                ModuleEditorNavActionButton(
+                    if (currentRoute.storage == "database") "Модули из базы данных" else "Модули",
+                    active = true,
+                )
             }
         },
         content = {
@@ -337,132 +332,36 @@ fun ComposeModuleEditorPage(
 
             Div({ classes("row", "g-4") }) {
                 Div({ classes("col-12", "col-xl-3") }) {
-                    Div({ classes("panel", "h-100") }) {
-                        Div({ classes("panel-title") }) {
-                            Text(if (currentRoute.storage == "database") "Модули из базы данных" else "Модули")
-                        }
-                        Div({
-                            classes("module-catalog-status", "mt-3", "mb-3", "text-secondary", "small")
-                        }) {
-                            Text(buildCatalogStatus(state, currentRoute.storage))
-                        }
-                        if (currentRoute.storage == "database") {
-                            Div({ classes("module-catalog-actions", "mb-3") }) {
-                                EditorIconActionButton(
-                                    icon = "+",
-                                    label = "Новый",
-                                    title = "Новый модуль",
-                                    enabled = capabilities?.createModule == true && !actionBusy,
-                                    style = EditorActionStyle.PrimaryOutline,
-                                    onClick = onOpenCreateModuleAction,
+                    ModuleCatalogSidebar(
+                        route = currentRoute,
+                        state = state,
+                        capabilities = capabilities,
+                        actionBusy = actionBusy,
+                        onOpenCreateModule = onOpenCreateModuleAction,
+                        onDeleteModule = onDeleteModuleAction,
+                        onImportModules = { window.location.href = "/db-sync" },
+                        onToggleIncludeHidden = {
+                            val nextRoute = currentRoute.copy(
+                                includeHidden = !currentRoute.includeHidden,
+                                openCreateDialog = false,
+                            )
+                            currentRoute = nextRoute
+                            scope.launch {
+                                state = store.startLoading(state)
+                                state = store.load(nextRoute)
+                            }
+                        },
+                        onSelectModule = { moduleId ->
+                            scope.launch {
+                                state = store.startLoading(state)
+                                currentRoute = currentRoute.copy(
+                                    moduleId = moduleId,
+                                    openCreateDialog = false,
                                 )
-                                EditorIconActionButton(
-                                    icon = "−",
-                                    label = "Удалить",
-                                    title = "Удалить модуль",
-                                    enabled = capabilities?.deleteModule == true && !actionBusy && state.selectedModuleId != null,
-                                    style = EditorActionStyle.DangerOutline,
-                                    onClick = onDeleteModuleAction,
-                                )
-                                EditorIconActionButton(
-                                    icon = "⇅",
-                                    label = "Импорт",
-                                    title = "Импорт из файлов",
-                                    enabled = true,
-                                    style = EditorActionStyle.SecondaryOutline,
-                                    onClick = { window.location.href = "/db-sync" },
-                                )
+                                state = store.selectModule(state, currentRoute, moduleId)
                             }
-                        }
-                        if (currentRoute.storage == "database") {
-                            Label(attrs = { classes("config-form-check", "mb-3") }) {
-                                Input(type = org.jetbrains.compose.web.attributes.InputType.Checkbox, attrs = {
-                                    classes("form-check-input")
-                                    if (currentRoute.includeHidden) {
-                                        attr("checked", "checked")
-                                    }
-                                    onClick {
-                                        val nextRoute = currentRoute.copy(
-                                            includeHidden = !currentRoute.includeHidden,
-                                            openCreateDialog = false,
-                                        )
-                                        currentRoute = nextRoute
-                                        scope.launch {
-                                            state = store.startLoading(state)
-                                            state = store.load(nextRoute)
-                                        }
-                                    }
-                                })
-                                Span({ classes("form-check-label") }) { Text("Показывать скрытые модули") }
-                            }
-                        }
-                        if (currentRoute.storage == "database" && currentRoute.includeHidden) {
-                            Div({ classes("text-secondary", "small", "mb-3") }) {
-                                Text("Каталог открыт с показом скрытых модулей.")
-                            }
-                        }
-                        if (state.loading && state.modules.isEmpty()) {
-                            P({ classes("text-secondary", "small", "mb-0") }) {
-                                Text("Каталог модулей загружается.")
-                            }
-                        } else {
-                            Div({ classes("list-group", "module-list") }) {
-                                state.modules.forEach { module ->
-                                    Button(attrs = {
-                                        classes("list-group-item", "list-group-item-action")
-                                        if (module.id == state.selectedModuleId) {
-                                            classes("active")
-                                        }
-                                        attr("type", "button")
-                                        onClick {
-                                        scope.launch {
-                                            state = store.startLoading(state)
-                                            currentRoute = currentRoute.copy(
-                                                moduleId = module.id,
-                                                    openCreateDialog = false,
-                                                )
-                                                state = store.selectModule(state, currentRoute, module.id)
-                                            }
-                                        }
-                                    }) {
-                                        val moduleDescription = module.description
-                                        Div({ classes("module-list-head") }) {
-                                            Div {
-                                                Div({ classes("module-list-title") }) {
-                                                    Text(module.title.ifBlank { module.id })
-                                                }
-                                                if (!moduleDescription.isNullOrBlank()) {
-                                                    Div({ classes("module-list-description") }) {
-                                                        Text(moduleDescription)
-                                                    }
-                                                }
-                                            }
-                                            Span({
-                                                classes("module-validation-badge", validationBadgeClass(module.validationStatus))
-                                            }) {
-                                                Text(translateValidationStatus(module.validationStatus))
-                                            }
-                                            if (module.hasActiveRun) {
-                                                ModuleRunningBadge()
-                                            }
-                                            if (module.hiddenFromUi) {
-                                                Span({ classes("module-validation-badge", "module-validation-badge-warning") }) {
-                                                    Text("Скрыт")
-                                                }
-                                            }
-                                        }
-                                        if (module.tags.isNotEmpty()) {
-                                            Div({ classes("module-list-tags") }) {
-                                                module.tags.forEach { tag ->
-                                                    Span({ classes("module-tag") }) { Text(tag) }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
+                        },
+                    )
                 }
 
                 Div({ classes("col-12", "col-xl-9") }) {
@@ -660,4 +559,160 @@ fun ComposeModuleEditorPage(
             }
         },
     )
+}
+
+@Composable
+private fun ModuleEditorNavActionButton(
+    label: String,
+    hrefValue: String? = null,
+    active: Boolean = false,
+) {
+    if (active) {
+        Button(attrs = {
+            classes("btn", "btn-dark")
+            attr("type", "button")
+            disabled()
+        }) {
+            Text(label)
+        }
+        return
+    }
+    A(attrs = {
+        classes("btn", "btn-outline-secondary")
+        href(hrefValue ?: "#")
+    }) {
+        Text(label)
+    }
+}
+
+@Composable
+private fun ModuleCatalogSidebar(
+    route: ModuleEditorRouteState,
+    state: ModuleEditorPageState,
+    capabilities: ModuleLifecycleCapabilities?,
+    actionBusy: Boolean,
+    onOpenCreateModule: () -> Unit,
+    onDeleteModule: () -> Unit,
+    onImportModules: () -> Unit,
+    onToggleIncludeHidden: () -> Unit,
+    onSelectModule: (String) -> Unit,
+) {
+    Div({ classes("panel", "h-100") }) {
+        Div({ classes("panel-title") }) {
+            Text(if (route.storage == "database") "Модули из базы данных" else "Модули")
+        }
+        Div({
+            classes("module-catalog-status", "mt-3", "mb-3", "text-secondary", "small")
+        }) {
+            Text(buildCatalogStatus(state, route.storage))
+        }
+        if (route.storage == "database") {
+            Div({ classes("module-catalog-actions", "mb-3") }) {
+                EditorIconActionButton(
+                    icon = "+",
+                    label = "Новый",
+                    title = "Новый модуль",
+                    enabled = capabilities?.createModule == true && !actionBusy,
+                    style = EditorActionStyle.PrimaryOutline,
+                    onClick = onOpenCreateModule,
+                )
+                EditorIconActionButton(
+                    icon = "−",
+                    label = "Удалить",
+                    title = "Удалить модуль",
+                    enabled = capabilities?.deleteModule == true && !actionBusy && state.selectedModuleId != null,
+                    style = EditorActionStyle.DangerOutline,
+                    onClick = onDeleteModule,
+                )
+                EditorIconActionButton(
+                    icon = "⇅",
+                    label = "Импорт",
+                    title = "Импорт из файлов",
+                    enabled = true,
+                    style = EditorActionStyle.SecondaryOutline,
+                    onClick = onImportModules,
+                )
+            }
+            Label(attrs = { classes("config-form-check", "mb-3") }) {
+                Input(type = org.jetbrains.compose.web.attributes.InputType.Checkbox, attrs = {
+                    classes("form-check-input")
+                    if (route.includeHidden) {
+                        attr("checked", "checked")
+                    }
+                    onClick { onToggleIncludeHidden() }
+                })
+                Span({ classes("form-check-label") }) { Text("Показывать скрытые модули") }
+            }
+        }
+        if (route.storage == "database" && route.includeHidden) {
+            Div({ classes("text-secondary", "small", "mb-3") }) {
+                Text("Каталог открыт с показом скрытых модулей.")
+            }
+        }
+        if (state.loading && state.modules.isEmpty()) {
+            P({ classes("text-secondary", "small", "mb-0") }) {
+                Text("Каталог модулей загружается.")
+            }
+        } else {
+            Div({ classes("list-group", "module-list") }) {
+                state.modules.forEach { module ->
+                    ModuleCatalogListItem(
+                        module = module,
+                        selected = module.id == state.selectedModuleId,
+                        onClick = { onSelectModule(module.id) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ModuleCatalogListItem(
+    module: ModuleCatalogItem,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val moduleDescription = module.description
+    Button(attrs = {
+        classes("list-group-item", "list-group-item-action")
+        if (selected) {
+            classes("active")
+        }
+        attr("type", "button")
+        onClick { onClick() }
+    }) {
+        Div({ classes("module-list-head") }) {
+            Div {
+                Div({ classes("module-list-title") }) {
+                    Text(module.title.ifBlank { module.id })
+                }
+                if (!moduleDescription.isNullOrBlank()) {
+                    Div({ classes("module-list-description") }) {
+                        Text(moduleDescription)
+                    }
+                }
+            }
+            Span({
+                classes("module-validation-badge", validationBadgeClass(module.validationStatus))
+            }) {
+                Text(translateValidationStatus(module.validationStatus))
+            }
+            if (module.hasActiveRun) {
+                ModuleRunningBadge()
+            }
+            if (module.hiddenFromUi) {
+                Span({ classes("module-validation-badge", "module-validation-badge-warning") }) {
+                    Text("Скрыт")
+                }
+            }
+        }
+        if (module.tags.isNotEmpty()) {
+            Div({ classes("module-list-tags") }) {
+                module.tags.forEach { tag ->
+                    Span({ classes("module-tag") }) { Text(tag) }
+                }
+            }
+        }
+    }
 }

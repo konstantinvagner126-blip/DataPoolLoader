@@ -646,6 +646,15 @@
 - sql_console library action cleanup:
   - query picker и favorite object actions сведены к общему `SqlLibraryActionButton(...)` в [SqlConsoleLibrarySections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleLibrarySections.kt)
   - library слой больше не держит отдельные `apply/clear/favorite object` button helper-ветки для одного и того же `btn-sm` action pattern.
+- module_editor hero nav cleanup:
+  - hero navigation button-ы сведены к локальному `ModuleEditorNavActionButton(...)` в [ModuleEditorPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPage.kt)
+  - editor page больше не держит отдельные `anchor + disabled button` ветки для одного и того же hero navigation pattern.
+- module_editor catalog sidebar cleanup:
+  - левый каталог модулей сведен к локальному `ModuleCatalogSidebar(...)` в [ModuleEditorPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPage.kt)
+  - page-level wiring больше не смешивает route actions, includeHidden toggle, catalog status и list rendering в одной большой inline-ветке.
+- module_editor catalog item cleanup:
+  - rendering одного элемента каталога вынесен в `ModuleCatalogListItem(...)` в [ModuleEditorPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPage.kt)
+  - module list больше не держит inline badge/title/tag rendering внутри большого sidebar-блока.
 
 Критерий завершения:
 
