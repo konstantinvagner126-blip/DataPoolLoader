@@ -2,11 +2,7 @@ package com.sbrf.lt.platform.ui.server
 
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleExecutionPolicy
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleTransactionMode
-import com.sbrf.lt.platform.ui.model.SqlConsoleConnectionCheckResponse
-import com.sbrf.lt.platform.ui.model.SqlConsoleExportRequest
 import com.sbrf.lt.platform.ui.model.SqlConsoleExecutionResponse
-import com.sbrf.lt.platform.ui.model.SqlConsoleObjectSearchRequest
-import com.sbrf.lt.platform.ui.model.SqlConsoleObjectSearchResponse
 import com.sbrf.lt.platform.ui.model.SqlConsoleQueryRequest
 import com.sbrf.lt.platform.ui.model.SqlConsoleQueryResponse
 import com.sbrf.lt.platform.ui.model.SqlConsoleStartQueryResponse
@@ -20,6 +16,13 @@ internal data class SqlConsoleExecutionPaths(
     val cleanupDir: Path,
     val credentialsPath: Path?,
 )
+
+internal fun SqlConsoleQueryRequest.toTransactionMode(): SqlConsoleTransactionMode =
+    runCatching { SqlConsoleTransactionMode.valueOf(transactionMode.uppercase()) }
+        .getOrDefault(SqlConsoleTransactionMode.AUTO_COMMIT)
+
+internal fun ApplicationCall.requireSqlConsoleExecutionId(): String =
+    requireRouteParam("id")
 
 internal inline fun <T> UiServerContext.withSqlConsoleCredentialsPath(
     prefix: String,
@@ -46,36 +49,6 @@ internal fun UiServerContext.createSqlConsoleExecutionPaths(prefix: String): Sql
         throw ex
     }
 }
-
-internal fun SqlConsoleQueryRequest.toTransactionMode(): SqlConsoleTransactionMode =
-    runCatching { SqlConsoleTransactionMode.valueOf(transactionMode.uppercase()) }
-        .getOrDefault(SqlConsoleTransactionMode.AUTO_COMMIT)
-
-internal fun SqlConsoleExportRequest.requireShardName(): String =
-    shardName?.trim()?.takeIf { it.isNotEmpty() }
-        ?: badRequest("Для CSV-экспорта нужно указать shardName.")
-
-internal fun ApplicationCall.requireSqlConsoleExecutionId(): String =
-    requireRouteParam("id")
-
-internal fun UiServerContext.checkSqlConsoleConnections(): SqlConsoleConnectionCheckResponse =
-    withSqlConsoleCredentialsPath("datapool-ui-sql-console-check-") { credentialsPath ->
-        sqlConsoleService.checkConnections(credentialsPath = credentialsPath).toResponse(
-            configured = sqlConsoleService.info().configured,
-        )
-    }
-
-internal fun UiServerContext.searchSqlConsoleObjects(
-    request: SqlConsoleObjectSearchRequest,
-): SqlConsoleObjectSearchResponse =
-    withSqlConsoleCredentialsPath("datapool-ui-sql-console-objects-") { credentialsPath ->
-        sqlConsoleService.searchObjects(
-            rawQuery = request.query,
-            credentialsPath = credentialsPath,
-            selectedSourceNames = request.selectedSourceNames,
-            maxObjectsPerSource = request.maxObjectsPerSource,
-        ).toResponse()
-    }
 
 internal fun UiServerContext.executeSqlConsoleQuery(
     request: SqlConsoleQueryRequest,
