@@ -195,7 +195,7 @@ internal fun SqlFavoriteObjectsBlock(
                             Text(favorite.qualifiedName())
                         }
                         Div({ classes("sql-favorite-object-note") }) {
-                            Text("${favorite.sourceName} • ${translateFavoriteObjectType(favorite.objectType)}")
+                            Text("${favorite.sourceName} • ${translateSqlObjectType(favorite.objectType)}")
                         }
                     }
                     Div({ classes("d-flex", "flex-wrap", "gap-2") }) {

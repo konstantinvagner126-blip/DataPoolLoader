@@ -1,27 +1,5 @@
 package com.sbrf.lt.platform.composeui.sql_console
 
-import kotlinx.browser.window
-
-@kotlinx.serialization.Serializable
-internal data class SqlConsoleExportRequest(
-    val result: SqlConsoleQueryResult,
-    val shardName: String? = null,
-)
-
-internal fun SqlConsoleQueryResult?.statementResultsOrSelf(): List<SqlConsoleStatementResult> =
-    when {
-        this == null -> emptyList()
-        statementResults.isNotEmpty() -> statementResults
-        else -> listOf(
-            SqlConsoleStatementResult(
-                sql = sql,
-                statementType = statementType,
-                statementKeyword = statementKeyword,
-                shardResults = shardResults,
-            ),
-        )
-    }
-
 internal data class SqlScriptOutlineItem(
     val index: Int,
     val keyword: String,
@@ -151,127 +129,6 @@ internal fun parseSqlScriptOutline(sql: String): List<SqlScriptOutlineItem> {
     return items
 }
 
-internal fun focusEditorLine(
-    editor: dynamic,
-    lineNumber: Int,
-) {
-    if (editor == null) {
-        return
-    }
-    editor.revealLineInCenter(lineNumber)
-    val position = js("{}")
-    position.lineNumber = lineNumber
-    position.column = 1
-    editor.setPosition(position)
-    editor.focus()
-}
-
-internal fun insertSqlText(
-    editor: dynamic,
-    text: String,
-    currentValue: String,
-    onFallback: (String) -> Unit,
-) {
-    if (editor == null || editor.executeEdits == undefined) {
-        onFallback(appendSqlText(currentValue, text))
-        return
-    }
-    val edit = js("{}")
-    edit.range = editor.getSelection()
-    edit.text = text
-    edit.forceMoveMarkers = true
-    editor.executeEdits("compose-sql-console-favorites", arrayOf(edit))
-    editor.focus()
-}
-
-internal fun appendSqlText(
-    currentValue: String,
-    text: String,
-): String =
-    when {
-        currentValue.isBlank() -> text
-        currentValue.last().isWhitespace() -> currentValue + text
-        else -> "$currentValue $text"
-    }
-
-internal fun registerSqlConsoleEditorShortcuts(
-    editor: dynamic,
-    onRun: () -> Unit,
-    onRunCurrent: () -> Unit,
-    onFormat: () -> Unit,
-    onStop: () -> Unit,
-) {
-    val monaco = window.asDynamic().monaco ?: return
-    val ctrlEnter = (monaco.KeyMod.CtrlCmd as Int) or (monaco.KeyCode.Enter as Int)
-    val ctrlShiftEnter = (monaco.KeyMod.CtrlCmd as Int) or (monaco.KeyMod.Shift as Int) or (monaco.KeyCode.Enter as Int)
-    val shiftAltF = (monaco.KeyMod.Shift as Int) or (monaco.KeyMod.Alt as Int) or (monaco.KeyCode.KeyF as Int)
-    val escape = monaco.KeyCode.Escape as Int
-    editor.addCommand(ctrlEnter) { onRun() }
-    editor.addCommand(ctrlShiftEnter) { onRunCurrent() }
-    editor.addCommand(shiftAltF) { onFormat() }
-    editor.addCommand(escape) { onStop() }
-}
-
-internal fun SqlConsoleFavoriteObject.qualifiedName(): String = "${schemaName}.${objectName}"
-
-internal fun supportsFavoriteRowPreview(favorite: SqlConsoleFavoriteObject): Boolean =
-    when (favorite.objectType.uppercase()) {
-        "TABLE", "VIEW", "MATERIALIZED_VIEW" -> true
-        else -> false
-    }
-
-internal fun buildFavoritePreviewSql(favorite: SqlConsoleFavoriteObject): String {
-    val qualifiedName = sqlQualifiedName(favorite.schemaName, favorite.objectName)
-    return if (supportsFavoriteRowPreview(favorite)) {
-        """
-        select *
-        from $qualifiedName
-        limit 100;
-        """.trimIndent()
-    } else {
-        """
-        select schemaname,
-               tablename,
-               indexname,
-               indexdef
-        from pg_catalog.pg_indexes
-        where schemaname = ${sqlLiteral(favorite.schemaName)}
-          and indexname = ${sqlLiteral(favorite.objectName)};
-        """.trimIndent()
-    }
-}
-
-internal fun buildFavoriteCountSql(favorite: SqlConsoleFavoriteObject): String {
-    val qualifiedName = sqlQualifiedName(favorite.schemaName, favorite.objectName)
-    return """
-        select count(*) as total_rows
-        from $qualifiedName;
-    """.trimIndent()
-}
-
-internal fun buildFavoriteMetadataHref(favorite: SqlConsoleFavoriteObject): String =
-    "/sql-console-objects?query=${urlEncode(favorite.objectName)}&source=${urlEncode(favorite.sourceName)}&schema=${urlEncode(favorite.schemaName)}&object=${urlEncode(favorite.objectName)}&type=${urlEncode(favorite.objectType)}"
-
-internal fun sqlQualifiedName(
-    schemaName: String,
-    objectName: String,
-): String = "${sqlIdentifier(schemaName)}.${sqlIdentifier(objectName)}"
-
-internal fun sqlIdentifier(value: String): String = "\"${value.replace("\"", "\"\"")}\""
-
-internal fun sqlLiteral(value: String): String = "'${value.replace("'", "''")}'"
-
-internal fun urlEncode(value: String): String = js("encodeURIComponent(value)") as String
-
-internal fun translateFavoriteObjectType(type: String): String =
-    when (type.uppercase()) {
-        "TABLE" -> "Таблица"
-        "VIEW" -> "Представление"
-        "MATERIALIZED_VIEW" -> "Материализованное представление"
-        "INDEX" -> "Индекс"
-        else -> type
-    }
-
 internal fun formatSqlScript(sql: String): String {
     val outline = parseSqlScriptOutline(sql)
     if (outline.isEmpty()) {
@@ -334,13 +191,3 @@ internal fun formatSqlStatement(sql: String): String {
         .trim()
     return formatted
 }
-
-internal fun SqlConsoleStatementResult.toStandaloneQueryResult(source: SqlConsoleQueryResult?): SqlConsoleQueryResult =
-    SqlConsoleQueryResult(
-        sql = sql,
-        statementType = statementType,
-        statementKeyword = statementKeyword,
-        shardResults = shardResults,
-        maxRowsPerShard = source?.maxRowsPerShard ?: 0,
-        statementResults = emptyList(),
-    )

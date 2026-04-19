@@ -153,7 +153,7 @@ fun ComposeSqlConsoleObjectsPage(
                                 }
                                 if (target.objectType.isNotBlank()) {
                                     if (isNotEmpty()) append(" • ")
-                                    append(translateObjectType(target.objectType))
+                                    append(translateSqlObjectType(target.objectType))
                                 }
                             },
                         )
@@ -175,7 +175,7 @@ fun ComposeSqlConsoleObjectsPage(
                                         Text("${favorite.schemaName}.${favorite.objectName}")
                                     }
                                     Div({ classes("sql-favorite-object-note") }) {
-                                        Text("${favorite.sourceName} • ${translateObjectType(favorite.objectType)}")
+                                        Text("${favorite.sourceName} • ${translateSqlObjectType(favorite.objectType)}")
                                     }
                                 }
                             }
@@ -382,7 +382,7 @@ private fun SqlConsoleObjectCard(
                     Text("${dbObject.schemaName}.${dbObject.objectName}")
                 }
                 Div({ classes("small", "text-secondary") }) {
-                    Text("$sourceName • ${translateObjectType(dbObject.objectType)}")
+                    Text("$sourceName • ${translateSqlObjectType(dbObject.objectType)}")
                 }
                 if (isSelectedObject) {
                     Div({ classes("sql-object-selected-note") }) {
@@ -458,15 +458,6 @@ private fun SqlConsoleObjectCard(
     }
 }
 
-private fun translateObjectType(type: String): String =
-    when (type.uppercase()) {
-        "TABLE" -> "Таблица"
-        "VIEW" -> "Представление"
-        "MATERIALIZED_VIEW" -> "Материализованное представление"
-        "INDEX" -> "Индекс"
-        else -> type
-    }
-
 private data class SqlObjectNavigationTarget(
     val sourceName: String,
     val schemaName: String,
@@ -491,39 +482,4 @@ private fun SqlObjectNavigationTarget.matches(
         return false
     }
     return true
-}
-
-private fun supportsRowPreview(dbObject: SqlConsoleDatabaseObject): Boolean =
-    when (dbObject.objectType.uppercase()) {
-        "TABLE", "VIEW", "MATERIALIZED_VIEW" -> true
-        else -> false
-    }
-
-private fun buildPreviewSql(dbObject: SqlConsoleDatabaseObject): String {
-    val qualifiedName = sqlQualifiedName(dbObject.schemaName, dbObject.objectName)
-    return if (supportsRowPreview(dbObject)) {
-        """
-        select *
-        from $qualifiedName
-        limit 100;
-        """.trimIndent()
-    } else {
-        """
-        select schemaname,
-               tablename,
-               indexname,
-               indexdef
-        from pg_catalog.pg_indexes
-        where schemaname = ${sqlLiteral(dbObject.schemaName)}
-          and indexname = ${sqlLiteral(dbObject.objectName)};
-        """.trimIndent()
-    }
-}
-
-private fun buildCountSql(dbObject: SqlConsoleDatabaseObject): String {
-    val qualifiedName = sqlQualifiedName(dbObject.schemaName, dbObject.objectName)
-    return """
-        select count(*) as total_rows
-        from $qualifiedName;
-    """.trimIndent()
 }
