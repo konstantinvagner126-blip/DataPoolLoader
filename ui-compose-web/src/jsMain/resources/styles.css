@@ -533,6 +533,41 @@ body {
   word-break: break-all;
 }
 
+.module-catalog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.module-catalog-actions .module-editor-icon-btn {
+  min-height: 2.45rem;
+  min-width: 0;
+  padding: 0.5rem 0.8rem;
+  border-radius: 12px;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.module-editor-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+}
+
+.module-editor-icon-btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.module-editor-icon-btn-label {
+  line-height: 1.1;
+}
+
 .module-draft-status {
   display: inline-flex;
   align-items: center;
@@ -590,23 +625,6 @@ body {
 
 .module-editor-toolbar-group-secondary .btn {
   min-width: 12rem;
-}
-
-.module-editor-toolbar-group-admin .btn {
-  min-width: 10.75rem;
-}
-
-.module-editor-toolbar-group-admin {
-  gap: 0.5rem;
-}
-
-.module-editor-toolbar-group-admin .module-editor-icon-btn {
-  min-width: 2.85rem;
-  width: 2.85rem;
-  padding-inline: 0;
-  justify-content: center;
-  font-size: 1.15rem;
-  line-height: 1;
 }
 
 .editor-message-box {

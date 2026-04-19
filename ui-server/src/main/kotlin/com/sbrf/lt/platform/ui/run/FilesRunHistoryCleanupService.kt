@@ -9,7 +9,7 @@ import java.time.temporal.ChronoUnit
  * Controlled cleanup истории FILES-запусков, сохраненной в persisted UI state.
  */
 class FilesRunHistoryCleanupService(
-    private val runManager: RunManager,
+    private val runManager: FilesRunHistoryMaintenanceOperations,
     private val retentionDays: Int = 30,
     private val keepMinRunsPerModule: Int = 30,
 ) {

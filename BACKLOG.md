@@ -117,7 +117,8 @@
   - [DatabaseModuleStoreSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/DatabaseModuleStoreSupport.kt)
   - [DatabaseModuleStoreLifecycleSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/DatabaseModuleStoreLifecycleSupport.kt)
   - [DatabaseModuleStoreQuerySupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/DatabaseModuleStoreQuerySupport.kt)
-  - [DatabaseModuleStore.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/DatabaseModuleStore.kt) теперь координирует lifecycle и query-слои, а не держит каталог, детали и SQL-assets прямо в одном файле
+  - [DatabaseModuleStoreMutationSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/DatabaseModuleStoreMutationSupport.kt)
+  - [DatabaseModuleStore.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/DatabaseModuleStore.kt) теперь остался тонким фасадом над query/lifecycle/mutation support-слоями
 - для DB-registry добавлен интерфейсный boundary:
   - [DatabaseModuleRegistryOperations.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/DatabaseModuleRegistryOperations.kt)
   - `DatabaseModuleBackend`, `DatabaseModuleRunService`, `DatabaseModuleSyncImporter` и `UiServerContext` теперь зависят от контракта, а не от concrete `DatabaseModuleStore`
@@ -127,11 +128,16 @@
 - `SqlConsoleService` начал распиливаться на отдельные support-компоненты:
   - [SqlConsoleConfigSupport.kt](/Users/kwdev/DataPoolLoader/core/src/main/kotlin/com/sbrf/lt/datapool/sqlconsole/SqlConsoleConfigSupport.kt)
   - [SqlConsoleJdbcSupport.kt](/Users/kwdev/DataPoolLoader/core/src/main/kotlin/com/sbrf/lt/datapool/sqlconsole/SqlConsoleJdbcSupport.kt)
+  - [SqlConsoleStateSupport.kt](/Users/kwdev/DataPoolLoader/core/src/main/kotlin/com/sbrf/lt/datapool/sqlconsole/SqlConsoleStateSupport.kt)
+  - [SqlConsoleExecutionSupport.kt](/Users/kwdev/DataPoolLoader/core/src/main/kotlin/com/sbrf/lt/datapool/sqlconsole/SqlConsoleExecutionSupport.kt)
+  - [SqlConsoleService.kt](/Users/kwdev/DataPoolLoader/core/src/main/kotlin/com/sbrf/lt/datapool/sqlconsole/SqlConsoleService.kt) теперь остался boundary-слоем над config/state/execution support-компонентами
 - для SQL-консоли добавлен сервисный интерфейс:
   - [SqlConsoleOperations.kt](/Users/kwdev/DataPoolLoader/core/src/main/kotlin/com/sbrf/lt/datapool/sqlconsole/SqlConsoleOperations.kt)
   - server-layer и query manager теперь зависят от контракта, а не от concrete `SqlConsoleService`
 - `ApplicationRunner` начал распиливаться на отдельные support-компоненты:
   - [ApplicationRunnerSupport.kt](/Users/kwdev/DataPoolLoader/core/src/main/kotlin/com/sbrf/lt/datapool/app/ApplicationRunnerSupport.kt)
+  - [ApplicationRunnerPipelineSupport.kt](/Users/kwdev/DataPoolLoader/core/src/main/kotlin/com/sbrf/lt/datapool/app/ApplicationRunnerPipelineSupport.kt)
+  - [ApplicationRunner.kt](/Users/kwdev/DataPoolLoader/core/src/main/kotlin/com/sbrf/lt/datapool/app/ApplicationRunner.kt) теперь остался boundary-слоем над config loading и pipeline execution support
 - `DatabaseRunStore` начал делиться на узкие контракты:
   - [DatabaseRunExecutionStore.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunExecutionStore.kt)
   - [DatabaseRunQueryStore.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunQueryStore.kt)
@@ -145,15 +151,18 @@
 - `RunManager` тоже начал отделять orchestration от persisted history:
   - [RunManagerHistorySupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/RunManagerHistorySupport.kt)
   - [RunManagerExecutionSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/RunManagerExecutionSupport.kt)
-  - [RunManager.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/RunManager.kt) теперь не держит в себе целиком восстановление persisted history, cleanup-планирование и мутацию live snapshot/event-state
+  - [RunManagerStateSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/RunManagerStateSupport.kt)
+  - [RunManager.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/RunManager.kt) теперь не держит в себе целиком восстановление persisted history, cleanup-планирование, UI-state assembly и credential-aware module details
+- для файлового run-слоя добавлены интерфейсные boundaries:
+  - [FilesModuleRunOperations.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/FilesModuleRunOperations.kt)
+  - [FilesRunHistoryMaintenanceOperations.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/FilesRunHistoryMaintenanceOperations.kt)
+  - `CommonRoutes`, `FilesModuleRunHistoryService`, `FilesRunHistoryCleanupService`, `FilesOutputRetentionService` и `UiServerContext` теперь зависят от контрактов, а не от concrete `RunManager`
 
 Что осталось:
 
 - продолжить рефакторинг:
-  - [ApplicationRunner.kt](/Users/kwdev/DataPoolLoader/core/src/main/kotlin/com/sbrf/lt/datapool/app/ApplicationRunner.kt)
   - [SqlConsoleService.kt](/Users/kwdev/DataPoolLoader/core/src/main/kotlin/com/sbrf/lt/datapool/sqlconsole/SqlConsoleService.kt)
-  - [DatabaseModuleStore.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/DatabaseModuleStore.kt)
-  - при необходимости [RunManager.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/RunManager.kt) и дальнейшее упрощение внутренних support-слоев DB run-store
+  - при необходимости [RunManager.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/RunManager.kt) как orchestration-слой и дальнейшее упрощение внутренних support-слоев DB run-store
 
 
 ## Рекомендуемый порядок выполнения

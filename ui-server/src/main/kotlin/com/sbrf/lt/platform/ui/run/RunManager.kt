@@ -9,14 +9,10 @@ import com.sbrf.lt.platform.ui.config.UiAppConfig
 import com.sbrf.lt.platform.ui.config.UiConfigLoader
 import com.sbrf.lt.platform.ui.config.storageDirPath
 import com.sbrf.lt.platform.ui.model.CredentialsStatusResponse
-import com.sbrf.lt.platform.ui.model.CurrentStorageModuleResponse
-import com.sbrf.lt.platform.ui.model.ModuleDescriptor
 import com.sbrf.lt.platform.ui.model.ModuleDetailsResponse
-import com.sbrf.lt.platform.ui.model.RunHistoryCleanupModuleResponse
 import com.sbrf.lt.platform.ui.model.RunHistoryCleanupPreviewResponse
 import com.sbrf.lt.platform.ui.model.RunHistoryCleanupResultResponse
 import com.sbrf.lt.platform.ui.model.StartRunRequest
-import com.sbrf.lt.platform.ui.model.UiSettingsResponse
 import com.sbrf.lt.platform.ui.model.UiRunSnapshot
 import com.sbrf.lt.platform.ui.model.UiStateResponse
 import com.sbrf.lt.platform.ui.module.ModuleRegistry
@@ -34,37 +30,27 @@ class RunManager(
     private val stateStore: RunStateStore = RunStateStore(uiConfig.storageDirPath()),
     private val credentialsService: UiCredentialsService = UiCredentialsService(uiConfigProvider = { uiConfig }),
     private val moduleExecutionSource: ModuleExecutionSource = FilesModuleExecutionSource(moduleRegistry),
-) : UiCredentialsProvider {
+) : FilesModuleRunOperations, FilesRunHistoryMaintenanceOperations {
     private val executor = Executors.newSingleThreadExecutor()
     private val snapshots = mutableListOf<MutableRunSnapshot>()
     private val updatesFlow = MutableSharedFlow<UiStateResponse>(replay = 1, extraBufferCapacity = 32)
     private val mapper = com.sbrf.lt.datapool.config.ConfigLoader().objectMapper()
     private val historySupport = RunManagerHistorySupport(stateStore, mapper)
     private val executionSupport = RunManagerExecutionSupport(mapper)
+    private val stateSupport = RunManagerStateSupport(moduleRegistry, uiConfig)
 
     init {
         restorePersistedState()
         updatesFlow.tryEmit(currentState())
     }
 
-    fun updates() = updatesFlow.asSharedFlow()
+    override fun updates() = updatesFlow.asSharedFlow()
 
     @Synchronized
-    fun currentState(): UiStateResponse {
-        val ordered = snapshots.sortedByDescending { it.startedAt }
-        return UiStateResponse(
-            credentialsStatus = currentCredentialsStatus(),
-            uiSettings = UiSettingsResponse(
-                showTechnicalDiagnostics = uiConfig.showTechnicalDiagnostics,
-                showRawSummaryJson = uiConfig.showRawSummaryJson,
-            ),
-            activeRun = ordered.firstOrNull { it.status != ExecutionStatus.SUCCESS && it.status != ExecutionStatus.FAILED }?.toUi(),
-            history = ordered.map { it.toUi() },
-        )
-    }
+    override fun currentState(): UiStateResponse = stateSupport.currentState(snapshots, currentCredentialsStatus())
 
     @Synchronized
-    fun uploadCredentials(fileName: String, content: String): CredentialsStatusResponse {
+    override fun uploadCredentials(fileName: String, content: String): CredentialsStatusResponse {
         credentialsService.uploadCredentials(fileName, content)
         publishState()
         return currentCredentialsStatus()
@@ -74,11 +60,15 @@ class RunManager(
     override fun currentCredentialsStatus(): CredentialsStatusResponse = credentialsService.currentCredentialsStatus()
 
     @Synchronized
-    fun startRun(request: StartRunRequest): UiRunSnapshot {
+    override fun startRun(request: StartRunRequest): UiRunSnapshot {
         require(snapshots.none { it.status != ExecutionStatus.SUCCESS && it.status != ExecutionStatus.FAILED }) {
             "Уже выполняется другой запуск. Дождитесь его завершения."
         }
-        validateCredentialsBeforeRun(request.configText)
+        stateSupport.validateCredentialsBeforeRun(
+            configText = request.configText,
+            credentialProperties = currentProperties(),
+            credentialsStatus = currentCredentialsStatus(),
+        )
 
         val module = moduleRegistry.getModule(request.moduleId)
         val snapshot = executionSupport.createSnapshot(module)
@@ -100,7 +90,7 @@ class RunManager(
     }
 
     private fun runModule(
-        module: ModuleDescriptor,
+        module: com.sbrf.lt.platform.ui.model.ModuleDescriptor,
         request: StartRunRequest,
         snapshot: MutableRunSnapshot,
     ): ApplicationRunResult {
@@ -119,41 +109,18 @@ class RunManager(
     }
 
     @Synchronized
-    fun loadModuleDetails(moduleId: String): ModuleDetailsResponse {
-        val details = moduleRegistry.loadModuleDetails(moduleId)
-        val requirement = analyzeCredentialRequirements(details.configText, currentProperties())
-        return details.copy(
-            requiresCredentials = requirement.requiresCredentials,
+    override fun loadModuleDetails(moduleId: String): ModuleDetailsResponse =
+        stateSupport.loadModuleDetails(
+            moduleId = moduleId,
             credentialsStatus = currentCredentialsStatus(),
-            requiredCredentialKeys = requirement.requiredKeys,
-            missingCredentialKeys = requirement.missingKeys,
-            credentialsReady = !requirement.requiresCredentials || requirement.ready,
+            credentialProperties = currentProperties(),
         )
-    }
-
-    private fun validateCredentialsBeforeRun(configText: String) {
-        val requirement = analyzeCredentialRequirements(configText, currentProperties())
-        if (!requirement.requiresCredentials) {
-            return
-        }
-        val status = currentCredentialsStatus()
-        require(requirement.ready) {
-            buildMissingCredentialValuesMessage(
-                subjectLabel = "модуля",
-                missingKeys = requirement.missingKeys,
-                credentialsStatus = status,
-            )
-        }
-    }
 
     override fun materializeCredentialsFile(tempDir: Path): Path? {
         return credentialsService.materializeCredentialsFile(tempDir)
     }
 
     override fun currentProperties(): Map<String, String> = credentialsService.currentProperties()
-
-    private fun usesCredentialPlaceholders(configText: String): Boolean =
-        containsCredentialPlaceholders(configText)
 
     @Synchronized
     private fun handleEvent(snapshot: MutableRunSnapshot, event: ExecutionEvent) {
@@ -186,7 +153,7 @@ class RunManager(
     }
 
     @Synchronized
-    fun previewHistoryCleanup(
+    override fun previewHistoryCleanup(
         cutoffTimestamp: Instant,
         retentionDays: Int,
         keepMinRunsPerModule: Int,
@@ -201,7 +168,7 @@ class RunManager(
         )
 
     @Synchronized
-    fun executeHistoryCleanup(
+    override fun executeHistoryCleanup(
         cutoffTimestamp: Instant,
         retentionDays: Int,
         keepMinRunsPerModule: Int,

@@ -9,7 +9,7 @@ import java.time.Instant
 import java.time.temporal.ChronoUnit
 
 class FilesOutputRetentionService(
-    private val runManager: RunManager,
+    private val runManager: FilesModuleRunOperations,
     private val retentionDays: Int = 14,
     private val keepMinRunsPerModule: Int = 20,
 ) {

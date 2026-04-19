@@ -49,7 +49,7 @@ internal fun Route.registerSqlConsoleRoutes(context: UiServerContext) {
     post("/api/sql-console/connections/check") {
         val tempDir = kotlin.io.path.createTempDirectory("datapool-ui-sql-console-check-")
         try {
-            val credentialsPath = context.runManager.materializeCredentialsFile(tempDir)
+            val credentialsPath = context.filesRunService.materializeCredentialsFile(tempDir)
             call.respond(
                 context.sqlConsoleService.checkConnections(credentialsPath = credentialsPath).toResponse(
                     configured = context.sqlConsoleService.info().configured,
@@ -64,7 +64,7 @@ internal fun Route.registerSqlConsoleRoutes(context: UiServerContext) {
         val request = call.receive<SqlConsoleQueryRequest>()
         val tempDir = kotlin.io.path.createTempDirectory("datapool-ui-sql-console-")
         try {
-            val credentialsPath = context.runManager.materializeCredentialsFile(tempDir)
+            val credentialsPath = context.filesRunService.materializeCredentialsFile(tempDir)
             call.respond(
                 context.sqlConsoleService.executeQuery(
                     rawSql = request.sql,
@@ -110,7 +110,7 @@ internal fun Route.registerSqlConsoleRoutes(context: UiServerContext) {
         val request = call.receive<SqlConsoleQueryRequest>()
         val tempDir = kotlin.io.path.createTempDirectory("datapool-ui-sql-console-")
         val credentialsPath = try {
-            context.runManager.materializeCredentialsFile(tempDir)
+            context.filesRunService.materializeCredentialsFile(tempDir)
         } catch (ex: Exception) {
             tempDir.toFile().deleteRecursively()
             throw ex

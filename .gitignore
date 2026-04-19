@@ -7,6 +7,8 @@ kotlin-js-store/
 *.iml
 out/
 **/output/
+!ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/model/output/
+!ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/model/output/**
 
 # Local credentials
 gradle/credential.properties

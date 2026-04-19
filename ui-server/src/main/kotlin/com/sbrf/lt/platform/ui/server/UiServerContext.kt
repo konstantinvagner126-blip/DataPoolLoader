@@ -25,9 +25,10 @@ import com.sbrf.lt.platform.ui.run.DatabaseModuleRunService
 import com.sbrf.lt.platform.ui.run.DatabaseOutputRetentionService
 import com.sbrf.lt.platform.ui.run.DatabaseRunHistoryCleanupService
 import com.sbrf.lt.platform.ui.run.DatabaseRunStore
+import com.sbrf.lt.platform.ui.run.FilesModuleRunOperations
+import com.sbrf.lt.platform.ui.run.FilesRunHistoryMaintenanceOperations
 import com.sbrf.lt.platform.ui.run.FilesOutputRetentionService
 import com.sbrf.lt.platform.ui.run.FilesRunHistoryCleanupService
-import com.sbrf.lt.platform.ui.run.RunManager
 import com.sbrf.lt.platform.ui.run.UiCredentialsService
 import com.sbrf.lt.platform.ui.run.history.DatabaseModuleRunHistoryService
 import com.sbrf.lt.platform.ui.run.history.ModuleRunHistoryService
@@ -51,7 +52,8 @@ internal class UiServerContext(
     internal val filesModuleBackend: FilesModuleBackend,
     private val databaseModuleStore: DatabaseModuleRegistryOperations?,
     private val databaseModuleBackend: DatabaseModuleBackend?,
-    internal val runManager: RunManager,
+    internal val filesRunService: FilesModuleRunOperations,
+    private val filesRunHistoryMaintenance: FilesRunHistoryMaintenanceOperations,
     internal val configFormService: ConfigFormService,
     internal val sqlConsoleService: SqlConsoleOperations,
     internal val sqlConsoleQueryManager: SqlConsoleQueryManager,
@@ -130,11 +132,11 @@ internal class UiServerContext(
         }
 
     fun currentFilesRunHistoryCleanupService(): FilesRunHistoryCleanupService =
-        FilesRunHistoryCleanupService(runManager)
+        FilesRunHistoryCleanupService(filesRunHistoryMaintenance)
 
     fun currentFilesOutputRetentionService(): FilesOutputRetentionService =
         FilesOutputRetentionService(
-            runManager = runManager,
+            runManager = filesRunService,
             retentionDays = currentRuntimeUiConfig().outputRetention.retentionDays,
             keepMinRunsPerModule = currentRuntimeUiConfig().outputRetention.keepMinRunsPerModule,
         )

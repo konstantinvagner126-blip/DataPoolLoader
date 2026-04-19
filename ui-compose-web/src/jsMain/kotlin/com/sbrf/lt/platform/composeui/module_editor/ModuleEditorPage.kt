@@ -175,6 +175,74 @@ fun ComposeModuleEditorPage(
         ?: session?.module?.sqlFiles?.firstOrNull()
     val selectedModuleId = state.selectedModuleId
     val hasRunningRun = runPanelState.history?.runs?.any { it.status.equals("RUNNING", ignoreCase = true) } == true
+    val capabilities = session?.capabilities
+    val actionBusy = state.actionInProgress != null
+
+    val onRunAction: () -> Unit = {
+        scope.launch {
+            state = store.beginAction(state, "run")
+            state = if (currentRoute.storage == "database") {
+                store.runDatabaseModule(state)
+            } else {
+                store.runFilesModule(state)
+            }
+            refreshModuleCatalog()
+            state.selectedModuleId?.let { moduleId ->
+                refreshEditorRunPanel(moduleId)
+            }
+        }
+    }
+    val onSaveAction: () -> Unit = {
+        scope.launch {
+            state = store.beginAction(state, "save")
+            state = if (currentRoute.storage == "database") {
+                store.saveDatabaseWorkingCopy(state, currentRoute)
+            } else {
+                store.saveFilesModule(state, currentRoute)
+            }
+        }
+    }
+    val onDiscardWorkingCopyAction: () -> Unit = {
+        if (window.confirm("Сбросить личный черновик? Несохраненные изменения будут потеряны.")) {
+            scope.launch {
+                state = store.beginAction(state, "discard")
+                state = store.discardDatabaseWorkingCopy(state, currentRoute)
+            }
+        }
+    }
+    val onPublishWorkingCopyAction: () -> Unit = {
+        if (window.confirm("Опубликовать черновик как новую ревизию? После публикации личный черновик будет удален.")) {
+            scope.launch {
+                state = store.beginAction(state, "publish")
+                state = store.publishDatabaseWorkingCopy(state, currentRoute)
+            }
+        }
+    }
+    val onOpenCreateModuleAction: () -> Unit = {
+        state = store.openCreateModuleDialog(state)
+    }
+    val onDeleteModuleAction: () -> Unit = {
+        val moduleId = state.selectedModuleId
+        if (!moduleId.isNullOrBlank() && window.confirm("Удалить модуль '$moduleId'? Это действие необратимо.")) {
+            scope.launch {
+                state = store.beginAction(state, "delete")
+                state = store.deleteDatabaseModule(state, currentRoute)
+                currentRoute = currentRoute.copy(
+                    moduleId = state.selectedModuleId,
+                    openCreateDialog = false,
+                )
+            }
+        }
+    }
+    val onReloadAction: () -> Unit = {
+        val moduleId = state.selectedModuleId
+        if (!moduleId.isNullOrBlank()) {
+            scope.launch {
+                state = store.startLoading(state)
+                state = store.selectModule(state, currentRoute, moduleId)
+            }
+        }
+    }
 
     PollingEffect(
         enabled = currentRoute.storage == "database" && !selectedModuleId.isNullOrBlank() && !runPanelState.loading && hasRunningRun,
@@ -299,6 +367,34 @@ fun ComposeModuleEditorPage(
                             classes("module-catalog-status", "mt-3", "mb-3", "text-secondary", "small")
                         }) {
                             Text(buildCatalogStatus(state, currentRoute.storage))
+                        }
+                        if (currentRoute.storage == "database") {
+                            Div({ classes("module-catalog-actions", "mb-3") }) {
+                                EditorIconActionButton(
+                                    icon = "+",
+                                    label = "Новый",
+                                    title = "Новый модуль",
+                                    enabled = capabilities?.createModule == true && !actionBusy,
+                                    style = EditorActionStyle.PrimaryOutline,
+                                    onClick = onOpenCreateModuleAction,
+                                )
+                                EditorIconActionButton(
+                                    icon = "−",
+                                    label = "Удалить",
+                                    title = "Удалить модуль",
+                                    enabled = capabilities?.deleteModule == true && !actionBusy && state.selectedModuleId != null,
+                                    style = EditorActionStyle.DangerOutline,
+                                    onClick = onDeleteModuleAction,
+                                )
+                                EditorIconActionButton(
+                                    icon = "⇅",
+                                    label = "Импорт",
+                                    title = "Импорт из файлов",
+                                    enabled = true,
+                                    style = EditorActionStyle.SecondaryOutline,
+                                    onClick = { window.location.href = "/db-sync" },
+                                )
+                            }
                         }
                         if (currentRoute.storage == "database") {
                             Label(attrs = { classes("config-form-check", "mb-3") }) {
@@ -444,69 +540,13 @@ fun ComposeModuleEditorPage(
                             route = currentRoute,
                             state = state,
                             onTabSelect = { tab -> state = store.selectTab(state, tab) },
-                            onRun = {
-                                scope.launch {
-                                    state = store.beginAction(state, "run")
-                                    state = if (currentRoute.storage == "database") {
-                                        store.runDatabaseModule(state)
-                                    } else {
-                                        store.runFilesModule(state)
-                                    }
-                                    refreshModuleCatalog()
-                                    state.selectedModuleId?.let { moduleId ->
-                                        refreshEditorRunPanel(moduleId)
-                                    }
-                                }
-                            },
-                            onSave = {
-                                scope.launch {
-                                    state = store.beginAction(state, "save")
-                                    state = if (currentRoute.storage == "database") {
-                                        store.saveDatabaseWorkingCopy(state, currentRoute)
-                                    } else {
-                                        store.saveFilesModule(state, currentRoute)
-                                    }
-                                }
-                            },
-                            onDiscardWorkingCopy = {
-                                if (window.confirm("Сбросить личный черновик? Несохраненные изменения будут потеряны.")) {
-                                    scope.launch {
-                                        state = store.beginAction(state, "discard")
-                                        state = store.discardDatabaseWorkingCopy(state, currentRoute)
-                                    }
-                                }
-                            },
-                            onPublishWorkingCopy = {
-                                if (window.confirm("Опубликовать черновик как новую ревизию? После публикации личный черновик будет удален.")) {
-                                    scope.launch {
-                                        state = store.beginAction(state, "publish")
-                                        state = store.publishDatabaseWorkingCopy(state, currentRoute)
-                                    }
-                                }
-                            },
-                            onOpenCreateModule = {
-                                state = store.openCreateModuleDialog(state)
-                            },
-                            onDeleteModule = {
-                                val moduleId = state.selectedModuleId ?: return@EditorShellHeader
-                                if (window.confirm("Удалить модуль '$moduleId'? Это действие необратимо.")) {
-                                    scope.launch {
-                                        state = store.beginAction(state, "delete")
-                                        state = store.deleteDatabaseModule(state, currentRoute)
-                                        currentRoute = currentRoute.copy(
-                                            moduleId = state.selectedModuleId,
-                                            openCreateDialog = false,
-                                        )
-                                    }
-                                }
-                            },
-                            onReload = {
-                                val moduleId = state.selectedModuleId ?: return@EditorShellHeader
-                                scope.launch {
-                                    state = store.startLoading(state)
-                                    state = store.selectModule(state, currentRoute, moduleId)
-                                }
-                            },
+                            onRun = onRunAction,
+                            onSave = onSaveAction,
+                            onDiscardWorkingCopy = onDiscardWorkingCopyAction,
+                            onPublishWorkingCopy = onPublishWorkingCopyAction,
+                            onOpenCreateModule = onOpenCreateModuleAction,
+                            onDeleteModule = onDeleteModuleAction,
+                            onReload = onReloadAction,
                         )
                         ValidationAlert(session)
 
@@ -794,30 +834,6 @@ private fun EditorShellHeader(
                         Div({ classes("module-editor-toolbar-group", "module-editor-toolbar-group-secondary") }) {
                             Div({ classes("module-editor-toolbar-group-label") }) { Text("Редактор") }
                             EditorActionButton("Отменить изменения", state.hasDraftChanges && !actionBusy, EditorActionStyle.DangerOutline, onReload)
-                        }
-                        Div({ classes("module-editor-toolbar-group", "module-editor-toolbar-group-admin") }) {
-                            Div({ classes("module-editor-toolbar-group-label") }) { Text("Модули из базы данных") }
-                            EditorIconActionButton(
-                                icon = "+",
-                                title = "Новый модуль",
-                                enabled = capabilities.createModule && !actionBusy,
-                                style = EditorActionStyle.PrimaryOutline,
-                                onClick = onOpenCreateModule,
-                            )
-                            EditorIconActionButton(
-                                icon = "−",
-                                title = "Удалить модуль",
-                                enabled = capabilities.deleteModule && !actionBusy && state.selectedModuleId != null,
-                                style = EditorActionStyle.DangerOutline,
-                                onClick = onDeleteModule,
-                            )
-                            EditorIconActionButton(
-                                icon = "⇅",
-                                title = "Импорт из файлов",
-                                enabled = true,
-                                style = EditorActionStyle.SecondaryOutline,
-                                onClick = { window.location.href = "/db-sync" },
-                            )
                         }
                     }
                 }
@@ -1547,6 +1563,7 @@ private fun EditorActionButton(
 @Composable
 private fun EditorIconActionButton(
     icon: String,
+    label: String,
     title: String,
     enabled: Boolean,
     style: EditorActionStyle = EditorActionStyle.SecondaryOutline,
@@ -1564,7 +1581,8 @@ private fun EditorIconActionButton(
             onClick { onClick() }
         }
     }) {
-        Text(icon)
+        Span({ classes("module-editor-icon-btn-icon") }) { Text(icon) }
+        Span({ classes("module-editor-icon-btn-label") }) { Text(label) }
     }
 }
 

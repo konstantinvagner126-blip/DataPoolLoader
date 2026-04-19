@@ -1,7 +1,6 @@
 package com.sbrf.lt.datapool.sqlconsole
 
 import com.fasterxml.jackson.annotation.JsonAlias
-import com.sbrf.lt.datapool.config.ValueResolver
 import org.slf4j.LoggerFactory
 import java.nio.file.Path
 
@@ -98,19 +97,18 @@ class SqlConsoleService(
     private val connectionChecker: ShardConnectionChecker = JdbcShardConnectionChecker(),
 ) : SqlConsoleOperations {
     private val logger = LoggerFactory.getLogger(javaClass)
-    private val support = SqlConsoleConfigSupport()
+    private val configSupport = SqlConsoleConfigSupport()
+    private val stateSupport = SqlConsoleStateSupport()
+    private val executionSupport = SqlConsoleExecutionSupport(
+        configSupport = configSupport,
+        executor = executor,
+        connectionChecker = connectionChecker,
+        logger = logger,
+    )
     @Volatile
     private var currentConfig: SqlConsoleConfig = config
 
-    override fun info(): SqlConsoleInfo {
-        val config = currentConfig
-        return SqlConsoleInfo(
-            configured = config.sources.isNotEmpty(),
-            sourceNames = config.sources.map { it.name },
-            maxRowsPerShard = config.maxRowsPerShard,
-            queryTimeoutSec = config.queryTimeoutSec,
-        )
-    }
+    override fun info(): SqlConsoleInfo = stateSupport.info(currentConfig)
 
     override fun updateMaxRowsPerShard(maxRowsPerShard: Int): SqlConsoleInfo {
         return updateSettings(maxRowsPerShard, currentConfig.queryTimeoutSec)
@@ -120,11 +118,8 @@ class SqlConsoleService(
         maxRowsPerShard: Int,
         queryTimeoutSec: Int?,
     ): SqlConsoleInfo {
-        require(maxRowsPerShard > 0) { "Лимит строк на source должен быть больше 0." }
-        require(queryTimeoutSec == null || queryTimeoutSec > 0) {
-            "Таймаут запроса на source должен быть больше 0, если задан."
-        }
-        currentConfig = currentConfig.copy(
+        currentConfig = stateSupport.updateSettings(
+            currentConfig = currentConfig,
             maxRowsPerShard = maxRowsPerShard,
             queryTimeoutSec = queryTimeoutSec,
         )
@@ -136,68 +131,22 @@ class SqlConsoleService(
         credentialsPath: Path?,
         selectedSourceNames: List<String>,
         executionControl: SqlConsoleExecutionControl,
-    ): SqlConsoleQueryResult {
-        val config = currentConfig
-        val statement = support.parseAndValidateStatement(rawSql)
-        val resolvedShards = support.resolveSources(config, credentialsPath, selectedSourceNames)
-
-        val shardResults = resolvedShards.map { shard ->
-            if (executionControl.isCancelled()) {
-                throw SqlConsoleExecutionCancelledException("Запрос отменен пользователем.")
-            }
-            runCatching {
-                executor.execute(
-                    shard = shard,
-                    statement = statement,
-                    fetchSize = config.fetchSize,
-                    maxRows = config.maxRowsPerShard,
-                    queryTimeoutSec = config.queryTimeoutSec,
-                    executionControl = executionControl,
-                )
-            }.onFailure { ex ->
-                if (ex is SqlConsoleExecutionCancelledException) {
-                    throw ex
-                }
-                logger.warn("SQL-консоль: shard {} завершился ошибкой: {}", shard.name, ex.message)
-            }.getOrElse { ex ->
-                RawShardExecutionResult(
-                    shardName = shard.name,
-                    status = "FAILED",
-                    errorMessage = ex.message ?: "Неизвестная ошибка",
-                )
-            }
-        }
-
-        return SqlConsoleQueryResult(
-            sql = statement.sql,
-            statementType = support.determineResultType(shardResults),
-            statementKeyword = statement.leadingKeyword,
-            shardResults = shardResults,
-            maxRowsPerShard = config.maxRowsPerShard,
+    ): SqlConsoleQueryResult =
+        executionSupport.executeQuery(
+            config = currentConfig,
+            rawSql = rawSql,
+            credentialsPath = credentialsPath,
+            selectedSourceNames = selectedSourceNames,
+            executionControl = executionControl,
         )
-    }
 
     override fun checkConnections(
         credentialsPath: Path?,
         selectedSourceNames: List<String>,
-    ): SqlConsoleConnectionCheckResult {
-        val config = currentConfig
-        val selectedSources = support.selectSources(config, selectedSourceNames)
-        val resolver = ValueResolver.fromFile(credentialsPath)
-        val results = selectedSources.map { source ->
-            runCatching {
-                val shard = support.resolveSource(source, resolver)
-                connectionChecker.check(shard, config.queryTimeoutSec)
-            }.onFailure { ex ->
-                logger.warn("SQL-консоль: проверка подключения shard {} завершилась ошибкой: {}", source.name, ex.message)
-            }.getOrElse { ex ->
-                RawShardConnectionCheckResult(
-                    shardName = source.name,
-                    status = "FAILED",
-                    errorMessage = ex.message ?: "Не удалось установить подключение.",
-                )
-            }
-        }
-        return SqlConsoleConnectionCheckResult(sourceResults = results)
-    }
+    ): SqlConsoleConnectionCheckResult =
+        executionSupport.checkConnections(
+            config = currentConfig,
+            credentialsPath = credentialsPath,
+            selectedSourceNames = selectedSourceNames,
+        )
 }

@@ -63,7 +63,7 @@ internal fun Route.registerCommonRoutes(
 
     get("/api/modules/catalog") {
         val modules = context.filesModuleBackend.listModules()
-        val activeModuleId = context.runManager.currentState().activeRun?.moduleId
+        val activeModuleId = context.filesRunService.currentState().activeRun?.moduleId
         call.respond(
             ModulesCatalogResponse(
                 appsRootStatus = requireNotNull(context.filesModuleBackend.catalogStatus()),
@@ -116,15 +116,15 @@ internal fun Route.registerCommonRoutes(
     }
 
     post("/api/runs") {
-        call.respond(context.runManager.startRun(call.receive<StartRunRequest>()))
+        call.respond(context.filesRunService.startRun(call.receive<StartRunRequest>()))
     }
 
     get("/api/state") {
-        call.respond(context.runManager.currentState())
+        call.respond(context.filesRunService.currentState())
     }
 
     get("/api/credentials") {
-        call.respond(context.runManager.currentCredentialsStatus())
+        call.respond(context.filesRunService.currentCredentialsStatus())
     }
 
     get("/api/run-history/cleanup/preview") {
@@ -237,12 +237,12 @@ internal fun Route.registerCommonRoutes(
             part.dispose.invoke()
         }
         require(!content.isNullOrBlank()) { "Не удалось прочитать содержимое credential.properties." }
-        call.respond(context.runManager.uploadCredentials(fileName, requireNotNull(content)))
+        call.respond(context.filesRunService.uploadCredentials(fileName, requireNotNull(content)))
     }
 
     webSocket("/ws") {
-        send(Frame.Text(mapper.writeValueAsString(context.runManager.currentState())))
-        context.runManager.updates().collect { state ->
+        send(Frame.Text(mapper.writeValueAsString(context.filesRunService.currentState())))
+        context.filesRunService.updates().collect { state ->
             send(Frame.Text(mapper.writeValueAsString(state)))
         }
     }

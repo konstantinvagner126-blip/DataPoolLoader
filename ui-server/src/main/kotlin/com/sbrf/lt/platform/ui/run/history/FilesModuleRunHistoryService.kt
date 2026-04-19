@@ -8,14 +8,14 @@ import com.sbrf.lt.platform.ui.model.ModuleRunSummaryResponse
 import com.sbrf.lt.platform.ui.model.UiRunSnapshot
 import com.sbrf.lt.platform.ui.module.ModuleRegistry
 import com.sbrf.lt.platform.ui.module.backend.ModuleActor
-import com.sbrf.lt.platform.ui.run.RunManager
+import com.sbrf.lt.platform.ui.run.FilesModuleRunOperations
 
 /**
  * FILES-реализация общего backend-контракта истории запусков.
  */
 class FilesModuleRunHistoryService(
     private val moduleRegistry: ModuleRegistry,
-    private val runManager: RunManager,
+    private val runManager: FilesModuleRunOperations,
 ) : ModuleRunHistoryService {
     override fun loadSession(moduleId: String, actor: ModuleActor?): ModuleRunPageSessionResponse {
         val module = moduleRegistry.loadModuleDetails(moduleId)
