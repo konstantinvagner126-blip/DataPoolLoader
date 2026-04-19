@@ -323,289 +323,402 @@ fun ComposeSqlConsolePage(
                 }
 
                 Div({ classes("col-12", "col-xl-9") }) {
-                    Div({ classes("panel", "sql-workspace-panel") }) {
-                        Div({ classes("d-flex", "flex-wrap", "align-items-start", "justify-content-between", "gap-3", "mb-3") }) {
-                            Div {
-                                Div({ classes("panel-title", "mb-1") }) { Text("SQL-редактор") }
-                                Div({ classes("text-secondary", "small") }) {
-                                    Text("Поддерживается один SQL или SQL-скрипт из нескольких statement-ов. Результат показывается отдельно по каждому statement и source.")
-                                }
+                    SqlConsoleWorkspacePanel(
+                        state = state,
+                        selectedRecentQuery = selectedRecentQuery,
+                        selectedFavoriteQuery = selectedFavoriteQuery,
+                        editorCursorLine = editorCursorLine,
+                        scriptOutline = scriptOutline,
+                        currentOutlineItem = currentOutlineItem,
+                        statementAnalysis = statementAnalysis,
+                        runButtonClass = runButtonClass,
+                        pendingManualTransaction = pendingManualTransaction,
+                        isRunning = isRunning,
+                        currentExecution = currentExecution,
+                        runningClockTick = runningClockTick,
+                        statementResults = statementResults,
+                        exportableResult = exportableResult,
+                        activeExportShard = activeExportShard,
+                        activeOutputTab = activeOutputTab,
+                        selectedStatementIndex = selectedStatementIndex,
+                        selectedResultShard = selectedResultShard,
+                        currentDataPage = currentDataPage,
+                        onRecentSelected = { selectedRecentQuery = it },
+                        onFavoriteSelected = { selectedFavoriteQuery = it },
+                        onApplyRecent = { state = store.applyRecentQuery(state, selectedRecentQuery) },
+                        onApplyFavorite = { state = store.applyFavoriteQuery(state, selectedFavoriteQuery) },
+                        onRememberFavorite = { state = store.rememberFavoriteQuery(state) },
+                        onRemoveFavorite = {
+                            state = store.removeFavoriteQuery(state, selectedFavoriteQuery)
+                            selectedFavoriteQuery = ""
+                        },
+                        onClearRecent = {
+                            state = store.clearRecentQueries(state)
+                            selectedRecentQuery = ""
+                        },
+                        onStrictSafetyToggle = { state = store.updateStrictSafety(state, !state.strictSafetyEnabled) },
+                        onAutoCommitToggle = { state = store.updateAutoCommitEnabled(state, it) },
+                        onInsertFavoriteObject = { favorite, sql ->
+                            insertSqlText(
+                                editor = editorInstance,
+                                text = sql,
+                                currentValue = state.draftSql,
+                                onFallback = { nextSql -> state = store.updateDraftSql(state, nextSql) },
+                            )
+                        },
+                        onOpenFavoriteMetadata = { favorite ->
+                            window.location.href = buildFavoriteMetadataHref(favorite)
+                        },
+                        onRemoveFavoriteObject = { favorite ->
+                            state = store.removeFavoriteObject(state, favorite)
+                        },
+                        onJumpToLine = { lineNumber -> focusEditorLine(editorInstance, lineNumber) },
+                        onEditorReady = { editor ->
+                            val monacoEditor = editor.asDynamic()
+                            editorInstance = monacoEditor
+                            monacoEditor.onDidChangeCursorPosition { event ->
+                                editorCursorLine = event.position.lineNumber as Int
                             }
-                        }
-
-                        QueryLibraryBlock(
-                            state = state,
-                            selectedRecentQuery = selectedRecentQuery,
-                            selectedFavoriteQuery = selectedFavoriteQuery,
-                            onRecentSelected = { selectedRecentQuery = it },
-                            onFavoriteSelected = { selectedFavoriteQuery = it },
-                            onApplyRecent = {
-                                state = store.applyRecentQuery(state, selectedRecentQuery)
-                            },
-                            onApplyFavorite = {
-                                state = store.applyFavoriteQuery(state, selectedFavoriteQuery)
-                            },
-                            onRememberFavorite = {
-                                state = store.rememberFavoriteQuery(state)
-                            },
-                            onRemoveFavorite = {
-                                state = store.removeFavoriteQuery(state, selectedFavoriteQuery)
-                                selectedFavoriteQuery = ""
-                            },
-                            onClearRecent = {
-                                state = store.clearRecentQueries(state)
-                                selectedRecentQuery = ""
-                            },
-                            onStrictSafetyToggle = {
-                                state = store.updateStrictSafety(state, !state.strictSafetyEnabled)
-                            },
-                            onAutoCommitToggle = {
-                                state = store.updateAutoCommitEnabled(state, it)
-                            },
-                        )
-
-                        SqlFavoriteObjectsBlock(
-                            favorites = state.favoriteObjects,
-                            onInsert = { favorite ->
-                                insertSqlText(
-                                    editor = editorInstance,
-                                    text = favorite.qualifiedName(),
-                                    currentValue = state.draftSql,
-                                    onFallback = { nextSql ->
-                                        state = store.updateDraftSql(state, nextSql)
-                                    },
-                                )
-                            },
-                            onInsertSelect = { favorite ->
-                                insertSqlText(
-                                    editor = editorInstance,
-                                    text = buildFavoritePreviewSql(favorite),
-                                    currentValue = state.draftSql,
-                                    onFallback = { nextSql ->
-                                        state = store.updateDraftSql(state, nextSql)
-                                    },
-                                )
-                            },
-                            onInsertCount = { favorite ->
-                                insertSqlText(
-                                    editor = editorInstance,
-                                    text = buildFavoriteCountSql(favorite),
-                                    currentValue = state.draftSql,
-                                    onFallback = { nextSql ->
-                                        state = store.updateDraftSql(state, nextSql)
-                                    },
-                                )
-                            },
-                            onOpenMetadata = { favorite ->
-                                window.location.href = buildFavoriteMetadataHref(favorite)
-                            },
-                            onRemove = { favorite ->
-                                state = store.removeFavoriteObject(state, favorite)
-                            },
-                        )
-
-                        SqlEditorIdeBlock(
-                            outlineItems = scriptOutline,
-                            currentLine = editorCursorLine,
-                            onJumpToLine = { lineNumber ->
-                                focusEditorLine(editorInstance, lineNumber)
-                            },
-                        )
-
-                        MonacoEditorPane(
-                            instanceKey = "compose-sql-console-editor",
-                            language = "sql",
-                            value = state.draftSql,
-                            classNames = listOf("editor-frame", "sql-editor-frame"),
-                            onEditorReady = { editor ->
-                                editorInstance = editor
-                                editor.onDidChangeCursorPosition { event ->
-                                    editorCursorLine = event.position.lineNumber as Int
-                                }
-                                registerSqlConsoleEditorShortcuts(
-                                    editor = editor,
-                                    onRun = { runAllAction?.invoke() },
-                                    onRunCurrent = { runCurrentAction?.invoke() },
-                                    onFormat = { formatSqlAction?.invoke() },
-                                    onStop = { stopAction?.invoke() },
-                                )
-                            },
-                            onValueChange = { next ->
-                                state = store.updateDraftSql(state, next)
-                            },
-                        )
-
-                        Div({ classes("sql-toolbar") }) {
-                            Div({ classes("d-flex", "flex-wrap", "align-items-center", "gap-2") }) {
-                                Label(attrs = {
-                                    classes("small", "text-secondary", "mb-0")
-                                    attr("for", "composeSqlPageSize")
-                                }) { Text("Строк на странице") }
-                                Select(attrs = {
-                                    id("composeSqlPageSize")
-                                    classes("form-select", "form-select-sm", "sql-page-size-select")
-                                    onChange {
-                                        state = store.updatePageSize(state, it.value?.toIntOrNull() ?: 50)
-                                    }
-                                }) {
-                                    listOf(25, 50, 100).forEach { pageSize ->
-                                        Option(value = pageSize.toString(), attrs = {
-                                            if (state.pageSize == pageSize) {
-                                                selected()
-                                            }
-                                        }) {
-                                            Text(pageSize.toString())
-                                        }
-                                    }
-                                }
+                            registerSqlConsoleEditorShortcuts(
+                                editor = monacoEditor,
+                                onRun = { runAllAction?.invoke() },
+                                onRunCurrent = { runCurrentAction?.invoke() },
+                                onFormat = { formatSqlAction?.invoke() },
+                                onStop = { stopAction?.invoke() },
+                            )
+                        },
+                        onDraftSqlChange = { next -> state = store.updateDraftSql(state, next) },
+                        onPageSizeChange = { nextPageSize -> state = store.updatePageSize(state, nextPageSize) },
+                        onFormatSql = { formatSqlAction?.invoke() },
+                        onRunCurrent = { runCurrentAction?.invoke() },
+                        onRunAll = { runAllAction?.invoke() },
+                        onStop = { stopAction?.invoke() },
+                        onCommit = {
+                            scope.launch {
+                                state = store.beginAction(state, "commit-query")
+                                state = store.commitExecution(state)
                             }
-                            Div({ classes("d-flex", "flex-wrap", "align-items-center", "gap-2") }) {
-                                SqlToolbarActionButton(
-                                    toneClass = "btn-outline-dark",
-                                    onClick = { formatSqlAction?.invoke() },
-                                ) {
-                                    Text("Форматировать")
-                                }
-                                SqlToolbarActionButton(
-                                    toneClass = "btn-outline-dark",
-                                    disabled = (
-                                        state.actionInProgress == "run-current-query" ||
-                                            state.info?.configured != true ||
-                                            pendingManualTransaction ||
-                                            currentOutlineItem == null
+                        },
+                        onRollback = {
+                            scope.launch {
+                                state = store.beginAction(state, "rollback-query")
+                                state = store.rollbackExecution(state)
+                            }
+                        },
+                        onExportCsv = {
+                            val result = exportableResult ?: return@SqlConsoleWorkspacePanel
+                            val shardName = activeExportShard ?: return@SqlConsoleWorkspacePanel
+                            scope.launch {
+                                runCatching {
+                                    httpClient.downloadPostJson(
+                                        path = "/api/sql-console/export/source-csv",
+                                        payload = SqlConsoleExportRequest(
+                                            result = result,
+                                            shardName = shardName,
                                         ),
-                                    onClick = { runCurrentAction?.invoke() },
-                                ) {
-                                    Text("Текущий")
-                                }
-                                SqlToolbarActionButton(
-                                    toneClass = runButtonClass,
-                                    disabled = state.actionInProgress == "run-query" || state.info?.configured != true || pendingManualTransaction,
-                                    extraClasses = arrayOf("sql-action-button", "sql-action-button-run"),
-                                    onClick = { runAllAction?.invoke() },
-                                ) {
-                                    Span({ classes("sql-action-icon", "sql-action-icon-play") })
-                                }
-                                SqlToolbarActionButton(
-                                    toneClass = "btn-danger",
-                                    disabled = !isRunning || state.actionInProgress == "cancel-query",
-                                    extraClasses = arrayOf("sql-action-button", "sql-action-button-stop"),
-                                    onClick = { stopAction?.invoke() },
-                                ) {
-                                    Span({ classes("sql-action-icon", "sql-action-icon-stop") })
-                                }
-                                SqlToolbarActionButton(
-                                    toneClass = "btn-success",
-                                    disabled = !pendingManualTransaction || state.actionInProgress == "commit-query",
-                                    onClick = {
-                                    scope.launch {
-                                        state = store.beginAction(state, "commit-query")
-                                        state = store.commitExecution(state)
-                                    }
-                                },
-                                ) {
-                                    Text("Commit")
-                                }
-                                SqlToolbarActionButton(
-                                    toneClass = "btn-outline-danger",
-                                    disabled = !pendingManualTransaction || state.actionInProgress == "rollback-query",
-                                    onClick = {
-                                    scope.launch {
-                                        state = store.beginAction(state, "rollback-query")
-                                        state = store.rollbackExecution(state)
-                                    }
-                                },
-                                ) {
-                                    Text("Rollback")
-                                }
-                                SqlToolbarActionButton(
-                                    toneClass = "btn-outline-secondary",
-                                    disabled = activeExportShard == null,
-                                    onClick = {
-                                    val result = exportableResult ?: return@SqlToolbarActionButton
-                                    val shardName = activeExportShard ?: return@SqlToolbarActionButton
-                                    scope.launch {
-                                        runCatching {
-                                            httpClient.downloadPostJson(
-                                                path = "/api/sql-console/export/source-csv",
-                                                payload = SqlConsoleExportRequest(
-                                                    result = result,
-                                                    shardName = shardName,
-                                                ),
-                                                serializer = SqlConsoleExportRequest.serializer(),
-                                                fallbackFileName = "$shardName.csv",
-                                            )
-                                        }.onFailure { error ->
-                                            state = state.copy(
-                                                errorMessage = error.message ?: "Не удалось скачать CSV.",
-                                                successMessage = null,
-                                            )
-                                        }
-                                    }
-                                },
-                                ) {
-                                    Text("Скачать CSV")
-                                }
-                                SqlToolbarActionButton(
-                                    toneClass = "btn-outline-secondary",
-                                    disabled = exportableResult?.statementType != "RESULT_SET",
-                                    onClick = {
-                                    val result = exportableResult ?: return@SqlToolbarActionButton
-                                    scope.launch {
-                                        runCatching {
-                                            httpClient.downloadPostJson(
-                                                path = "/api/sql-console/export/all-zip",
-                                                payload = SqlConsoleExportRequest(result = result),
-                                                serializer = SqlConsoleExportRequest.serializer(),
-                                                fallbackFileName = "sql-console-results.zip",
-                                            )
-                                        }.onFailure { error ->
-                                            state = state.copy(
-                                                errorMessage = error.message ?: "Не удалось скачать ZIP.",
-                                                successMessage = null,
-                                            )
-                                        }
-                                    }
-                                },
-                                ) {
-                                    Text("Скачать ZIP")
+                                        serializer = SqlConsoleExportRequest.serializer(),
+                                        fallbackFileName = "$shardName.csv",
+                                    )
+                                }.onFailure { error ->
+                                    state = state.copy(
+                                        errorMessage = error.message ?: "Не удалось скачать CSV.",
+                                        successMessage = null,
+                                    )
                                 }
                             }
-                        }
-
-                        CommandGuardrail(analysis = statementAnalysis, strictSafetyEnabled = state.strictSafetyEnabled)
-                        ExecutionStatusStrip(currentExecution, runningClockTick)
-
-                        Div({ classes("sql-output-panel") }) {
-                            StatementSelectionBlock(
-                                statementResults = statementResults,
-                                selectedStatementIndex = selectedStatementIndex,
-                                onSelectStatement = {
-                                    selectedStatementIndex = it
-                                    selectedResultShard = null
-                                    currentDataPage = 1
-                                },
-                            )
-                            QueryOutputPanel(
-                                execution = currentExecution,
-                                result = exportableResult,
-                                pageSize = state.pageSize,
-                                activeTab = activeOutputTab,
-                                selectedShard = selectedResultShard,
-                                currentPage = currentDataPage,
-                                onSelectTab = { activeOutputTab = it },
-                                onSelectShard = {
-                                    selectedResultShard = it
-                                    currentDataPage = 1
-                                },
-                                onSelectPage = { currentDataPage = it },
-                            )
-                        }
-                    }
+                        },
+                        onExportZip = {
+                            val result = exportableResult ?: return@SqlConsoleWorkspacePanel
+                            scope.launch {
+                                runCatching {
+                                    httpClient.downloadPostJson(
+                                        path = "/api/sql-console/export/all-zip",
+                                        payload = SqlConsoleExportRequest(result = result),
+                                        serializer = SqlConsoleExportRequest.serializer(),
+                                        fallbackFileName = "sql-console-results.zip",
+                                    )
+                                }.onFailure { error ->
+                                    state = state.copy(
+                                        errorMessage = error.message ?: "Не удалось скачать ZIP.",
+                                        successMessage = null,
+                                    )
+                                }
+                            }
+                        },
+                        onSelectStatement = {
+                            selectedStatementIndex = it
+                            selectedResultShard = null
+                            currentDataPage = 1
+                        },
+                        onSelectOutputTab = { activeOutputTab = it },
+                        onSelectShard = {
+                            selectedResultShard = it
+                            currentDataPage = 1
+                        },
+                        onSelectPage = { currentDataPage = it },
+                    )
                 }
             }
         },
     )
+}
+
+@Composable
+private fun SqlConsoleWorkspacePanel(
+    state: SqlConsolePageState,
+    selectedRecentQuery: String,
+    selectedFavoriteQuery: String,
+    editorCursorLine: Int,
+    scriptOutline: List<SqlScriptOutlineItem>,
+    currentOutlineItem: SqlScriptOutlineItem?,
+    statementAnalysis: SqlStatementAnalysis,
+    runButtonClass: String,
+    pendingManualTransaction: Boolean,
+    isRunning: Boolean,
+    currentExecution: SqlConsoleExecutionResponse?,
+    runningClockTick: Int,
+    statementResults: List<SqlConsoleStatementResult>,
+    exportableResult: SqlConsoleQueryResult?,
+    activeExportShard: String?,
+    activeOutputTab: String,
+    selectedStatementIndex: Int,
+    selectedResultShard: String?,
+    currentDataPage: Int,
+    onRecentSelected: (String) -> Unit,
+    onFavoriteSelected: (String) -> Unit,
+    onApplyRecent: () -> Unit,
+    onApplyFavorite: () -> Unit,
+    onRememberFavorite: () -> Unit,
+    onRemoveFavorite: () -> Unit,
+    onClearRecent: () -> Unit,
+    onStrictSafetyToggle: () -> Unit,
+    onAutoCommitToggle: (Boolean) -> Unit,
+    onInsertFavoriteObject: (SqlConsoleFavoriteObject, String) -> Unit,
+    onOpenFavoriteMetadata: (SqlConsoleFavoriteObject) -> Unit,
+    onRemoveFavoriteObject: (SqlConsoleFavoriteObject) -> Unit,
+    onJumpToLine: (Int) -> Unit,
+    onEditorReady: (Any) -> Unit,
+    onDraftSqlChange: (String) -> Unit,
+    onPageSizeChange: (Int) -> Unit,
+    onFormatSql: () -> Unit,
+    onRunCurrent: () -> Unit,
+    onRunAll: () -> Unit,
+    onStop: () -> Unit,
+    onCommit: () -> Unit,
+    onRollback: () -> Unit,
+    onExportCsv: () -> Unit,
+    onExportZip: () -> Unit,
+    onSelectStatement: (Int) -> Unit,
+    onSelectOutputTab: (String) -> Unit,
+    onSelectShard: (String?) -> Unit,
+    onSelectPage: (Int) -> Unit,
+) {
+    Div({ classes("panel", "sql-workspace-panel") }) {
+        Div({ classes("d-flex", "flex-wrap", "align-items-start", "justify-content-between", "gap-3", "mb-3") }) {
+            Div {
+                Div({ classes("panel-title", "mb-1") }) { Text("SQL-редактор") }
+                Div({ classes("text-secondary", "small") }) {
+                    Text("Поддерживается один SQL или SQL-скрипт из нескольких statement-ов. Результат показывается отдельно по каждому statement и source.")
+                }
+            }
+        }
+
+        QueryLibraryBlock(
+            state = state,
+            selectedRecentQuery = selectedRecentQuery,
+            selectedFavoriteQuery = selectedFavoriteQuery,
+            onRecentSelected = onRecentSelected,
+            onFavoriteSelected = onFavoriteSelected,
+            onApplyRecent = onApplyRecent,
+            onApplyFavorite = onApplyFavorite,
+            onRememberFavorite = onRememberFavorite,
+            onRemoveFavorite = onRemoveFavorite,
+            onClearRecent = onClearRecent,
+            onStrictSafetyToggle = onStrictSafetyToggle,
+            onAutoCommitToggle = onAutoCommitToggle,
+        )
+
+        SqlFavoriteObjectsBlock(
+            favorites = state.favoriteObjects,
+            onInsert = { favorite ->
+                onInsertFavoriteObject(favorite, favorite.qualifiedName())
+            },
+            onInsertSelect = { favorite ->
+                onInsertFavoriteObject(favorite, buildFavoritePreviewSql(favorite))
+            },
+            onInsertCount = { favorite ->
+                onInsertFavoriteObject(favorite, buildFavoriteCountSql(favorite))
+            },
+            onOpenMetadata = onOpenFavoriteMetadata,
+            onRemove = onRemoveFavoriteObject,
+        )
+
+        SqlEditorIdeBlock(
+            outlineItems = scriptOutline,
+            currentLine = editorCursorLine,
+            onJumpToLine = onJumpToLine,
+        )
+
+        MonacoEditorPane(
+            instanceKey = "compose-sql-console-editor",
+            language = "sql",
+            value = state.draftSql,
+            classNames = listOf("editor-frame", "sql-editor-frame"),
+            onEditorReady = { editor -> onEditorReady(editor) },
+            onValueChange = onDraftSqlChange,
+        )
+
+        SqlConsoleWorkspaceToolbar(
+            state = state,
+            currentOutlineItem = currentOutlineItem,
+            runButtonClass = runButtonClass,
+            pendingManualTransaction = pendingManualTransaction,
+            isRunning = isRunning,
+            exportableResult = exportableResult,
+            activeExportShard = activeExportShard,
+            onPageSizeChange = onPageSizeChange,
+            onFormatSql = onFormatSql,
+            onRunCurrent = onRunCurrent,
+            onRunAll = onRunAll,
+            onStop = onStop,
+            onCommit = onCommit,
+            onRollback = onRollback,
+            onExportCsv = onExportCsv,
+            onExportZip = onExportZip,
+        )
+
+        CommandGuardrail(analysis = statementAnalysis, strictSafetyEnabled = state.strictSafetyEnabled)
+        ExecutionStatusStrip(currentExecution, runningClockTick)
+
+        Div({ classes("sql-output-panel") }) {
+            StatementSelectionBlock(
+                statementResults = statementResults,
+                selectedStatementIndex = selectedStatementIndex,
+                onSelectStatement = onSelectStatement,
+            )
+            QueryOutputPanel(
+                execution = currentExecution,
+                result = exportableResult,
+                pageSize = state.pageSize,
+                activeTab = activeOutputTab,
+                selectedShard = selectedResultShard,
+                currentPage = currentDataPage,
+                onSelectTab = onSelectOutputTab,
+                onSelectShard = onSelectShard,
+                onSelectPage = onSelectPage,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SqlConsoleWorkspaceToolbar(
+    state: SqlConsolePageState,
+    currentOutlineItem: SqlScriptOutlineItem?,
+    runButtonClass: String,
+    pendingManualTransaction: Boolean,
+    isRunning: Boolean,
+    exportableResult: SqlConsoleQueryResult?,
+    activeExportShard: String?,
+    onPageSizeChange: (Int) -> Unit,
+    onFormatSql: () -> Unit,
+    onRunCurrent: () -> Unit,
+    onRunAll: () -> Unit,
+    onStop: () -> Unit,
+    onCommit: () -> Unit,
+    onRollback: () -> Unit,
+    onExportCsv: () -> Unit,
+    onExportZip: () -> Unit,
+) {
+    Div({ classes("sql-toolbar") }) {
+        Div({ classes("d-flex", "flex-wrap", "align-items-center", "gap-2") }) {
+            Label(attrs = {
+                classes("small", "text-secondary", "mb-0")
+                attr("for", "composeSqlPageSize")
+            }) { Text("Строк на странице") }
+            Select(attrs = {
+                id("composeSqlPageSize")
+                classes("form-select", "form-select-sm", "sql-page-size-select")
+                onChange {
+                    onPageSizeChange(it.value?.toIntOrNull() ?: 50)
+                }
+            }) {
+                listOf(25, 50, 100).forEach { pageSize ->
+                    Option(value = pageSize.toString(), attrs = {
+                        if (state.pageSize == pageSize) {
+                            selected()
+                        }
+                    }) {
+                        Text(pageSize.toString())
+                    }
+                }
+            }
+        }
+        Div({ classes("d-flex", "flex-wrap", "align-items-center", "gap-2") }) {
+            SqlToolbarActionButton(
+                toneClass = "btn-outline-dark",
+                onClick = onFormatSql,
+            ) {
+                Text("Форматировать")
+            }
+            SqlToolbarActionButton(
+                toneClass = "btn-outline-dark",
+                disabled = (
+                    state.actionInProgress == "run-current-query" ||
+                        state.info?.configured != true ||
+                        pendingManualTransaction ||
+                        currentOutlineItem == null
+                    ),
+                onClick = onRunCurrent,
+            ) {
+                Text("Текущий")
+            }
+            SqlToolbarActionButton(
+                toneClass = runButtonClass,
+                disabled = state.actionInProgress == "run-query" || state.info?.configured != true || pendingManualTransaction,
+                extraClasses = arrayOf("sql-action-button", "sql-action-button-run"),
+                onClick = onRunAll,
+            ) {
+                Span({ classes("sql-action-icon", "sql-action-icon-play") })
+            }
+            SqlToolbarActionButton(
+                toneClass = "btn-danger",
+                disabled = !isRunning || state.actionInProgress == "cancel-query",
+                extraClasses = arrayOf("sql-action-button", "sql-action-button-stop"),
+                onClick = onStop,
+            ) {
+                Span({ classes("sql-action-icon", "sql-action-icon-stop") })
+            }
+            SqlToolbarActionButton(
+                toneClass = "btn-success",
+                disabled = !pendingManualTransaction || state.actionInProgress == "commit-query",
+                onClick = onCommit,
+            ) {
+                Text("Commit")
+            }
+            SqlToolbarActionButton(
+                toneClass = "btn-outline-danger",
+                disabled = !pendingManualTransaction || state.actionInProgress == "rollback-query",
+                onClick = onRollback,
+            ) {
+                Text("Rollback")
+            }
+            SqlToolbarActionButton(
+                toneClass = "btn-outline-secondary",
+                disabled = activeExportShard == null,
+                onClick = onExportCsv,
+            ) {
+                Text("Скачать CSV")
+            }
+            SqlToolbarActionButton(
+                toneClass = "btn-outline-secondary",
+                disabled = exportableResult?.statementType != "RESULT_SET",
+                onClick = onExportZip,
+            ) {
+                Text("Скачать ZIP")
+            }
+        }
+    }
 }
 
 @Composable

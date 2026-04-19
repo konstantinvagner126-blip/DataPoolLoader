@@ -684,6 +684,15 @@
   - hero art вынесен в `ModuleEditorHeroArt(...)`, `DatabaseModuleHeroArt(...)` и `FilesModuleHeroArt(...)`
   - catalog actions вынесены в `ModuleCatalogActionBar(...)`, а loading/list body в `ModuleCatalogBody(...)`
   - [ModuleEditorPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPage.kt) стал ближе к shell/wiring-слою и меньше смешивает hero, catalog actions и catalog body.
+- sql_console workspace panel cleanup:
+  - правая workspace-ветка вынесена из [SqlConsolePage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsolePage.kt) в `SqlConsoleWorkspacePanel(...)`
+  - page-level shell больше не смешивает query library, favorites, Monaco editor, toolbar и output panel в одной длинной inline-ветке.
+- sql_console workspace toolbar cleanup:
+  - toolbar с page-size selector и query actions вынесен в `SqlConsoleWorkspaceToolbar(...)` в [SqlConsolePage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsolePage.kt)
+  - run/stop/commit/export control flow больше не живет inline внутри общего workspace layout.
+- module_editor content pane cleanup:
+  - правая content-ветка вынесена из [ModuleEditorPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPage.kt) в `ModuleEditorContentPane(...)`
+  - loading/empty/session/credentials/tabs/create-module/dialog flow больше не смешивается в основном page-shell.
 
 Критерий завершения:
 

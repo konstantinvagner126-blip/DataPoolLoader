@@ -365,166 +365,112 @@ fun ComposeModuleEditorPage(
                 }
 
                 Div({ classes("col-12", "col-xl-9") }) {
-                    if (state.loading && session == null) {
-                        LoadingStateCard(
-                            title = "Редактор модуля",
-                            text = "Загружаю compose-shell выбранного модуля.",
-                        )
-                    } else if (session == null) {
-                        EmptyStateCard(
-                            title = "Редактор модуля",
-                            text = "Модуль не выбран или недоступен.",
-                        )
-                    } else {
-                        CredentialsPanel(
-                            module = session.module,
-                            sectionStateKey = "module-editor.sections.${currentRoute.storage}.${session.module.id}.credentials",
-                            uploadInProgress = credentialsUploadInProgress,
-                            selectedFileName = selectedCredentialsFile?.name,
-                            uploadMessage = credentialsUploadMessage,
-                            uploadMessageLevel = credentialsUploadMessageLevel,
-                            onFileSelected = { file ->
-                                selectedCredentialsFile = file
+                    ModuleEditorContentPane(
+                        route = currentRoute,
+                        state = state,
+                        session = session,
+                        selectedSqlPath = selectedSql?.path,
+                        runPanelState = runPanelState,
+                        credentialsUploadInProgress = credentialsUploadInProgress,
+                        selectedCredentialsFile = selectedCredentialsFile,
+                        credentialsUploadMessage = credentialsUploadMessage,
+                        credentialsUploadMessageLevel = credentialsUploadMessageLevel,
+                        onCredentialsFileSelected = { file ->
+                            selectedCredentialsFile = file
+                            credentialsUploadMessage = null
+                        },
+                        onUploadCredentials = {
+                            val file = selectedCredentialsFile ?: return@ModuleEditorContentPane
+                            val moduleId = state.selectedModuleId ?: return@ModuleEditorContentPane
+                            scope.launch {
+                                credentialsUploadInProgress = true
                                 credentialsUploadMessage = null
-                            },
-                            onUpload = {
-                                val file = selectedCredentialsFile ?: return@CredentialsPanel
-                                val moduleId = state.selectedModuleId ?: return@CredentialsPanel
-                                scope.launch {
-                                    credentialsUploadInProgress = true
-                                    credentialsUploadMessage = null
-                                    try {
-                                        uploadCredentialsFile(credentialsHttpClient, file)
-                                        state = store.startLoading(state)
-                                        val refreshed = store.selectModule(state, currentRoute, moduleId)
-                                        state = refreshed.copy(
-                                            successMessage = "Файл credential.properties загружен: ${file.name}.",
-                                        )
-                                        selectedCredentialsFile = null
-                                        credentialsUploadMessageLevel = "success"
-                                        credentialsUploadMessage = "Статус credentials обновлен."
-                                    } catch (error: Throwable) {
-                                        credentialsUploadMessageLevel = "warning"
-                                        credentialsUploadMessage = error.message ?: "Не удалось загрузить credential.properties."
-                                    } finally {
-                                        credentialsUploadInProgress = false
-                                    }
+                                try {
+                                    uploadCredentialsFile(credentialsHttpClient, file)
+                                    state = store.startLoading(state)
+                                    val refreshed = store.selectModule(state, currentRoute, moduleId)
+                                    state = refreshed.copy(
+                                        successMessage = "Файл credential.properties загружен: ${file.name}.",
+                                    )
+                                    selectedCredentialsFile = null
+                                    credentialsUploadMessageLevel = "success"
+                                    credentialsUploadMessage = "Статус credentials обновлен."
+                                } catch (error: Throwable) {
+                                    credentialsUploadMessageLevel = "warning"
+                                    credentialsUploadMessage = error.message ?: "Не удалось загрузить credential.properties."
+                                } finally {
+                                    credentialsUploadInProgress = false
                                 }
-                            },
-                        )
-
-                        EditorShellHeader(
-                            route = currentRoute,
-                            state = state,
-                            onTabSelect = { tab -> state = store.selectTab(state, tab) },
-                            onRun = onRunAction,
-                            onSave = onSaveAction,
-                            onDiscardWorkingCopy = onDiscardWorkingCopyAction,
-                            onPublishWorkingCopy = onPublishWorkingCopyAction,
-                            onOpenCreateModule = onOpenCreateModuleAction,
-                            onDeleteModule = onDeleteModuleAction,
-                            onReload = onReloadAction,
-                        )
-                        ValidationAlert(session)
-
-                        val currentModuleId = state.selectedModuleId
-                        if (currentModuleId != null) {
-                            EditorRunOverviewPanel(
-                                route = currentRoute,
-                                state = runPanelState,
-                            )
-                        }
-
-                        if (currentRoute.storage == "database" && state.createModuleDialogOpen) {
-                            CreateModulePanel(
-                                state = state,
-                                onModuleCodeChange = { value -> state = store.updateCreateModuleCode(state, value) },
-                                onTitleChange = { value -> state = store.updateCreateModuleTitle(state, value) },
-                                onDescriptionChange = { value -> state = store.updateCreateModuleDescription(state, value) },
-                                onTagsChange = { value -> state = store.updateCreateModuleTagsText(state, value) },
-                                onHiddenFromUiChange = { value -> state = store.updateCreateModuleHiddenFromUi(state, value) },
-                                onConfigTextChange = { value -> state = store.updateCreateModuleConfigText(state, value) },
-                                onRestoreTemplate = { state = store.restoreCreateModuleTemplate(state) },
-                                onCancel = { state = store.closeCreateModuleDialog(state) },
-                                onCreate = {
-                                    scope.launch {
-                                        state = store.beginAction(state, "create")
-                                        state = store.createDatabaseModule(state, currentRoute)
-                                        currentRoute = currentRoute.copy(
-                                            moduleId = state.selectedModuleId,
-                                            includeHidden = currentRoute.includeHidden || state.session?.module?.hiddenFromUi == true,
-                                            openCreateDialog = false,
-                                        )
-                                    }
-                                },
-                            )
-                        }
-
-                        TabNavigation(
-                            activeTab = state.activeTab,
-                            onTabSelect = { tab -> state = store.selectTab(state, tab) },
-                        )
-
-                        when (state.activeTab) {
-                            ModuleEditorTab.SETTINGS -> ModuleEditorSettingsForm(
-                                storageMode = currentRoute.storage,
-                                state = state,
-                                module = session.module,
-                                onRefreshFromConfig = {
-                                    scope.launch {
-                                        state = store.startConfigFormSync(state)
-                                        state = store.syncConfigFormFromConfigDraft(state)
-                                    }
-                                },
-                                onApplyFormState = { nextFormState ->
-                                    scope.launch {
-                                        state = store.startConfigFormSync(state)
-                                        state = store.applyConfigForm(state, nextFormState)
-                                    }
-                                },
-                            )
-                            ModuleEditorTab.SQL -> SqlPreview(
-                                state = state,
-                                selectedSqlPath = selectedSql?.path,
-                                onSelectSql = { path -> state = store.selectSqlResource(state, path) },
-                                onSqlChange = { path, value -> state = store.updateSqlText(state, path, value) },
-                                onCreateSql = {
-                                    val rawName = window.prompt("Введите имя SQL-ресурса:")
-                                    if (!rawName.isNullOrBlank()) {
-                                        state = store.createSqlResource(state, rawName)
-                                    }
-                                },
-                                onRenameSql = {
-                                    val currentPath = state.selectedSqlPath ?: return@SqlPreview
-                                    val rawName = window.prompt("Введите новое имя SQL-ресурса:", currentPath)
-                                    if (!rawName.isNullOrBlank()) {
-                                        scope.launch {
-                                            state = store.renameSqlResource(state, rawName)
-                                        }
-                                    }
-                                },
-                                onDeleteSql = {
-                                    val currentPath = state.selectedSqlPath ?: return@SqlPreview
-                                    if (window.confirm("Удалить SQL-ресурс '$currentPath'?")) {
-                                        state = store.deleteSqlResource(state)
-                                    }
-                                },
-                            )
-                            ModuleEditorTab.CONFIG -> ConfigPreview(
-                                configText = state.configTextDraft,
-                                onConfigChange = { value -> state = store.updateConfigText(state, value) },
-                            )
-                            ModuleEditorTab.META -> MetadataForm(
-                                route = currentRoute,
-                                state = state,
-                                session = session,
-                                onTitleChange = { value -> state = store.updateMetadataTitle(state, value) },
-                                onDescriptionChange = { value -> state = store.updateMetadataDescription(state, value) },
-                                onTagsChange = { value -> state = store.updateMetadataTags(state, value) },
-                                onHiddenFromUiChange = { value -> state = store.updateMetadataHiddenFromUi(state, value) },
-                            )
-                        }
-                    }
+                            }
+                        },
+                        onSelectTab = { tab -> state = store.selectTab(state, tab) },
+                        onRun = onRunAction,
+                        onSave = onSaveAction,
+                        onDiscardWorkingCopy = onDiscardWorkingCopyAction,
+                        onPublishWorkingCopy = onPublishWorkingCopyAction,
+                        onOpenCreateModule = onOpenCreateModuleAction,
+                        onDeleteModule = onDeleteModuleAction,
+                        onReload = onReloadAction,
+                        onModuleCodeChange = { value -> state = store.updateCreateModuleCode(state, value) },
+                        onTitleChange = { value -> state = store.updateCreateModuleTitle(state, value) },
+                        onDescriptionChange = { value -> state = store.updateCreateModuleDescription(state, value) },
+                        onTagsChange = { value -> state = store.updateCreateModuleTagsText(state, value) },
+                        onHiddenFromUiChange = { value -> state = store.updateCreateModuleHiddenFromUi(state, value) },
+                        onConfigTextChange = { value -> state = store.updateCreateModuleConfigText(state, value) },
+                        onRestoreTemplate = { state = store.restoreCreateModuleTemplate(state) },
+                        onCloseCreateModuleDialog = { state = store.closeCreateModuleDialog(state) },
+                        onCreateModule = {
+                            scope.launch {
+                                state = store.beginAction(state, "create")
+                                state = store.createDatabaseModule(state, currentRoute)
+                                currentRoute = currentRoute.copy(
+                                    moduleId = state.selectedModuleId,
+                                    includeHidden = currentRoute.includeHidden || state.session?.module?.hiddenFromUi == true,
+                                    openCreateDialog = false,
+                                )
+                            }
+                        },
+                        onRefreshFromConfig = {
+                            scope.launch {
+                                state = store.startConfigFormSync(state)
+                                state = store.syncConfigFormFromConfigDraft(state)
+                            }
+                        },
+                        onApplyFormState = { nextFormState ->
+                            scope.launch {
+                                state = store.startConfigFormSync(state)
+                                state = store.applyConfigForm(state, nextFormState)
+                            }
+                        },
+                        onSelectSql = { path -> state = store.selectSqlResource(state, path) },
+                        onSqlChange = { path, value -> state = store.updateSqlText(state, path, value) },
+                        onCreateSql = {
+                            val rawName = window.prompt("Введите имя SQL-ресурса:")
+                            if (!rawName.isNullOrBlank()) {
+                                state = store.createSqlResource(state, rawName)
+                            }
+                        },
+                        onRenameSql = {
+                            val currentPath = state.selectedSqlPath ?: return@ModuleEditorContentPane
+                            val rawName = window.prompt("Введите новое имя SQL-ресурса:", currentPath)
+                            if (!rawName.isNullOrBlank()) {
+                                scope.launch {
+                                    state = store.renameSqlResource(state, rawName)
+                                }
+                            }
+                        },
+                        onDeleteSql = {
+                            val currentPath = state.selectedSqlPath ?: return@ModuleEditorContentPane
+                            if (window.confirm("Удалить SQL-ресурс '$currentPath'?")) {
+                                state = store.deleteSqlResource(state)
+                            }
+                        },
+                        onConfigDraftChange = { value -> state = store.updateConfigText(state, value) },
+                        onMetadataTitleChange = { value -> state = store.updateMetadataTitle(state, value) },
+                        onMetadataDescriptionChange = { value -> state = store.updateMetadataDescription(state, value) },
+                        onMetadataTagsChange = { value -> state = store.updateMetadataTags(state, value) },
+                        onMetadataHiddenFromUiChange = { value -> state = store.updateMetadataHiddenFromUi(state, value) },
+                    )
                 }
             }
         },
@@ -532,6 +478,149 @@ fun ComposeModuleEditorPage(
             ModuleEditorHeroArt(currentRoute.storage)
         },
     )
+}
+
+@Composable
+private fun ModuleEditorContentPane(
+    route: ModuleEditorRouteState,
+    state: ModuleEditorPageState,
+    session: ModuleEditorSessionResponse?,
+    selectedSqlPath: String?,
+    runPanelState: ModuleRunsPageState,
+    credentialsUploadInProgress: Boolean,
+    selectedCredentialsFile: File?,
+    credentialsUploadMessage: String?,
+    credentialsUploadMessageLevel: String,
+    onCredentialsFileSelected: (File?) -> Unit,
+    onUploadCredentials: () -> Unit,
+    onSelectTab: (ModuleEditorTab) -> Unit,
+    onRun: () -> Unit,
+    onSave: () -> Unit,
+    onDiscardWorkingCopy: () -> Unit,
+    onPublishWorkingCopy: () -> Unit,
+    onOpenCreateModule: () -> Unit,
+    onDeleteModule: () -> Unit,
+    onReload: () -> Unit,
+    onModuleCodeChange: (String) -> Unit,
+    onTitleChange: (String) -> Unit,
+    onDescriptionChange: (String) -> Unit,
+    onTagsChange: (String) -> Unit,
+    onHiddenFromUiChange: (Boolean) -> Unit,
+    onConfigTextChange: (String) -> Unit,
+    onRestoreTemplate: () -> Unit,
+    onCloseCreateModuleDialog: () -> Unit,
+    onCreateModule: () -> Unit,
+    onRefreshFromConfig: () -> Unit,
+    onApplyFormState: (ConfigFormStateDto) -> Unit,
+    onSelectSql: (String) -> Unit,
+    onSqlChange: (String, String) -> Unit,
+    onCreateSql: () -> Unit,
+    onRenameSql: () -> Unit,
+    onDeleteSql: () -> Unit,
+    onConfigDraftChange: (String) -> Unit,
+    onMetadataTitleChange: (String) -> Unit,
+    onMetadataDescriptionChange: (String) -> Unit,
+    onMetadataTagsChange: (List<String>) -> Unit,
+    onMetadataHiddenFromUiChange: (Boolean) -> Unit,
+) {
+    if (state.loading && session == null) {
+        LoadingStateCard(
+            title = "Редактор модуля",
+            text = "Загружаю compose-shell выбранного модуля.",
+        )
+        return
+    }
+    if (session == null) {
+        EmptyStateCard(
+            title = "Редактор модуля",
+            text = "Модуль не выбран или недоступен.",
+        )
+        return
+    }
+
+    CredentialsPanel(
+        module = session.module,
+        sectionStateKey = "module-editor.sections.${route.storage}.${session.module.id}.credentials",
+        uploadInProgress = credentialsUploadInProgress,
+        selectedFileName = selectedCredentialsFile?.name,
+        uploadMessage = credentialsUploadMessage,
+        uploadMessageLevel = credentialsUploadMessageLevel,
+        onFileSelected = onCredentialsFileSelected,
+        onUpload = onUploadCredentials,
+    )
+
+    EditorShellHeader(
+        route = route,
+        state = state,
+        onTabSelect = onSelectTab,
+        onRun = onRun,
+        onSave = onSave,
+        onDiscardWorkingCopy = onDiscardWorkingCopy,
+        onPublishWorkingCopy = onPublishWorkingCopy,
+        onOpenCreateModule = onOpenCreateModule,
+        onDeleteModule = onDeleteModule,
+        onReload = onReload,
+    )
+    ValidationAlert(session)
+
+    state.selectedModuleId?.let {
+        EditorRunOverviewPanel(
+            route = route,
+            state = runPanelState,
+        )
+    }
+
+    if (route.storage == "database" && state.createModuleDialogOpen) {
+        CreateModulePanel(
+            state = state,
+            onModuleCodeChange = onModuleCodeChange,
+            onTitleChange = onTitleChange,
+            onDescriptionChange = onDescriptionChange,
+            onTagsChange = onTagsChange,
+            onHiddenFromUiChange = onHiddenFromUiChange,
+            onConfigTextChange = onConfigTextChange,
+            onRestoreTemplate = onRestoreTemplate,
+            onCancel = onCloseCreateModuleDialog,
+            onCreate = onCreateModule,
+        )
+    }
+
+    TabNavigation(
+        activeTab = state.activeTab,
+        onTabSelect = onSelectTab,
+    )
+
+    when (state.activeTab) {
+        ModuleEditorTab.SETTINGS -> ModuleEditorSettingsForm(
+            storageMode = route.storage,
+            state = state,
+            module = session.module,
+            onRefreshFromConfig = onRefreshFromConfig,
+            onApplyFormState = onApplyFormState,
+        )
+        ModuleEditorTab.SQL -> SqlPreview(
+            state = state,
+            selectedSqlPath = selectedSqlPath,
+            onSelectSql = onSelectSql,
+            onSqlChange = onSqlChange,
+            onCreateSql = onCreateSql,
+            onRenameSql = onRenameSql,
+            onDeleteSql = onDeleteSql,
+        )
+        ModuleEditorTab.CONFIG -> ConfigPreview(
+            configText = state.configTextDraft,
+            onConfigChange = onConfigDraftChange,
+        )
+        ModuleEditorTab.META -> MetadataForm(
+            route = route,
+            state = state,
+            session = session,
+            onTitleChange = onMetadataTitleChange,
+            onDescriptionChange = onMetadataDescriptionChange,
+            onTagsChange = onMetadataTagsChange,
+            onHiddenFromUiChange = onMetadataHiddenFromUiChange,
+        )
+    }
 }
 
 @Composable
