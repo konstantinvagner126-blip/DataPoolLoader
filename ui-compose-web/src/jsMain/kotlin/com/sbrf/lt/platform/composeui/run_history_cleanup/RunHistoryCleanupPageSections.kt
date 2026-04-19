@@ -107,7 +107,7 @@ internal fun CleanupSection(
             )
             CleanupOverviewCard(
                 label = "Освобождение",
-                value = buildCleanupFreedValue(preview),
+                value = preview.estimatedBytesToFree?.let(::formatByteSize) ?: "Через VACUUM",
                 note = buildCleanupFreedNote(preview),
             )
             CleanupOverviewCard(
@@ -152,6 +152,7 @@ internal fun CleanupSection(
         }
     }
 }
+
 
 @Composable
 internal fun OutputRetentionSection(
