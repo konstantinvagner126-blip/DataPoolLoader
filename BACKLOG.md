@@ -65,9 +65,18 @@
 - [Server.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/Server.kt) стал ближе к composition root, а не к transport-свалке.
 - route-specific transport/support-слои начали дробиться отдельно от самих handlers:
   - [SqlConsoleRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/SqlConsoleRouteSupport.kt)
-  - [CommonRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/CommonRouteSupport.kt)
   - [DatabaseRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseRouteSupport.kt);
+- `PageRoutes` больше не держит вручную повторяющийся redirect/static transport-код;
+- page-level routing support собран в [PageRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/PageRouteSupport.kt), где теперь живут:
+  - compose redirect helpers;
+  - mode-guarded redirects;
+  - static text pages;
+  - static resource proxy/migration для старых `compose-spike` URL;
 - `CommonRoutes`, `DatabaseRoutes` и `SqlConsoleRoutes` уже меньше знают о mode-specific maintenance flow, actor wiring, credentials/appsRoot orchestration и service resolution.
+- общий route support больше не смешивает разные ответственности в одном файле:
+  - maintenance flow вынесен в [CommonMaintenanceRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/CommonMaintenanceRouteSupport.kt)
+  - config/module flow вынесен в [CommonConfigRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/CommonConfigRouteSupport.kt)
+  - credentials upload вынесен в [CommonCredentialsRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/CommonCredentialsRouteSupport.kt);
 - [ModuleRunRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/ModuleRunRoutes.kt) больше не держит вручную path parsing и service resolution;
 - для экрана `История и результаты` появился отдельный support-слой:
   - [ModuleRunRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/ModuleRunRouteSupport.kt).
