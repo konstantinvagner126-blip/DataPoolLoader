@@ -556,6 +556,15 @@
 - sql_console object table-reference cleanup:
   - подпись связанной таблицы вынесена из [SqlConsoleObjectsPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectsPage.kt) в общий object helper [SqlConsoleObjectSqlSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectSqlSupport.kt)
   - object card больше не собирает `Таблица: schema.table` строку локально внутри экранного файла.
+- sql_console object helper dedup:
+  - generic builder-ы `buildSqlObjectQualifiedName(...)` и `buildSqlObjectContextLabel(...)` сведены в [SqlConsoleObjectSqlSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectSqlSupport.kt)
+  - [SqlConsoleObjectNavigationSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectNavigationSupport.kt) больше не дублирует ту же string-building логику для navigation target.
+- module_editor field header cleanup:
+  - повторяющийся label/help markup вынесен в локальный `ConfigFieldHeader(...)` внутри [ModuleEditorConfigFormFieldSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorConfigFormFieldSupport.kt)
+  - `CommitTextField / CommitTextareaField / CommitSelectField / CommitNumericTextField` больше не держат одинаковые `Span(config-form-label/help)` ветки.
+- module_editor external SQL alert text cleanup:
+  - pure copy для внешней SQL-ссылки вынесена из web form-layer в shared [ModuleEditorLabels.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorLabels.kt)
+  - [ModuleEditorConfigFormFieldSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorConfigFormFieldSupport.kt) больше не держит route/storage-specific alert text inline.
 - module_runs support cleanup:
   - остаточный [ModuleRunsPageSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsPageSupport.kt) удален
   - `backHref` перенесен в [ModuleRunsRoute.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsRoute.kt)

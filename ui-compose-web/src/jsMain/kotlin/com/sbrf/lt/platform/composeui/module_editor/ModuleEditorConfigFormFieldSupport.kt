@@ -74,10 +74,7 @@ internal fun CommitTextField(
     Label(attrs = {
         classes("config-form-field", *if (wide) arrayOf("config-form-field-wide") else emptyArray())
     }) {
-        Span({ classes("config-form-label") }) { Text(label) }
-        if (helpText.isNotBlank()) {
-            Span({ classes("config-form-help") }) { Text(helpText) }
-        }
+        ConfigFieldHeader(label, helpText)
         Input(type = InputType.Text, attrs = {
             classes("form-control")
             value(draft)
@@ -101,10 +98,7 @@ internal fun CommitTextareaField(
 ) {
     var draft by remember(value) { mutableStateOf(value) }
     Label(attrs = { classes("config-form-field", "config-form-field-wide") }) {
-        Span({ classes("config-form-label") }) { Text(label) }
-        if (helpText.isNotBlank()) {
-            Span({ classes("config-form-help") }) { Text(helpText) }
-        }
+        ConfigFieldHeader(label, helpText)
         TextArea(value = draft, attrs = {
             classes("form-control")
             rows(rowsCount)
@@ -127,10 +121,7 @@ internal fun CommitSelectField(
     onCommit: (String) -> Unit,
 ) {
     Label(attrs = { classes("config-form-field") }) {
-        Span({ classes("config-form-label") }) { Text(label) }
-        if (helpText.isNotBlank()) {
-            Span({ classes("config-form-help") }) { Text(helpText) }
-        }
+        ConfigFieldHeader(label, helpText)
         Select(attrs = {
             classes("form-select")
             attr("value", value)
@@ -266,10 +257,7 @@ internal fun CommitNumericTextField(
 ) {
     var draft by remember(valueText) { mutableStateOf(valueText) }
     Label(attrs = { classes("config-form-field") }) {
-        Span({ classes("config-form-label") }) { Text(label) }
-        if (helpText.isNotBlank()) {
-            Span({ classes("config-form-help") }) { Text(helpText) }
-        }
+        ConfigFieldHeader(label, helpText)
         Input(type = InputType.Text, attrs = {
             classes("form-control")
             value(draft)
@@ -282,6 +270,17 @@ internal fun CommitNumericTextField(
                 draft = draft.ifBlank { valueText }
             }
         })
+    }
+}
+
+@Composable
+private fun ConfigFieldHeader(
+    label: String,
+    helpText: String,
+) {
+    Span({ classes("config-form-label") }) { Text(label) }
+    if (helpText.isNotBlank()) {
+        Span({ classes("config-form-help") }) { Text(helpText) }
     }
 }
 
@@ -334,12 +333,6 @@ internal fun ExternalSqlAlert(
         return
     }
     Div({ classes("alert", if (storageMode == "database") "alert-warning" else "alert-secondary", "mb-0", "w-100") }) {
-        Text(
-            if (storageMode == "database") {
-                "Обнаружена внешняя SQL-ссылка: $externalRef. Для DB-режима поддерживаются только встроенный SQL и SQL-ресурсы самого модуля."
-            } else {
-                "Используется внешняя SQL-ссылка: $externalRef. Она сохраняется, но полноценно управляется только через application.yml."
-            },
-        )
+        Text(buildExternalSqlAlertText(externalRef, storageMode))
     }
 }

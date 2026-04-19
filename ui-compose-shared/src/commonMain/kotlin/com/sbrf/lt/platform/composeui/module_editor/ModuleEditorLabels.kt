@@ -106,3 +106,13 @@ fun validationBadgeClass(validationStatus: String): String =
         "WARNING" -> "module-validation-badge-warning"
         else -> "module-validation-badge-invalid"
     }
+
+fun buildExternalSqlAlertText(
+    externalRef: String,
+    storageMode: String,
+): String =
+    if (storageMode == "database") {
+        "Обнаружена внешняя SQL-ссылка: $externalRef. Для DB-режима поддерживаются только встроенный SQL и SQL-ресурсы самого модуля."
+    } else {
+        "Используется внешняя SQL-ссылка: $externalRef. Она сохраняется, но полноценно управляется только через application.yml."
+    }

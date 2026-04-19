@@ -8,24 +8,10 @@ internal data class SqlObjectNavigationTarget(
 )
 
 internal fun SqlObjectNavigationTarget.qualifiedName(): String =
-    buildString {
-        if (schemaName.isNotBlank()) {
-            append(schemaName)
-            append(".")
-        }
-        append(objectName)
-    }
+    buildSqlObjectQualifiedName(schemaName, objectName)
 
 internal fun SqlObjectNavigationTarget.contextLabel(): String =
-    buildString {
-        if (sourceName.isNotBlank()) {
-            append(sourceName)
-        }
-        if (objectType.isNotBlank()) {
-            if (isNotEmpty()) append(" • ")
-            append(translateSqlObjectType(objectType))
-        }
-    }
+    buildSqlObjectContextLabel(sourceName, objectType)
 
 internal fun SqlObjectNavigationTarget.matches(
     sourceName: String,

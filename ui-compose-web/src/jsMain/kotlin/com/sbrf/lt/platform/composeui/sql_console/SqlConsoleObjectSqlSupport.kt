@@ -1,30 +1,16 @@
 package com.sbrf.lt.platform.composeui.sql_console
 
-internal fun SqlConsoleFavoriteObject.qualifiedName(): String = "${schemaName}.${objectName}"
+internal fun SqlConsoleFavoriteObject.qualifiedName(): String =
+    buildSqlObjectQualifiedName(schemaName, objectName)
 
-internal fun SqlConsoleDatabaseObject.qualifiedName(): String = "${schemaName}.${objectName}"
+internal fun SqlConsoleDatabaseObject.qualifiedName(): String =
+    buildSqlObjectQualifiedName(schemaName, objectName)
 
 internal fun SqlConsoleFavoriteObject.contextLabel(): String =
-    buildString {
-        if (sourceName.isNotBlank()) {
-            append(sourceName)
-        }
-        if (objectType.isNotBlank()) {
-            if (isNotEmpty()) append(" • ")
-            append(translateSqlObjectType(objectType))
-        }
-    }
+    buildSqlObjectContextLabel(sourceName, objectType)
 
 internal fun SqlConsoleDatabaseObject.contextLabel(sourceName: String): String =
-    buildString {
-        if (sourceName.isNotBlank()) {
-            append(sourceName)
-        }
-        if (objectType.isNotBlank()) {
-            if (isNotEmpty()) append(" • ")
-            append(translateSqlObjectType(objectType))
-        }
-    }
+    buildSqlObjectContextLabel(sourceName, objectType)
 
 internal fun SqlConsoleDatabaseObject.tableReferenceLabel(): String? =
     tableName?.let { "Таблица: ${schemaName}.$it" }
@@ -89,6 +75,32 @@ internal fun sqlIdentifier(value: String): String = "\"${value.replace("\"", "\"
 internal fun sqlLiteral(value: String): String = "'${value.replace("'", "''")}'"
 
 internal fun urlEncode(value: String): String = js("encodeURIComponent(value)") as String
+
+internal fun buildSqlObjectQualifiedName(
+    schemaName: String,
+    objectName: String,
+): String =
+    buildString {
+        if (schemaName.isNotBlank()) {
+            append(schemaName)
+            append(".")
+        }
+        append(objectName)
+    }
+
+internal fun buildSqlObjectContextLabel(
+    sourceName: String,
+    objectType: String,
+): String =
+    buildString {
+        if (sourceName.isNotBlank()) {
+            append(sourceName)
+        }
+        if (objectType.isNotBlank()) {
+            if (isNotEmpty()) append(" • ")
+            append(translateSqlObjectType(objectType))
+        }
+    }
 
 private fun buildPreviewSql(
     schemaName: String,
