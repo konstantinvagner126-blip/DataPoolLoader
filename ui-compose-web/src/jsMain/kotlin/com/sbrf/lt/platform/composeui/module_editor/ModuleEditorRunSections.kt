@@ -207,16 +207,10 @@ internal fun CredentialsPanel(
         title = "credential.properties",
         subtitle = buildCredentialsStatusText(status),
         actions = {
-            Button(attrs = {
-                classes("btn", "btn-outline-secondary", "btn-sm", "config-section-toggle")
-                attr("type", "button")
-                onClick {
-                    val nextValue = !expanded
-                    expanded = nextValue
-                    saveSectionExpanded(sectionStateKey, nextValue)
-                }
-            }) {
-                Text(if (expanded) "Свернуть" else "Развернуть")
+            SectionExpandToggleButton(expanded) {
+                val nextValue = !expanded
+                expanded = nextValue
+                saveSectionExpanded(sectionStateKey, nextValue)
             }
         },
     ) {

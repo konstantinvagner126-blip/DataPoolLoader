@@ -135,13 +135,11 @@ internal fun EditorShellHeader(
             if (route.storage == "database") {
                 Div({ classes("module-editor-toolbar") }) {
                     Div({ classes("module-editor-toolbar-row") }) {
-                        Div({ classes("module-editor-toolbar-group", "module-editor-toolbar-group-primary") }) {
-                            Div({ classes("module-editor-toolbar-group-label") }) { Text("Выполнение") }
+                        EditorToolbarGroup("Выполнение", "module-editor-toolbar-group-primary") {
                             EditorActionButton("Запустить", capabilities.run && !actionBusy, EditorActionStyle.Success, onRun)
                             RunsHistoryLinkButton(route, state.selectedModuleId)
                         }
-                        Div({ classes("module-editor-toolbar-group", "module-editor-toolbar-group-draft") }) {
-                            Div({ classes("module-editor-toolbar-group-label") }) { Text("Личный черновик") }
+                        EditorToolbarGroup("Личный черновик", "module-editor-toolbar-group-draft") {
                             EditorActionButton(
                                 "Сохранить черновик",
                                 capabilities.saveWorkingCopy && state.hasDraftChanges && !actionBusy,
@@ -151,8 +149,7 @@ internal fun EditorShellHeader(
                             EditorActionButton("Опубликовать", capabilities.publish && !actionBusy && !state.hasDraftChanges, EditorActionStyle.Success, onPublishWorkingCopy)
                             EditorActionButton("Сбросить черновик", capabilities.discardWorkingCopy && !actionBusy, EditorActionStyle.DangerOutline, onDiscardWorkingCopy)
                         }
-                        Div({ classes("module-editor-toolbar-group", "module-editor-toolbar-group-secondary") }) {
-                            Div({ classes("module-editor-toolbar-group-label") }) { Text("Редактор") }
+                        EditorToolbarGroup("Редактор", "module-editor-toolbar-group-secondary") {
                             EditorActionButton("Отменить изменения", state.hasDraftChanges && !actionBusy, EditorActionStyle.DangerOutline, onReload)
                         }
                     }
@@ -160,13 +157,11 @@ internal fun EditorShellHeader(
             } else {
                 Div({ classes("module-editor-toolbar") }) {
                     Div({ classes("module-editor-toolbar-row") }) {
-                        Div({ classes("module-editor-toolbar-group", "module-editor-toolbar-group-primary") }) {
-                            Div({ classes("module-editor-toolbar-group-label") }) { Text("Выполнение") }
+                        EditorToolbarGroup("Выполнение", "module-editor-toolbar-group-primary") {
                             RunsHistoryLinkButton(route, state.selectedModuleId)
                             EditorActionButton("Запустить", capabilities.run && !actionBusy, EditorActionStyle.PrimarySolid, onRun)
                         }
-                        Div({ classes("module-editor-toolbar-group", "module-editor-toolbar-group-secondary") }) {
-                            Div({ classes("module-editor-toolbar-group-label") }) { Text("Редактор") }
+                        EditorToolbarGroup("Редактор", "module-editor-toolbar-group-secondary") {
                             EditorActionButton("Отменить изменения", state.hasDraftChanges && !actionBusy, EditorActionStyle.DangerOutline, onReload)
                             EditorActionButton("Сохранить", capabilities.save && state.hasDraftChanges && !actionBusy, EditorActionStyle.PrimarySolid, onSave)
                         }
@@ -193,6 +188,18 @@ private fun RunsHistoryLinkButton(
             attr("aria-disabled", "true")
         }
     }) { Text("История и результаты") }
+}
+
+@Composable
+private fun EditorToolbarGroup(
+    label: String,
+    vararg groupClasses: String,
+    content: @Composable () -> Unit,
+) {
+    Div({ classes("module-editor-toolbar-group", *groupClasses) }) {
+        Div({ classes("module-editor-toolbar-group-label") }) { Text(label) }
+        content()
+    }
 }
 
 @Composable

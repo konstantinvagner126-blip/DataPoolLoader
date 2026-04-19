@@ -66,79 +66,45 @@ internal fun QueryLibraryBlock(
 ) {
     Div({ classes("sql-query-library", "mb-3") }) {
         Div({ classes("sql-query-library-row") }) {
-            Div({ classes("sql-query-library-block") }) {
-                Label(attrs = {
-                    classes("small", "text-secondary", "mb-1")
-                    attr("for", "composeRecentQueries")
-                }) { Text("Последние запросы") }
-                Div({ classes("d-flex", "flex-wrap", "gap-2") }) {
-                    Select(attrs = {
-                        id("composeRecentQueries")
-                        classes("form-select", "form-select-sm", "sql-recent-query-select")
-                        onChange { onRecentSelected(it.value ?: "") }
-                    }) {
-                        Option(value = "") { Text(if (state.recentQueries.isEmpty()) "История пока пуста" else "Выбери запрос") }
-                        state.recentQueries.forEach { query ->
-                            Option(value = query, attrs = { if (selectedRecentQuery == query) selected() }) {
-                                Text(query.take(120))
-                            }
-                        }
-                    }
-                    Button(attrs = {
-                        classes("btn", "btn-outline-secondary", "btn-sm")
-                        attr("type", "button")
-                        if (selectedRecentQuery.isBlank()) {
-                            disabled()
-                        }
-                        onClick { onApplyRecent() }
-                    }) { Text("Подставить") }
-                    Button(attrs = {
-                        classes("btn", "btn-outline-secondary", "btn-sm")
-                        attr("type", "button")
-                        onClick { onClearRecent() }
-                    }) { Text("Очистить") }
-                }
+            SqlConsoleQueryPickerBlock(
+                fieldId = "composeRecentQueries",
+                label = "Последние запросы",
+                queries = state.recentQueries,
+                selectedQuery = selectedRecentQuery,
+                emptyText = "История пока пуста",
+                selectText = "Выбери запрос",
+                onSelected = onRecentSelected,
+                onApply = onApplyRecent,
+            ) {
+                Button(attrs = {
+                    classes("btn", "btn-outline-secondary", "btn-sm")
+                    attr("type", "button")
+                    onClick { onClearRecent() }
+                }) { Text("Очистить") }
             }
-            Div({ classes("sql-query-library-block") }) {
-                Label(attrs = {
-                    classes("small", "text-secondary", "mb-1")
-                    attr("for", "composeFavoriteQueries")
-                }) { Text("Избранные запросы") }
-                Div({ classes("d-flex", "flex-wrap", "gap-2") }) {
-                    Select(attrs = {
-                        id("composeFavoriteQueries")
-                        classes("form-select", "form-select-sm", "sql-recent-query-select")
-                        onChange { onFavoriteSelected(it.value ?: "") }
-                    }) {
-                        Option(value = "") { Text(if (state.favoriteQueries.isEmpty()) "Избранное пока пусто" else "Выбери запрос") }
-                        state.favoriteQueries.forEach { query ->
-                            Option(value = query, attrs = { if (selectedFavoriteQuery == query) selected() }) {
-                                Text(query.take(120))
-                            }
-                        }
+            SqlConsoleQueryPickerBlock(
+                fieldId = "composeFavoriteQueries",
+                label = "Избранные запросы",
+                queries = state.favoriteQueries,
+                selectedQuery = selectedFavoriteQuery,
+                emptyText = "Избранное пока пусто",
+                selectText = "Выбери запрос",
+                onSelected = onFavoriteSelected,
+                onApply = onApplyFavorite,
+            ) {
+                Button(attrs = {
+                    classes("btn", "btn-outline-primary", "btn-sm")
+                    attr("type", "button")
+                    onClick { onRememberFavorite() }
+                }) { Text("В избранное") }
+                Button(attrs = {
+                    classes("btn", "btn-outline-danger", "btn-sm")
+                    attr("type", "button")
+                    if (selectedFavoriteQuery.isBlank()) {
+                        disabled()
                     }
-                    Button(attrs = {
-                        classes("btn", "btn-outline-secondary", "btn-sm")
-                        attr("type", "button")
-                        if (selectedFavoriteQuery.isBlank()) {
-                            disabled()
-                        }
-                        onClick { onApplyFavorite() }
-                    }) { Text("Подставить") }
-                    Button(attrs = {
-                        classes("btn", "btn-outline-primary", "btn-sm")
-                        attr("type", "button")
-                        onClick { onRememberFavorite() }
-                    }) { Text("В избранное") }
-                    Button(attrs = {
-                        classes("btn", "btn-outline-danger", "btn-sm")
-                        attr("type", "button")
-                        if (selectedFavoriteQuery.isBlank()) {
-                            disabled()
-                        }
-                        onClick { onRemoveFavorite() }
-                    }) { Text("Убрать") }
-                }
+                    onClick { onRemoveFavorite() }
+                }) { Text("Убрать") }
             }
         }
         SqlConsoleSettingToggle(
@@ -151,6 +117,49 @@ internal fun QueryLibraryBlock(
             checked = state.transactionMode == "AUTO_COMMIT",
             onToggle = { onAutoCommitToggle(state.transactionMode != "AUTO_COMMIT") },
         )
+    }
+}
+
+@Composable
+private fun SqlConsoleQueryPickerBlock(
+    fieldId: String,
+    label: String,
+    queries: List<String>,
+    selectedQuery: String,
+    emptyText: String,
+    selectText: String,
+    onSelected: (String) -> Unit,
+    onApply: () -> Unit,
+    actions: @Composable () -> Unit,
+) {
+    Div({ classes("sql-query-library-block") }) {
+        Label(attrs = {
+            classes("small", "text-secondary", "mb-1")
+            attr("for", fieldId)
+        }) { Text(label) }
+        Div({ classes("d-flex", "flex-wrap", "gap-2") }) {
+            Select(attrs = {
+                id(fieldId)
+                classes("form-select", "form-select-sm", "sql-recent-query-select")
+                onChange { onSelected(it.value ?: "") }
+            }) {
+                Option(value = "") { Text(if (queries.isEmpty()) emptyText else selectText) }
+                queries.forEach { query ->
+                    Option(value = query, attrs = { if (selectedQuery == query) selected() }) {
+                        Text(query.take(120))
+                    }
+                }
+            }
+            Button(attrs = {
+                classes("btn", "btn-outline-secondary", "btn-sm")
+                attr("type", "button")
+                if (selectedQuery.isBlank()) {
+                    disabled()
+                }
+                onClick { onApply() }
+            }) { Text("Подставить") }
+            actions()
+        }
     }
 }
 

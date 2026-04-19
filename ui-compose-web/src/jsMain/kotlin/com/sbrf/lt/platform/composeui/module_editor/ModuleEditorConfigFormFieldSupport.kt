@@ -11,7 +11,6 @@ import org.jetbrains.compose.web.attributes.InputType
 import org.jetbrains.compose.web.attributes.disabled
 import org.jetbrains.compose.web.attributes.rows
 import org.jetbrains.compose.web.attributes.value
-import org.jetbrains.compose.web.dom.Button
 import org.jetbrains.compose.web.dom.Div
 import org.jetbrains.compose.web.dom.Input
 import org.jetbrains.compose.web.dom.Label
@@ -41,16 +40,10 @@ internal fun ConfigSectionCard(
                 actions()
             }
             if (sectionStateKey != null) {
-                Button(attrs = {
-                    classes("btn", "btn-outline-secondary", "btn-sm", "config-section-toggle")
-                    attr("type", "button")
-                    onClick {
-                        val nextValue = !expanded
-                        expanded = nextValue
-                        saveSectionExpanded(sectionStateKey, nextValue)
-                    }
-                }) {
-                    Text(if (expanded) "Свернуть" else "Развернуть")
+                SectionExpandToggleButton(expanded) {
+                    val nextValue = !expanded
+                    expanded = nextValue
+                    saveSectionExpanded(sectionStateKey, nextValue)
                 }
             }
         },

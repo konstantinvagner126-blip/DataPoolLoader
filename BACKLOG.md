@@ -506,6 +506,10 @@
   - `buildMaintenanceMessage(...)`, `describeActiveSingleSync(...)`, `buildActiveSingleSyncSummary(...)` и `syncRunMeta(...)` вынесены из web support в shared [ModuleSyncLabels.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncLabels.kt) через formatter callback
   - [ModuleSyncPageSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncPageSupport.kt) удален
   - [ModuleSyncPageSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncPageSections.kt) использует shared text/presentation helper-ы напрямую, без отдельного web support-слоя.
+- screen-local helper cleanup продолжен:
+  - `SqlConsoleLibrarySections.kt` больше не держит две параллельные реализации query picker-блоков; общий локальный `SqlConsoleQueryPickerBlock(...)` закрывает recent/favorite queries
+  - `ModuleEditorShellSections.kt` больше не повторяет вручную `module-editor-toolbar-group` markup; toolbar-группы сведены к локальному `EditorToolbarGroup(...)`
+  - editor секции больше не дублируют кнопку `Свернуть/Развернуть`; общий `SectionExpandToggleButton(...)` вынесен в [ModuleEditorSectionStateSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorSectionStateSupport.kt) и используется в config/run слоях.
 - credentials upload helper cleanup:
   - duplicate `uploadCredentialsFile(...)` больше не живет параллельно в `module_editor` и `sql_console`
   - общий web-only helper вынесен в [CredentialsHttpSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/foundation/http/CredentialsHttpSupport.kt)
