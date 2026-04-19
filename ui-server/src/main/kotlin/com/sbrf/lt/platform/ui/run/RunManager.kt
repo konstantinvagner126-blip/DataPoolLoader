@@ -1,7 +1,6 @@
 package com.sbrf.lt.platform.ui.run
 
 import com.sbrf.lt.datapool.app.ApplicationRunner
-import com.sbrf.lt.datapool.model.ExecutionStatus
 import com.sbrf.lt.platform.ui.config.UiAppConfig
 import com.sbrf.lt.platform.ui.config.UiConfigLoader
 import com.sbrf.lt.platform.ui.config.storageDirPath
@@ -35,6 +34,7 @@ class RunManager(
     private val historyCleanupSupport = RunManagerHistoryCleanupSupport(stateStore, mapper)
     private val executionSupport = RunManagerExecutionSupport(mapper, applicationRunner, moduleExecutionSource)
     private val stateSupport = RunManagerStateSupport(moduleRegistry, uiConfig)
+    private val startSupport = RunManagerStartSupport(moduleRegistry, executionSupport, stateSupport)
 
     init {
         restorePersistedState()
@@ -58,17 +58,14 @@ class RunManager(
 
     @Synchronized
     override fun startRun(request: StartRunRequest): UiRunSnapshot {
-        require(snapshots.none { it.status != ExecutionStatus.SUCCESS && it.status != ExecutionStatus.FAILED }) {
-            "Уже выполняется другой запуск. Дождитесь его завершения."
-        }
-        stateSupport.validateCredentialsBeforeRun(
-            configText = request.configText,
+        val startContext = startSupport.prepareStart(
+            request = request,
+            snapshots = snapshots,
             credentialProperties = currentProperties(),
             credentialsStatus = currentCredentialsStatus(),
         )
-
-        val module = moduleRegistry.getModule(request.moduleId)
-        val snapshot = executionSupport.createSnapshot(module)
+        val module = startContext.module
+        val snapshot = startContext.snapshot
         snapshots.add(0, snapshot)
         publishState()
 
