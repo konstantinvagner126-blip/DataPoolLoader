@@ -673,3 +673,10 @@ fun ComposeModuleEditorPage(
         },
     )
 }
+
+private fun validationBadgeClass(validationStatus: String): String =
+    when (validationStatus.uppercase()) {
+        "VALID" -> "module-validation-badge-valid"
+        "WARNING" -> "module-validation-badge-warning"
+        else -> "module-validation-badge-invalid"
+    }

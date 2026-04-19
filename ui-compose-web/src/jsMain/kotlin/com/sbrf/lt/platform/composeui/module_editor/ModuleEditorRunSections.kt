@@ -17,6 +17,7 @@ import com.sbrf.lt.platform.composeui.foundation.dom.classesFromString
 import com.sbrf.lt.platform.composeui.foundation.format.formatDateTime
 import com.sbrf.lt.platform.composeui.foundation.format.formatDuration
 import com.sbrf.lt.platform.composeui.foundation.format.formatNumber
+import com.sbrf.lt.platform.composeui.foundation.run.formatTimeoutSeconds
 import com.sbrf.lt.platform.composeui.module_runs.ModuleRunsPageState
 import com.sbrf.lt.platform.composeui.run.buildCompactProgressEntries
 import com.sbrf.lt.platform.composeui.run.detectActiveSourceName
@@ -114,7 +115,7 @@ internal fun EditorRunOverviewPanel(
                         add(
                             RunProgressMetric(
                                 "Query timeout",
-                                formatEditorTimeoutSeconds(structuredSummary?.queryTimeoutSec),
+                                formatTimeoutSeconds(structuredSummary?.queryTimeoutSec),
                             ),
                         )
                         add(RunProgressMetric("Строк в merged", formatNumber(details.run.mergedRowCount)))

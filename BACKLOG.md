@@ -510,10 +510,17 @@
   - duplicate `uploadCredentialsFile(...)` больше не живет параллельно в `module_editor` и `sql_console`
   - общий web-only helper вынесен в [CredentialsHttpSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/foundation/http/CredentialsHttpSupport.kt)
   - [ModuleEditorPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPage.kt) и [SqlConsolePage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsolePage.kt) используют foundation helper напрямую вместо feature-scoped дублей.
+- credentials status helper cleanup:
+  - `loadCredentialsStatus(...)` тоже вынесен из SQL feature-layer в [CredentialsHttpSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/foundation/http/CredentialsHttpSupport.kt)
+  - [SqlConsolePageSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsolePageSupport.kt) больше не держит credentials HTTP lifecycle.
 - module_editor section-state cleanup:
   - duplicate localStorage helper-ы для раскрытия секций больше не живут параллельно в `ModuleEditorPageSupport.kt` и `ModuleEditorConfigFormSupport.kt`
   - общий helper вынесен в [ModuleEditorSectionStateSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorSectionStateSupport.kt)
   - [ModuleEditorRunSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorRunSections.kt) и [ModuleEditorConfigFormFieldSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorConfigFormFieldSupport.kt) используют единый helper вместо двух локальных реализаций.
+- module_editor route/presentation cleanup:
+  - route URL builder-ы вынесены из page support в [ModuleEditorRoute.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorRoute.kt)
+  - `formatEditorTimeoutSeconds(...)` заменен на общий foundation helper `formatTimeoutSeconds(...)`
+  - остаточный [ModuleEditorPageSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPageSupport.kt) удален, а одноразовый `validationBadgeClass(...)` локализован в [ModuleEditorPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPage.kt).
 - module_runs support cleanup:
   - остаточный [ModuleRunsPageSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsPageSupport.kt) удален
   - `backHref` перенесен в [ModuleRunsRoute.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsRoute.kt)

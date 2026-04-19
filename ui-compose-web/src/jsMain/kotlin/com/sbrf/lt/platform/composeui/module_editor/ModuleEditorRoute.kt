@@ -12,3 +12,42 @@ fun parseModuleEditorRoute(params: Map<String, String>): ModuleEditorRouteState?
         openCreateDialog = params["openCreate"] == "true" || params["openCreate"] == "1",
     )
 }
+
+fun buildRunsHref(
+    route: ModuleEditorRouteState,
+    moduleId: String?,
+): String {
+    val includeHiddenPart = if (route.includeHidden) "&includeHidden=true" else ""
+    return "/module-runs?storage=${route.storage}&module=${moduleId.orEmpty()}$includeHiddenPart"
+}
+
+fun buildComposeEditorUrl(
+    storage: String,
+    moduleId: String?,
+    includeHidden: Boolean,
+): String {
+    val query = buildString {
+        var separator = '?'
+        if (!moduleId.isNullOrBlank()) {
+            append(separator)
+            append("module=")
+            append(moduleId)
+            separator = '&'
+        }
+        if (storage == "database" && includeHidden) {
+            append(separator)
+            append("includeHidden=true")
+        }
+    }
+    return buildPrimaryEditorUrl(storage, query)
+}
+
+fun buildPrimaryEditorUrl(
+    storage: String,
+    query: String,
+): String =
+    if (storage == "database") {
+        "/db-modules$query"
+    } else {
+        "/modules$query"
+    }

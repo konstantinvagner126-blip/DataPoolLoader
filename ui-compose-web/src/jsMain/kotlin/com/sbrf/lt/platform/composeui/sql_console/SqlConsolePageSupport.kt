@@ -1,15 +1,6 @@
 package com.sbrf.lt.platform.composeui.sql_console
 
-import com.sbrf.lt.platform.composeui.foundation.http.ComposeHttpClient
-import com.sbrf.lt.platform.composeui.model.CredentialsStatusResponse
 import kotlinx.browser.window
-
-internal suspend fun loadCredentialsStatus(
-    httpClient: ComposeHttpClient,
-): CredentialsStatusResponse? =
-    runCatching {
-        httpClient.get("/api/credentials", CredentialsStatusResponse.serializer())
-    }.getOrNull()
 
 @kotlinx.serialization.Serializable
 internal data class SqlConsoleExportRequest(

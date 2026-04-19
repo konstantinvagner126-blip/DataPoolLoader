@@ -4,6 +4,13 @@ import com.sbrf.lt.platform.composeui.model.CredentialsStatusResponse
 import org.w3c.files.File
 import org.w3c.xhr.FormData
 
+internal suspend fun loadCredentialsStatus(
+    httpClient: ComposeHttpClient,
+): CredentialsStatusResponse? =
+    runCatching {
+        httpClient.get("/api/credentials", CredentialsStatusResponse.serializer())
+    }.getOrNull()
+
 internal suspend fun uploadCredentialsFile(
     httpClient: ComposeHttpClient,
     file: File,
