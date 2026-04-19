@@ -121,7 +121,7 @@ fun ComposeModuleRunsPage(
             Div({ classes("hero-actions", "mb-3") }) {
                 A(attrs = {
                     classes("btn", "btn-outline-secondary")
-                    href(buildBackHref(route))
+                    href(route.backHref())
                 }) { Text("Вернуться к модулю") }
                 Button(attrs = {
                     classes("btn", "btn-dark")

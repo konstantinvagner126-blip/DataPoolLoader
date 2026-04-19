@@ -35,6 +35,7 @@ import com.sbrf.lt.platform.composeui.run.translateRunStatus
 import com.sbrf.lt.platform.composeui.run.translateStage
 import com.sbrf.lt.platform.composeui.run.translateStageKey
 import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import org.jetbrains.compose.web.attributes.InputType
 import org.jetbrains.compose.web.attributes.href
 import org.jetbrains.compose.web.attributes.placeholder
@@ -50,6 +51,10 @@ import org.jetbrains.compose.web.dom.Pre
 import org.jetbrains.compose.web.dom.Select
 import org.jetbrains.compose.web.dom.Span
 import org.jetbrains.compose.web.dom.Text
+
+private val technicalDiagnosticsJson = Json {
+    prettyPrint = true
+}
 
 @Composable
 internal fun ModuleRunDetailsPanel(

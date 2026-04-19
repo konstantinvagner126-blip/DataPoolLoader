@@ -14,3 +14,10 @@ fun parseModuleRunsRoute(params: Map<String, String>): ModuleRunsRouteState? {
         moduleId = moduleId,
     )
 }
+
+fun ModuleRunsRouteState.backHref(): String =
+    if (storage == "database") {
+        "/db-modules?module=$moduleId"
+    } else {
+        "/modules?module=$moduleId"
+    }

@@ -46,6 +46,9 @@ fun syncActionTone(action: String): String =
         else -> "secondary"
     }
 
+fun actorLabel(displayName: String?, actorId: String?): String? =
+    displayName ?: actorId
+
 fun syncRunTitle(run: ModuleSyncRunSummaryResponse): String =
     if (run.scope.equals("ONE", ignoreCase = true) && !run.moduleCode.isNullOrBlank()) {
         "Модуль ${run.moduleCode}"
