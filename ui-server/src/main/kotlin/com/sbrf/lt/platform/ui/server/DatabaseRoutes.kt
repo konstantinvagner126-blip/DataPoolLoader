@@ -33,15 +33,11 @@ internal fun Route.registerDatabaseRoutes(
     }
 
     get("/api/db/run-history/cleanup/preview") {
-        val runtimeContext = context.requireDatabaseRuntimeContext(requireMaintenanceInactive = true)
-        val cleanupService = context.requireDatabaseRouteCleanupService(runtimeContext)
         val disableSafeguard = context.includeHiddenQueryParam(call.request.queryParameters["disableSafeguard"])
-        call.respond(cleanupService.previewCleanup(disableSafeguard = disableSafeguard))
+        call.respond(context.previewDatabaseRunHistoryCleanup(disableSafeguard))
     }
 
     post("/api/db/run-history/cleanup") {
-        val runtimeContext = context.requireDatabaseRuntimeContext(requireMaintenanceInactive = true)
-        val cleanupService = context.requireDatabaseRouteCleanupService(runtimeContext)
         val payload = call.receiveText()
         val request = try {
             if (payload.isBlank()) {
@@ -53,20 +49,16 @@ internal fun Route.registerDatabaseRoutes(
             logger.warn("Некорректный payload для /api/db/run-history/cleanup: {}", payload.take(4_000), error)
             badRequest("Некорректные данные для cleanup истории запусков.")
         }
-        call.respond(cleanupService.executeCleanup(disableSafeguard = request.disableSafeguard))
+        call.respond(context.executeDatabaseRunHistoryCleanup(request.disableSafeguard))
     }
 
     get("/api/db/sync/runs") {
-        val runtimeContext = context.requireDatabaseRuntimeContext()
-        val syncService = context.requireDatabaseRouteSyncService(runtimeContext)
-        call.respond(mapOf("runs" to syncService.listSyncRuns(context.parseLimit(call.request.queryParameters["limit"]))))
+        call.respond(mapOf("runs" to context.listDatabaseSyncRuns(context.parseLimit(call.request.queryParameters["limit"]))))
     }
 
     get("/api/db/sync/runs/{syncRunId}") {
-        val runtimeContext = context.requireDatabaseRuntimeContext()
-        val syncService = context.requireDatabaseRouteSyncService(runtimeContext)
-        val syncRunId = requireNotNull(call.parameters["syncRunId"])
-        val details = syncService.loadSyncRunDetails(syncRunId) ?: throw ModuleSyncRunNotFoundException(syncRunId)
+        val syncRunId = call.requireRouteParam("syncRunId")
+        val details = context.loadDatabaseSyncRunDetails(syncRunId) ?: throw ModuleSyncRunNotFoundException(syncRunId)
         call.respond(details)
     }
 
@@ -76,71 +68,63 @@ internal fun Route.registerDatabaseRoutes(
     }
 
     get("/api/db/modules/{id}") {
-        val runtimeContext = context.requireDatabaseRuntimeContext(requireMaintenanceInactive = true)
-        val backend = context.requireDatabaseRouteBackend(runtimeContext)
+        val routeContext = context.requireDatabaseModuleRouteContext(call)
+        val backend = context.requireDatabaseRouteBackend(routeContext.runtimeContext)
         call.respond(
             backend.loadModule(
-                moduleId = requireNotNull(call.parameters["id"]),
-                actor = context.requireDatabaseActor(runtimeContext),
+                moduleId = routeContext.moduleCode,
+                actor = context.requireDatabaseActor(routeContext.runtimeContext),
             ),
         )
     }
 
     get("/api/db/modules/{id}/runs") {
-        val runtimeContext = context.requireDatabaseRuntimeContext(requireMaintenanceInactive = true)
-        val runService = context.requireDatabaseRouteRunService(runtimeContext)
-        call.respond(runService.listRuns(requireNotNull(call.parameters["id"])))
+        val routeContext = context.requireDatabaseModuleRouteContext(call)
+        val runService = context.requireDatabaseRouteRunService(routeContext.runtimeContext)
+        call.respond(runService.listRuns(routeContext.moduleCode))
     }
 
     get("/api/db/modules/{id}/runs/{runId}") {
-        val runtimeContext = context.requireDatabaseRuntimeContext(requireMaintenanceInactive = true)
-        val runService = context.requireDatabaseRouteRunService(runtimeContext)
+        val routeContext = context.requireDatabaseModuleRouteContext(call)
+        val runService = context.requireDatabaseRouteRunService(routeContext.runtimeContext)
         call.respond(
             runService.loadRunDetails(
-                moduleCode = requireNotNull(call.parameters["id"]),
-                runId = requireNotNull(call.parameters["runId"]),
+                moduleCode = routeContext.moduleCode,
+                runId = call.requireRouteParam("runId"),
             ),
         )
     }
 
     post("/api/db/modules/{id}/save") {
-        val runtimeContext = context.requireDatabaseRuntimeContext(requireMaintenanceInactive = true)
-        val moduleCode = requireNotNull(call.parameters["id"])
-        context.requireDatabaseModuleIsNotSyncing(moduleCode)
-        val backend = context.requireDatabaseRouteBackend(runtimeContext)
+        val routeContext = context.requireDatabaseMutableModuleRouteContext(call)
+        val backend = context.requireDatabaseRouteBackend(routeContext.runtimeContext)
         backend.saveModule(
-            moduleId = moduleCode,
+            moduleId = routeContext.moduleCode,
             request = call.receive<SaveModuleRequest>(),
-            actor = context.requireDatabaseActor(runtimeContext),
+            actor = context.requireDatabaseActor(routeContext.runtimeContext),
         )
         call.respond(SaveResultResponse("Изменения сохранены в личный черновик."))
     }
 
     post("/api/db/modules/{id}/discard-working-copy") {
-        val runtimeContext = context.requireDatabaseRuntimeContext(requireMaintenanceInactive = true)
-        val moduleCode = requireNotNull(call.parameters["id"])
-        context.requireDatabaseModuleIsNotSyncing(moduleCode)
-        val store = context.requireDatabaseRouteStore(runtimeContext)
-        val actor = context.requireDatabaseRouteActor(runtimeContext)
+        val routeContext = context.requireDatabaseMutableModuleRouteContext(call)
+        val store = context.requireDatabaseRouteStore(routeContext.runtimeContext)
         store.discardWorkingCopy(
-            moduleCode = moduleCode,
-            actorId = actor.actorId,
-            actorSource = actor.actorSource,
+            moduleCode = routeContext.moduleCode,
+            actorId = routeContext.actor.actorId,
+            actorSource = routeContext.actor.actorSource,
         )
         call.respond(SaveResultResponse("Личный черновик удалён."))
     }
 
     post("/api/db/modules/{id}/publish") {
-        val runtimeContext = context.requireDatabaseRuntimeContext(requireMaintenanceInactive = true)
-        val moduleCode = requireNotNull(call.parameters["id"])
-        context.requireDatabaseModuleIsNotSyncing(moduleCode)
-        val store = context.requireDatabaseRouteStore(runtimeContext)
-        val actor = context.requireDatabaseRouteActor(runtimeContext)
+        val routeContext = context.requireDatabaseMutableModuleRouteContext(call)
+        val store = context.requireDatabaseRouteStore(routeContext.runtimeContext)
         val result = store.publishWorkingCopy(
-            moduleCode = moduleCode,
-            actorId = actor.actorId,
-            actorSource = actor.actorSource,
-            actorDisplayName = actor.actorDisplayName,
+            moduleCode = routeContext.moduleCode,
+            actorId = routeContext.actor.actorId,
+            actorSource = routeContext.actor.actorSource,
+            actorDisplayName = routeContext.actor.actorDisplayName,
         )
         call.respond(
             mapOf(
@@ -153,18 +137,15 @@ internal fun Route.registerDatabaseRoutes(
     }
 
     post("/api/db/modules/{id}/run") {
-        val runtimeContext = context.requireDatabaseRuntimeContext(requireMaintenanceInactive = true)
-        val moduleCode = requireNotNull(call.parameters["id"])
-        context.requireDatabaseModuleIsNotSyncing(moduleCode)
-        val runService = context.requireDatabaseRouteRunService(runtimeContext)
-        val actor = context.requireDatabaseRouteActor(runtimeContext)
+        val routeContext = context.requireDatabaseMutableModuleRouteContext(call)
+        val runService = context.requireDatabaseRouteRunService(routeContext.runtimeContext)
         call.receive<DatabaseRunStartRequest>()
         call.respond(
             runService.startRun(
-                moduleCode = moduleCode,
-                actorId = actor.actorId,
-                actorSource = actor.actorSource,
-                actorDisplayName = actor.actorDisplayName,
+                moduleCode = routeContext.moduleCode,
+                actorId = routeContext.actor.actorId,
+                actorSource = routeContext.actor.actorSource,
+                actorDisplayName = routeContext.actor.actorDisplayName,
             ),
         )
     }
@@ -199,14 +180,11 @@ internal fun Route.registerDatabaseRoutes(
     }
 
     delete("/api/db/modules/{id}") {
-        val runtimeContext = context.requireDatabaseRuntimeContext(requireMaintenanceInactive = true)
-        val moduleCode = requireNotNull(call.parameters["id"])
-        context.requireDatabaseModuleIsNotSyncing(moduleCode)
-        val store = context.requireDatabaseRouteStore(runtimeContext)
-        val actor = context.requireDatabaseRouteActor(runtimeContext)
+        val routeContext = context.requireDatabaseMutableModuleRouteContext(call)
+        val store = context.requireDatabaseRouteStore(routeContext.runtimeContext)
         val result = store.deleteModule(
-            moduleCode = moduleCode,
-            actorId = actor.actorId,
+            moduleCode = routeContext.moduleCode,
+            actorId = routeContext.actor.actorId,
         )
         call.respond(
             mapOf(
@@ -218,24 +196,11 @@ internal fun Route.registerDatabaseRoutes(
     }
 
     post("/api/db/sync/one") {
-        val runtimeContext = context.requireDatabaseRuntimeContext()
-        val syncService = context.requireDatabaseRouteSyncService(runtimeContext)
-        val actor = context.requireDatabaseRouteSyncActor(runtimeContext)
         val request = call.receive<SyncOneModuleRequest>()
-        val result = syncService.syncOneFromFiles(
-            moduleCode = request.moduleCode,
-            appsRoot = context.currentAppsRootOrFail(),
-            actorId = actor.actorId,
-            actorSource = actor.actorSource,
-            actorDisplayName = actor.actorDisplayName,
-        )
-        call.respond(result)
+        call.respond(context.syncOneDatabaseModuleFromFiles(request))
     }
 
     post("/api/db/sync/selected") {
-        val runtimeContext = context.requireDatabaseRuntimeContext()
-        val syncService = context.requireDatabaseRouteSyncService(runtimeContext)
-        val actor = context.requireDatabaseRouteSyncActor(runtimeContext)
         val payload = call.receiveText()
         val request = try {
             mapper.readValue(payload, SyncSelectedModulesRequest::class.java)
@@ -243,26 +208,10 @@ internal fun Route.registerDatabaseRoutes(
             logger.warn("Некорректный payload для /api/db/sync/selected: {}", payload.take(4_000), error)
             badRequest("Некорректные данные для выборочной синхронизации.")
         }
-        val result = syncService.syncSelectedFromFiles(
-            moduleCodes = request.moduleCodes,
-            appsRoot = context.currentAppsRootOrFail(),
-            actorId = actor.actorId,
-            actorSource = actor.actorSource,
-            actorDisplayName = actor.actorDisplayName,
-        )
-        call.respond(result)
+        call.respond(context.syncSelectedDatabaseModulesFromFiles(request))
     }
 
     post("/api/db/sync/all") {
-        val runtimeContext = context.requireDatabaseRuntimeContext()
-        val syncService = context.requireDatabaseRouteSyncService(runtimeContext)
-        val actor = context.requireDatabaseRouteSyncActor(runtimeContext)
-        val result = syncService.syncAllFromFiles(
-            appsRoot = context.currentAppsRootOrFail(),
-            actorId = actor.actorId,
-            actorSource = actor.actorSource,
-            actorDisplayName = actor.actorDisplayName,
-        )
-        call.respond(result)
+        call.respond(context.syncAllDatabaseModulesFromFiles())
     }
 }

@@ -67,7 +67,7 @@
   - [SqlConsoleRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/SqlConsoleRouteSupport.kt)
   - [CommonRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/CommonRouteSupport.kt)
   - [DatabaseRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseRouteSupport.kt);
-- `CommonRoutes` и `DatabaseRoutes` уже меньше знают о mode-specific maintenance flow, actor wiring и service resolution.
+- `CommonRoutes`, `DatabaseRoutes` и `SqlConsoleRoutes` уже меньше знают о mode-specific maintenance flow, actor wiring, credentials/appsRoot orchestration и service resolution.
 - [ModuleRunRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/ModuleRunRoutes.kt) больше не держит вручную path parsing и service resolution;
 - для экрана `История и результаты` появился отдельный support-слой:
   - [ModuleRunRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/ModuleRunRouteSupport.kt).
@@ -158,8 +158,8 @@
   - из legacy `sql-console-state.json`
   - из старого расширенного `sql-console-preferences-state.json`.
 - legacy combined SQL-console state больше не маскируется под рабочий store:
-  - [SqlConsoleStateStore.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/sqlconsole/SqlConsoleStateStore.kt) теперь держит явную legacy-only роль через `LegacySqlConsoleStateStore`;
-  - [PersistedSqlConsoleState.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/sqlconsole/PersistedSqlConsoleState.kt) теперь моделирует именно `LegacySqlConsoleState`.
+  - [LegacySqlConsoleStateStore.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/sqlconsole/LegacySqlConsoleStateStore.kt) теперь держит явную legacy-only роль;
+  - [LegacySqlConsoleState.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/sqlconsole/LegacySqlConsoleState.kt) теперь моделирует именно legacy combined state.
 
 Критерий завершения:
 

@@ -1,13 +1,10 @@
 package com.sbrf.lt.platform.ui.server
 
-import com.sbrf.lt.datapool.sqlconsole.SqlConsoleExecutionPolicy
-import com.sbrf.lt.datapool.sqlconsole.SqlConsoleTransactionMode
 import com.sbrf.lt.platform.ui.model.SqlConsoleObjectSearchRequest
 import com.sbrf.lt.platform.ui.model.SqlConsoleExportRequest
 import com.sbrf.lt.platform.ui.model.SqlConsoleQueryRequest
 import com.sbrf.lt.platform.ui.model.SqlConsoleSettingsUpdateRequest
 import com.sbrf.lt.platform.ui.model.toResponse
-import com.sbrf.lt.platform.ui.model.toStartResponse
 import io.ktor.http.ContentDisposition
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
@@ -50,49 +47,22 @@ internal fun Route.registerSqlConsoleRoutes(context: UiServerContext) {
     }
 
     post("/api/sql-console/connections/check") {
-        context.withSqlConsoleCredentialsPath("datapool-ui-sql-console-check-") { credentialsPath ->
-            call.respond(
-                context.sqlConsoleService.checkConnections(credentialsPath = credentialsPath).toResponse(
-                    configured = context.sqlConsoleService.info().configured,
-                ),
-            )
-        }
+        call.respond(context.checkSqlConsoleConnections())
     }
 
     post("/api/sql-console/objects/search") {
         val request = call.receive<SqlConsoleObjectSearchRequest>()
-        context.withSqlConsoleCredentialsPath("datapool-ui-sql-console-objects-") { credentialsPath ->
-            call.respond(
-                context.sqlConsoleService.searchObjects(
-                    rawQuery = request.query,
-                    credentialsPath = credentialsPath,
-                    selectedSourceNames = request.selectedSourceNames,
-                    maxObjectsPerSource = request.maxObjectsPerSource,
-                ).toResponse(),
-            )
-        }
+        call.respond(context.searchSqlConsoleObjects(request))
     }
 
     post("/api/sql-console/query") {
         val request = call.receive<SqlConsoleQueryRequest>()
-        context.withSqlConsoleCredentialsPath("datapool-ui-sql-console-") { credentialsPath ->
-            call.respond(
-                context.sqlConsoleService.executeQuery(
-                    rawSql = request.sql,
-                    credentialsPath = credentialsPath,
-                    selectedSourceNames = request.selectedSourceNames,
-                    executionPolicy = SqlConsoleExecutionPolicy.STOP_ON_FIRST_ERROR,
-                    transactionMode = request.toTransactionMode(),
-                ).toResponse(),
-            )
-        }
+        call.respond(context.executeSqlConsoleQuery(request))
     }
 
     post("/api/sql-console/export/source-csv") {
         val request = call.receive<SqlConsoleExportRequest>()
-        val shardName = requireNotNull(request.shardName?.takeIf { it.isNotBlank() }) {
-            "Для CSV-экспорта нужно указать shardName."
-        }
+        val shardName = request.requireShardName()
         val bytes = context.sqlConsoleExportService.exportShardCsv(request.result, shardName)
         call.response.headers.append(
             HttpHeaders.ContentDisposition,
@@ -119,37 +89,22 @@ internal fun Route.registerSqlConsoleRoutes(context: UiServerContext) {
 
     post("/api/sql-console/query/start") {
         val request = call.receive<SqlConsoleQueryRequest>()
-        val executionPaths = context.createSqlConsoleExecutionPaths("datapool-ui-sql-console-")
-        try {
-            call.respond(
-                context.sqlConsoleQueryManager.startQuery(
-                    sql = request.sql,
-                    credentialsPath = executionPaths.credentialsPath,
-                    selectedSourceNames = request.selectedSourceNames,
-                    executionPolicy = SqlConsoleExecutionPolicy.STOP_ON_FIRST_ERROR,
-                    transactionMode = request.toTransactionMode(),
-                    cleanupDir = executionPaths.cleanupDir,
-                ).toStartResponse(),
-            )
-        } catch (ex: Exception) {
-            executionPaths.cleanupDir.toFile().deleteRecursively()
-            throw ex
-        }
+        call.respond(context.startSqlConsoleQuery(request))
     }
 
     get("/api/sql-console/query/{id}") {
-        call.respond(context.sqlConsoleQueryManager.snapshot(requireNotNull(call.parameters["id"])).toResponse())
+        call.respond(context.loadSqlConsoleExecution(call.requireSqlConsoleExecutionId()))
     }
 
     post("/api/sql-console/query/{id}/cancel") {
-        call.respond(context.sqlConsoleQueryManager.cancel(requireNotNull(call.parameters["id"])).toResponse())
+        call.respond(context.cancelSqlConsoleExecution(call.requireSqlConsoleExecutionId()))
     }
 
     post("/api/sql-console/query/{id}/commit") {
-        call.respond(context.sqlConsoleQueryManager.commit(requireNotNull(call.parameters["id"])).toResponse())
+        call.respond(context.commitSqlConsoleExecution(call.requireSqlConsoleExecutionId()))
     }
 
     post("/api/sql-console/query/{id}/rollback") {
-        call.respond(context.sqlConsoleQueryManager.rollback(requireNotNull(call.parameters["id"])).toResponse())
+        call.respond(context.rollbackSqlConsoleExecution(call.requireSqlConsoleExecutionId()))
     }
 }

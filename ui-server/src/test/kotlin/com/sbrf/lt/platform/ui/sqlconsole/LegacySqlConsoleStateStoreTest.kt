@@ -7,7 +7,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.io.path.writeText
 
-class SqlConsoleStateStoreTest {
+class LegacySqlConsoleStateStoreTest {
 
     @Test
     fun `migrates legacy combined sql console state into workspace library and preferences stores`() {
