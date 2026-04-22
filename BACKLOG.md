@@ -960,6 +960,16 @@
 - files run history event split cleanup:
   - remaining mixed event-support больше не держит вместе type detection, primitive decoding и human-readable presentation;
   - event typing/primitive accessors теперь живут в [FilesRunHistoryEventDecodingSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/history/FilesRunHistoryEventDecodingSupport.kt), а stage/severity/message mapping — в [FilesRunHistoryEventPresentationSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/history/FilesRunHistoryEventPresentationSupport.kt).
+- DB module run completion split cleanup:
+  - success/finalization flow вынесен из [DatabaseModuleRunCompletionSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleRunCompletionSupport.kt) в [DatabaseModuleRunSuccessSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleRunSuccessSupport.kt);
+  - fail-fast fallback и `markRunFailed` routing вынесены в [DatabaseModuleRunFailureSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleRunFailureSupport.kt), а исходный completion-support остался thin facade-слоем.
+- DB run mutation split cleanup:
+  - create flow вынесен из [DatabaseRunStoreRunMutationSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreRunMutationSupport.kt) в [DatabaseRunStoreRunCreationSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreRunCreationSupport.kt);
+  - finish flow вынесен в [DatabaseRunStoreRunCompletionMutationSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreRunCompletionMutationSupport.kt);
+  - fail mutation вынесен в [DatabaseRunStoreRunFailureMutationSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreRunFailureMutationSupport.kt), а исходный run-mutation support стал lifecycle facade-слоем.
+- files history cleanup response/execution split cleanup:
+  - preview response assembly вынесена из [RunManagerHistoryCleanupSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/RunManagerHistoryCleanupSupport.kt) в [RunManagerHistoryCleanupPreviewResponseSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/RunManagerHistoryCleanupPreviewResponseSupport.kt);
+  - execution mutation/result mapping вынесены в [RunManagerHistoryCleanupExecutionSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/RunManagerHistoryCleanupExecutionSupport.kt), а `RunManager` больше не опирается на mixed cleanup support-файл.
 
 Критерий завершения:
 
