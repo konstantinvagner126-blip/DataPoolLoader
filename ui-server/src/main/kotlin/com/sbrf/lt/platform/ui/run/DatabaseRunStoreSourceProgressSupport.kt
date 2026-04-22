@@ -5,7 +5,7 @@ import com.sbrf.lt.datapool.db.registry.sql.RunHistorySql
 import java.sql.Timestamp
 import java.time.Instant
 
-internal class DatabaseRunStoreProgressUpdateSupport(
+internal class DatabaseRunStoreSourceProgressSupport(
     private val connectionProvider: DatabaseConnectionProvider,
     private val normalizedSchema: String,
 ) {
@@ -71,28 +71,6 @@ internal class DatabaseRunStoreProgressUpdateSupport(
                 stmt.setLong(1, mergedRowCount)
                 stmt.setString(2, runId)
                 stmt.setString(3, sourceName)
-                stmt.executeUpdate()
-            }
-        }
-    }
-
-    fun updateMergedRowCount(runId: String, mergedRowCount: Long) {
-        connectionProvider.getConnection().use { connection ->
-            connection.prepareStatement(RunHistorySql.updateMergedRowCount(normalizedSchema)).use { stmt ->
-                stmt.setLong(1, mergedRowCount)
-                stmt.setString(2, runId)
-                stmt.executeUpdate()
-            }
-        }
-    }
-
-    fun updateTargetStatus(runId: String, targetStatus: String, targetTableName: String?, targetRowsLoaded: Long?) {
-        connectionProvider.getConnection().use { connection ->
-            connection.prepareStatement(RunHistorySql.updateTargetStatus(normalizedSchema)).use { stmt ->
-                stmt.setString(1, targetStatus)
-                stmt.setString(2, targetTableName)
-                setNullableLong(stmt, 3, targetRowsLoaded)
-                stmt.setString(4, runId)
                 stmt.executeUpdate()
             }
         }

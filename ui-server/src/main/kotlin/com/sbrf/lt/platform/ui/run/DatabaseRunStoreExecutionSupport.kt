@@ -21,7 +21,11 @@ internal class DatabaseRunStoreExecutionSupport(
         normalizedSchema = normalizedSchema,
         objectMapperWithTime = objectMapperWithTime,
     )
-    private val progressUpdateSupport = DatabaseRunStoreProgressUpdateSupport(
+    private val sourceProgressSupport = DatabaseRunStoreSourceProgressSupport(
+        connectionProvider = connectionProvider,
+        normalizedSchema = normalizedSchema,
+    )
+    private val mergeTargetProgressSupport = DatabaseRunStoreMergeTargetProgressSupport(
         connectionProvider = connectionProvider,
         normalizedSchema = normalizedSchema,
     )
@@ -37,10 +41,10 @@ internal class DatabaseRunStoreExecutionSupport(
     ) = runLifecycleSupport.createRun(context, startedAt, outputDir)
 
     override fun markSourceStarted(runId: String, sourceName: String, startedAt: Instant) =
-        progressUpdateSupport.markSourceStarted(runId, sourceName, startedAt)
+        sourceProgressSupport.markSourceStarted(runId, sourceName, startedAt)
 
     override fun updateSourceProgress(runId: String, sourceName: String, timestamp: Instant, exportedRowCount: Long) =
-        progressUpdateSupport.updateSourceProgress(runId, sourceName, timestamp, exportedRowCount)
+        sourceProgressSupport.updateSourceProgress(runId, sourceName, timestamp, exportedRowCount)
 
     override fun markSourceFinished(
         runId: String,
@@ -49,19 +53,19 @@ internal class DatabaseRunStoreExecutionSupport(
         finishedAt: Instant,
         exportedRowCount: Long?,
         errorMessage: String?,
-    ) = progressUpdateSupport.markSourceFinished(runId, sourceName, status, finishedAt, exportedRowCount, errorMessage)
+    ) = sourceProgressSupport.markSourceFinished(runId, sourceName, status, finishedAt, exportedRowCount, errorMessage)
 
     override fun markSourceSkipped(runId: String, sourceName: String, finishedAt: Instant, message: String) =
-        progressUpdateSupport.markSourceSkipped(runId, sourceName, finishedAt, message)
+        sourceProgressSupport.markSourceSkipped(runId, sourceName, finishedAt, message)
 
     override fun updateSourceMergedRows(runId: String, sourceName: String, mergedRowCount: Long) =
-        progressUpdateSupport.updateSourceMergedRows(runId, sourceName, mergedRowCount)
+        sourceProgressSupport.updateSourceMergedRows(runId, sourceName, mergedRowCount)
 
     override fun updateMergedRowCount(runId: String, mergedRowCount: Long) =
-        progressUpdateSupport.updateMergedRowCount(runId, mergedRowCount)
+        mergeTargetProgressSupport.updateMergedRowCount(runId, mergedRowCount)
 
     override fun updateTargetStatus(runId: String, targetStatus: String, targetTableName: String?, targetRowsLoaded: Long?) =
-        progressUpdateSupport.updateTargetStatus(runId, targetStatus, targetTableName, targetRowsLoaded)
+        mergeTargetProgressSupport.updateTargetStatus(runId, targetStatus, targetTableName, targetRowsLoaded)
 
     override fun appendEvent(
         runId: String,

@@ -605,6 +605,16 @@
 - DB cleanup transaction split:
   - transaction boundary вынесен из [DatabaseRunStoreCleanupExecutionSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreCleanupExecutionSupport.kt) в [DatabaseRunStoreCleanupTransactionSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreCleanupTransactionSupport.kt);
   - `CleanupExecutionSupport` теперь держит orchestration удаления, а не low-level `autoCommit/commit/rollback` lifecycle.
+- DB run progress write split:
+  - source lifecycle/progress writes вынесены из старого [DatabaseRunStoreProgressUpdateSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreSourceProgressSupport.kt) в [DatabaseRunStoreSourceProgressSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreSourceProgressSupport.kt);
+  - merge/target aggregate writes вынесены в [DatabaseRunStoreMergeTargetProgressSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreMergeTargetProgressSupport.kt);
+  - старый mixed progress-update файл удален.
+- DB execution store facade cleanup:
+  - [DatabaseRunStoreExecutionSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreExecutionSupport.kt) больше не зависит от смешанного progress-update слоя;
+  - execution store теперь агрегирует отдельные `source progress`, `merge/target progress`, `event/artifact` и `run lifecycle` responsibilities как явный facade, а не как полу-монолитный write hub.
+- DB module event log split:
+  - payload mapping вынесен из [DatabaseModuleRunEventLogSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleRunEventLogSupport.kt) в [DatabaseModuleRunEventPayloadSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleRunEventPayloadSupport.kt);
+  - append policy с `seqNo` increment и warn-on-failure вынесена в [DatabaseModuleRunEventAppendSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleRunEventAppendSupport.kt), а исходный event-log support остался thin facade-слоем.
 - config form service cleanup:
   - parser и writer responsibilities вынесены из [ConfigFormService.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/ConfigFormService.kt) в [ConfigFormParsingSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/ConfigFormParsingSupport.kt) и [ConfigFormUpdateSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/ConfigFormUpdateSupport.kt);
   - `ConfigFormService` перестал быть смешанным `parse + apply + typed field decoding` монолитом и остался facade-слоем над двумя явными подролями.
