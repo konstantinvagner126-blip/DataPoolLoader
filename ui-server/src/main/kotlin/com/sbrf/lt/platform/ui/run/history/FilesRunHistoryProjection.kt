@@ -4,44 +4,39 @@ import com.sbrf.lt.platform.ui.model.ModuleRunArtifactResponse
 import com.sbrf.lt.platform.ui.model.ModuleRunEventResponse
 import com.sbrf.lt.platform.ui.model.ModuleRunSourceResultResponse
 import com.sbrf.lt.platform.ui.model.UiRunSnapshot
-import java.nio.file.Files
-import java.nio.file.Path
 import java.time.Instant
-import kotlin.io.path.fileSize
-import kotlin.math.absoluteValue
-import kotlin.math.floor
 
 internal fun projectFilesRunSourceResults(run: UiRunSnapshot): List<ModuleRunSourceResultResponse> {
     val states = linkedMapOf<String, FilesSourceState>()
     var sortOrder = 0
 
     run.events.forEach { event ->
-        val sourceName = event.stringValue("sourceName") ?: return@forEach
+        val sourceName = event.eventSourceName() ?: return@forEach
         val state = states.getOrPut(sourceName) { FilesSourceState(sortOrder = sortOrder++) }
         when (detectFilesEventType(event)) {
             "SourceExportStartedEvent" -> {
-                state.startedAt = event.instantValue("timestamp")
+                state.startedAt = event.eventTimestamp()
                 state.status = "RUNNING"
             }
             "SourceExportProgressEvent" -> {
-                state.exportedRowCount = event.longValue("rowCount") ?: state.exportedRowCount
+                state.exportedRowCount = event.eventRowCount() ?: state.exportedRowCount
                 if (state.status == "PENDING") {
                     state.status = "RUNNING"
                 }
             }
             "SourceExportFinishedEvent" -> {
-                state.finishedAt = event.instantValue("timestamp")
+                state.finishedAt = event.eventTimestamp()
                 state.status = event.statusValue() ?: state.status
-                state.exportedRowCount = event.longValue("rowCount") ?: state.exportedRowCount
-                state.errorMessage = event.stringValue("errorMessage")
+                state.exportedRowCount = event.eventRowCount() ?: state.exportedRowCount
+                state.errorMessage = event.eventErrorMessage()
             }
             "SourceSchemaMismatchEvent" -> {
-                state.finishedAt = event.instantValue("timestamp")
+                state.finishedAt = event.eventTimestamp()
                 state.status = "SKIPPED"
                 state.errorMessage = "Источник исключен из объединения из-за несовпадения схемы."
             }
             "MergeFinishedEvent" -> {
-                state.mergedRowCount = event.longMap("sourceCounts")[sourceName] ?: state.mergedRowCount
+                state.mergedRowCount = event.sourceCounts()[sourceName] ?: state.mergedRowCount
             }
         }
     }
@@ -76,7 +71,7 @@ internal fun projectFilesTargetState(run: UiRunSnapshot): FilesTargetState {
     run.events.forEach { event ->
         when (detectFilesEventType(event)) {
             "RunStartedEvent" -> {
-                targetEnabled = event.booleanValue("targetEnabled") == true
+                targetEnabled = event.targetEnabledValue() == true
                 if (targetEnabled && targetStatus == "NOT_ENABLED") {
                     targetStatus = if (run.status.name == "FAILED") "FAILED" else "PENDING"
                 }
@@ -85,14 +80,14 @@ internal fun projectFilesTargetState(run: UiRunSnapshot): FilesTargetState {
             "TargetImportStartedEvent" -> {
                 targetEnabled = true
                 targetStatus = if (run.status.name == "FAILED") "FAILED" else "RUNNING"
-                targetTableName = event.stringValue("table") ?: targetTableName
+                targetTableName = event.eventTableName() ?: targetTableName
             }
 
             "TargetImportFinishedEvent" -> {
                 targetEnabled = true
                 targetStatus = event.statusValue() ?: targetStatus
-                targetTableName = event.stringValue("table") ?: targetTableName
-                targetRowsLoaded = event.longValue("rowCount") ?: targetRowsLoaded
+                targetTableName = event.eventTableName() ?: targetTableName
+                targetRowsLoaded = event.eventRowCount() ?: targetRowsLoaded
             }
         }
     }
@@ -128,14 +123,14 @@ internal fun projectFilesRunArtifacts(
     artifacts += createArtifact(
         artifactKind = "MERGED_OUTPUT",
         artifactKey = "merged",
-        filePath = joinOutputPath(outputDir, "merged.csv"),
+        filePath = joinFilesRunOutputPath(outputDir, "merged.csv"),
     )
 
     if (!run.summaryJson.isNullOrBlank()) {
         artifacts += createArtifact(
             artifactKind = "SUMMARY_JSON",
             artifactKey = "summary",
-            filePath = joinOutputPath(outputDir, "summary.json"),
+            filePath = joinFilesRunOutputPath(outputDir, "summary.json"),
         )
     }
 
@@ -146,7 +141,7 @@ internal fun projectFilesRunArtifacts(
             artifacts += createArtifact(
                 artifactKind = "SOURCE_OUTPUT",
                 artifactKey = source.sourceName,
-                filePath = joinOutputPath(outputDir, "${source.sourceName}.csv"),
+                filePath = joinFilesRunOutputPath(outputDir, "${source.sourceName}.csv"),
             )
         }
 
@@ -158,11 +153,11 @@ internal fun projectFilesRunEvents(run: UiRunSnapshot): List<ModuleRunEventRespo
         val eventType = detectFilesEventType(event) ?: return@mapIndexedNotNull null
         ModuleRunEventResponse(
             seqNo = index + 1,
-            timestamp = event.instantValue("timestamp"),
+            timestamp = event.eventTimestamp(),
             stage = filesStageFor(eventType),
             eventType = eventType,
             severity = filesSeverityFor(eventType, event),
-            sourceName = event.stringValue("sourceName"),
+            sourceName = event.eventSourceName(),
             message = filesMessageFor(eventType, event),
             payload = event,
         )
@@ -172,174 +167,12 @@ private fun createArtifact(
     artifactKind: String,
     artifactKey: String,
     filePath: String,
-): ModuleRunArtifactResponse {
-    val path = runCatching { Path.of(filePath) }.getOrNull()
-    val exists = path?.let(Files::exists) == true
-    return ModuleRunArtifactResponse(
+): ModuleRunArtifactResponse =
+    createFilesRunArtifact(
         artifactKind = artifactKind,
         artifactKey = artifactKey,
         filePath = filePath,
-        storageStatus = if (exists) "PRESENT" else "MISSING",
-        fileSizeBytes = path?.takeIf(Files::exists)?.fileSize(),
     )
-}
-
-private fun joinOutputPath(outputDir: String, fileName: String): String {
-    val base = outputDir.trim()
-    if (base.isEmpty()) {
-        return fileName
-    }
-    val separator = if (base.contains('\\') && !base.contains('/')) "\\" else "/"
-    return "${base.trimEnd('/', '\\')}$separator$fileName"
-}
-
-internal fun detectFilesEventType(event: Map<String, Any?>): String? {
-    val explicit = event.stringValue("type")?.substringAfterLast('.')
-    if (!explicit.isNullOrBlank()) {
-        return explicit
-    }
-    return when {
-        event.containsKey("summaryFile") && event.containsKey("mergedRowCount") -> "RunFinishedEvent"
-        event.containsKey("fileName") && !event.containsKey("sourceName") -> "OutputCleanupEvent"
-        event.containsKey("table") && event.containsKey("expectedRowCount") -> "TargetImportStartedEvent"
-        event.containsKey("table") && event.containsKey("rowCount") && event.containsKey("status") -> "TargetImportFinishedEvent"
-        event.containsKey("sourceCounts") -> "MergeFinishedEvent"
-        event.containsKey("outputFile") && event.containsKey("sourceNames") -> "MergeStartedEvent"
-        event.containsKey("expectedColumns") && event.containsKey("actualColumns") -> "SourceSchemaMismatchEvent"
-        event.containsKey("sourceName") && event.containsKey("columns") && event.containsKey("status") -> "SourceExportFinishedEvent"
-        event.containsKey("sourceName") && event.containsKey("rowCount") -> "SourceExportProgressEvent"
-        event.containsKey("sourceName") -> "SourceExportStartedEvent"
-        event.containsKey("mergeMode") && event.containsKey("targetEnabled") -> "RunStartedEvent"
-        else -> null
-    }
-}
-
-private fun filesStageFor(eventType: String): String =
-    when (eventType) {
-        "RunStartedEvent" -> "PREPARE"
-        "SourceExportStartedEvent",
-        "SourceExportProgressEvent",
-        "SourceExportFinishedEvent",
-        "SourceSchemaMismatchEvent" -> "SOURCE"
-        "MergeStartedEvent", "MergeFinishedEvent" -> "MERGE"
-        "TargetImportStartedEvent", "TargetImportFinishedEvent" -> "TARGET"
-        else -> "RUN"
-    }
-
-private fun filesSeverityFor(eventType: String, event: Map<String, Any?>): String =
-    when (eventType) {
-        "SourceSchemaMismatchEvent" -> "WARNING"
-        "SourceExportFinishedEvent",
-        "TargetImportFinishedEvent",
-        "RunFinishedEvent" -> {
-            when (event.statusValue()) {
-                "FAILED" -> "ERROR"
-                "SUCCESS" -> "SUCCESS"
-                "SKIPPED" -> "INFO"
-                else -> "INFO"
-            }
-        }
-        "MergeFinishedEvent" -> "SUCCESS"
-        else -> "INFO"
-    }
-
-private fun filesMessageFor(eventType: String, event: Map<String, Any?>): String =
-    when (eventType) {
-        "RunStartedEvent" -> {
-            val sourceCount = event.stringList("sourceNames").size
-            val mergeMode = event.stringValue("mergeMode") ?: "-"
-            "Запуск начат. Источников: $sourceCount, режим объединения: $mergeMode."
-        }
-        "SourceExportStartedEvent" -> "Начата выгрузка из источника ${event.stringValue("sourceName")}."
-        "SourceExportProgressEvent" -> "Источник ${event.stringValue("sourceName")}: выгружено ${event.longValue("rowCount") ?: 0} строк."
-        "SourceExportFinishedEvent" -> {
-            if (event.statusValue() == "SUCCESS") {
-                "Источник ${event.stringValue("sourceName")} завершен успешно. Получено ${event.longValue("rowCount") ?: 0} строк."
-            } else {
-                "Источник ${event.stringValue("sourceName")} завершился с ошибкой: ${event.stringValue("errorMessage") ?: "неизвестная ошибка"}."
-            }
-        }
-        "SourceSchemaMismatchEvent" -> "Источник ${event.stringValue("sourceName")} исключен из объединения: набор колонок отличается от базового."
-        "MergeStartedEvent" -> "Начато объединение данных из ${event.stringList("sourceNames").size} успешных источников."
-        "MergeFinishedEvent" -> "Объединение завершено. В merged.csv записано ${event.longValue("rowCount") ?: 0} строк."
-        "TargetImportStartedEvent" -> "Начата загрузка merged.csv в таблицу ${event.stringValue("table")}."
-        "TargetImportFinishedEvent" -> {
-            when (event.statusValue()) {
-                "SUCCESS" -> "Загрузка в таблицу ${event.stringValue("table")} завершена. Загружено ${event.longValue("rowCount") ?: 0} строк."
-                "SKIPPED" -> "Загрузка в target пропущена."
-                else -> "Загрузка в таблицу ${event.stringValue("table")} завершилась ошибкой: ${event.stringValue("errorMessage") ?: "неизвестная ошибка"}."
-            }
-        }
-        "OutputCleanupEvent" -> "Удален временный файл ${event.stringValue("fileName")}."
-        "RunFinishedEvent" -> {
-            if (event.statusValue() == "SUCCESS") {
-                "Запуск завершен успешно."
-            } else {
-                "Запуск завершен с ошибкой: ${event.stringValue("errorMessage") ?: "неизвестная ошибка"}."
-            }
-        }
-        else -> event.toString()
-    }
-
-private fun Map<String, Any?>.stringValue(key: String): String? =
-    this[key]?.toString()?.takeIf { it.isNotBlank() }
-
-internal fun Map<String, Any?>.statusValue(): String? =
-    stringValue("status")?.substringAfterLast('.')
-
-private fun Map<String, Any?>.longValue(key: String): Long? =
-    when (val value = this[key]) {
-        null -> null
-        is Number -> value.toLong()
-        else -> value.toString().toLongOrNull()
-    }
-
-private fun Map<String, Any?>.instantValue(key: String): Instant? =
-    when (val raw = this[key]) {
-        null -> null
-        is Number -> raw.toInstant()
-        else -> raw.toString().takeIf { it.isNotBlank() }?.let { value ->
-            runCatching { Instant.parse(value) }.getOrNull()
-                ?: value.toDoubleOrNull()?.toInstant()
-        }
-    }
-
-private fun Number.toInstant(): Instant {
-    val numericValue = toDouble()
-    return if (numericValue.absoluteValue >= 100_000_000_000.0) {
-        Instant.ofEpochMilli(toLong())
-    } else {
-        val epochSeconds = floor(numericValue).toLong()
-        val nanos = ((numericValue - epochSeconds) * 1_000_000_000.0).toLong()
-        Instant.ofEpochSecond(epochSeconds, nanos)
-    }
-}
-
-private fun Map<String, Any?>.stringList(key: String): List<String> =
-    when (val value = this[key]) {
-        is Iterable<*> -> value.mapNotNull { it?.toString() }
-        else -> emptyList()
-    }
-
-private fun Map<String, Any?>.booleanValue(key: String): Boolean? =
-    when (val value = this[key]) {
-        null -> null
-        is Boolean -> value
-        else -> value.toString().toBooleanStrictOrNull()
-    }
-
-private fun Map<String, Any?>.longMap(key: String): Map<String, Long> =
-    when (val value = this[key]) {
-        is Map<*, *> -> value.entries.mapNotNull { entry ->
-            val mapKey = entry.key?.toString() ?: return@mapNotNull null
-            val mapValue = when (val raw = entry.value) {
-                is Number -> raw.toLong()
-                else -> raw?.toString()?.toLongOrNull()
-            } ?: return@mapNotNull null
-            mapKey to mapValue
-        }.toMap()
-        else -> emptyMap()
-    }
 
 private class FilesSourceState(
     val sortOrder: Int,

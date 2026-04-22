@@ -577,6 +577,16 @@
 - UI config file IO cleanup:
   - общий `UiRootConfig` read/write helper вынесен в [UiConfigFileSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/config/UiConfigFileSupport.kt);
   - [UiConfig.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/config/UiConfig.kt) и [UiConfigPersistenceService.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/config/UiConfigPersistenceService.kt) больше не держат параллельную JSON/YAML file IO-логику поверх `UiRootConfig`.
+- config form service cleanup:
+  - parser и writer responsibilities вынесены из [ConfigFormService.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/ConfigFormService.kt) в [ConfigFormParsingSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/ConfigFormParsingSupport.kt) и [ConfigFormUpdateSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/ConfigFormUpdateSupport.kt);
+  - `ConfigFormService` перестал быть смешанным `parse + apply + typed field decoding` монолитом и остался facade-слоем над двумя явными подролями.
+- module registry cleanup:
+  - metadata и SQL-catalog/file responsibilities вынесены из [ModuleRegistry.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/ModuleRegistry.kt) в [ModuleRegistryMetadataSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/ModuleRegistryMetadataSupport.kt) и [ModuleRegistrySqlFileSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/ModuleRegistrySqlFileSupport.kt);
+  - `ModuleRegistry` больше не держит в одном файле `module catalog + metadata parsing + SQL path resolution + SQL file discovery/save`.
+- files run history projection cleanup:
+  - event decoding/message severity mapping вынесены в [FilesRunHistoryEventSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/history/FilesRunHistoryEventSupport.kt);
+  - artifact/path formatting вынесены в [FilesRunHistoryArtifactSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/history/FilesRunHistoryArtifactSupport.kt);
+  - [FilesRunHistoryProjection.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/history/FilesRunHistoryProjection.kt) больше не смешивает source/target projection с low-level event decoding и file artifact formatting.
 - run presentation helper cleanup:
   - generic run-display helper-ы вынесены из [ModuleRunsPageSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsPageSupport.kt) в нейтральный foundation-слой [RunPresentationSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/foundation/run/RunPresentationSupport.kt)
   - `ModuleRunsPageSupport.kt` больше не держит `formatStageDuration / formatTimeoutSeconds / formatRowsInterval / formatBooleanFlag / extractArtifactName`

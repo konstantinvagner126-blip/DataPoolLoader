@@ -21,7 +21,7 @@ class ModuleRegistryTest {
         val modules = registry.listModules()
         assertEquals(listOf("demo-app"), modules.map { it.id })
         assertEquals("Demo App", modules.single().title)
-        assertEquals("VALID", modules.single().validationStatus)
+        assertEquals("VALID", modules.single().validationStatus, modules.single().validationIssues.joinToString { it.message })
         assertTrue(modules.single().tags.contains("postgres"))
 
         val details = registry.loadModuleDetails("demo-app")
@@ -126,6 +126,9 @@ class ModuleRegistryTest {
               commonSqlFile: classpath:sql/missing.sql
               sources:
                 - name: db1
+                  jdbcUrl: ${'$'}{DB1_JDBC_URL}
+                  username: ${'$'}{DB1_USERNAME}
+                  password: ${'$'}{DB1_PASSWORD}
                   sqlFile: relative/db1.sql
             """.trimIndent(),
         )
@@ -138,7 +141,7 @@ class ModuleRegistryTest {
         assertEquals("INVALID", details.validationStatus)
         assertTrue(details.validationIssues.any { it.message.contains("missing.sql") })
 
-        val error = assertFailsWith<IllegalStateException> {
+        val error = assertFailsWith<ModuleNotFoundException> {
             registry.getModule("unknown-module")
         }
         assertTrue(error.message!!.contains("не найден"))
@@ -183,7 +186,13 @@ class ModuleRegistryTest {
               commonSqlFile: classpath:sql/common.sql
               sources:
                 - name: db1
+                  jdbcUrl: ${'$'}{DB1_JDBC_URL}
+                  username: ${'$'}{DB1_USERNAME}
+                  password: ${'$'}{DB1_PASSWORD}
                 - name: db2
+                  jdbcUrl: ${'$'}{DB2_JDBC_URL}
+                  username: ${'$'}{DB2_USERNAME}
+                  password: ${'$'}{DB2_PASSWORD}
                   sqlFile: classpath:sql/db2.sql
             """.trimIndent(),
         )
