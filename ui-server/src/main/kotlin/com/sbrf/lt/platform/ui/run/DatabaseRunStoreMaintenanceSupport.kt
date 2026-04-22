@@ -13,10 +13,11 @@ internal class DatabaseRunStoreMaintenanceSupport(
     private val normalizedSchema = normalizeRegistrySchemaName(schema)
     private val cleanupPlanningSupport = DatabaseRunStoreCleanupPlanningSupport(normalizedSchema)
     private val historyUsageSupport = DatabaseRunStoreHistoryUsageSupport(normalizedSchema)
+    private val responseSupport = DatabaseRunStoreCleanupResponseSupport()
     private val cleanupExecutionSupport = DatabaseRunStoreCleanupExecutionSupport(
-        connectionProvider = connectionProvider,
-        normalizedSchema = normalizedSchema,
+        transactionSupport = DatabaseRunStoreCleanupTransactionSupport(connectionProvider),
         cleanupPlanningSupport = cleanupPlanningSupport,
+        responseSupport = responseSupport,
     )
 
     override fun previewCleanup(
@@ -33,24 +34,13 @@ internal class DatabaseRunStoreMaintenanceSupport(
                 disableSafeguard = disableSafeguard,
             )
             val currentUsage = historyUsageSupport.loadCurrentHistoryStorageUsage(connection)
-            return DatabaseRunHistoryCleanupPreviewResponse(
-                safeguardEnabled = !disableSafeguard,
+            return responseSupport.buildPreviewResponse(
+                preview = preview,
+                currentUsage = currentUsage,
+                cutoffTimestamp = cutoffTimestamp,
                 retentionDays = retentionDays,
                 keepMinRunsPerModule = keepMinRunsPerModule,
-                cutoffTimestamp = cutoffTimestamp,
-                currentRunsCount = currentUsage.totalRuns,
-                currentModulesCount = currentUsage.totalModules,
-                currentStorageBytes = currentUsage.totalStorageBytes,
-                currentOldestRequestedAt = currentUsage.oldestRequestedAt,
-                currentNewestRequestedAt = currentUsage.newestRequestedAt,
-                currentTopModules = currentUsage.topModules,
-                totalModulesAffected = preview.modules.size,
-                totalRunsToDelete = preview.totalRunsToDelete,
-                totalSourceResultsToDelete = preview.totalSourceResultsToDelete,
-                totalEventsToDelete = preview.totalEventsToDelete,
-                totalArtifactsToDelete = preview.totalArtifactsToDelete,
-                totalOrphanExecutionSnapshotsToDelete = preview.totalOrphanExecutionSnapshotsToDelete,
-                modules = preview.modules,
+                disableSafeguard = disableSafeguard,
             )
         }
     }

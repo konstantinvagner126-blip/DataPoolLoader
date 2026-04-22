@@ -42,6 +42,8 @@ internal class DatabaseRunStoreCleanupPlanningSupport(
         disableSafeguard = disableSafeguard,
         includeSnapshotCutoff = includeSnapshotCutoff,
     )
+
+    fun normalizedSchema(): String = normalizedSchema
 }
 
 internal data class DatabaseRunHistoryCleanupPreviewData(

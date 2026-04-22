@@ -49,6 +49,11 @@ open class DatabaseModuleRunService(
         runQueryStore = runQueryStore,
         activeRunRegistry = activeRunRegistry,
     )
+    private val submissionSupport = DatabaseModuleRunSubmissionSupport(
+        activeRunRegistry = activeRunRegistry,
+        executionSupport = executionSupport,
+        executor = executor,
+    )
 
     override fun startRun(
         moduleCode: String,
@@ -63,17 +68,7 @@ open class DatabaseModuleRunService(
             actorDisplayName = actorDisplayName,
             localActiveRunId = activeRunRegistry.currentRunId(moduleCode),
         )
-        activeRunRegistry.markActive(moduleCode, context.runId)
-        executor.submit {
-            try {
-                executionSupport.executeRun(
-                    moduleCode = moduleCode,
-                    context = context,
-                )
-            } finally {
-                activeRunRegistry.clear(moduleCode, context.runId)
-            }
-        }
+        submissionSupport.submitRun(moduleCode, context)
 
         return DatabaseRunStartResponse(
             runId = context.runId,
