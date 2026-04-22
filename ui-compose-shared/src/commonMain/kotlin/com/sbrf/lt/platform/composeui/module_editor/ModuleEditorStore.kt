@@ -147,13 +147,13 @@ class ModuleEditorStore(
         draftSupport.restoreCreateModuleTemplate(current)
 
     fun startLoading(current: ModuleEditorPageState): ModuleEditorPageState =
-        current.copy(loading = true, errorMessage = null, successMessage = null)
+        draftSupport.startLoading(current)
 
     fun beginAction(
         current: ModuleEditorPageState,
         actionName: String,
     ): ModuleEditorPageState =
-        current.copy(actionInProgress = actionName, errorMessage = null, successMessage = null)
+        draftSupport.beginAction(current, actionName)
 
     suspend fun saveFilesModule(
         current: ModuleEditorPageState,

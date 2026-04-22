@@ -350,6 +350,19 @@
   - execution/export lifecycle вынесен в [SqlConsoleExecutionBindings.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleExecutionBindings.kt)
   - library/settings/credentials flow вынесен в [SqlConsoleLibraryBindings.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleLibraryBindings.kt)
   - editor/selection flow вынесен в [SqlConsoleEditorBindings.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleEditorBindings.kt).
+- [ModuleSyncPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncPage.kt) больше не держит загрузку, polling и action orchestration внутри page-shell:
+  - callbacks вынесены в [ModuleSyncPageBindings.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncPageBindings.kt)
+  - load/polling effects вынесены в [ModuleSyncPageEffects.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncPageEffects.kt)
+  - content flow вынесен в [ModuleSyncPageContentSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncPageContentSections.kt);
+- [RunHistoryCleanupPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/run_history_cleanup/RunHistoryCleanupPage.kt) тоже переведен в shell/wiring режим:
+  - callbacks вынесены в [RunHistoryCleanupPageBindings.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/run_history_cleanup/RunHistoryCleanupPageBindings.kt)
+  - initial-load effect вынесен в [RunHistoryCleanupPageEffects.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/run_history_cleanup/RunHistoryCleanupPageEffects.kt)
+  - page content вынесен в [RunHistoryCleanupPageContentSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/run_history_cleanup/RunHistoryCleanupPageContentSections.kt);
+- support-слой редактора модулей больше не держит loading/action flow в двух mixed-файлах:
+  - loading state factory и metadata/config snapshot helpers вынесены в [ModuleEditorStoreStateFactory.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreStateFactory.kt)
+  - DB fallback logic вынесена в [ModuleEditorStoreFallbackSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreFallbackSupport.kt)
+  - catalog/session loading flow разрезан на [ModuleEditorStoreCatalogLoadingSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreCatalogLoadingSupport.kt) и [ModuleEditorStoreSessionLoadingSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreSessionLoadingSupport.kt)
+  - action flow разрезан на [ModuleEditorStoreSaveActionSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreSaveActionSupport.kt), [ModuleEditorStoreRunActionSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreRunActionSupport.kt) и [ModuleEditorStoreDatabaseLifecycleActionSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreDatabaseLifecycleActionSupport.kt).
 
 Критерий завершения:
 
