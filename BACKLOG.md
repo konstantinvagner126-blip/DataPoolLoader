@@ -558,6 +558,16 @@
   - локальные `formatInstant(...)` и `formatBytes(...)` удалены из [RunHistoryCleanupPageSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/run_history_cleanup/RunHistoryCleanupPageSupport.kt)
   - общие formatter-ы `formatCompactDateTime(...)` и `formatByteSize(...)` добавлены в [Formatters.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/foundation/format/Formatters.kt)
   - [RunHistoryCleanupPageSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/run_history_cleanup/RunHistoryCleanupPageSections.kt) теперь использует foundation formatting напрямую, без feature-only дублирования.
+- thin shared-store helper cleanup:
+  - одноразовый [HomePageStoreSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/home/HomePageStoreSupport.kt) удален;
+  - [HomePageStore.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/home/HomePageStore.kt) теперь держит свою небольшую orchestration-логику напрямую, без искусственного support-слоя.
+- module editor workflow cleanup:
+  - переходный агрегатор [ModuleEditorStoreActionSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreActionSupport.kt) удален;
+  - workflow-store теперь зависит напрямую от реальных action-support слоев `save/run/database lifecycle`, без лишнего промежуточного wrapper-а.
+- SQL-console persisted state cleanup:
+  - общий файловый JSON/persistence helper вынесен в [SqlConsoleStateFileSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/sqlconsole/SqlConsoleStateFileSupport.kt);
+  - [LegacySqlConsoleStateStore.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/sqlconsole/LegacySqlConsoleStateStore.kt), [SqlConsoleWorkspaceStateStore.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/sqlconsole/SqlConsoleWorkspaceStateStore.kt), [SqlConsolePreferencesStateStore.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/sqlconsole/SqlConsolePreferencesStateStore.kt) и [SqlConsoleLibraryStateStore.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/sqlconsole/SqlConsoleLibraryStateStore.kt) больше не дублируют одинаковый read/save/migration код;
+  - persisted state-слой SQL-консоли стал короче и менее хрупким без изменения behavior.
 - run presentation helper cleanup:
   - generic run-display helper-ы вынесены из [ModuleRunsPageSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsPageSupport.kt) в нейтральный foundation-слой [RunPresentationSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/foundation/run/RunPresentationSupport.kt)
   - `ModuleRunsPageSupport.kt` больше не держит `formatStageDuration / formatTimeoutSeconds / formatRowsInterval / formatBooleanFlag / extractArtifactName`

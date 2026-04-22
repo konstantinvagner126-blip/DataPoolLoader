@@ -4,7 +4,6 @@ import com.sbrf.lt.datapool.config.ConfigLoader
 import java.nio.file.Path
 import kotlin.io.path.deleteIfExists
 import kotlin.io.path.exists
-import kotlin.io.path.inputStream
 
 class LegacySqlConsoleStateStore(
     private val storageDir: Path,
@@ -19,17 +18,10 @@ class LegacySqlConsoleStateStore(
     }
 
     fun load(): LegacySqlConsoleState {
-        if (!stateFile.exists()) {
-            return LegacySqlConsoleState()
-        }
-        return try {
-            stateFile.inputStream().bufferedReader().use {
-                configLoader.objectMapper()
-                    .readValue(it, LegacySqlConsoleState::class.java)
-                    .normalized()
-            }
-        } catch (_: Exception) {
-            LegacySqlConsoleState()
-        }
+        return readOptionalSqlConsoleStateFile(
+            stateFile = stateFile,
+            configLoader = configLoader,
+            stateClass = LegacySqlConsoleState::class.java,
+        )?.normalized() ?: LegacySqlConsoleState()
     }
 }

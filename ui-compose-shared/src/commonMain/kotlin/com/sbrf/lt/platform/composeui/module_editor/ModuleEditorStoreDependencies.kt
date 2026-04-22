@@ -11,6 +11,9 @@ internal fun createModuleEditorStoreDependencies(
     syncRoute: (storage: String, moduleId: String?, includeHidden: Boolean) -> Unit,
 ): ModuleEditorStoreDependencies {
     val loadingSupport = ModuleEditorStoreLoadingSupport(api, syncRoute)
+    val saveActionSupport = ModuleEditorStoreSaveActionSupport(api, loadingSupport)
+    val runActionSupport = ModuleEditorStoreRunActionSupport(api)
+    val databaseLifecycleActionSupport = ModuleEditorStoreDatabaseLifecycleActionSupport(api, loadingSupport)
     val configFormSupport = ModuleEditorStoreConfigFormSupport(api)
     return ModuleEditorStoreDependencies(
         loadingStore = loadingSupport,
@@ -19,7 +22,9 @@ internal fun createModuleEditorStoreDependencies(
             sqlResourceSupport = ModuleEditorStoreSqlResourceSupport(configFormSupport),
         ),
         workflowStore = ModuleEditorWorkflowStoreSupport(
-            actionSupport = ModuleEditorStoreActionSupport(api, loadingSupport),
+            saveActionSupport = saveActionSupport,
+            runActionSupport = runActionSupport,
+            databaseLifecycleActionSupport = databaseLifecycleActionSupport,
             configFormSupport = configFormSupport,
         ),
     )
