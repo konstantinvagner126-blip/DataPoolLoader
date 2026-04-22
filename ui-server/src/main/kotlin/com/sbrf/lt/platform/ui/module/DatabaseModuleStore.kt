@@ -18,6 +18,8 @@ open class DatabaseModuleStore(
     private val validationService: ModuleValidationService = ModuleValidationService(),
 ) : DatabaseModuleRegistryOperations {
     private val snapshotSupport = DatabaseModuleSnapshotSupport(objectMapper)
+    private val lifecycleLookupSupport = DatabaseModuleStoreLookupSupport()
+    private val lifecyclePersistenceSupport = DatabaseModuleStorePersistenceSupport(snapshotSupport)
     private val revisionWriter = DatabaseModuleRevisionWriter(
         objectMapper = objectMapper,
         validationService = validationService,
@@ -28,7 +30,10 @@ open class DatabaseModuleStore(
         validationService = validationService,
         snapshotSupport = snapshotSupport,
     )
-    private val lifecycleSupport = DatabaseModuleStoreLifecycleSupport(snapshotSupport)
+    private val lifecycleSupport = DatabaseModuleStoreLifecycleSupport(
+        lookupSupport = lifecycleLookupSupport,
+        persistenceSupport = lifecyclePersistenceSupport,
+    )
     private val querySupport = DatabaseModuleStoreQuerySupport(
         connectionProvider = connectionProvider,
         schema = schema,
