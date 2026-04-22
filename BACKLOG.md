@@ -577,6 +577,15 @@
 - UI config file IO cleanup:
   - общий `UiRootConfig` read/write helper вынесен в [UiConfigFileSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/config/UiConfigFileSupport.kt);
   - [UiConfig.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/config/UiConfig.kt) и [UiConfigPersistenceService.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/config/UiConfigPersistenceService.kt) больше не держат параллельную JSON/YAML file IO-логику поверх `UiRootConfig`.
+- run manager runtime-state cleanup:
+  - mutable history snapshots и updates flow вынесены из [RunManager.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/RunManager.kt) в [RunManagerRuntimeStateSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/RunManagerRuntimeStateSupport.kt);
+  - `RunManager` больше не смешивает orchestration запуска с runtime-state publication/persistence.
+- UI credentials service cleanup:
+  - fallback resolution и property parsing вынесены из [UiCredentialsService.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/UiCredentialsService.kt) в [UiCredentialsFallbackSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/UiCredentialsFallbackSupport.kt);
+  - persisted uploaded-credentials mapping вынесен в [UiCredentialsPersistenceSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/UiCredentialsPersistenceSupport.kt), а сам service остался facade-слоем.
+- SQL console async manager cleanup:
+  - start/lookup/cancel lifecycle вынесен из [SqlConsoleQueryManager.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/sqlconsole/SqlConsoleQueryManager.kt) в [SqlConsoleQueryStateSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/sqlconsole/SqlConsoleQueryStateSupport.kt);
+  - commit/rollback flow вынесен в [SqlConsoleQueryTransactionSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/sqlconsole/SqlConsoleQueryTransactionSupport.kt), а `SqlConsoleQueryManager` стал orchestration-фасадом над `state + execution + transaction`.
 - config form service cleanup:
   - parser и writer responsibilities вынесены из [ConfigFormService.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/ConfigFormService.kt) в [ConfigFormParsingSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/ConfigFormParsingSupport.kt) и [ConfigFormUpdateSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/ConfigFormUpdateSupport.kt);
   - `ConfigFormService` перестал быть смешанным `parse + apply + typed field decoding` монолитом и остался facade-слоем над двумя явными подролями.

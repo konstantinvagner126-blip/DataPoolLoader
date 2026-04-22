@@ -15,6 +15,8 @@ import com.sbrf.lt.datapool.sqlconsole.SqlConsoleQueryResult
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleService
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleSourceConfig
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleTransactionalOperations
+import com.sbrf.lt.platform.ui.error.UiEntityNotFoundException
+import com.sbrf.lt.platform.ui.error.UiStateConflictException
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.Test
@@ -35,7 +37,7 @@ class SqlConsoleQueryManagerTest {
 
         assertNull(manager.currentSnapshot())
 
-        val error = assertFailsWith<IllegalArgumentException> {
+        val error = assertFailsWith<UiEntityNotFoundException> {
             manager.cancel("missing")
         }
         assertTrue(error.message!!.contains("не найден"))
@@ -357,7 +359,7 @@ class SqlConsoleQueryManagerTest {
         )
 
         val started = manager.startQuery("select 1", null, cleanupDir = cleanupDir)
-        val error = assertFailsWith<IllegalArgumentException> {
+        val error = assertFailsWith<UiStateConflictException> {
             manager.startQuery("select 2", null)
         }
         assertTrue(error.message!!.contains("уже выполняется запрос"))
@@ -383,7 +385,7 @@ class SqlConsoleQueryManagerTest {
             ),
         )
 
-        assertFailsWith<IllegalArgumentException> {
+        assertFailsWith<UiEntityNotFoundException> {
             manager.snapshot("missing")
         }
 
@@ -391,7 +393,7 @@ class SqlConsoleQueryManagerTest {
         val finished = waitForCompletion(manager, started.id)
         assertEquals(SqlConsoleExecutionStatus.SUCCESS, finished.status)
 
-        val error = assertFailsWith<IllegalArgumentException> {
+        val error = assertFailsWith<UiStateConflictException> {
             manager.cancel(started.id)
         }
         assertTrue(error.message!!.contains("уже завершен"))

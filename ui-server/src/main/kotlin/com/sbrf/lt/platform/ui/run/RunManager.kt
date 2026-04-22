@@ -12,8 +12,6 @@ import com.sbrf.lt.platform.ui.model.StartRunRequest
 import com.sbrf.lt.platform.ui.model.UiRunSnapshot
 import com.sbrf.lt.platform.ui.model.UiStateResponse
 import com.sbrf.lt.platform.ui.module.ModuleRegistry
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import java.nio.file.Path
 import java.time.Instant
 import java.util.concurrent.Executors
@@ -27,24 +25,26 @@ class RunManager(
     private val moduleExecutionSource: ModuleExecutionSource = FilesModuleExecutionSource(moduleRegistry),
 ) : FilesModuleRunOperations, FilesRunHistoryMaintenanceOperations {
     private val executor = Executors.newSingleThreadExecutor()
-    private val snapshots = mutableListOf<MutableRunSnapshot>()
-    private val updatesFlow = MutableSharedFlow<UiStateResponse>(replay = 1, extraBufferCapacity = 32)
     private val mapper = com.sbrf.lt.datapool.config.ConfigLoader().objectMapper()
     private val persistenceSupport = RunManagerPersistenceSupport(stateStore)
     private val historyCleanupSupport = RunManagerHistoryCleanupSupport(stateStore, mapper)
     private val executionSupport = RunManagerExecutionSupport(mapper, applicationRunner, moduleExecutionSource)
     private val stateSupport = RunManagerStateSupport(moduleRegistry, uiConfig)
     private val startSupport = RunManagerStartSupport(moduleRegistry, executionSupport, stateSupport)
+    private val runtimeStateSupport = RunManagerRuntimeStateSupport(
+        persistenceSupport = persistenceSupport,
+        stateSupport = stateSupport,
+        credentialsProvider = credentialsService,
+    )
 
     init {
-        restorePersistedState()
-        updatesFlow.tryEmit(currentState())
+        runtimeStateSupport.emitCurrentState()
     }
 
-    override fun updates() = updatesFlow.asSharedFlow()
+    override fun updates() = runtimeStateSupport.updates()
 
     @Synchronized
-    override fun currentState(): UiStateResponse = stateSupport.currentState(snapshots, currentCredentialsStatus())
+    override fun currentState(): UiStateResponse = runtimeStateSupport.currentState()
 
     @Synchronized
     override fun uploadCredentials(fileName: String, content: String): CredentialsStatusResponse {
@@ -60,13 +60,13 @@ class RunManager(
     override fun startRun(request: StartRunRequest): UiRunSnapshot {
         val startContext = startSupport.prepareStart(
             request = request,
-            snapshots = snapshots,
+            snapshots = runtimeStateSupport.snapshots(),
             credentialProperties = currentProperties(),
             credentialsStatus = currentCredentialsStatus(),
         )
         val module = startContext.module
         val snapshot = startContext.snapshot
-        snapshots.add(0, snapshot)
+        runtimeStateSupport.prependSnapshot(snapshot)
         publishState()
 
         executor.submit {
@@ -98,14 +98,7 @@ class RunManager(
 
     @Synchronized
     private fun publishState() {
-        persistState()
-        updatesFlow.tryEmit(currentState())
-    }
-
-    @Synchronized
-    private fun restorePersistedState() {
-        snapshots.clear()
-        snapshots.addAll(persistenceSupport.restoreSnapshots())
+        runtimeStateSupport.publishState()
     }
 
     @Synchronized
@@ -116,7 +109,7 @@ class RunManager(
         disableSafeguard: Boolean,
     ): RunHistoryCleanupPreviewResponse =
         historyCleanupSupport.previewHistoryCleanup(
-            snapshots = snapshots,
+            snapshots = runtimeStateSupport.snapshots(),
             cutoffTimestamp = cutoffTimestamp,
             retentionDays = retentionDays,
             keepMinRunsPerModule = keepMinRunsPerModule,
@@ -131,7 +124,7 @@ class RunManager(
         disableSafeguard: Boolean,
     ): RunHistoryCleanupResultResponse {
         val result = historyCleanupSupport.executeHistoryCleanup(
-            snapshots = snapshots,
+            snapshots = runtimeStateSupport.snapshots(),
             cutoffTimestamp = cutoffTimestamp,
             retentionDays = retentionDays,
             keepMinRunsPerModule = keepMinRunsPerModule,
@@ -141,10 +134,5 @@ class RunManager(
             publishState()
         }
         return result.response
-    }
-
-    @Synchronized
-    private fun persistState() {
-        persistenceSupport.persistSnapshots(snapshots)
     }
 }
