@@ -260,7 +260,7 @@
 
 Статус:
 
-- частично реализовано
+- реализовано
 
 Цель:
 
@@ -401,6 +401,10 @@
   - explicit store contracts выделены в [ModuleEditorLoadingStore.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorLoadingStore.kt), [ModuleEditorDraftStore.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorDraftStore.kt) и [ModuleEditorWorkflowStore.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorWorkflowStore.kt)
   - concrete facade wiring вынесен в [ModuleEditorStoreDependencies.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreDependencies.kt)
   - draft/workflow delegation живет в [ModuleEditorDraftStoreSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorDraftStoreSupport.kt) и [ModuleEditorWorkflowStoreSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorWorkflowStoreSupport.kt).
+- архитектурный review этого этапа зафиксировал stop-condition:
+  - giant-file wave считается завершенной, когда top-offender файлы становятся reviewable и responsibility-coherent;
+  - line-count сам по себе больше не является достаточной причиной для нового распила;
+  - дальнейшие правки этих экранов должны идти только при наличии нового architectural smell, а не ради дополнительного дробления.
 
 Критерий завершения:
 
