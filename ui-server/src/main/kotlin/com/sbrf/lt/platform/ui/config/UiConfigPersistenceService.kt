@@ -10,28 +10,20 @@ open class UiConfigPersistenceService(
     private val configLoader: ConfigLoader = ConfigLoader(),
     private val startDir: Path = Path.of("").toAbsolutePath().normalize(),
 ) {
-    open fun resolveEditableConfigPath(): Path? {
-        uiConfigLoader.resolveExternalConfigPath()?.let { return it }
+    private val pathSupport = UiConfigPersistencePathSupport(uiConfigLoader, startDir)
+    private val mutationSupport = UiConfigPersistenceMutationSupport(uiConfigLoader, configLoader)
 
-        val projectRoot = ProjectRootLocator.find(startDir) ?: return null
-        val devConfig = projectRoot.resolve("ui-server/src/main/resources/application.yml").normalize()
-        return devConfig.takeIf { Files.exists(it) }
-    }
+    open fun resolveEditableConfigPath(): Path? = pathSupport.resolveEditableConfigPath()
 
     open fun resolveManagedExternalConfigPath(): Path {
         resolveExplicitExternalConfigPath()?.let { return it }
-        uiConfigLoader.resolveExternalConfigPath()?.let { return it }
-        resolvePackagedSidecarConfigPath()?.let { return it }
-        return resolveDefaultManagedUiConfigPath()
+        return pathSupport.resolveManagedExternalConfigPath(
+            packagedSidecarPath = resolvePackagedSidecarConfigPath(),
+        )
     }
 
     open fun updateModuleStoreMode(mode: UiModuleStoreMode): UiAppConfig {
-        val targetPath = resolveManagedExternalConfigPath()
-        val baseUiConfig = readBaseUiConfig(targetPath)
-        val updatedUiConfig = baseUiConfig.copy(
-            moduleStore = baseUiConfig.moduleStore.copy(mode = mode),
-        )
-        return writeUiConfig(targetPath, updatedUiConfig)
+        return mutationSupport.updateModuleStoreMode(resolveManagedExternalConfigPath(), mode)
     }
 
     open fun updateSqlConsoleSettings(
@@ -46,41 +38,12 @@ open class UiConfigPersistenceService(
         val targetPath = requireNotNull(resolveEditableConfigPath()) {
             "Не удалось определить редактируемый ui-конфиг. Укажи внешний ui-application.yml или запусти UI из проекта."
         }
-
-        val baseUiConfig = readBaseUiConfig(targetPath)
-
-        val updatedUiConfig = baseUiConfig.copy(
-            sqlConsole = baseUiConfig.sqlConsole.copy(
-                maxRowsPerShard = maxRowsPerShard,
-                queryTimeoutSec = queryTimeoutSec,
-            ),
-        )
-
-        return writeUiConfig(targetPath, updatedUiConfig)
+        return mutationSupport.updateSqlConsoleSettings(targetPath, maxRowsPerShard, queryTimeoutSec)
     }
 
     open fun updateSqlConsoleMaxRowsPerShard(maxRowsPerShard: Int): UiAppConfig {
         val currentTimeout = uiConfigLoader.load().sqlConsole.queryTimeoutSec
         return updateSqlConsoleSettings(maxRowsPerShard, currentTimeout)
-    }
-
-    private fun readBaseUiConfig(targetPath: Path): UiAppConfig {
-        return if (java.nio.file.Files.exists(targetPath)) {
-            readUiConfigFile(targetPath, configLoader)
-        } else {
-            uiConfigLoader.load()
-        }
-    }
-
-    private fun writeUiConfig(
-        targetPath: Path,
-        updatedUiConfig: UiAppConfig,
-    ): UiAppConfig {
-        writeUiConfigFile(targetPath, updatedUiConfig, configLoader)
-
-        return updatedUiConfig.copy(
-            configBaseDir = targetPath.parent?.toAbsolutePath()?.normalize()?.toString(),
-        )
     }
 
     private fun resolveExplicitExternalConfigPath(): Path? {

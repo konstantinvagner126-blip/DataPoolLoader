@@ -624,6 +624,15 @@
 - DB run lifecycle query/mutation cleanup:
   - active-run lookup вынесен из [DatabaseRunStoreRunLifecycleSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreRunLifecycleSupport.kt) в [DatabaseRunStoreActiveRunQuerySupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreActiveRunQuerySupport.kt);
   - create/finish/fail mutation flow вынесен в [DatabaseRunStoreRunMutationSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreRunMutationSupport.kt), а lifecycle-фасад перестал смешивать query и transactional write responsibilities.
+- ui config model/path helper cleanup:
+  - path/credentials/storage helper-ы вынесены из [UiConfig.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/config/UiConfig.kt) в [UiConfigModelPathSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/config/UiConfigModelPathSupport.kt);
+  - основной config-модельный файл больше не смешивает data classes, loader и runtime path helpers в одном месте.
+- ui config loader cleanup:
+  - external source resolution вынесен из [UiConfig.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/config/UiConfig.kt) в [UiConfigExternalPathResolutionSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/config/UiConfigExternalPathResolutionSupport.kt);
+  - load flow вынесен в [UiConfigLoadSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/config/UiConfigLoadSupport.kt), а `UiConfigLoader` остался фасадом над resolution/load responsibilities.
+- ui config persistence cleanup:
+  - editable/managed path resolution вынесен из [UiConfigPersistenceService.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/config/UiConfigPersistenceService.kt) в [UiConfigPersistencePathSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/config/UiConfigPersistencePathSupport.kt);
+  - mutation/write flow вынесен в [UiConfigPersistenceMutationSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/config/UiConfigPersistenceMutationSupport.kt), а сервис остался orchestration-фасадом.
 - run presentation helper cleanup:
   - generic run-display helper-ы вынесены из [ModuleRunsPageSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsPageSupport.kt) в нейтральный foundation-слой [RunPresentationSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/foundation/run/RunPresentationSupport.kt)
   - `ModuleRunsPageSupport.kt` больше не держит `formatStageDuration / formatTimeoutSeconds / formatRowsInterval / formatBooleanFlag / extractArtifactName`

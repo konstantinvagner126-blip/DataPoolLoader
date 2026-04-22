@@ -4,12 +4,10 @@ import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonIgnore
 import com.fasterxml.jackson.annotation.JsonValue
 import com.sbrf.lt.datapool.config.ConfigLoader
-import com.sbrf.lt.datapool.config.CredentialsFileLocator
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleConfig
 import java.io.InputStream
 import java.nio.file.Files
 import java.nio.file.Path
-import kotlin.io.path.inputStream
 
 data class UiRootConfig(
     val ui: UiAppConfig = UiAppConfig(),
@@ -72,26 +70,19 @@ data class UiModuleStorePostgresConfig(
 open class UiConfigLoader(
     private val configLoader: ConfigLoader = ConfigLoader(),
 ) {
+    private val loadSupport = UiConfigLoadSupport(configLoader)
+    private val externalPathSupport = UiConfigExternalPathResolutionSupport(
+        packagedSidecarPathProvider = ::resolvePackagedSidecarConfigPath,
+    )
+
     open fun load(): UiAppConfig {
-        val externalConfig = resolveExternalConfigPath()
-        if (externalConfig != null) {
-            require(Files.exists(externalConfig)) {
-                "UI-конфиг не найден: $externalConfig"
-            }
-            return readUiConfigFileWithBaseDir(externalConfig, configLoader)
-        }
-
-        val stream: InputStream = classpathConfigStream() ?: return UiAppConfig()
-        return stream.bufferedReader().use {
-            configLoader.objectMapper().readValue(it, UiRootConfig::class.java).ui
-        }
+        return loadSupport.load(
+            externalConfig = resolveExternalConfigPath(),
+            classpathStream = classpathConfigStream(),
+        )
     }
 
-    open fun resolveExternalConfigPath(): Path? {
-        resolveExplicitUiConfigPath()?.let { return it }
-        resolvePackagedSidecarConfigPath()?.let { return it }
-        return resolveExistingDefaultManagedUiConfigPath()
-    }
+    open fun resolveExternalConfigPath(): Path? = externalPathSupport.resolveExternalConfigPath()
 
     open fun resolvePackagedSidecarConfigPath(): Path? {
         return resolveReadablePackagedSidecarConfigPath(resolvePackagedAppDirectory())
@@ -112,49 +103,4 @@ open class UiConfigLoader(
 
     open fun resolveProcessCommand(): String? =
         ProcessHandle.current().info().command().orElse(null)
-}
-
-fun UiAppConfig.defaultCredentialsPath(): Path? {
-    val configured = defaultCredentialsFile?.trim()?.takeIf { it.isNotEmpty() }?.let { configuredPath ->
-        val path = Path.of(configuredPath)
-        if (path.isAbsolute) {
-            path
-        } else {
-            configBaseDir?.let { Path.of(it).resolve(path).normalize() } ?: path
-        }
-    }
-    if (configured != null) {
-        return configured
-    }
-    return CredentialsFileLocator.find()
-}
-
-fun UiAppConfig.appsRootPath(): Path? {
-    return appsRoot?.trim()?.takeIf { it.isNotEmpty() }?.let {
-        Path.of(it).toAbsolutePath().normalize()
-    }
-}
-
-fun UiModuleStoreConfig.isDatabaseMode(): Boolean = mode == UiModuleStoreMode.DATABASE
-
-fun UiModuleStorePostgresConfig.isConfigured(): Boolean =
-    !jdbcUrl.isNullOrBlank() && !username.isNullOrBlank() && !password.isNullOrBlank()
-
-fun UiModuleStorePostgresConfig.schemaName(): String =
-    schema.trim().ifEmpty { UiModuleStorePostgresConfig.DEFAULT_SCHEMA }
-
-fun UiAppConfig.storageDirPath(): Path {
-    storageDir?.trim()?.takeIf { it.isNotEmpty() }?.let { configuredStorageDir ->
-        val path = Path.of(configuredStorageDir)
-        if (path.isAbsolute) {
-            return path.normalize()
-        }
-        configBaseDir?.let {
-            return Path.of(it).resolve(path).normalize()
-        }
-        return path.toAbsolutePath().normalize()
-    }
-    val userHome = System.getProperty("user.home")?.trim()?.takeIf { it.isNotEmpty() }
-        ?: return Path.of(".datapool-loader/ui/storage").toAbsolutePath().normalize()
-    return Path.of(userHome).resolve(".datapool-loader/ui/storage").toAbsolutePath().normalize()
 }
