@@ -58,26 +58,3 @@ class FilesModuleRunHistoryService(
             .firstOrNull { it.moduleId == moduleId && it.id == runId }
             ?: throw UiEntityNotFoundException("Запуск '$runId' для модуля '$moduleId' не найден.")
 }
-
-private fun UiRunSnapshot.toCommonSummary(): ModuleRunSummaryResponse {
-    val sourceResults = projectFilesRunSourceResults(this)
-    val targetState = projectFilesTargetState(this)
-    return ModuleRunSummaryResponse(
-        runId = id,
-        moduleId = moduleId,
-        moduleTitle = moduleTitle,
-        status = status.name,
-        startedAt = startedAt,
-        finishedAt = finishedAt,
-        requestedAt = startedAt,
-        outputDir = outputDir,
-        mergedRowCount = mergedRowCount,
-        errorMessage = errorMessage,
-        successfulSourceCount = sourceResults.count { it.status == "SUCCESS" },
-        failedSourceCount = sourceResults.count { it.status == "FAILED" },
-        skippedSourceCount = sourceResults.count { it.status == "SKIPPED" },
-        targetStatus = targetState.status,
-        targetTableName = targetState.tableName,
-        targetRowsLoaded = targetState.rowsLoaded,
-    )
-}

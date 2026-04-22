@@ -1,7 +1,5 @@
 package com.sbrf.lt.platform.ui.run.history
 
-import com.sbrf.lt.platform.ui.model.ModuleRunArtifactResponse
-import com.sbrf.lt.platform.ui.model.ModuleRunEventResponse
 import com.sbrf.lt.platform.ui.model.ModuleRunSourceResultResponse
 import com.sbrf.lt.platform.ui.model.UiRunSnapshot
 import java.time.Instant
@@ -112,67 +110,6 @@ internal fun projectFilesTargetState(run: UiRunSnapshot): FilesTargetState {
         rowsLoaded = targetRowsLoaded,
     )
 }
-
-internal fun projectFilesRunArtifacts(
-    run: UiRunSnapshot,
-    sourceResults: List<ModuleRunSourceResultResponse>,
-): List<ModuleRunArtifactResponse> {
-    val outputDir = run.outputDir ?: return emptyList()
-    val artifacts = mutableListOf<ModuleRunArtifactResponse>()
-
-    artifacts += createArtifact(
-        artifactKind = "MERGED_OUTPUT",
-        artifactKey = "merged",
-        filePath = joinFilesRunOutputPath(outputDir, "merged.csv"),
-    )
-
-    if (!run.summaryJson.isNullOrBlank()) {
-        artifacts += createArtifact(
-            artifactKind = "SUMMARY_JSON",
-            artifactKey = "summary",
-            filePath = joinFilesRunOutputPath(outputDir, "summary.json"),
-        )
-    }
-
-    sourceResults
-        .filter { it.status == "SUCCESS" }
-        .sortedBy { it.sortOrder }
-        .forEach { source ->
-            artifacts += createArtifact(
-                artifactKind = "SOURCE_OUTPUT",
-                artifactKey = source.sourceName,
-                filePath = joinFilesRunOutputPath(outputDir, "${source.sourceName}.csv"),
-            )
-        }
-
-    return artifacts
-}
-
-internal fun projectFilesRunEvents(run: UiRunSnapshot): List<ModuleRunEventResponse> =
-    run.events.mapIndexedNotNull { index, event ->
-        val eventType = detectFilesEventType(event) ?: return@mapIndexedNotNull null
-        ModuleRunEventResponse(
-            seqNo = index + 1,
-            timestamp = event.eventTimestamp(),
-            stage = filesStageFor(eventType),
-            eventType = eventType,
-            severity = filesSeverityFor(eventType, event),
-            sourceName = event.eventSourceName(),
-            message = filesMessageFor(eventType, event),
-            payload = event,
-        )
-    }
-
-private fun createArtifact(
-    artifactKind: String,
-    artifactKey: String,
-    filePath: String,
-): ModuleRunArtifactResponse =
-    createFilesRunArtifact(
-        artifactKind = artifactKind,
-        artifactKey = artifactKey,
-        filePath = filePath,
-    )
 
 private class FilesSourceState(
     val sortOrder: Int,
