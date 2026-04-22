@@ -42,19 +42,13 @@ internal data class OutputRetentionDeleteResult(
 )
 
 internal object OutputRetentionPlanner {
+    private val runNormalizationSupport = OutputRetentionRunNormalizationSupport()
+    private val moduleSummarySupport = OutputRetentionModuleSummarySupport()
     private val directoryInspectionSupport = OutputRetentionDirectoryInspectionSupport()
     private val deletionSupport = OutputRetentionDeletionSupport()
 
     fun buildPlan(candidates: List<OutputRetentionRunRef>): OutputRetentionPlan {
-        val normalizedRuns = candidates
-            .mapNotNull { candidate ->
-                val trimmed = candidate.outputDir.trim()
-                if (trimmed.isEmpty()) {
-                    null
-                } else {
-                    candidate.copy(outputDir = trimmed)
-                }
-            }
+        val normalizedRuns = runNormalizationSupport.normalizeRuns(candidates)
 
         val directories = normalizedRuns
             .map { it.outputDir }
@@ -63,26 +57,7 @@ internal object OutputRetentionPlanner {
 
         val directoriesByPath = directories.associateBy { it.rawPath }
 
-        val modules = normalizedRuns
-            .groupBy { it.moduleCode }
-            .map { (moduleCode, runs) ->
-                val moduleDirectories = runs
-                    .mapNotNull { directoriesByPath[it.outputDir] }
-                    .distinctBy { it.rawPath }
-                OutputRetentionModuleResponse(
-                    moduleCode = moduleCode,
-                    totalRunsAffected = runs.size,
-                    totalOutputDirsToDelete = moduleDirectories.count { it.exists },
-                    totalBytesToFree = moduleDirectories.sumOf { it.sizeBytes },
-                    oldestRequestedAt = runs.minOfOrNull { it.requestedAt },
-                    newestRequestedAt = runs.maxOfOrNull { it.requestedAt },
-                )
-            }
-            .sortedWith(
-                compareByDescending<OutputRetentionModuleResponse> { it.totalOutputDirsToDelete }
-                    .thenByDescending { it.totalBytesToFree }
-                    .thenBy { it.moduleCode },
-            )
+        val modules = moduleSummarySupport.buildModules(normalizedRuns, directoriesByPath)
 
         return OutputRetentionPlan(
             runs = normalizedRuns,

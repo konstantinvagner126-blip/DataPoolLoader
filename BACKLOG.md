@@ -980,6 +980,15 @@
 - DB execution snapshot preparation split cleanup:
   - loading source/sql files, runtime snapshot assembly и content-hash preparation вынесены из [DatabaseModuleExecutionSource.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleExecutionSource.kt) в [DatabaseModuleExecutionRuntimeSnapshotSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleExecutionRuntimeSnapshotSupport.kt);
   - `DatabaseModuleExecutionSource` теперь держит transaction boundary и persistence wiring, а не весь execution snapshot pipeline.
+- output retention planner split cleanup:
+  - normalization `outputDir` candidate-ов вынесена из [OutputRetentionPlanner.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/OutputRetentionPlanner.kt) в [OutputRetentionRunNormalizationSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/OutputRetentionRunNormalizationSupport.kt);
+  - module aggregation/summary вынесены в [OutputRetentionModuleSummarySupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/OutputRetentionModuleSummarySupport.kt), а planner остался facade над `normalize -> inspect -> summarize -> delete`.
+- DB cleanup preview split cleanup:
+  - module list preview вынесен из [DatabaseRunStoreCleanupPreviewSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreCleanupPreviewSupport.kt) в [DatabaseRunStoreCleanupModulePreviewSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreCleanupModulePreviewSupport.kt);
+  - aggregate count query вынесен в [DatabaseRunStoreCleanupCountSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreCleanupCountSupport.kt), а preview support стал thin facade над `modules + counts`.
+- DB history usage split cleanup:
+  - storage overview/bytes/top-modules вынесены из [DatabaseRunStoreHistoryUsageSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreHistoryUsageSupport.kt) в [DatabaseRunStoreHistoryStorageUsageSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreHistoryStorageUsageSupport.kt);
+  - current output usage candidates вынесены в [DatabaseRunStoreOutputUsageCandidateSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreOutputUsageCandidateSupport.kt), а исходный history-usage support остался фасадом.
 
 Критерий завершения:
 

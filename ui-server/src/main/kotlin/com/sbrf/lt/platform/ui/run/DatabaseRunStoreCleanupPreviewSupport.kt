@@ -9,53 +9,41 @@ internal class DatabaseRunStoreCleanupPreviewSupport(
     private val normalizedSchema: String,
     private val statementSupport: DatabaseRunStoreCleanupStatementSupport,
 ) {
+    private val modulePreviewSupport = DatabaseRunStoreCleanupModulePreviewSupport(normalizedSchema, statementSupport)
+    private val countSupport = DatabaseRunStoreCleanupCountSupport(statementSupport)
+
     fun loadCleanupPreview(
         connection: Connection,
         cutoffTimestamp: Instant,
         keepMinRunsPerModule: Int,
         disableSafeguard: Boolean,
     ): DatabaseRunHistoryCleanupPreviewData {
-        val modules = statementSupport.prepareCleanupStatement(
+        val modules = modulePreviewSupport.loadModules(
             connection = connection,
-            sql = RunHistorySql.listCleanupModules(normalizedSchema),
             cutoffTimestamp = cutoffTimestamp,
             keepMinRunsPerModule = keepMinRunsPerModule,
             disableSafeguard = disableSafeguard,
-            includeSnapshotCutoff = false,
-        ).use { stmt ->
-            stmt.executeQuery().use { rs ->
-                val result = mutableListOf<DatabaseRunHistoryCleanupModuleResponse>()
-                while (rs.next()) {
-                    result += DatabaseRunHistoryCleanupModuleResponse(
-                        moduleCode = rs.getString("module_code"),
-                        totalRunsToDelete = rs.getInt("total_runs_to_delete"),
-                        oldestRequestedAt = rs.getTimestamp("oldest_requested_at")?.toInstant(),
-                        newestRequestedAt = rs.getTimestamp("newest_requested_at")?.toInstant(),
-                    )
-                }
-                result
-            }
-        }
+        )
 
         return DatabaseRunHistoryCleanupPreviewData(
             modules = modules,
-            totalRunsToDelete = queryCleanupCount(
+            totalRunsToDelete = countSupport.queryCleanupCount(
                 connection, RunHistorySql.countCleanupRuns(normalizedSchema), "total_runs_to_delete",
                 cutoffTimestamp, keepMinRunsPerModule, disableSafeguard, includeSnapshotCutoff = false,
             ),
-            totalSourceResultsToDelete = queryCleanupCount(
+            totalSourceResultsToDelete = countSupport.queryCleanupCount(
                 connection, RunHistorySql.countCleanupSourceResults(normalizedSchema), "total_source_results_to_delete",
                 cutoffTimestamp, keepMinRunsPerModule, disableSafeguard, includeSnapshotCutoff = false,
             ),
-            totalEventsToDelete = queryCleanupCount(
+            totalEventsToDelete = countSupport.queryCleanupCount(
                 connection, RunHistorySql.countCleanupEvents(normalizedSchema), "total_events_to_delete",
                 cutoffTimestamp, keepMinRunsPerModule, disableSafeguard, includeSnapshotCutoff = false,
             ),
-            totalArtifactsToDelete = queryCleanupCount(
+            totalArtifactsToDelete = countSupport.queryCleanupCount(
                 connection, RunHistorySql.countCleanupArtifacts(normalizedSchema), "total_artifacts_to_delete",
                 cutoffTimestamp, keepMinRunsPerModule, disableSafeguard, includeSnapshotCutoff = false,
             ),
-            totalOrphanExecutionSnapshotsToDelete = queryCleanupCount(
+            totalOrphanExecutionSnapshotsToDelete = countSupport.queryCleanupCount(
                 connection,
                 RunHistorySql.countCleanupOrphanExecutionSnapshots(normalizedSchema),
                 "total_orphan_execution_snapshots_to_delete",
@@ -66,26 +54,4 @@ internal class DatabaseRunStoreCleanupPreviewSupport(
             ),
         )
     }
-
-    private fun queryCleanupCount(
-        connection: Connection,
-        sql: String,
-        columnName: String,
-        cutoffTimestamp: Instant,
-        keepMinRunsPerModule: Int,
-        disableSafeguard: Boolean,
-        includeSnapshotCutoff: Boolean,
-    ): Int =
-        statementSupport.prepareCleanupStatement(
-            connection = connection,
-            sql = sql,
-            cutoffTimestamp = cutoffTimestamp,
-            keepMinRunsPerModule = keepMinRunsPerModule,
-            disableSafeguard = disableSafeguard,
-            includeSnapshotCutoff = includeSnapshotCutoff,
-        ).use { stmt ->
-            stmt.executeQuery().use { rs ->
-                if (!rs.next()) 0 else rs.getInt(columnName)
-            }
-        }
 }
