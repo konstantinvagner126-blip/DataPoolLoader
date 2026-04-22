@@ -720,6 +720,15 @@
 - module_editor config field split cleanup:
   - базовые text/select/checkbox form controls вынесены из [ModuleEditorConfigFormFieldSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorConfigFormFieldSupport.kt) в [ModuleEditorConfigFormBasicFieldSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorConfigFormBasicFieldSupport.kt)
   - numeric form controls вынесены в [ModuleEditorConfigFormNumericFieldSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorConfigFormNumericFieldSupport.kt), а исходный файл оставлен для SQL-specific field flow.
+- sql_console page content split cleanup:
+  - page-level `content` flow вынесен из [SqlConsolePage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsolePage.kt) в [SqlConsolePageContentSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsolePageContentSections.kt)
+  - основной page-файл теперь ближе к state/effect orchestration и не держит sidebar/workspace layout в том же теле функции.
+- module_editor page content split cleanup:
+  - page-level `content` flow вынесен из [ModuleEditorPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPage.kt) в [ModuleEditorPageContentSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPageContentSections.kt)
+  - основной editor page больше не смешивает PageScaffold shell и catalog/content layout внутри одного длинного composable.
+- sql_console library split cleanup:
+  - mixed [SqlConsoleLibrarySections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleLibrarySections.kt) удален;
+  - hero flow вынесен в [SqlConsoleHeroSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleHeroSections.kt), query/settings flow — в [SqlConsoleQueryLibrarySections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleQueryLibrarySections.kt), favorite objects flow — в [SqlConsoleFavoriteObjectSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleFavoriteObjectSections.kt).
 
 Критерий завершения:
 
