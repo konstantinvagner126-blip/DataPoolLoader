@@ -1,11 +1,8 @@
 package com.sbrf.lt.platform.ui.run
 
 import com.sbrf.lt.platform.ui.model.output.OutputRetentionModuleResponse
-import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Instant
-import java.util.Comparator
-import kotlin.io.path.isDirectory
 
 data class OutputRetentionRunRef(
     val moduleCode: String,
@@ -45,6 +42,9 @@ internal data class OutputRetentionDeleteResult(
 )
 
 internal object OutputRetentionPlanner {
+    private val directoryInspectionSupport = OutputRetentionDirectoryInspectionSupport()
+    private val deletionSupport = OutputRetentionDeletionSupport()
+
     fun buildPlan(candidates: List<OutputRetentionRunRef>): OutputRetentionPlan {
         val normalizedRuns = candidates
             .mapNotNull { candidate ->
@@ -59,7 +59,7 @@ internal object OutputRetentionPlanner {
         val directories = normalizedRuns
             .map { it.outputDir }
             .distinct()
-            .map { rawPath -> inspectDirectory(rawPath) }
+            .let(directoryInspectionSupport::inspectDirectories)
 
         val directoriesByPath = directories.associateBy { it.rawPath }
 
@@ -91,67 +91,6 @@ internal object OutputRetentionPlanner {
         )
     }
 
-    fun delete(plan: OutputRetentionPlan): OutputRetentionDeleteResult {
-        var deletedDirs = 0
-        var missingDirs = 0
-        var bytesFreed = 0L
-
-        plan.directories.forEach { entry ->
-            val path = entry.normalizedPath
-            if (path == null || !Files.exists(path)) {
-                missingDirs += 1
-                return@forEach
-            }
-            deleteRecursively(path)
-            deletedDirs += 1
-            bytesFreed += entry.sizeBytes
-        }
-
-        return OutputRetentionDeleteResult(
-            deletedDirs = deletedDirs,
-            missingDirs = missingDirs,
-            bytesFreed = bytesFreed,
-        )
-    }
-
-    private fun inspectDirectory(rawPath: String): OutputRetentionDirectoryEntry {
-        val normalizedPath = runCatching { Path.of(rawPath).toAbsolutePath().normalize() }.getOrNull()
-        val exists = normalizedPath != null && Files.exists(normalizedPath)
-        val sizeBytes = normalizedPath
-            ?.takeIf { exists }
-            ?.let { calculateSize(it) }
-            ?: 0L
-        return OutputRetentionDirectoryEntry(
-            rawPath = rawPath,
-            normalizedPath = normalizedPath,
-            exists = exists,
-            sizeBytes = sizeBytes,
-        )
-    }
-
-    private fun calculateSize(path: Path): Long {
-        if (!Files.exists(path)) return 0L
-        if (!path.isDirectory()) {
-            return runCatching { Files.size(path) }.getOrDefault(0L)
-        }
-        Files.walk(path).use { stream ->
-            return stream
-                .filter { Files.isRegularFile(it) }
-                .mapToLong {
-                    runCatching { Files.size(it) }.getOrDefault(0L)
-                }
-                .sum()
-        }
-    }
-
-    private fun deleteRecursively(path: Path) {
-        if (!Files.exists(path)) return
-        Files.walk(path)
-            .sorted(Comparator.reverseOrder())
-            .use { stream ->
-                stream.forEach { current ->
-                    Files.deleteIfExists(current)
-                }
-            }
-    }
+    fun delete(plan: OutputRetentionPlan): OutputRetentionDeleteResult =
+        deletionSupport.deleteDirectories(plan.directories)
 }
