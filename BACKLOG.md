@@ -376,6 +376,20 @@
   - catalog/route/credentials flow вынесен в [ModuleEditorPageCatalogBindings.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPageCatalogBindings.kt)
   - run/save/publish/reload flow вынесен в [ModuleEditorPageExecutionBindings.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPageExecutionBindings.kt)
   - create-module, config-form, SQL и metadata draft flow вынесен в [ModuleEditorPageDraftBindings.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPageDraftBindings.kt).
+- [SqlConsoleSidebarSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleSidebarSections.kt) разрезан по естественным subflow-слоям:
+  - navigation flow вынесен в [SqlConsoleNavSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleNavSections.kt)
+  - source sidebar/settings flow вынесен в [SqlConsoleSourceSidebarSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleSourceSidebarSections.kt)
+  - source selection flow вынесен в [SqlConsoleSourceSelectionSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleSourceSelectionSections.kt)
+  - credentials upload/details flow вынесен в [SqlConsoleCredentialsSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleCredentialsSections.kt);
+- [ModuleSyncHistorySections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncHistorySections.kt) больше не держит history/details/summary в одном файле:
+  - history list flow вынесен в [ModuleSyncRunHistorySections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncRunHistorySections.kt)
+  - run details flow вынесен в [ModuleSyncRunDetailSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncRunDetailSections.kt)
+  - summary metrics/value rows вынесены в [ModuleSyncRunSummarySections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncRunSummarySections.kt);
+- [ModuleEditorWorkspaceSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorWorkspaceSections.kt) разрезан по workspace-subflow:
+  - create-module flow вынесен в [ModuleEditorCreateModuleSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorCreateModuleSections.kt)
+  - SQL workspace flow вынесен в [ModuleEditorSqlWorkspaceSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorSqlWorkspaceSections.kt)
+  - config preview вынесен в [ModuleEditorConfigWorkspaceSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorConfigWorkspaceSections.kt)
+  - общие workspace action buttons вынесены в [ModuleEditorWorkspaceActionSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorWorkspaceActionSections.kt).
 
 Критерий завершения:
 
