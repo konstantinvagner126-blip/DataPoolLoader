@@ -337,6 +337,19 @@
   - loading/search/favorite-object mutation вынесены из [SqlConsoleObjectsStore.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectsStore.kt) в [SqlConsoleObjectsStoreLoadingSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectsStoreLoadingSupport.kt) и [SqlConsoleObjectsStoreActionSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectsStoreActionSupport.kt)
   - home loading/mode-switch flow вынесен из [HomePageStore.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/home/HomePageStore.kt) в [HomePageStoreSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/home/HomePageStoreSupport.kt);
 - `P0.3` перешел из чисто page-level декомпозиции в следующий слой: store/support separation без возврата orchestration обратно в page/store giant-файлы.
+- `ModuleRunsDetailSections.kt` больше не держит весь details-pane в одном knowledge-heavy файле:
+  - overview/summary flow вынесен в [ModuleRunsOverviewSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsOverviewSections.kt)
+  - source/events flow вынесен в [ModuleRunsSourceSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsSourceSections.kt)
+  - diagnostics/artifacts/raw-summary flow вынесен в [ModuleRunsArtifactSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsArtifactSections.kt);
+- [ModuleEditorStore.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStore.kt) дальше разрезан по ответственности:
+  - pure draft/dialog/mutation state вынесен в [ModuleEditorStoreDraftSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreDraftSupport.kt)
+  - config-form lifecycle и SQL-resource usage rules вынесены в [ModuleEditorStoreConfigFormSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreConfigFormSupport.kt)
+  - SQL-resource create/rename/delete flow вынесен в [ModuleEditorStoreSqlResourceSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreSqlResourceSupport.kt);
+- [SqlConsolePageBindings.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsolePageBindings.kt) больше не держит единый mixed callback-factory:
+  - shared binding context вынесен в [SqlConsolePageBindingContext.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsolePageBindingContext.kt)
+  - execution/export lifecycle вынесен в [SqlConsoleExecutionBindings.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleExecutionBindings.kt)
+  - library/settings/credentials flow вынесен в [SqlConsoleLibraryBindings.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleLibraryBindings.kt)
+  - editor/selection flow вынесен в [SqlConsoleEditorBindings.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleEditorBindings.kt).
 
 Критерий завершения:
 
