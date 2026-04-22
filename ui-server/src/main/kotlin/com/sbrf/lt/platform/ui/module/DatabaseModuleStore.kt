@@ -17,10 +17,24 @@ open class DatabaseModuleStore(
     private val objectMapper: ObjectMapper = jacksonObjectMapper(),
     private val validationService: ModuleValidationService = ModuleValidationService(),
 ) : DatabaseModuleRegistryOperations {
-    private val revisionWriter = DatabaseModuleRevisionWriter(objectMapper, validationService)
-    private val support = DatabaseModuleStoreSupport(objectMapper, validationService)
-    private val lifecycleSupport = DatabaseModuleStoreLifecycleSupport(support, revisionWriter)
-    private val querySupport = DatabaseModuleStoreQuerySupport(connectionProvider, schema, support)
+    private val snapshotSupport = DatabaseModuleSnapshotSupport(objectMapper)
+    private val revisionWriter = DatabaseModuleRevisionWriter(
+        objectMapper = objectMapper,
+        validationService = validationService,
+        snapshotSupport = snapshotSupport,
+    )
+    private val presentationSupport = DatabaseModuleStorePresentationSupport(
+        objectMapper = objectMapper,
+        validationService = validationService,
+        snapshotSupport = snapshotSupport,
+    )
+    private val lifecycleSupport = DatabaseModuleStoreLifecycleSupport(snapshotSupport)
+    private val querySupport = DatabaseModuleStoreQuerySupport(
+        connectionProvider = connectionProvider,
+        schema = schema,
+        presentationSupport = presentationSupport,
+        snapshotSupport = snapshotSupport,
+    )
     private val mutationSupport = DatabaseModuleStoreMutationSupport(
         connectionProvider = connectionProvider,
         schema = schema,

@@ -7,8 +7,7 @@ import java.sql.Connection
 import java.util.UUID
 
 internal class DatabaseModuleStoreLifecycleSupport(
-    private val support: DatabaseModuleStoreSupport,
-    private val revisionWriter: DatabaseModuleRevisionWriter,
+    private val snapshotSupport: DatabaseModuleSnapshotSupport,
 ) {
     fun loadModuleForSave(
         connection: Connection,
@@ -44,7 +43,14 @@ internal class DatabaseModuleStoreLifecycleSupport(
         actorDisplayName: String?,
         request: SaveModuleRequest,
     ) {
-        val snapshotJson = support.buildWorkingCopyJson(request)
+        val snapshotJson = snapshotSupport.serializeWorkingCopySnapshot(
+            configText = request.configText,
+            sqlFileContents = request.sqlFiles,
+            title = request.title,
+            description = request.description,
+            tags = request.tags,
+            hiddenFromUi = request.hiddenFromUi,
+        )
         connection.prepareStatement(ModuleRegistrySql.upsertWorkingCopy(normalizedSchema)).use { statement ->
             statement.setString(1, module.workingCopyId ?: UUID.randomUUID().toString())
             statement.setString(2, module.moduleId)
@@ -54,7 +60,17 @@ internal class DatabaseModuleStoreLifecycleSupport(
             statement.setString(6, module.currentRevisionId)
             statement.setString(7, snapshotJson)
             statement.setString(8, request.configText)
-            statement.setString(9, support.contentHash(request))
+            statement.setString(
+                9,
+                snapshotSupport.calculateRevisionContentHash(
+                    configText = request.configText,
+                    title = request.title,
+                    description = request.description,
+                    tags = request.tags,
+                    hiddenFromUi = request.hiddenFromUi,
+                    sqlFiles = request.sqlFiles,
+                ),
+            )
             statement.executeUpdate()
         }
     }
@@ -170,7 +186,7 @@ internal class DatabaseModuleStoreLifecycleSupport(
         actorDisplayName: String?,
         request: RegistryModuleDraft,
     ) {
-        val snapshotJson = support.buildSnapshotJson(
+        val snapshotJson = snapshotSupport.serializeWorkingCopySnapshot(
             configText = request.configText,
             sqlFileContents = request.sqlFiles,
             title = request.title,
@@ -188,7 +204,17 @@ internal class DatabaseModuleStoreLifecycleSupport(
             stmt.setString(6, revisionId)
             stmt.setString(7, snapshotJson)
             stmt.setString(8, request.configText)
-            stmt.setString(9, revisionWriter.contentHashForCreate(request))
+            stmt.setString(
+                9,
+                snapshotSupport.calculateRevisionContentHash(
+                    configText = request.configText,
+                    title = request.title,
+                    description = request.description,
+                    tags = request.tags,
+                    hiddenFromUi = request.hiddenFromUi,
+                    sqlFiles = request.sqlFiles,
+                ),
+            )
             stmt.executeUpdate()
         }
     }

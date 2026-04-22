@@ -1,11 +1,8 @@
 package com.sbrf.lt.platform.ui.run
 
-import com.fasterxml.jackson.core.type.TypeReference
-import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.sbrf.lt.datapool.app.RuntimeModuleSnapshot
-import com.sbrf.lt.datapool.config.sql.SqlFileReferenceExtractor
 import com.sbrf.lt.datapool.db.registry.DatabaseConnectionProvider
 import com.sbrf.lt.datapool.db.registry.DriverManagerDatabaseConnectionProvider
 import com.sbrf.lt.datapool.db.registry.sql.ExecutionSnapshotSql
@@ -13,9 +10,8 @@ import com.sbrf.lt.datapool.db.registry.sql.ModuleRegistrySql
 import com.sbrf.lt.datapool.db.registry.sql.normalizeRegistrySchemaName
 import com.sbrf.lt.platform.ui.config.UiModuleStorePostgresConfig
 import com.sbrf.lt.platform.ui.config.schemaName
-import com.sbrf.lt.platform.ui.model.ModuleFileContent
 import com.sbrf.lt.platform.ui.module.DatabaseModuleNotFoundException
-import java.security.MessageDigest
+import com.sbrf.lt.platform.ui.module.DatabaseModuleSnapshotSupport
 import java.sql.Connection
 import java.util.UUID
 
@@ -26,10 +22,10 @@ import java.util.UUID
 class DatabaseModuleExecutionSource(
     private val connectionProvider: DatabaseConnectionProvider,
     private val schema: String = UiModuleStorePostgresConfig.DEFAULT_SCHEMA,
-    private val objectMapper: ObjectMapper = jacksonObjectMapper(),
+    objectMapper: ObjectMapper = jacksonObjectMapper(),
     private val snapshotFactory: RuntimeConfigSnapshotFactory = RuntimeConfigSnapshotFactory(),
 ) {
-    private val sqlFilesType = object : TypeReference<List<ModuleFileContent>>() {}
+    private val snapshotSupport = DatabaseModuleSnapshotSupport(objectMapper)
 
     companion object {
         fun fromConfig(config: UiModuleStorePostgresConfig): DatabaseModuleExecutionSource =
@@ -67,8 +63,8 @@ class DatabaseModuleExecutionSource(
                     executionSnapshotId = executionSnapshotId,
                 )
 
-                val snapshotJson = buildSnapshotJson(source.configText, sqlFiles)
-                val contentHash = contentHash(source.configText, sqlFiles)
+                val snapshotJson = snapshotSupport.serializeExecutionSnapshot(source.configText, sqlFiles)
+                val contentHash = snapshotSupport.calculateExecutionContentHash(source.configText, sqlFiles)
                 insertExecutionSnapshot(
                     connection = connection,
                     normalizedSchema = normalizedSchema,
@@ -126,7 +122,7 @@ class DatabaseModuleExecutionSource(
         source: DatabaseExecutionSourceRow,
     ): Map<String, String> {
         return if (source.sourceKind == "WORKING_COPY") {
-            readWorkingCopySqlFiles(source.workingCopyJson).associate { it.path to it.content }
+            snapshotSupport.deserializeWorkingCopySqlFileContents(source.workingCopyJson)
         } else {
             connection.prepareStatement(ModuleRegistrySql.sqlAssets(normalizedSchema)).use { stmt ->
                 stmt.setString(1, source.sourceRevisionId)
@@ -165,44 +161,5 @@ class DatabaseModuleExecutionSource(
             stmt.setString(10, contentHash)
             stmt.executeUpdate()
         }
-    }
-
-    private fun readWorkingCopySqlFiles(workingCopyJson: String?): List<ModuleFileContent> {
-        if (workingCopyJson.isNullOrBlank()) return emptyList()
-        val root = objectMapper.readTree(workingCopyJson)
-        val sqlFilesNode = root.path("sqlFiles").takeIf(JsonNode::isArray) ?: return emptyList()
-        return objectMapper.readValue(sqlFilesNode.traverse(objectMapper), sqlFilesType)
-    }
-
-    private fun buildSnapshotJson(configText: String, sqlFileContents: Map<String, String>): String {
-        val sqlLabels = SqlFileReferenceExtractor.labelsByPathOrEmpty(configText, objectMapper)
-        val sqlFiles = sqlFileContents.entries
-            .sortedBy { it.key }
-            .map { (path, content) ->
-                ModuleFileContent(
-                    label = sqlLabels[path] ?: path,
-                    path = path,
-                    content = content,
-                    exists = true,
-                )
-            }
-        val root = objectMapper.createObjectNode()
-        root.put("configText", configText)
-        root.set<JsonNode>("sqlFiles", objectMapper.valueToTree(sqlFiles))
-        return objectMapper.writeValueAsString(root)
-    }
-
-    private fun contentHash(configText: String, sqlFiles: Map<String, String>): String {
-        val input = buildString {
-            append(configText)
-            sqlFiles.toSortedMap().forEach { (path, content) ->
-                append('\n')
-                append(path)
-                append('\u0000')
-                append(content)
-            }
-        }
-        val digest = MessageDigest.getInstance("SHA-256").digest(input.toByteArray(Charsets.UTF_8))
-        return digest.joinToString("") { "%02x".format(it) }
     }
 }

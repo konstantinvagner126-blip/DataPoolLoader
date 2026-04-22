@@ -1,6 +1,7 @@
 package com.sbrf.lt.platform.ui.module
 
 import com.sbrf.lt.datapool.db.registry.DatabaseConnectionProvider
+import com.sbrf.lt.datapool.db.registry.model.RegistryModuleDraft
 import java.lang.reflect.Proxy
 import java.sql.Connection
 import java.sql.PreparedStatement
@@ -310,6 +311,63 @@ class DatabaseModuleStoreTest {
         assertTrue(error.message!!.contains("устарел"))
         assertTrue(preparedSql.any { it.contains("module_working_copy") })
         assertTrue(preparedSql.none { it.contains("insert into ui_registry.module_revision") })
+    }
+
+    @Test
+    fun `creates module with initial revision sql assets structure and working copy`() {
+        val preparedSql = mutableListOf<String>()
+        val stringParams = mutableListOf<String>()
+        val store = DatabaseModuleStore(
+            connectionProvider = DatabaseConnectionProvider {
+                fakeConnection(
+                    rows = emptyList(),
+                    preparedSql = preparedSql,
+                    stringParams = stringParams,
+                )
+            },
+        )
+
+        val result = store.createModule(
+            moduleCode = "db-demo",
+            actorId = "kwdev",
+            actorSource = "OS_LOGIN",
+            actorDisplayName = "kwdev",
+            originKind = "CREATED_IN_UI",
+            request = RegistryModuleDraft(
+                title = "DB Demo",
+                description = "Demo module",
+                tags = listOf("db"),
+                hiddenFromUi = false,
+                configText = """
+                    app:
+                      outputDir: ./out
+                      mergeMode: plain
+                      errorMode: continue_on_error
+                      parallelism: 1
+                      fetchSize: 100
+                      commonSqlFile: common.sql
+                      target:
+                        enabled: false
+                      sources:
+                        - name: db1
+                          jdbcUrl: jdbc:test:db1
+                          username: user
+                          password: pwd
+                          sqlFile: common.sql
+                """.trimIndent(),
+                sqlFiles = mapOf("common.sql" to "select 1"),
+            ),
+        )
+
+        assertEquals("db-demo", result.moduleCode)
+        assertTrue(preparedSql.any { it.contains("insert into ui_registry.module ") })
+        assertTrue(preparedSql.any { it.contains("insert into ui_registry.module_revision ") })
+        assertTrue(preparedSql.any { it.contains("insert into ui_registry.module_revision_sql_asset ") })
+        assertTrue(preparedSql.any { it.contains("insert into ui_registry.module_revision_source ") })
+        assertTrue(preparedSql.any { it.contains("insert into ui_registry.module_working_copy ") })
+        assertTrue(stringParams.any { it.contains("\"configText\"") })
+        assertTrue(stringParams.any { it == "common.sql" })
+        assertTrue(stringParams.any { it == "select 1" })
     }
 
     @Test

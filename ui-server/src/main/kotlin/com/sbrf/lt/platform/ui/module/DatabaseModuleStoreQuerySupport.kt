@@ -9,7 +9,8 @@ import com.sbrf.lt.platform.ui.model.ModuleFileContent
 internal class DatabaseModuleStoreQuerySupport(
     private val connectionProvider: DatabaseConnectionProvider,
     private val schema: String,
-    private val support: DatabaseModuleStoreSupport,
+    private val presentationSupport: DatabaseModuleStorePresentationSupport,
+    private val snapshotSupport: DatabaseModuleSnapshotSupport,
 ) {
     fun listModules(includeHidden: Boolean): List<ModuleCatalogItemResponse> {
         val normalizedSchema = normalizeRegistrySchemaName(schema)
@@ -25,7 +26,7 @@ internal class DatabaseModuleStoreQuerySupport(
                             normalizedSchema = normalizedSchema,
                             revisionId = resultSet.getString("current_revision_id"),
                         )
-                        modules += support.catalogItem(resultSet, configText, sqlFiles)
+                        modules += presentationSupport.catalogItem(resultSet, configText, sqlFiles)
                     }
                     return modules
                 }
@@ -48,17 +49,17 @@ internal class DatabaseModuleStoreQuerySupport(
                     if (!resultSet.next()) {
                         throw DatabaseModuleNotFoundException(moduleCode)
                     }
-                    support.editableModuleRow(resultSet)
+                    presentationSupport.editableModuleRow(resultSet)
                 }
             }
             val sqlFiles = if (row.sourceKind == "WORKING_COPY") {
-                row.workingCopyJson?.let(support::readWorkingCopySqlFiles) ?: emptyList()
+                row.workingCopyJson?.let(snapshotSupport::deserializeWorkingCopySqlFiles) ?: emptyList()
             } else {
                 loadRevisionSqlAssets(connection, normalizedSchema, row.currentRevisionId)
             }
 
             return DatabaseEditableModule(
-                module = support.moduleDetails(row, sqlFiles),
+                module = presentationSupport.moduleDetails(row, sqlFiles),
                 sourceKind = row.sourceKind,
                 currentRevisionId = row.currentRevisionId,
                 workingCopyId = row.workingCopyId,
@@ -69,7 +70,7 @@ internal class DatabaseModuleStoreQuerySupport(
     }
 
     fun readSqlFileContents(workingCopyJson: String?): Map<String, String> =
-        support.readSqlFileContents(workingCopyJson)
+        snapshotSupport.deserializeWorkingCopySqlFileContents(workingCopyJson)
 
     private fun loadRevisionSqlAssets(
         connection: java.sql.Connection,
