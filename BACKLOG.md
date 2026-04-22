@@ -612,7 +612,8 @@
   - metadata и SQL-catalog/file responsibilities вынесены из [ModuleRegistry.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/ModuleRegistry.kt) в [ModuleRegistryMetadataSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/ModuleRegistryMetadataSupport.kt) и [ModuleRegistrySqlFileSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/ModuleRegistrySqlFileSupport.kt);
   - `ModuleRegistry` больше не держит в одном файле `module catalog + metadata parsing + SQL path resolution + SQL file discovery/save`.
 - files run history projection cleanup:
-  - event decoding/message severity mapping вынесены в [FilesRunHistoryEventSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/history/FilesRunHistoryEventSupport.kt);
+  - event decoding и primitive field extraction вынесены в [FilesRunHistoryEventDecodingSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/history/FilesRunHistoryEventDecodingSupport.kt);
+  - stage/severity/message presentation вынесены в [FilesRunHistoryEventPresentationSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/history/FilesRunHistoryEventPresentationSupport.kt);
   - artifact/path formatting вынесены в [FilesRunHistoryArtifactSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/history/FilesRunHistoryArtifactSupport.kt);
   - [FilesRunHistoryProjection.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/history/FilesRunHistoryProjection.kt) больше не смешивает source/target projection с low-level event decoding и file artifact formatting.
 - DB module snapshot support cleanup:
@@ -931,6 +932,15 @@
   - runtime/actions/overview flow вынесен в [ModuleSyncOverviewSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncOverviewSections.kt);
   - selective module picker вынесен в [ModuleSyncSelectionSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncSelectionSections.kt);
   - history/details flow вынесен в [ModuleSyncHistorySections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncHistorySections.kt).
+- run manager execution split cleanup:
+  - snapshot creation/event mutation/finalization вынесены из [RunManagerExecutionSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/RunManagerExecutionSupport.kt) в [RunManagerSnapshotSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/RunManagerSnapshotSupport.kt);
+  - execution pipeline вынесен в [RunManagerExecutionPipelineSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/RunManagerExecutionPipelineSupport.kt), а исходный support-класс стал thin facade над `snapshot + pipeline`.
+- DB module run event routing split cleanup:
+  - `RunStartedEvent -> createRun` flow вынесен из [DatabaseModuleRunEventSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleRunEventSupport.kt) в [DatabaseModuleRunStartEventSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleRunStartEventSupport.kt);
+  - routing `source/merge/target/run-finished/output-cleanup` вынесен в [DatabaseModuleRunEventRoutingSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleRunEventRoutingSupport.kt), а исходный event-support остался synchronized facade-слоем.
+- files run history event split cleanup:
+  - remaining mixed event-support больше не держит вместе type detection, primitive decoding и human-readable presentation;
+  - event typing/primitive accessors теперь живут в [FilesRunHistoryEventDecodingSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/history/FilesRunHistoryEventDecodingSupport.kt), а stage/severity/message mapping — в [FilesRunHistoryEventPresentationSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/history/FilesRunHistoryEventPresentationSupport.kt).
 
 Критерий завершения:
 

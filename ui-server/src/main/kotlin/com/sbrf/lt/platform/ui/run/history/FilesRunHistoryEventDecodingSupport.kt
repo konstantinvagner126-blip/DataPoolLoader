@@ -25,73 +25,6 @@ internal fun detectFilesEventType(event: Map<String, Any?>): String? {
     }
 }
 
-internal fun filesStageFor(eventType: String): String =
-    when (eventType) {
-        "RunStartedEvent" -> "PREPARE"
-        "SourceExportStartedEvent",
-        "SourceExportProgressEvent",
-        "SourceExportFinishedEvent",
-        "SourceSchemaMismatchEvent" -> "SOURCE"
-        "MergeStartedEvent", "MergeFinishedEvent" -> "MERGE"
-        "TargetImportStartedEvent", "TargetImportFinishedEvent" -> "TARGET"
-        else -> "RUN"
-    }
-
-internal fun filesSeverityFor(eventType: String, event: Map<String, Any?>): String =
-    when (eventType) {
-        "SourceSchemaMismatchEvent" -> "WARNING"
-        "SourceExportFinishedEvent",
-        "TargetImportFinishedEvent",
-        "RunFinishedEvent" -> {
-            when (event.statusValue()) {
-                "FAILED" -> "ERROR"
-                "SUCCESS" -> "SUCCESS"
-                "SKIPPED" -> "INFO"
-                else -> "INFO"
-            }
-        }
-        "MergeFinishedEvent" -> "SUCCESS"
-        else -> "INFO"
-    }
-
-internal fun filesMessageFor(eventType: String, event: Map<String, Any?>): String =
-    when (eventType) {
-        "RunStartedEvent" -> {
-            val sourceCount = event.stringList("sourceNames").size
-            val mergeMode = event.stringValue("mergeMode") ?: "-"
-            "Запуск начат. Источников: $sourceCount, режим объединения: $mergeMode."
-        }
-        "SourceExportStartedEvent" -> "Начата выгрузка из источника ${event.stringValue("sourceName")}."
-        "SourceExportProgressEvent" -> "Источник ${event.stringValue("sourceName")}: выгружено ${event.longValue("rowCount") ?: 0} строк."
-        "SourceExportFinishedEvent" -> {
-            if (event.statusValue() == "SUCCESS") {
-                "Источник ${event.stringValue("sourceName")} завершен успешно. Получено ${event.longValue("rowCount") ?: 0} строк."
-            } else {
-                "Источник ${event.stringValue("sourceName")} завершился с ошибкой: ${event.stringValue("errorMessage") ?: "неизвестная ошибка"}."
-            }
-        }
-        "SourceSchemaMismatchEvent" -> "Источник ${event.stringValue("sourceName")} исключен из объединения: набор колонок отличается от базового."
-        "MergeStartedEvent" -> "Начато объединение данных из ${event.stringList("sourceNames").size} успешных источников."
-        "MergeFinishedEvent" -> "Объединение завершено. В merged.csv записано ${event.longValue("rowCount") ?: 0} строк."
-        "TargetImportStartedEvent" -> "Начата загрузка merged.csv в таблицу ${event.stringValue("table")}."
-        "TargetImportFinishedEvent" -> {
-            when (event.statusValue()) {
-                "SUCCESS" -> "Загрузка в таблицу ${event.stringValue("table")} завершена. Загружено ${event.longValue("rowCount") ?: 0} строк."
-                "SKIPPED" -> "Загрузка в target пропущена."
-                else -> "Загрузка в таблицу ${event.stringValue("table")} завершилась ошибкой: ${event.stringValue("errorMessage") ?: "неизвестная ошибка"}."
-            }
-        }
-        "OutputCleanupEvent" -> "Удален временный файл ${event.stringValue("fileName")}."
-        "RunFinishedEvent" -> {
-            if (event.statusValue() == "SUCCESS") {
-                "Запуск завершен успешно."
-            } else {
-                "Запуск завершен с ошибкой: ${event.stringValue("errorMessage") ?: "неизвестная ошибка"}."
-            }
-        }
-        else -> event.toString()
-    }
-
 private fun Map<String, Any?>.stringValue(key: String): String? =
     this[key]?.toString()?.takeIf { it.isNotBlank() }
 
@@ -167,3 +100,7 @@ internal fun Map<String, Any?>.eventErrorMessage(): String? = stringValue("error
 internal fun Map<String, Any?>.eventTableName(): String? = stringValue("table")
 
 internal fun Map<String, Any?>.eventSourceNames(): List<String> = stringList("sourceNames")
+
+internal fun Map<String, Any?>.eventStringValue(key: String): String? = stringValue(key)
+
+internal fun Map<String, Any?>.eventLongValue(key: String): Long? = longValue(key)
