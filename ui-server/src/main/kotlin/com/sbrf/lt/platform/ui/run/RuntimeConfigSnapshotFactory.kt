@@ -1,12 +1,8 @@
 package com.sbrf.lt.platform.ui.run
 
-import com.fasterxml.jackson.databind.node.ObjectNode
 import com.sbrf.lt.datapool.app.RuntimeModuleSnapshot
 import com.sbrf.lt.datapool.config.ConfigLoader
 import java.nio.file.Files
-import java.nio.file.Path
-import kotlin.io.path.createDirectories
-import kotlin.io.path.writeText
 
 /**
  * Создает runtime snapshot из YAML-конфига и набора SQL-файлов.
@@ -15,6 +11,7 @@ import kotlin.io.path.writeText
 class RuntimeConfigSnapshotFactory(
     private val configLoader: ConfigLoader = ConfigLoader(),
 ) {
+    private val workingCopySupport = RuntimeConfigWorkingCopySupport(configLoader)
 
     fun createSnapshot(
         moduleCode: String?,
@@ -27,7 +24,7 @@ class RuntimeConfigSnapshotFactory(
         fallbackSqlResolver: (String) -> String? = { null },
     ): RuntimeModuleSnapshot {
         val tempDir = Files.createTempDirectory("datapool-ui-runtime-${moduleCode ?: "module"}-")
-        val tempConfig = prepareWorkingCopy(
+        val tempConfig = workingCopySupport.prepareWorkingCopy(
             configText = configText,
             sqlFiles = sqlFiles,
             tempDir = tempDir,
@@ -44,51 +41,5 @@ class RuntimeConfigSnapshotFactory(
             executionSnapshotId = executionSnapshotId,
             configLocation = configLocation,
         )
-    }
-
-    private fun prepareWorkingCopy(
-        configText: String,
-        sqlFiles: Map<String, String>,
-        tempDir: Path,
-        fallbackSqlResolver: (String) -> String?,
-    ): Path {
-        val root = configLoader.objectMapper().readTree(configText) as ObjectNode
-        val appNode = root.path("app") as ObjectNode
-
-        appNode.path("commonSqlFile").takeIf { it.isTextual }?.also { node ->
-            rewriteSqlReference(sqlFiles, tempDir, node.asText(), appNode, "commonSqlFile", fallbackSqlResolver)
-        }
-
-        appNode.path("sources").takeIf { it.isArray }?.forEach { sourceNode ->
-            sourceNode.path("sqlFile").takeIf { it.isTextual }?.also { node ->
-                rewriteSqlReference(sqlFiles, tempDir, node.asText(), sourceNode as ObjectNode, "sqlFile", fallbackSqlResolver)
-            }
-        }
-
-        val configPath = tempDir.resolve("application.yml")
-        configPath.writeText(configLoader.objectMapper().writerWithDefaultPrettyPrinter().writeValueAsString(root))
-        return configPath
-    }
-
-    private fun rewriteSqlReference(
-        sqlFiles: Map<String, String>,
-        tempDir: Path,
-        originalRef: String,
-        objectNode: ObjectNode,
-        fieldName: String,
-        fallbackSqlResolver: (String) -> String?,
-    ) {
-        val content = sqlFiles[originalRef]
-            ?: fallbackSqlResolver(originalRef)
-            ?: return
-
-        val relativePath = when {
-            originalRef.startsWith("classpath:") -> originalRef.removePrefix("classpath:").removePrefix("/")
-            else -> originalRef.removePrefix("./")
-        }
-        val target = tempDir.resolve(relativePath).normalize()
-        target.parent?.createDirectories()
-        target.writeText(content)
-        objectNode.put(fieldName, relativePath)
     }
 }

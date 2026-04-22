@@ -970,6 +970,16 @@
 - files history cleanup response/execution split cleanup:
   - preview response assembly вынесена из [RunManagerHistoryCleanupSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/RunManagerHistoryCleanupSupport.kt) в [RunManagerHistoryCleanupPreviewResponseSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/RunManagerHistoryCleanupPreviewResponseSupport.kt);
   - execution mutation/result mapping вынесены в [RunManagerHistoryCleanupExecutionSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/RunManagerHistoryCleanupExecutionSupport.kt), а `RunManager` больше не опирается на mixed cleanup support-файл.
+- runtime config snapshot working-copy split cleanup:
+  - materialization `application.yml + SQL references` вынесен из [RuntimeConfigSnapshotFactory.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/RuntimeConfigSnapshotFactory.kt) в [RuntimeConfigWorkingCopySupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/RuntimeConfigWorkingCopySupport.kt);
+  - snapshot factory осталась facade-слоем над `working-copy -> ConfigLoader.load -> RuntimeModuleSnapshot`.
+- output retention service planning split cleanup:
+  - files candidate/current-usage planning вынесены из [FilesOutputRetentionService.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/FilesOutputRetentionService.kt) в [FilesOutputRetentionPlanningSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/FilesOutputRetentionPlanningSupport.kt);
+  - database candidate/current-usage planning вынесены из [DatabaseOutputRetentionService.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseOutputRetentionService.kt) в [DatabaseOutputRetentionPlanningSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseOutputRetentionPlanningSupport.kt);
+  - общий retention cutoff/policy helper вынесен в [OutputRetentionPolicySupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/OutputRetentionPolicySupport.kt), а оба service-слоя стали facade-уровнем.
+- DB execution snapshot preparation split cleanup:
+  - loading source/sql files, runtime snapshot assembly и content-hash preparation вынесены из [DatabaseModuleExecutionSource.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleExecutionSource.kt) в [DatabaseModuleExecutionRuntimeSnapshotSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleExecutionRuntimeSnapshotSupport.kt);
+  - `DatabaseModuleExecutionSource` теперь держит transaction boundary и persistence wiring, а не весь execution snapshot pipeline.
 
 Критерий завершения:
 

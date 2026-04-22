@@ -1,6 +1,7 @@
 package com.sbrf.lt.platform.ui.run
 
 import com.sbrf.lt.datapool.app.ApplicationRunner
+import com.sbrf.lt.datapool.config.ConfigLoader
 import com.sbrf.lt.datapool.db.PostgresSourceExporter
 import com.sbrf.lt.datapool.model.ExecutionStatus
 import com.sbrf.lt.platform.ui.config.UiAppConfig
@@ -308,7 +309,8 @@ class RunManagerTest {
         val latest = state.history.first()
         assertEquals(ExecutionStatus.SUCCESS, latest.status)
         assertEquals(1L, latest.mergedRowCount)
-        assertTrue(latest.summaryJson?.contains("\"mergedRowCount\" : 1") == true)
+        val summaryJson = requireNotNull(latest.summaryJson)
+        assertEquals(1L, ConfigLoader().objectMapper().readTree(summaryJson).path("mergedRowCount").asLong())
     }
 
     @Test

@@ -9,7 +9,6 @@ import com.sbrf.lt.datapool.db.registry.sql.normalizeRegistrySchemaName
 import com.sbrf.lt.platform.ui.config.UiModuleStorePostgresConfig
 import com.sbrf.lt.platform.ui.config.schemaName
 import com.sbrf.lt.platform.ui.module.DatabaseModuleSnapshotSupport
-import java.util.UUID
 
 /**
  * Готовит runtime snapshot DB-модуля из current revision или personal working copy
@@ -24,6 +23,11 @@ class DatabaseModuleExecutionSource(
     private val snapshotSupport = DatabaseModuleSnapshotSupport(objectMapper)
     private val querySupport = DatabaseModuleExecutionQuerySupport(snapshotSupport)
     private val persistenceSupport = DatabaseModuleExecutionSnapshotPersistenceSupport()
+    private val runtimeSnapshotSupport = DatabaseModuleExecutionRuntimeSnapshotSupport(
+        snapshotFactory = snapshotFactory,
+        snapshotSupport = snapshotSupport,
+        querySupport = querySupport,
+    )
 
     companion object {
         fun fromConfig(config: UiModuleStorePostgresConfig): DatabaseModuleExecutionSource =
@@ -48,34 +52,26 @@ class DatabaseModuleExecutionSource(
             val previousAutoCommit = connection.autoCommit
             connection.autoCommit = false
             try {
-                val source = querySupport.loadSource(connection, normalizedSchema, moduleCode, actorId, actorSource)
-                val sqlFiles = querySupport.loadSqlFiles(connection, normalizedSchema, source)
-                val executionSnapshotId = UUID.randomUUID().toString()
-                val runtimeSnapshot = snapshotFactory.createSnapshot(
-                    moduleCode = source.moduleCode,
-                    moduleTitle = source.title,
-                    configText = source.configText,
-                    sqlFiles = sqlFiles,
-                    launchSourceKind = source.sourceKind,
-                    configLocation = "db:${source.moduleCode}#${source.sourceKind.lowercase()}",
-                    executionSnapshotId = executionSnapshotId,
+                val preparedSnapshot = runtimeSnapshotSupport.prepareRuntimeSnapshot(
+                    connection = connection,
+                    normalizedSchema = normalizedSchema,
+                    moduleCode = moduleCode,
+                    actorId = actorId,
+                    actorSource = actorSource,
                 )
-
-                val snapshotJson = snapshotSupport.serializeExecutionSnapshot(source.configText, sqlFiles)
-                val contentHash = snapshotSupport.calculateExecutionContentHash(source.configText, sqlFiles)
                 persistenceSupport.insertExecutionSnapshot(
                     connection = connection,
                     normalizedSchema = normalizedSchema,
-                    executionSnapshotId = executionSnapshotId,
-                    source = source,
+                    executionSnapshotId = preparedSnapshot.executionSnapshotId,
+                    source = preparedSnapshot.source,
                     actorId = actorId,
                     actorSource = actorSource,
                     actorDisplayName = actorDisplayName,
-                    snapshotJson = snapshotJson,
-                    contentHash = contentHash,
+                    snapshotJson = preparedSnapshot.snapshotJson,
+                    contentHash = preparedSnapshot.contentHash,
                 )
                 connection.commit()
-                return runtimeSnapshot
+                return preparedSnapshot.runtimeSnapshot
             } catch (ex: Exception) {
                 connection.rollback()
                 throw ex
