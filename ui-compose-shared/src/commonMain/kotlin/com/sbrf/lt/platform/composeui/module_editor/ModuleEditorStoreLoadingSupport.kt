@@ -3,7 +3,7 @@ package com.sbrf.lt.platform.composeui.module_editor
 internal class ModuleEditorStoreLoadingSupport(
     private val api: ModuleEditorApi,
     private val syncRoute: (storage: String, moduleId: String?, includeHidden: Boolean) -> Unit,
-) {
+) : ModuleEditorLoadingStore {
     private val stateFactory = ModuleEditorStoreStateFactory()
     private val fallbackSupport = ModuleEditorStoreFallbackSupport(api)
     private val catalogLoadingSupport = ModuleEditorStoreCatalogLoadingSupport(
@@ -19,17 +19,17 @@ internal class ModuleEditorStoreLoadingSupport(
         fallbackSupport = fallbackSupport,
     )
 
-    suspend fun load(route: ModuleEditorRouteState): ModuleEditorPageState =
+    override suspend fun load(route: ModuleEditorRouteState): ModuleEditorPageState =
         catalogLoadingSupport.load(route, ::loadConfigFormSnapshot)
 
-    suspend fun selectModule(
+    override suspend fun selectModule(
         current: ModuleEditorPageState,
         route: ModuleEditorRouteState,
         moduleId: String,
     ): ModuleEditorPageState =
         sessionLoadingSupport.selectModule(current, route, moduleId, ::loadConfigFormSnapshot)
 
-    suspend fun refreshCatalog(
+    override suspend fun refreshCatalog(
         current: ModuleEditorPageState,
         route: ModuleEditorRouteState,
     ): ModuleEditorPageState =
