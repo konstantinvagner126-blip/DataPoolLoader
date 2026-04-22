@@ -14,7 +14,9 @@ class UiConfigTest {
 
     @Test
     fun `loads ui config from classpath`() {
-        val config = UiConfigLoader().load()
+        val config = object : UiConfigLoader() {
+            override fun resolveExternalConfigPath() = null
+        }.load()
 
         assertEquals(8080, config.port)
         assertEquals(UiModuleStoreMode.DATABASE, config.moduleStore.mode)

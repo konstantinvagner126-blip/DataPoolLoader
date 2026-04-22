@@ -78,12 +78,7 @@ open class UiConfigLoader(
             require(Files.exists(externalConfig)) {
                 "UI-конфиг не найден: $externalConfig"
             }
-            externalConfig.inputStream().bufferedReader().use {
-                return configLoader.objectMapper()
-                    .readValue(it, UiRootConfig::class.java)
-                    .ui
-                    .copy(configBaseDir = externalConfig.parent?.toAbsolutePath()?.normalize()?.toString())
-            }
+            return readUiConfigFileWithBaseDir(externalConfig, configLoader)
         }
 
         val stream: InputStream = classpathConfigStream() ?: return UiAppConfig()
@@ -93,50 +88,26 @@ open class UiConfigLoader(
     }
 
     open fun resolveExternalConfigPath(): Path? {
-        System.getProperty("datapool.ui.config")
-            ?.trim()
-            ?.takeIf { it.isNotEmpty() }
-            ?.let { return Path.of(it).toAbsolutePath().normalize() }
-
-        System.getenv("DATAPOOL_UI_CONFIG")
-            ?.trim()
-            ?.takeIf { it.isNotEmpty() }
-            ?.let { return Path.of(it).toAbsolutePath().normalize() }
-
+        resolveExplicitUiConfigPath()?.let { return it }
         resolvePackagedSidecarConfigPath()?.let { return it }
-
-        val userHome = System.getProperty("user.home")?.trim()?.takeIf { it.isNotEmpty() } ?: return null
-        val defaultPath = Path.of(userHome).resolve(".datapool-loader/ui/application.yml").normalize()
-        return defaultPath.takeIf { Files.exists(it) }
+        return resolveExistingDefaultManagedUiConfigPath()
     }
 
     open fun resolvePackagedSidecarConfigPath(): Path? {
-        val appDir = resolvePackagedAppDirectory() ?: return null
-        val candidates = listOf(
-            appDir.resolve("ui-application.yml"),
-            appDir.resolve("application.yml"),
-        )
-        return candidates.firstOrNull { Files.exists(it) }
+        return resolveReadablePackagedSidecarConfigPath(resolvePackagedAppDirectory())
     }
 
     open fun classpathConfigStream(): InputStream? =
         javaClass.classLoader.getResourceAsStream("application.yml")
 
     open fun resolvePackagedAppDirectory(): Path? {
-        val launcherPath = System.getProperty("jpackage.app-path")
-            ?.trim()
-            ?.takeIf { it.isNotEmpty() }
-            ?.let { Path.of(it).toAbsolutePath().normalize() }
-            ?: resolveProcessCommand()
-                ?.let { Path.of(it).toAbsolutePath().normalize() }
-            ?: return null
-
-        val macAppBundle = launcherPath.ancestors()
-            .firstOrNull { it.fileName?.toString()?.endsWith(".app") == true }
-        if (macAppBundle != null) {
-            return macAppBundle.parent?.normalize()
-        }
-        return launcherPath.parent?.normalize()
+        return resolvePackagedUiAppDirectory(
+            launcherPath = System.getProperty("jpackage.app-path")
+                ?.trim()
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { Path.of(it).toAbsolutePath().normalize() },
+            processCommand = resolveProcessCommand(),
+        )
     }
 
     open fun resolveProcessCommand(): String? =
@@ -186,12 +157,4 @@ fun UiAppConfig.storageDirPath(): Path {
     val userHome = System.getProperty("user.home")?.trim()?.takeIf { it.isNotEmpty() }
         ?: return Path.of(".datapool-loader/ui/storage").toAbsolutePath().normalize()
     return Path.of(userHome).resolve(".datapool-loader/ui/storage").toAbsolutePath().normalize()
-}
-
-private fun Path.ancestors(): Sequence<Path> = sequence {
-    var current: Path? = this@ancestors
-    while (current != null) {
-        yield(current)
-        current = current.parent
-    }
 }

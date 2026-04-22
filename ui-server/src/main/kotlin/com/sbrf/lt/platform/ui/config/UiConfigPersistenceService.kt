@@ -22,13 +22,7 @@ open class UiConfigPersistenceService(
         resolveExplicitExternalConfigPath()?.let { return it }
         uiConfigLoader.resolveExternalConfigPath()?.let { return it }
         resolvePackagedSidecarConfigPath()?.let { return it }
-
-        val userHome = System.getProperty("user.home")?.trim()?.takeIf { it.isNotEmpty() }
-        return if (userHome != null) {
-            Path.of(userHome).resolve(".datapool-loader/ui/application.yml").toAbsolutePath().normalize()
-        } else {
-            Path.of(".datapool-loader/ui/application.yml").toAbsolutePath().normalize()
-        }
+        return resolveDefaultManagedUiConfigPath()
     }
 
     open fun updateModuleStoreMode(mode: UiModuleStoreMode): UiAppConfig {
@@ -71,10 +65,8 @@ open class UiConfigPersistenceService(
     }
 
     private fun readBaseUiConfig(targetPath: Path): UiAppConfig {
-        return if (Files.exists(targetPath)) {
-            Files.newBufferedReader(targetPath).use {
-                configLoader.objectMapper().readValue(it, UiRootConfig::class.java).ui
-            }
+        return if (java.nio.file.Files.exists(targetPath)) {
+            readUiConfigFile(targetPath, configLoader)
         } else {
             uiConfigLoader.load()
         }
@@ -84,10 +76,7 @@ open class UiConfigPersistenceService(
         targetPath: Path,
         updatedUiConfig: UiAppConfig,
     ): UiAppConfig {
-        targetPath.parent?.let { Files.createDirectories(it) }
-        Files.newBufferedWriter(targetPath).use { writer ->
-            configLoader.objectMapper().writeValue(writer, UiRootConfig(updatedUiConfig))
-        }
+        writeUiConfigFile(targetPath, updatedUiConfig, configLoader)
 
         return updatedUiConfig.copy(
             configBaseDir = targetPath.parent?.toAbsolutePath()?.normalize()?.toString(),
@@ -95,28 +84,18 @@ open class UiConfigPersistenceService(
     }
 
     private fun resolveExplicitExternalConfigPath(): Path? {
-        System.getProperty("datapool.ui.config")
-            ?.trim()
-            ?.takeIf { it.isNotEmpty() }
-            ?.let { return Path.of(it).toAbsolutePath().normalize() }
-
-        System.getenv("DATAPOOL_UI_CONFIG")
-            ?.trim()
-            ?.takeIf { it.isNotEmpty() }
-            ?.let { return Path.of(it).toAbsolutePath().normalize() }
-
-        return null
+        return resolveExplicitUiConfigPath()
     }
 
     private fun resolvePackagedSidecarConfigPath(): Path? {
-        val appPath = System.getProperty("jpackage.app-path")
-            ?.trim()
-            ?.takeIf { it.isNotEmpty() }
-            ?: return null
-        val launcherPath = Path.of(appPath).toAbsolutePath().normalize()
-        val macAppBundle = generateSequence(launcherPath) { it.parent }
-            .firstOrNull { it.fileName?.toString()?.endsWith(".app") == true }
-        val appDir = macAppBundle?.parent ?: launcherPath.parent ?: return null
-        return appDir.resolve("ui-application.yml").normalize()
+        return resolveManagedPackagedSidecarConfigPath(
+            resolvePackagedUiAppDirectory(
+                launcherPath = System.getProperty("jpackage.app-path")
+                    ?.trim()
+                    ?.takeIf { it.isNotEmpty() }
+                    ?.let { Path.of(it).toAbsolutePath().normalize() },
+                processCommand = null,
+            ),
+        )
     }
 }

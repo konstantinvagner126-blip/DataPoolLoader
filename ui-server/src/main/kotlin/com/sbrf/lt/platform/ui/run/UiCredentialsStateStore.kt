@@ -1,13 +1,9 @@
 package com.sbrf.lt.platform.ui.run
 
 import com.sbrf.lt.datapool.config.ConfigLoader
-import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.StandardCopyOption
-import kotlin.io.path.createDirectories
 import kotlin.io.path.exists
 import kotlin.io.path.inputStream
-import kotlin.io.path.outputStream
 
 /**
  * Хранилище загруженного пользователем `credential.properties`.
@@ -20,10 +16,8 @@ class UiCredentialsStateStore(
     private val legacyRunStateFile: Path = storageDir.resolve("run-state.json")
 
     fun load(): PersistedCredentialsState {
-        if (stateFile.exists()) {
-            stateFile.inputStream().bufferedReader().use {
-                return configLoader.objectMapper().readValue(it, PersistedCredentialsState::class.java)
-            }
+        readOptionalRunStateFile(stateFile, configLoader, PersistedCredentialsState::class.java)?.let {
+            return it
         }
         val migratedState = loadLegacyState()
         if (migratedState.uploadedCredentials != null) {
@@ -34,17 +28,7 @@ class UiCredentialsStateStore(
     }
 
     fun save(state: PersistedCredentialsState) {
-        storageDir.createDirectories()
-        val tempFile = storageDir.resolve("credentials-state.json.tmp")
-        tempFile.outputStream().bufferedWriter().use {
-            configLoader.objectMapper().writerWithDefaultPrettyPrinter().writeValue(it, state)
-        }
-        Files.move(
-            tempFile,
-            stateFile,
-            StandardCopyOption.REPLACE_EXISTING,
-            StandardCopyOption.ATOMIC_MOVE,
-        )
+        saveRunStateFile(storageDir, stateFile, configLoader, state)
     }
 
     private fun loadLegacyState(): PersistedCredentialsState {
@@ -81,16 +65,7 @@ class UiCredentialsStateStore(
                 return
             }
             rootObject.remove("uploadedCredentials")
-            val tempFile = storageDir.resolve("run-state.json.tmp")
-            tempFile.outputStream().bufferedWriter().use {
-                mapper.writerWithDefaultPrettyPrinter().writeValue(it, rootObject)
-            }
-            Files.move(
-                tempFile,
-                legacyRunStateFile,
-                StandardCopyOption.REPLACE_EXISTING,
-                StandardCopyOption.ATOMIC_MOVE,
-            )
+            saveRunStateFile(storageDir, legacyRunStateFile, configLoader, rootObject)
         }
     }
 }
