@@ -747,6 +747,19 @@
 - sql_console query library subflow split cleanup:
   - picker flow вынесен из [SqlConsoleQueryLibrarySections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleQueryLibrarySections.kt) в [SqlConsoleQueryPickerSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleQueryPickerSections.kt);
   - settings toggle flow вынесен в [SqlConsoleQuerySettingsSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleQuerySettingsSections.kt), а исходный library-файл оставлен aggregator/action слоем.
+- module_runs page orchestration split cleanup:
+  - page-local UI state и callback wiring вынесены из [ModuleRunsPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsPage.kt) в [ModuleRunsPageBindings.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsPageBindings.kt);
+  - `LaunchedEffect/PollingEffect/WebSocketEffect` lifecycle вынесен в [ModuleRunsPageEffects.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsPageEffects.kt);
+  - page-level content flow вынесен в [ModuleRunsPageContentSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsPageContentSections.kt), а основной page-файл больше не держит long-running refresh и selection/filter orchestration в одном месте.
+- module_runs sections split cleanup:
+  - mixed [ModuleRunsPageSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsPageSections.kt) удален;
+  - history/overview flow вынесен в [ModuleRunsHistorySections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsHistorySections.kt);
+  - detail/result/diagnostics flow вынесен в [ModuleRunsDetailSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsDetailSections.kt).
+- module_sync sections split cleanup:
+  - mixed [ModuleSyncPageSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncPageSections.kt) удален;
+  - runtime/actions/overview flow вынесен в [ModuleSyncOverviewSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncOverviewSections.kt);
+  - selective module picker вынесен в [ModuleSyncSelectionSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncSelectionSections.kt);
+  - history/details flow вынесен в [ModuleSyncHistorySections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncHistorySections.kt).
 
 Критерий завершения:
 
