@@ -6,6 +6,12 @@
   const DEFAULT_SQL_OBJECT_COMPLETION_LIMIT = 8;
   const MAX_SQL_OBJECT_SUGGESTIONS = 24;
   const MAX_SQL_COLUMN_SUGGESTIONS = 48;
+  const SQL_IDENTIFIER_PATTERN = '(?:"(?:[^"]|"")*"|[A-Za-z_][A-Za-z0-9_$]*)';
+  const SQL_OBJECT_REFERENCE_PATTERN = `${SQL_IDENTIFIER_PATTERN}(?:\\s*\\.\\s*${SQL_IDENTIFIER_PATTERN})?`;
+  const SQL_ALIAS_DEFINITION_PATTERN = new RegExp(
+    `\\b(?:from|join|update)\\s+(${SQL_OBJECT_REFERENCE_PATTERN})(?:\\s+(?:as\\s+)?)(${SQL_IDENTIFIER_PATTERN})`,
+    "gi"
+  );
   const sqlMetadataSearchCache = new Map();
   const sqlObjectColumnsCache = new Map();
   let sqlMetadataContext = normalizeSqlMetadataContext(global.__composeSqlConsoleMetadataContext);
@@ -299,6 +305,18 @@
       };
     }
     if (qualifiers.length === 1) {
+      const aliasTarget = resolveSqlAliasColumnTarget(model, position, qualifiers[0]);
+      if (aliasTarget) {
+        return {
+          range,
+          mode: "alias-columns",
+          token,
+          aliasName: qualifiers[0].toLowerCase(),
+          schemaName: aliasTarget.schemaName,
+          objectName: aliasTarget.objectName,
+          remoteQuery: null
+        };
+      }
       const schemaName = qualifiers[0].toLowerCase();
       return {
         range,
@@ -325,6 +343,139 @@
       schemaName: qualifiers[0].toLowerCase(),
       remoteQuery: null
     };
+  }
+
+  function resolveSqlAliasColumnTarget(model, position, aliasName) {
+    const normalizedAliasName = normalizeSqlIdentifier(aliasName).toLowerCase();
+    if (!normalizedAliasName) {
+      return null;
+    }
+    const sqlPrefix = sanitizeSqlForAliasLookup(buildSqlPrefix(model, position));
+    let resolvedTarget = null;
+    let match;
+    while ((match = SQL_ALIAS_DEFINITION_PATTERN.exec(sqlPrefix)) !== null) {
+      const parsedTarget = parseSqlAliasTarget(match[1], match[2]);
+      if (!parsedTarget || parsedTarget.aliasName !== normalizedAliasName) {
+        continue;
+      }
+      resolvedTarget = parsedTarget;
+    }
+    return resolvedTarget;
+  }
+
+  function buildSqlPrefix(model, position) {
+    return model.getValueInRange(new global.monaco.Range(1, 1, position.lineNumber, position.column));
+  }
+
+  function sanitizeSqlForAliasLookup(sql) {
+    let sanitized = "";
+    let inSingleQuote = false;
+    let inDoubleQuote = false;
+    let inLineComment = false;
+    let inBlockComment = false;
+
+    for (let index = 0; index < sql.length; index += 1) {
+      const char = sql[index];
+      const next = sql[index + 1];
+
+      if (inLineComment) {
+        if (char === "\n") {
+          inLineComment = false;
+          sanitized += "\n";
+        } else {
+          sanitized += " ";
+        }
+        continue;
+      }
+
+      if (inBlockComment) {
+        if (char === "*" && next === "/") {
+          sanitized += "  ";
+          index += 1;
+          inBlockComment = false;
+        } else {
+          sanitized += char === "\n" ? "\n" : " ";
+        }
+        continue;
+      }
+
+      if (!inSingleQuote && !inDoubleQuote && char === "-" && next === "-") {
+        sanitized += "  ";
+        index += 1;
+        inLineComment = true;
+        continue;
+      }
+
+      if (!inSingleQuote && !inDoubleQuote && char === "/" && next === "*") {
+        sanitized += "  ";
+        index += 1;
+        inBlockComment = true;
+        continue;
+      }
+
+      if (inSingleQuote) {
+        sanitized += char === "\n" ? "\n" : " ";
+        if (char === "'" && next === "'") {
+          sanitized += " ";
+          index += 1;
+        } else if (char === "'") {
+          inSingleQuote = false;
+        }
+        continue;
+      }
+
+      if (inDoubleQuote) {
+        sanitized += char;
+        if (char === '"' && next === '"') {
+          sanitized += '"';
+          index += 1;
+        } else if (char === '"') {
+          inDoubleQuote = false;
+        }
+        continue;
+      }
+
+      if (char === "'") {
+        sanitized += " ";
+        inSingleQuote = true;
+        continue;
+      }
+
+      if (char === '"') {
+        sanitized += '"';
+        inDoubleQuote = true;
+        continue;
+      }
+
+      sanitized += char;
+    }
+
+    return sanitized;
+  }
+
+  function parseSqlAliasTarget(objectReference, aliasName) {
+    const normalizedAliasName = normalizeSqlIdentifier(aliasName).toLowerCase();
+    const normalizedReference = `${objectReference ?? ""}`.replace(/\s*\.\s*/g, ".").trim();
+    if (!normalizedAliasName || !normalizedReference) {
+      return null;
+    }
+    const parts = normalizedReference.split(".").map(normalizeSqlIdentifier).filter(Boolean);
+    if (parts.length === 0 || parts.length > 2) {
+      return null;
+    }
+    return {
+      aliasName: normalizedAliasName,
+      schemaName: parts.length === 2 ? parts[0].toLowerCase() : null,
+      objectName: parts[parts.length - 1].toLowerCase()
+    };
+  }
+
+  function normalizeSqlIdentifier(value) {
+    const trimmed = `${value ?? ""}`.trim();
+    if (trimmed.startsWith('"') && trimmed.endsWith('"') && trimmed.length >= 2) {
+      return trimmed.slice(1, -1).replace(/""/g, '"');
+    }
+    return trimmed;
   }
 
   function buildObjectSearchCacheKey(request) {
@@ -468,14 +619,21 @@
     return schemaName.startsWith(token) || objectName.startsWith(token) || qualifiedName.startsWith(token);
   }
 
-  function matchesExactObjectEntry(entry, completionContext) {
-    if (completionContext.mode !== "columns") {
+  function matchesColumnTargetEntry(entry, completionContext) {
+    if (completionContext.mode !== "columns" && completionContext.mode !== "alias-columns") {
       return false;
     }
     const dbObject = entry.dbObject;
-    return isColumnLookupObjectType(dbObject.objectType) &&
-      dbObject.schemaName.toLowerCase() === completionContext.schemaName &&
-      dbObject.objectName.toLowerCase() === completionContext.objectName;
+    if (!isColumnLookupObjectType(dbObject.objectType)) {
+      return false;
+    }
+    if (dbObject.objectName.toLowerCase() !== completionContext.objectName) {
+      return false;
+    }
+    if (completionContext.schemaName == null) {
+      return true;
+    }
+    return dbObject.schemaName.toLowerCase() === completionContext.schemaName;
   }
 
   function isColumnLookupObjectType(objectType) {
@@ -496,7 +654,7 @@
           tableName: value.tableName
         }
       }))
-      .filter(entry => matchesExactObjectEntry(entry, completionContext));
+      .filter(entry => matchesColumnTargetEntry(entry, completionContext));
   }
 
   function mergeUniqueObjectEntries(localEntries, remoteEntries) {
@@ -587,7 +745,7 @@
           query: completionContext.objectName,
           selectedSourceNames: sqlMetadataContext.selectedSourceNames,
           maxObjectsPerSource: sqlMetadataContext.maxObjectsPerSource
-        })).filter(entry => matchesExactObjectEntry(entry, completionContext))
+        })).filter(entry => matchesColumnTargetEntry(entry, completionContext))
       : [];
 
     const target = pickExactObjectTarget(localEntries, remoteEntries);

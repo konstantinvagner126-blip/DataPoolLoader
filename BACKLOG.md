@@ -586,6 +586,10 @@
     - добавлен readonly columns contract для exact object по выбранным source;
     - Monaco умеет подсказывать колонки в сценарии `schema.table.` через bounded session-local cache;
     - autocomplete колонок не тащит full inspector payload и не создает stateful backend completion-session;
+  - добавлен следующий bounded слой editor intelligence:
+    - простые `FROM / JOIN / UPDATE alias.` сценарии теперь тоже получают column autocomplete;
+    - alias resolution живет локально в Monaco-helper как lightweight parser по текущему SQL prefix;
+    - backend для этого не хранит отдельную completion-session и reuse-ит тот же readonly columns boundary;
 
 - развивать Monaco постепенно, без тяжелого IDE/LSP-стека и без ущерба для архитектуры SQL-консоли;
 - уровень 1:

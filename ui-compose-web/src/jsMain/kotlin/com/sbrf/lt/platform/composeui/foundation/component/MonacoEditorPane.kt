@@ -15,7 +15,7 @@ import org.jetbrains.compose.web.dom.Div
 
 private var monacoEditorCounter = 0
 private const val MONACO_LOADER_URL = "/static/compose-app/vendor/monaco-editor/min/vs/loader.js"
-private const val MONACO_HELPER_URL = "/static/compose-app/compose-monaco.js?v=20260423c"
+private const val MONACO_HELPER_URL = "/static/compose-app/compose-monaco.js?v=20260423d"
 
 @Composable
 fun MonacoEditorPane(
