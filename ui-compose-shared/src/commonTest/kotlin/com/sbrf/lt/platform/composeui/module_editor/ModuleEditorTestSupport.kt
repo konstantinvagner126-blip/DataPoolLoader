@@ -20,6 +20,12 @@ internal class StubModuleEditorApi(
     private val publishDatabaseWorkingCopyHandler: suspend (String) -> SaveResultResponseDto = {
         error("publishDatabaseWorkingCopy not configured")
     },
+    private val startFilesRunHandler: suspend (StartRunRequestDto) -> UiRunSnapshotDto = {
+        error("startFilesRun not configured")
+    },
+    private val startDatabaseRunHandler: suspend (String) -> DatabaseRunStartResponseDto = {
+        error("startDatabaseRun not configured")
+    },
 ) : ModuleEditorApi {
     override suspend fun loadFilesCatalog(): FilesModulesCatalogResponse = error("loadFilesCatalog not configured")
 
@@ -57,10 +63,10 @@ internal class StubModuleEditorApi(
         error("deleteDatabaseModule not configured")
 
     override suspend fun startFilesRun(request: StartRunRequestDto): UiRunSnapshotDto =
-        error("startFilesRun not configured")
+        startFilesRunHandler(request)
 
     override suspend fun startDatabaseRun(moduleId: String): DatabaseRunStartResponseDto =
-        error("startDatabaseRun not configured")
+        startDatabaseRunHandler(moduleId)
 
     override suspend fun parseConfigForm(configText: String): ConfigFormStateDto =
         error("parseConfigForm not configured")

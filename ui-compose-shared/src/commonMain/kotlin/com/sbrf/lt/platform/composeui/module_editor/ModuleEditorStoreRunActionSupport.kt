@@ -3,26 +3,16 @@ package com.sbrf.lt.platform.composeui.module_editor
 internal class ModuleEditorStoreRunActionSupport(
     private val api: ModuleEditorApi,
 ) {
+    private val requestSupport = ModuleEditorStoreRunRequestSupport()
+    private val stateSupport = ModuleEditorStoreRunStateSupport()
+
     suspend fun runFilesModule(current: ModuleEditorPageState): ModuleEditorPageState {
         val moduleId = current.selectedModuleId ?: return current
         return runCatching {
-            api.startFilesRun(
-                StartRunRequestDto(
-                    moduleId = moduleId,
-                    configText = current.configTextDraft,
-                    sqlFiles = current.sqlContentsDraft,
-                ),
-            )
-            current.copy(
-                actionInProgress = null,
-                errorMessage = null,
-                successMessage = null,
-            )
+            api.startFilesRun(requestSupport.buildFilesRunRequest(moduleId, current))
+            stateSupport.runStarted(current)
         }.getOrElse { error ->
-            current.copy(
-                actionInProgress = null,
-                errorMessage = error.message ?: "Не удалось запустить модуль.",
-            )
+            stateSupport.runFailed(current, error, "Не удалось запустить модуль.")
         }
     }
 
@@ -30,16 +20,9 @@ internal class ModuleEditorStoreRunActionSupport(
         val moduleId = current.selectedModuleId ?: return current
         return runCatching {
             api.startDatabaseRun(moduleId)
-            current.copy(
-                actionInProgress = null,
-                errorMessage = null,
-                successMessage = null,
-            )
+            stateSupport.runStarted(current)
         }.getOrElse { error ->
-            current.copy(
-                actionInProgress = null,
-                errorMessage = error.message ?: "Не удалось запустить модуль из базы данных.",
-            )
+            stateSupport.runFailed(current, error, "Не удалось запустить модуль из базы данных.")
         }
     }
 }

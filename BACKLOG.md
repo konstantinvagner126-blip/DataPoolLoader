@@ -880,6 +880,13 @@ Review after Phase F:
       - добавлены common tests на create/delete policy и rename workflow:
         - [ModuleEditorStoreSqlResourceDraftMutationSupportTest.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonTest/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreSqlResourceDraftMutationSupportTest.kt)
         - [ModuleEditorStoreSqlResourceRenameSupportTest.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonTest/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreSqlResourceRenameSupportTest.kt)
+    - run-action слой больше не смешивает files run request mapping и post-run state policy:
+      - files run request builder вынесен в [ModuleEditorStoreRunRequestSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreRunRequestSupport.kt);
+      - post-run state policy вынесен в [ModuleEditorStoreRunStateSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreRunStateSupport.kt);
+      - [ModuleEditorStoreRunActionSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreRunActionSupport.kt) остался orchestration-facade слоем поверх API;
+      - добавлены common tests на run request mapping и run action success/error state handling:
+        - [ModuleEditorStoreRunRequestSupportTest.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonTest/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreRunRequestSupportTest.kt)
+        - [ModuleEditorStoreRunActionSupportTest.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonTest/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreRunActionSupportTest.kt)
   - начат cleanup `module_runs` shared-store кластера:
     - [ModuleRunsStoreLoadingSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsStoreLoadingSupport.kt) перестал держать initial load, database runtime fallback и run selection/details policy в одном helper;
     - runtime/fallback branching вынесен в [ModuleRunsStoreRuntimeSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsStoreRuntimeSupport.kt);
