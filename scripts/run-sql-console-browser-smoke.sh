@@ -15,6 +15,7 @@ SQL_CONSOLE_DB_JDBC_URL="${LOCAL_MANUAL_DB_JDBC_URL:-jdbc:postgresql://127.0.0.1
 SQL_CONSOLE_DB_USERNAME="${LOCAL_MANUAL_DB_USERNAME:-kwdev}"
 SQL_CONSOLE_DB_PASSWORD="${LOCAL_MANUAL_DB_PASSWORD:-dummy}"
 SQL_CONSOLE_SMOKE_SKIP_DB_SETUP="${SQL_CONSOLE_SMOKE_SKIP_DB_SETUP:-0}"
+PLAYWRIGHT_TEST_ARGS="${PLAYWRIGHT_TEST_ARGS:-}"
 SERVER_PID=""
 
 DB_HOST="$(node -e 'const url = new URL(process.argv[1].replace(/^jdbc:/, "")); process.stdout.write(url.hostname);' "${SQL_CONSOLE_DB_JDBC_URL}")"
@@ -114,4 +115,10 @@ fi
 
 wait_for_server "${BASE_URL}"
 
-SQL_CONSOLE_BASE_URL="${BASE_URL}" npm --prefix "${SMOKE_ROOT}" test
+if [[ -n "${PLAYWRIGHT_TEST_ARGS}" ]]; then
+  # shellcheck disable=SC2206
+  PLAYWRIGHT_ARGS_ARRAY=( ${PLAYWRIGHT_TEST_ARGS} )
+  SQL_CONSOLE_BASE_URL="${BASE_URL}" npm --prefix "${SMOKE_ROOT}" test -- "${PLAYWRIGHT_ARGS_ARRAY[@]}"
+else
+  SQL_CONSOLE_BASE_URL="${BASE_URL}" npm --prefix "${SMOKE_ROOT}" test
+fi

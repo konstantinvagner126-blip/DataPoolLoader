@@ -2,6 +2,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
+import javax.xml.parsers.DocumentBuilderFactory
 
 apply(from = "repositories.gradle")
 
@@ -113,4 +114,84 @@ tasks.register<CreateAppModuleTask>("createAppModule") {
     appName.convention(
         providers.gradleProperty("appName")
     )
+}
+
+abstract class VerifyKoverLineCoverageTask : DefaultTask() {
+    @get:InputFile
+    abstract val reportFile: RegularFileProperty
+
+    @get:Input
+    abstract val minimumLineCoveragePercent: Property<Double>
+
+    @get:Input
+    abstract val coverageScopeLabel: Property<String>
+
+    @TaskAction
+    fun verify() {
+        val report = reportFile.get().asFile
+        require(report.exists()) {
+            "Kover report not found: ${report.absolutePath}"
+        }
+
+        val document = DocumentBuilderFactory.newInstance()
+            .newDocumentBuilder()
+            .parse(report)
+        val root = document.documentElement
+        val lineCounter = (0 until root.childNodes.length)
+            .asSequence()
+            .map { root.childNodes.item(it) }
+            .filter { it.nodeType == org.w3c.dom.Node.ELEMENT_NODE }
+            .map { it as org.w3c.dom.Element }
+            .firstOrNull { it.tagName == "counter" && it.getAttribute("type") == "LINE" }
+            ?: error("Failed to locate root LINE counter in ${report.absolutePath}")
+
+        val missed = lineCounter.getAttribute("missed").toLong()
+        val covered = lineCounter.getAttribute("covered").toLong()
+        val total = missed + covered
+        require(total > 0) {
+            "Kover report for ${coverageScopeLabel.get()} has zero measured lines: ${report.absolutePath}"
+        }
+
+        val actualPercent = covered.toDouble() * 100.0 / total.toDouble()
+        val minimumPercent = minimumLineCoveragePercent.get()
+
+        logger.lifecycle(
+            "Kover line coverage for {}: {}% (covered={}, total={}, floor={}%)",
+            coverageScopeLabel.get(),
+            String.format("%.2f", actualPercent),
+            covered,
+            total,
+            String.format("%.2f", minimumPercent),
+        )
+
+        check(actualPercent + 1e-9 >= minimumPercent) {
+            "Kover line coverage for ${coverageScopeLabel.get()} is ${"%.2f".format(actualPercent)}%, " +
+                "below floor ${"%.2f".format(minimumPercent)}%."
+        }
+    }
+}
+
+val uiServerKoverXmlReport = project(":ui-server").tasks.named("koverXmlReport")
+val uiServerKoverHtmlReport = project(":ui-server").tasks.named("koverHtmlReport")
+val uiServerKoverReportFile = project(":ui-server").layout.buildDirectory.file("reports/kover/report.xml")
+
+tasks.register("serverCoverageXmlReport") {
+    group = "verification"
+    description = "Строит bounded Kover XML report только для server-side scope (:ui-server)"
+    dependsOn(uiServerKoverXmlReport)
+}
+
+tasks.register("serverCoverageHtmlReport") {
+    group = "verification"
+    description = "Строит bounded Kover HTML report только для server-side scope (:ui-server)"
+    dependsOn(uiServerKoverHtmlReport)
+}
+
+tasks.register<VerifyKoverLineCoverageTask>("verifyServerCoverageFloor") {
+    group = "verification"
+    description = "Проверяет, что Kover line coverage для server-side scope (:ui-server) не ниже 80%"
+    dependsOn(uiServerKoverXmlReport)
+    reportFile.set(uiServerKoverReportFile)
+    minimumLineCoveragePercent.set(80.0)
+    coverageScopeLabel.set(":ui-server")
 }

@@ -16,7 +16,7 @@ fun ComposeAboutPage() {
     PageScaffold(
         eyebrow = "MLP Platform",
         title = "О проекте",
-        subtitle = "Локальное инженерное приложение для подготовки данных, управления модулями и безопасной ручной работы с источниками.",
+        subtitle = "Команда разработки проекта.",
         heroClassNames = listOf("hero-card-compact"),
         heroHeader = {
             Div({ classes("hero-actions", "mb-3") }) {
@@ -24,10 +24,6 @@ fun ComposeAboutPage() {
                     classes("btn", "btn-outline-secondary")
                     href("/")
                 }) { Text("На главную") }
-                A(attrs = {
-                    classes("btn", "btn-outline-secondary")
-                    href("/help")
-                }) { Text("Справка") }
                 Button(attrs = {
                     classes("btn", "btn-dark")
                     attr("type", "button")

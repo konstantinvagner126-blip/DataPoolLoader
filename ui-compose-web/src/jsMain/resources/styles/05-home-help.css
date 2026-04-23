@@ -4,15 +4,9 @@
   gap: 1rem;
 }
 
-.about-grid,
 .about-developer-grid {
   display: grid;
   gap: 1rem;
-}
-
-.about-grid {
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  margin-bottom: 1rem;
 }
 
 .about-developer-grid {
@@ -23,39 +17,10 @@
   padding: 1.35rem;
 }
 
-.about-card-wide {
-  background:
-    radial-gradient(circle at top right, rgba(29, 111, 216, 0.1), transparent 30%),
-    linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(244, 247, 251, 0.92));
-}
-
 .about-card-title {
   font-size: 1.2rem;
   font-weight: 700;
   color: #132238;
-}
-
-.about-card-text {
-  color: #41556e;
-  line-height: 1.6;
-}
-
-.about-chip-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.55rem;
-}
-
-.about-chip {
-  display: inline-flex;
-  align-items: center;
-  min-height: 2rem;
-  padding: 0.3rem 0.75rem;
-  border-radius: 999px;
-  background: rgba(29, 111, 216, 0.1);
-  color: #1d4ed8;
-  font-size: 0.78rem;
-  font-weight: 700;
 }
 
 .about-developer-card {
@@ -73,8 +38,9 @@
 .about-developer-head {
   display: flex;
   align-items: flex-start;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 1rem;
+  margin-bottom: 0.9rem;
 }
 
 .about-developer-alias {
@@ -87,14 +53,6 @@
   color: #132238;
   font-size: 0.82rem;
   font-weight: 700;
-}
-
-.about-developer-role {
-  color: #64748b;
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
 }
 
 .about-motorcycle-stage {

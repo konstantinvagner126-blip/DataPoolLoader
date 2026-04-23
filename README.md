@@ -766,17 +766,35 @@ ui:
 
 Для проекта подключен `Kover`.
 
-Основные команды:
+Основные exploratory команды:
 
 ```bash
 ./gradlew koverHtmlReport
 ./gradlew koverXmlReport
 ```
 
-Текущая целевая планка:
+Важно:
 
-- `core` >= 90%
-- `ui-server` >= 90%
+- root-level `kover*Report` строит широкий проектный отчет и не является bounded server-side gate;
+- для server-side контрольного порога используется отдельный scope `:ui-server`.
+
+Server-side coverage workflow:
+
+```bash
+./gradlew serverCoverageXmlReport
+./gradlew serverCoverageHtmlReport
+./gradlew verifyServerCoverageFloor
+```
+
+Текущий контрольный критерий:
+
+- server-side coverage floor измеряется по `Kover` line coverage только для `:ui-server`
+- нижняя граница: `>= 80%`
+
+Замечание по scope:
+
+- `core` не входит в этот конкретный server-side coverage gate, потому что это общий domain/runtime слой, а не boundary `ui-server`;
+- качество покрытия `core` остается отдельной инженерной задачей и не должно смешиваться с bounded server-side verification.
 
 ## Создание нового app-модуля
 

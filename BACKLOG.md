@@ -911,7 +911,7 @@
 
 Статус:
 
-- не реализовано
+- реализовано
 
 Проблема:
 
@@ -940,13 +940,23 @@
 3. при необходимости упростить hero/subtitle, чтобы они не дублировали удаленный explanatory content;
 4. не ломать существующий route `/about`.
 
+Что сделано:
+
+- со страницы `О проекте` убран весь explanatory content:
+  - `Назначение`;
+  - `Фокус`;
+  - chips и сопутствующие текстовые блоки;
+- основной content страницы теперь состоит только из карточек разработчиков;
+- hero/subtitle и навигационные действия упрощены, чтобы shell страницы не спорил с основным контентом;
+- удалены мертвые `about-*` стили, которые больше не используются после минимизации страницы.
+
 ## P2
 
 ### 16. Усилить тестовую стратегию под архитектурную программу
 
 Статус:
 
-- не реализовано
+- частично реализовано
 
 Цель:
 
@@ -980,6 +990,75 @@
    - собрать reproducible coverage report;
    - зафиксировать нижнюю границу не ниже `80%`;
    - добавить backlog-пакет на закрытие больших coverage дыр, если до порога не дотягиваем.
+
+#### 16.1. Bounded server-side Kover coverage floor
+
+Статус:
+
+- реализовано
+
+Проблема:
+
+- текущий root-level `koverXmlReport` не подходит как контрольный критерий server-side coverage:
+  - тащит весь проект;
+  - запускает лишние `app`/`web` задачи;
+  - поднимает `localPostgresTest`;
+  - не дает полезного aggregated root XML для server-side gate;
+- из-за этого coverage target в backlog есть, но reproducible bounded verification отсутствует.
+
+Целевой контракт:
+
+- server-side coverage floor измеряется через `Kover`;
+- exact scope для этого floor фиксируется как `:ui-server`:
+  - `ui-server` является server-side boundary/orchestration слоем;
+  - `core` не считается server-side scope для этого контрольного порога, потому что это общий domain/runtime слой;
+- должна существовать отдельная bounded команда:
+  - строит XML/HTML coverage report только для `:ui-server`;
+  - проверяет floor `>= 80%` по line coverage;
+  - не опирается на пустой root XML report;
+- контракт должен быть задокументирован в README и backlog.
+
+Что сделано:
+
+- в root Gradle добавлены bounded tasks:
+  - `serverCoverageXmlReport`
+  - `serverCoverageHtmlReport`
+  - `verifyServerCoverageFloor`
+- `verifyServerCoverageFloor` использует `Kover` XML report модуля `:ui-server` и валидирует line coverage floor `>= 80%`;
+- exact scope зафиксирован явно:
+  - server-side coverage floor сейчас относится к `:ui-server`;
+  - `core` остается отдельным quality stream, но не входит в этот gate;
+- README обновлен под новый reproducible workflow и больше не обещает старые `90%` targets, которые не совпадают с активным backlog-контрактом.
+
+#### 16.2. Первый visual regression baseline для стабильных экранов
+
+Статус:
+
+- реализовано
+
+Проблема:
+
+- visual regression stream в backlog заявлен, но сейчас нет ни одного committed browser-level screenshot baseline;
+- без первого стабильного baseline невозможно постепенно наращивать полноценный visual suite;
+- для первого шага нельзя брать слишком шумные экраны вроде SQL-консоли с runtime data, иначе будут ложные диффы и хрупкий suite.
+
+Целевой контракт:
+
+- в проекте появляется первый committed Playwright screenshot baseline;
+- coverage берется с наиболее стабильных user-facing экранов:
+  - главная страница;
+  - страница `О проекте`;
+- smoke harness умеет запускать конкретный spec и `--update-snapshots`, чтобы baseline можно было поддерживать как инженерный workflow;
+- visual пакет не должен ломать существующий SQL-console smoke flow.
+
+Что сделано:
+
+- в existing Playwright harness добавлен первый visual regression spec для:
+  - `/`
+  - `/about`
+- committed baseline snapshots зафиксированы в репозитории;
+- smoke launcher теперь умеет принимать `PLAYWRIGHT_TEST_ARGS`, чтобы запускать отдельный spec и обновлять snapshots без ad-hoc ручного редактирования script-а;
+- visual stream стартовал со стабильных экранов, не смешивая первый baseline с шумными runtime-heavy страницами.
 
 2. `Comprehensive visual regression coverage`
    - расширить существующий browser smoke harness до visual regression уровня;
