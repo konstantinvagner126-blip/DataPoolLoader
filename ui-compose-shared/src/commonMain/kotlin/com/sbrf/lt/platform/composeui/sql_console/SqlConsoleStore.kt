@@ -134,6 +134,14 @@ class SqlConsoleStore(
     suspend fun refreshExecution(current: SqlConsolePageState): SqlConsolePageState =
         executionSupport.refreshExecution(current)
 
+    suspend fun restoreExecution(
+        current: SqlConsolePageState,
+        executionId: String,
+        ownerSessionId: String,
+        ownerToken: String,
+    ): SqlConsolePageState =
+        executionSupport.restoreExecution(current, executionId, ownerSessionId, ownerToken)
+
     suspend fun heartbeatExecution(
         current: SqlConsolePageState,
         ownerSessionId: String,

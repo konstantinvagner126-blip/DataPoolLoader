@@ -122,8 +122,13 @@ internal class SqlConsoleQueryStateSupport(
         if (current.ownerLost) {
             throw UiStateConflictException("Execution session SQL-консоли уже потеряла владельца.")
         }
+        val rotatedOwnerToken = tokenFactory()
         val updated = current.copy(
-            snapshot = current.snapshot.copy(ownerLeaseExpiresAt = now.plus(ownerLeaseDuration)),
+            snapshot = current.snapshot.copy(
+                ownerToken = rotatedOwnerToken,
+                ownerLeaseExpiresAt = now.plus(ownerLeaseDuration),
+            ),
+            ownerToken = rotatedOwnerToken,
         )
         activeExecution = updated
         updated.snapshot

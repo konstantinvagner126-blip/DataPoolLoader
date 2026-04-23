@@ -29,7 +29,19 @@ internal fun SqlConsolePageEffects(
 
     LaunchedEffect(store) {
         setState(store.startLoading(currentState()))
-        setState(store.load())
+        val loadedState = store.load()
+        val restoredState = loadSqlConsoleExecutionOwnerState()
+            ?.takeIf { it.ownerSessionId == currentUiState().ownerSessionId }
+            ?.let { ownerState ->
+                store.restoreExecution(
+                    current = loadedState,
+                    executionId = ownerState.executionId,
+                    ownerSessionId = ownerState.ownerSessionId,
+                    ownerToken = ownerState.ownerToken,
+                )
+            }
+            ?: loadedState
+        setState(restoredState)
         setUiState(currentUiState().copy(credentialsStatus = loadCredentialsStatus(httpClient)))
     }
 
@@ -75,6 +87,30 @@ internal fun SqlConsolePageEffects(
                     ),
                 )
             }
+        }
+    }
+
+    LaunchedEffect(
+        currentState().currentExecutionId,
+        currentExecution?.status,
+        currentExecution?.transactionState,
+        currentExecution?.ownerToken,
+    ) {
+        val executionId = currentState().currentExecutionId
+        val ownerToken = currentExecution?.ownerToken
+        val trackingOwnedExecution = executionId != null &&
+            ownerToken != null &&
+            (currentExecution.status == "RUNNING" || currentExecution.transactionState == "PENDING_COMMIT")
+        if (trackingOwnedExecution) {
+            saveSqlConsoleExecutionOwnerState(
+                SqlConsoleExecutionOwnerState(
+                    executionId = executionId,
+                    ownerSessionId = currentUiState().ownerSessionId,
+                    ownerToken = ownerToken,
+                ),
+            )
+        } else {
+            clearSqlConsoleExecutionOwnerState()
         }
     }
 

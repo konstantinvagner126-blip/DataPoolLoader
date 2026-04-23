@@ -1064,6 +1064,15 @@
 - SQL execution safety timeout flow:
   - добавить automatic rollback при потере owner lease и при hard TTL для `PENDING_COMMIT`;
   - закрепить это server-side тестами на owner loss / timeout / unauthorized action.
+- SQL execution refresh recovery:
+  - восстановить ownership SQL execution session после refresh через browser session storage без потери server-side safety;
+  - same-tab reload должен поднимать heartbeat и current execution, а не обрывать control-path без причины.
+- SQL execution fencing token rotation:
+  - heartbeat должен ротировать owner token, чтобы stale token из duplicate tab быстро терял право на action/heartbeat;
+  - UI после ownership loss должен переходить в read-only snapshot без silent retry.
+- SQL execution recovery regression tests:
+  - закрепить route/manager сценарии для refresh recovery и stale-token conflict;
+  - duplicate tab должен терять управление после ротации token, а не продолжать heartbeat параллельно.
 
 Критерий завершения:
 

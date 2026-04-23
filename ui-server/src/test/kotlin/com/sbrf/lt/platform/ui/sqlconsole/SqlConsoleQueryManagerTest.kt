@@ -468,6 +468,28 @@ class SqlConsoleQueryManagerTest {
     }
 
     @Test
+    fun `heartbeat rotates owner token and fences stale token`() {
+        val manager = SqlConsoleQueryManager(sqlConsoleService = serviceWithSuccess())
+
+        val started = manager.startQuery(
+            sql = "select 1 as id",
+            credentialsPath = null,
+            ownerSessionId = ownerSessionId,
+        )
+        val initialToken = requireNotNull(started.ownerToken)
+
+        val rotated = manager.heartbeat(started.id, ownerSessionId, initialToken)
+        val rotatedToken = requireNotNull(rotated.ownerToken)
+
+        assertTrue(rotatedToken != initialToken)
+
+        val error = assertFailsWith<UiStateConflictException> {
+            manager.cancel(started.id, ownerSessionId, initialToken)
+        }
+        assertTrue(error.message!!.contains("не принадлежит"))
+    }
+
+    @Test
     fun `auto rollbacks pending commit when ttl expires`() {
         var now = Instant.parse("2026-04-23T00:00:00Z")
         val manager = SqlConsoleQueryManager(

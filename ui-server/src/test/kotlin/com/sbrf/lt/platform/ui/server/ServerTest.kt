@@ -92,6 +92,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import java.nio.file.Files
@@ -830,9 +831,26 @@ class ServerTest {
         assertEquals(HttpStatusCode.Conflict, duplicateStart.status)
         assertTrue(duplicateStart.bodyAsText().contains("уже выполняется запрос"))
 
-        val cancelled = client.post("/api/sql-console/query/$executionId/cancel") {
+        val heartbeat = client.post("/api/sql-console/query/$executionId/heartbeat") {
             contentType(ContentType.Application.Json)
             setBody("""{"ownerSessionId":"tab-1","ownerToken":"$ownerToken"}""")
+        }
+        assertEquals(HttpStatusCode.OK, heartbeat.status)
+        val heartbeatBody = heartbeat.bodyAsText()
+        val rotatedOwnerToken = Regex(""""ownerToken":"([^"]+)"""").find(heartbeatBody)?.groupValues?.get(1)
+        assertNotNull(rotatedOwnerToken)
+        assertNotEquals(ownerToken, rotatedOwnerToken)
+
+        val staleCancel = client.post("/api/sql-console/query/$executionId/cancel") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"ownerSessionId":"tab-1","ownerToken":"$ownerToken"}""")
+        }
+        assertEquals(HttpStatusCode.Conflict, staleCancel.status)
+        assertTrue(staleCancel.bodyAsText().contains("не принадлежит"))
+
+        val cancelled = client.post("/api/sql-console/query/$executionId/cancel") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"ownerSessionId":"tab-1","ownerToken":"$rotatedOwnerToken"}""")
         }.bodyAsText()
         assertTrue(cancelled.contains("\"cancelRequested\":true"))
 

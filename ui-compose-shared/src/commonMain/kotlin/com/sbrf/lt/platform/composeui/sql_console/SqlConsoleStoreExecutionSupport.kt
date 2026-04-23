@@ -137,6 +137,40 @@ internal class SqlConsoleStoreExecutionSupport(
         }
     }
 
+    suspend fun restoreExecution(
+        current: SqlConsolePageState,
+        executionId: String,
+        ownerSessionId: String,
+        ownerToken: String,
+    ): SqlConsolePageState {
+        return runCatching {
+            val loaded = api.loadExecution(executionId)
+            val trackingExecution = loaded.status == "RUNNING" || loaded.transactionState == "PENDING_COMMIT"
+            val restored = if (trackingExecution) {
+                api.heartbeatExecution(
+                    executionId = executionId,
+                    request = SqlConsoleExecutionOwnerActionRequest(
+                        ownerSessionId = ownerSessionId,
+                        ownerToken = ownerToken,
+                    ),
+                )
+            } else {
+                loaded
+            }
+            current.copy(
+                loading = false,
+                actionInProgress = null,
+                errorMessage = null,
+                currentExecution = restored.withOwnerToken(ownerToken),
+                currentExecutionId = restored.id,
+            )
+        }.getOrElse { error ->
+            current.clearExecutionOwnership(
+                error.message ?: "Не удалось восстановить SQL execution session после обновления страницы.",
+            )
+        }
+    }
+
     suspend fun heartbeatExecution(
         current: SqlConsolePageState,
         ownerSessionId: String,
@@ -152,10 +186,9 @@ internal class SqlConsoleStoreExecutionSupport(
                 currentExecutionId = snapshot.id,
             )
         }.getOrElse { error ->
-            current.copy(
-                actionInProgress = null,
-                errorMessage = error.message ?: "Не удалось подтвердить владение SQL execution session.",
-                successMessage = null,
+            current.handleOwnershipFailure(
+                error = error,
+                fallbackMessage = "Не удалось подтвердить владение SQL execution session.",
             )
         }
     }
@@ -181,11 +214,7 @@ internal class SqlConsoleStoreExecutionSupport(
                 currentExecutionId = snapshot.id,
             )
         }.getOrElse { error ->
-            current.copy(
-                actionInProgress = null,
-                errorMessage = error.message ?: "Не удалось остановить запрос.",
-                successMessage = null,
-            )
+            current.handleOwnershipFailure(error, "Не удалось остановить запрос.")
         }
     }
 
@@ -210,11 +239,7 @@ internal class SqlConsoleStoreExecutionSupport(
                 currentExecutionId = snapshot.id,
             )
         }.getOrElse { error ->
-            current.copy(
-                actionInProgress = null,
-                errorMessage = error.message ?: "Не удалось выполнить commit.",
-                successMessage = null,
-            )
+            current.handleOwnershipFailure(error, "Не удалось выполнить commit.")
         }
     }
 
@@ -239,11 +264,7 @@ internal class SqlConsoleStoreExecutionSupport(
                 currentExecutionId = snapshot.id,
             )
         }.getOrElse { error ->
-            current.copy(
-                actionInProgress = null,
-                errorMessage = error.message ?: "Не удалось выполнить rollback.",
-                successMessage = null,
-            )
+            current.handleOwnershipFailure(error, "Не удалось выполнить rollback.")
         }
     }
 }
@@ -264,3 +285,32 @@ private fun SqlConsoleExecutionResponse.withOwnerToken(ownerToken: String?): Sql
             else -> null
         },
     )
+
+private fun SqlConsolePageState.handleOwnershipFailure(
+    error: Throwable,
+    fallbackMessage: String,
+): SqlConsolePageState {
+    val message = error.message ?: fallbackMessage
+    return if (message.indicatesOwnershipLoss()) {
+        clearExecutionOwnership(message)
+    } else {
+        copy(
+            actionInProgress = null,
+            errorMessage = message,
+            successMessage = null,
+        )
+    }
+}
+
+private fun SqlConsolePageState.clearExecutionOwnership(message: String): SqlConsolePageState =
+    copy(
+        actionInProgress = null,
+        errorMessage = message,
+        successMessage = null,
+        currentExecution = currentExecution?.copy(ownerToken = null),
+    )
+
+private fun String.indicatesOwnershipLoss(): Boolean =
+    contains("не принадлежит", ignoreCase = true) ||
+        contains("потеряла владельца", ignoreCase = true) ||
+        contains("владелец", ignoreCase = true) && contains("потерян", ignoreCase = true)

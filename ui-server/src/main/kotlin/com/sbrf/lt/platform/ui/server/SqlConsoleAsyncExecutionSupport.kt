@@ -39,7 +39,7 @@ internal fun UiServerContext.heartbeatSqlConsoleExecution(
         executionId = executionId,
         ownerSessionId = request.ownerSessionId,
         ownerToken = request.ownerToken,
-    ).toResponse(includeOwnerToken = true, ownerToken = request.ownerToken)
+    ).toResponse(includeOwnerToken = true)
 
 internal fun UiServerContext.cancelSqlConsoleExecution(
     executionId: String,
@@ -49,7 +49,7 @@ internal fun UiServerContext.cancelSqlConsoleExecution(
         executionId = executionId,
         ownerSessionId = request.ownerSessionId,
         ownerToken = request.ownerToken,
-    ).toResponse(includeOwnerToken = true, ownerToken = request.ownerToken)
+    ).toResponse(includeOwnerToken = true)
 
 internal fun UiServerContext.commitSqlConsoleExecution(
     executionId: String,

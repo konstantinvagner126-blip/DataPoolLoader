@@ -6,7 +6,7 @@ import kotlinx.coroutines.CoroutineScope
 import org.w3c.files.File
 
 internal data class SqlConsolePageUiState(
-    val ownerSessionId: String = generateSqlConsoleOwnerSessionId(),
+    val ownerSessionId: String = resolveSqlConsoleOwnerSessionId(),
     val editorInstance: Any? = null,
     val editorCursorLine: Int = 1,
     val selectedRecentQuery: String = "",
