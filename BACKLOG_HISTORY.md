@@ -234,6 +234,50 @@
 
 - `2026-04-19`
 
+### 10.1 Cleanup и укрощение толстых store-слоев: завершенные волны
+
+Статус:
+
+- частично архивировано из рабочего backlog
+
+Ключевой результат:
+
+- store-слои SQL-консоли выведены из статуса top-offender:
+  - execution/settings/query/owner flow и object-browser state разрезаны на более узкие support-слои;
+  - façade store больше не смешивает heavy orchestration и pure state mutations;
+- `module_editor` прошел основную bounded cleanup-волну:
+  - draft, SQL-resource, config-form, save, run, lifecycle и storage-aware boundaries уже разведены;
+  - remaining workflow/store wiring после closure review выглядит как reviewable façade, а не как giant cluster;
+- `module_runs`, `module_sync` и `run_history_cleanup` получили targeted splits по runtime, selection, action и loading-state policy;
+- extraction-пакеты закреплены common tests, так что cleanup не остался без regression coverage.
+
+Что это изменило:
+
+- `ui-compose-shared` заметно меньше похож на mini-backend;
+- следующие cleanup-волны теперь должны стартовать только от реального top-offender review, а не по инерции.
+
+Основные даты:
+
+- `2026-04-22`
+- `2026-04-23`
+
+### 12. Финализация boundary модульного редактора и storage contracts
+
+Статус:
+
+- архивировано из рабочего backlog
+
+Ключевой результат:
+
+- storage-aware `read / save / run` boundaries вынесены из общего workflow слоя;
+- database lifecycle и working-copy lifecycle отделены от write-path и explicit wired через отдельные store contracts;
+- обычные `save/run` сценарии переведены на unified workflow contract без storage branching в page execution layer;
+- closure review подтвердил, что remaining `route.storage` checks относятся уже в основном к UI-capabilities и presentation, а не к knowledge-heavy workflow branching.
+
+Основные даты:
+
+- `2026-04-23`
+
 ## P2
 
 ### 17. Расширенный summary по длительностям
@@ -548,17 +592,20 @@
 - `2026-04-22`
 - `2026-04-23`
 
-### 6. SQL-console foundation and safety milestones
+### 6. SQL-console baseline program closure
 
 Статус:
 
-- архивировано как выполненная часть активного потока
+- архивировано из рабочего backlog
 
 Ключевой результат:
 
-- SQL-консоль сведена в единый master-stream backlog вместо разрозненных задач;
-- введены ownership, heartbeat, lease/TTL, release и recovery semantics для async execution;
-- object browser и основной экран консоли подготовлены к следующей фазе: object inspector и UX/control-flow improvements.
+- SQL-консоль собрана в отдельную подсистему с завершенным baseline-пакетом;
+- закрыты safety/recovery, multi-tab workspaces, group-first source selection и execution history per workspace;
+- object browser доведен до search-first DBA-like inspector flow;
+- главный экран консоли переведен в более IDE-like operational model;
+- Monaco получил staged autocomplete, object navigation, statement markers и bounded IDE-like enhancements;
+- browser-level smoke harness и разрезанный SQL-console test layer закрепили подсистему как отдельный инженерный поток.
 
 Основные даты:
 
