@@ -9,6 +9,7 @@ import org.jetbrains.compose.web.dom.Text
 @Composable
 internal fun SqlConsoleWorkspacePanel(
     state: SqlConsolePageState,
+    editorFocused: Boolean,
     selectedRecentQuery: String,
     selectedFavoriteQuery: String,
     currentOutlineItem: SqlScriptOutlineItem?,
@@ -38,6 +39,7 @@ internal fun SqlConsoleWorkspacePanel(
     onOpenFavoriteMetadata: (SqlConsoleFavoriteObject) -> Unit,
     onRemoveFavoriteObject: (SqlConsoleFavoriteObject) -> Unit,
     onEditorReady: (Any) -> Unit,
+    onFocusEditor: () -> Unit,
     onDraftSqlChange: (String) -> Unit,
     onPageSizeChange: (Int) -> Unit,
     onFormatSql: () -> Unit,
@@ -119,6 +121,10 @@ internal fun SqlConsoleWorkspacePanel(
             onRollback = onRollback,
             onExportCsv = onExportCsv,
             onExportZip = onExportZip,
+        )
+        SqlConsoleShortcutPanel(
+            editorFocused = editorFocused,
+            onFocusEditor = onFocusEditor,
         )
 
         CommandGuardrail(analysis = statementAnalysis, strictSafetyEnabled = state.strictSafetyEnabled)

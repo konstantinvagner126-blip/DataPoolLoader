@@ -406,6 +406,9 @@
   - query library теперь показывает summary по history/favorites/object shortcuts и подсказывает следующий шаг для выбранного query без перехода в editor/sidebar;
   - favorite objects переведены в более явную action hierarchy: primary SQL-действие, затем вспомогательные действия, затем inspector/remove;
   - statement/shard/page navigation собрана в один result navigator вместо разнесенных по экрану блоков и длинного pagination wall;
+  - shortcut contract вокруг Monaco стал явным: экран показывает, какие hotkeys живут editor-local и когда они реально активны;
+  - Monaco получил editor-local hotkeys для result navigation (`statement/source/page`, `data/status`) без глобальных browser handlers;
+  - library-actions `Подставить` теперь возвращают фокус в Monaco, а экран умеет явно показать и восстановить editor focus;
 
 - четко развести source/settings, editor, execution state, result output и transaction controls;
 - убрать визуальное смешение между рабочим контекстом и результатами запроса;

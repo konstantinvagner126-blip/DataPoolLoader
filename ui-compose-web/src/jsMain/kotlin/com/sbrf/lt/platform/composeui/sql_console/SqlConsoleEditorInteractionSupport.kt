@@ -36,14 +36,38 @@ internal fun registerSqlConsoleEditorShortcuts(
     onRunCurrent: () -> Unit,
     onFormat: () -> Unit,
     onStop: () -> Unit,
+    onShowData: () -> Unit,
+    onShowStatus: () -> Unit,
+    onPreviousStatement: () -> Unit,
+    onNextStatement: () -> Unit,
+    onPreviousShard: () -> Unit,
+    onNextShard: () -> Unit,
+    onPreviousPage: () -> Unit,
+    onNextPage: () -> Unit,
 ) {
     val monaco = window.asDynamic().monaco ?: return
     val ctrlEnter = (monaco.KeyMod.CtrlCmd as Int) or (monaco.KeyCode.Enter as Int)
     val ctrlShiftEnter = (monaco.KeyMod.CtrlCmd as Int) or (monaco.KeyMod.Shift as Int) or (monaco.KeyCode.Enter as Int)
     val shiftAltF = (monaco.KeyMod.Shift as Int) or (monaco.KeyMod.Alt as Int) or (monaco.KeyCode.KeyF as Int)
     val escape = monaco.KeyCode.Escape as Int
+    val ctrlAltDigit1 = (monaco.KeyMod.CtrlCmd as Int) or (monaco.KeyMod.Alt as Int) or (monaco.KeyCode.Digit1 as Int)
+    val ctrlAltDigit2 = (monaco.KeyMod.CtrlCmd as Int) or (monaco.KeyMod.Alt as Int) or (monaco.KeyCode.Digit2 as Int)
+    val ctrlAltUp = (monaco.KeyMod.CtrlCmd as Int) or (monaco.KeyMod.Alt as Int) or (monaco.KeyCode.UpArrow as Int)
+    val ctrlAltDown = (monaco.KeyMod.CtrlCmd as Int) or (monaco.KeyMod.Alt as Int) or (monaco.KeyCode.DownArrow as Int)
+    val ctrlAltLeft = (monaco.KeyMod.CtrlCmd as Int) or (monaco.KeyMod.Alt as Int) or (monaco.KeyCode.LeftArrow as Int)
+    val ctrlAltRight = (monaco.KeyMod.CtrlCmd as Int) or (monaco.KeyMod.Alt as Int) or (monaco.KeyCode.RightArrow as Int)
+    val ctrlAltPageUp = (monaco.KeyMod.CtrlCmd as Int) or (monaco.KeyMod.Alt as Int) or (monaco.KeyCode.PageUp as Int)
+    val ctrlAltPageDown = (monaco.KeyMod.CtrlCmd as Int) or (monaco.KeyMod.Alt as Int) or (monaco.KeyCode.PageDown as Int)
     editor.addCommand(ctrlEnter) { onRun() }
     editor.addCommand(ctrlShiftEnter) { onRunCurrent() }
     editor.addCommand(shiftAltF) { onFormat() }
     editor.addCommand(escape) { onStop() }
+    editor.addCommand(ctrlAltDigit1) { onShowData() }
+    editor.addCommand(ctrlAltDigit2) { onShowStatus() }
+    editor.addCommand(ctrlAltUp) { onPreviousStatement() }
+    editor.addCommand(ctrlAltDown) { onNextStatement() }
+    editor.addCommand(ctrlAltLeft) { onPreviousShard() }
+    editor.addCommand(ctrlAltRight) { onNextShard() }
+    editor.addCommand(ctrlAltPageUp) { onPreviousPage() }
+    editor.addCommand(ctrlAltPageDown) { onNextPage() }
 }

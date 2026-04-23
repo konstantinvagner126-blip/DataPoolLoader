@@ -32,4 +32,8 @@ internal class SqlConsolePageBindingContext(
     fun updateUiState(transform: (SqlConsolePageUiState) -> SqlConsolePageUiState) {
         setUiStateProvider(transform(currentUiState()))
     }
+
+    fun focusEditor() {
+        currentUiState().editorInstance?.asDynamic()?.focus?.invoke()
+    }
 }

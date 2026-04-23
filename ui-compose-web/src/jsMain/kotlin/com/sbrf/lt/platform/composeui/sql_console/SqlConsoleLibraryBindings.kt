@@ -81,10 +81,12 @@ internal class SqlConsoleLibraryBindings(
 
     fun applyRecent() {
         context.updateState { context.store.applyRecentQuery(it, context.currentUiState().selectedRecentQuery) }
+        context.focusEditor()
     }
 
     fun applyFavorite() {
         context.updateState { context.store.applyFavoriteQuery(it, context.currentUiState().selectedFavoriteQuery) }
+        context.focusEditor()
     }
 
     fun rememberFavorite() {

@@ -71,6 +71,7 @@ internal fun SqlConsolePageContent(
         Div({ classes("col-12", "col-xl-9") }) {
             SqlConsoleWorkspacePanel(
                 state = state,
+                editorFocused = uiState.editorFocused,
                 selectedRecentQuery = uiState.selectedRecentQuery,
                 selectedFavoriteQuery = uiState.selectedFavoriteQuery,
                 currentOutlineItem = currentOutlineItem,
@@ -100,6 +101,7 @@ internal fun SqlConsolePageContent(
                 onOpenFavoriteMetadata = callbacks.onOpenFavoriteMetadata,
                 onRemoveFavoriteObject = callbacks.onRemoveFavoriteObject,
                 onEditorReady = callbacks.onEditorReady,
+                onFocusEditor = callbacks.onFocusEditor,
                 onDraftSqlChange = callbacks.onDraftSqlChange,
                 onPageSizeChange = callbacks.onPageSizeChange,
                 onFormatSql = callbacks.onFormatSql,
