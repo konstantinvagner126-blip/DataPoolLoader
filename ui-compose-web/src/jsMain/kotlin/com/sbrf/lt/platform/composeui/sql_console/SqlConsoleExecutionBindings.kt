@@ -5,6 +5,22 @@ import kotlinx.coroutines.launch
 internal class SqlConsoleExecutionBindings(
     private val context: SqlConsolePageBindingContext,
 ) {
+    fun explainCurrent() {
+        launchExplainCurrent(SqlConsoleExplainMode.PLAN)
+    }
+
+    fun explainAnalyzeCurrent() {
+        launchExplainCurrent(SqlConsoleExplainMode.ANALYZE)
+    }
+
+    fun explainSelection() {
+        launchExplainSelection(SqlConsoleExplainMode.PLAN)
+    }
+
+    fun explainAnalyzeSelection() {
+        launchExplainSelection(SqlConsoleExplainMode.ANALYZE)
+    }
+
     fun runAll() {
         launchQuery(
             actionName = "run-query",
@@ -133,6 +149,44 @@ internal class SqlConsoleExecutionBindings(
         }
     }
 
+    private fun launchExplainCurrent(mode: SqlConsoleExplainMode) {
+        val statementSql = context.currentOutlineItem()?.sql?.trim().orEmpty()
+        if (statementSql.isBlank()) {
+            context.updateState {
+                it.copy(
+                    actionInProgress = null,
+                    errorMessage = "Под курсором нет SQL statement для ${mode.label}.",
+                    successMessage = null,
+                )
+            }
+            return
+        }
+        launchQuery(
+            actionName = explainActionName(mode, scope = "current"),
+            sqlOverride = buildExplainSql(statementSql, mode),
+            successMessage = "${mode.label} текущего statement запущен.",
+        )
+    }
+
+    private fun launchExplainSelection(mode: SqlConsoleExplainMode) {
+        val selectedSql = resolveExplainSelectionSql(context.currentUiState().selectedSqlText)
+        if (selectedSql == null) {
+            context.updateState {
+                it.copy(
+                    actionInProgress = null,
+                    errorMessage = "Для ${mode.label} выдели ровно один SQL statement в редакторе.",
+                    successMessage = null,
+                )
+            }
+            return
+        }
+        launchQuery(
+            actionName = explainActionName(mode, scope = "selection"),
+            sqlOverride = buildExplainSql(selectedSql, mode),
+            successMessage = "${mode.label} выделения запущен.",
+        )
+    }
+
     private fun launchQuery(
         actionName: String,
         sqlOverride: String? = null,
@@ -155,4 +209,13 @@ internal class SqlConsoleExecutionBindings(
             )
         }
     }
+
+    private fun explainActionName(
+        mode: SqlConsoleExplainMode,
+        scope: String,
+    ): String =
+        when (mode) {
+            SqlConsoleExplainMode.PLAN -> "explain-$scope-query"
+            SqlConsoleExplainMode.ANALYZE -> "explain-analyze-$scope-query"
+        }
 }

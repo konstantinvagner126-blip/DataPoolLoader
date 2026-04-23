@@ -7,13 +7,17 @@ data class SqlStatementAnalysis(
 )
 
 fun analyzeSqlStatement(sql: String): SqlStatementAnalysis {
-    val keyword = extractSqlKeyword(sql)
+    val normalized = normalizeSqlForAnalysis(sql)
+    val keyword = extractLeadingKeyword(normalized)
     if (keyword.isBlank()) {
         return SqlStatementAnalysis(
             keyword = "SQL",
             readOnly = false,
             dangerous = false,
         )
+    }
+    if (keyword == "EXPLAIN") {
+        return analyzeExplainStatement(normalized)
     }
     val readOnly = keyword in READ_ONLY_KEYWORDS
     val dangerous = keyword in DANGEROUS_KEYWORDS
@@ -24,8 +28,8 @@ fun analyzeSqlStatement(sql: String): SqlStatementAnalysis {
     )
 }
 
-private fun extractSqlKeyword(sql: String): String {
-    val normalized = sql
+private fun normalizeSqlForAnalysis(sql: String): String =
+    sql
         .lineSequence()
         .map { line ->
             val commentIndex = line.indexOf("--")
@@ -37,6 +41,66 @@ private fun extractSqlKeyword(sql: String): String {
         }
         .joinToString(" ")
         .trim()
+
+private fun analyzeExplainStatement(normalizedSql: String): SqlStatementAnalysis {
+    val explainBody = normalizedSql
+        .trimStart()
+        .split(Regex("\\s+"), limit = 2)
+        .getOrElse(1) { "" }
+        .trimStart()
+    val (optionBlock, statementBody) = splitExplainBody(explainBody)
+    val analyze = optionBlock.contains("ANALYZE", ignoreCase = true)
+    val targetKeyword = extractLeadingKeyword(statementBody)
+    val targetReadOnly = targetKeyword in READ_ONLY_KEYWORDS
+    val targetDangerous = targetKeyword in DANGEROUS_KEYWORDS
+    val displayKeyword = buildExplainKeyword(analyze, targetKeyword)
+    return SqlStatementAnalysis(
+        keyword = displayKeyword,
+        readOnly = !analyze || targetReadOnly,
+        dangerous = analyze && targetDangerous,
+    )
+}
+
+private fun splitExplainBody(explainBody: String): Pair<String, String> {
+    val trimmed = explainBody.trimStart()
+    if (!trimmed.startsWith("(")) {
+        return if (trimmed.startsWith("ANALYZE ", ignoreCase = true)) {
+            "ANALYZE" to trimmed.substringAfter(' ', "")
+        } else {
+            "" to trimmed
+        }
+    }
+    var depth = 0
+    for (index in trimmed.indices) {
+        when (trimmed[index]) {
+            '(' -> depth += 1
+            ')' -> {
+                depth -= 1
+                if (depth == 0) {
+                    return trimmed.substring(0, index + 1) to trimmed.substring(index + 1).trimStart()
+                }
+            }
+        }
+    }
+    return trimmed to ""
+}
+
+private fun buildExplainKeyword(
+    analyze: Boolean,
+    targetKeyword: String,
+): String =
+    buildString {
+        append("EXPLAIN")
+        if (analyze) {
+            append(" ANALYZE")
+        }
+        if (targetKeyword.isNotBlank()) {
+            append(' ')
+            append(targetKeyword)
+        }
+    }
+
+private fun extractLeadingKeyword(normalized: String): String {
     if (normalized.isBlank()) {
         return ""
     }
@@ -67,4 +131,3 @@ private val DANGEROUS_KEYWORDS = setOf(
     "GRANT",
     "REVOKE",
 )
-

@@ -26,6 +26,10 @@ internal fun SqlConsoleWorkspaceToolbar(
     onPageSizeChange: (Int) -> Unit,
     onFormatSql: () -> Unit,
     onOpenNewTab: () -> Unit,
+    onExplainCurrent: () -> Unit,
+    onExplainAnalyzeCurrent: () -> Unit,
+    onExplainSelection: () -> Unit,
+    onExplainAnalyzeSelection: () -> Unit,
     onRunCurrent: () -> Unit,
     onRunSelection: () -> Unit,
     onRunAll: () -> Unit,
@@ -72,6 +76,63 @@ internal fun SqlConsoleWorkspaceToolbar(
                     icon = "⊞",
                     toneClass = "btn-outline-dark",
                     onClick = onOpenNewTab,
+                )
+            }
+            SqlToolbarActionGroup(
+                title = "EXPLAIN",
+                note = buildSqlExplainScopeSummary(
+                    currentOutlineItem = currentOutlineItem,
+                    selectedSqlText = selectedSqlText,
+                    selectedSqlLineCount = selectedSqlLineCount,
+                ),
+            ) {
+                SqlToolbarActionButton(
+                    title = "EXPLAIN текущий statement",
+                    icon = "↦E",
+                    toneClass = "btn-outline-dark",
+                    buttonDisabled = (
+                        state.actionInProgress == "explain-current-query" ||
+                            state.info?.configured != true ||
+                            pendingManualTransaction ||
+                            currentOutlineItem == null
+                        ),
+                    onClick = onExplainCurrent,
+                )
+                SqlToolbarActionButton(
+                    title = "EXPLAIN ANALYZE текущий statement",
+                    icon = "↦A",
+                    toneClass = "btn-outline-warning",
+                    buttonDisabled = (
+                        state.actionInProgress == "explain-analyze-current-query" ||
+                            state.info?.configured != true ||
+                            pendingManualTransaction ||
+                            currentOutlineItem == null
+                        ),
+                    onClick = onExplainAnalyzeCurrent,
+                )
+                SqlToolbarActionButton(
+                    title = "EXPLAIN выделение",
+                    icon = "▣E",
+                    toneClass = "btn-outline-dark",
+                    buttonDisabled = (
+                        state.actionInProgress == "explain-selection-query" ||
+                            state.info?.configured != true ||
+                            pendingManualTransaction ||
+                            selectedSqlText.isBlank()
+                        ),
+                    onClick = onExplainSelection,
+                )
+                SqlToolbarActionButton(
+                    title = "EXPLAIN ANALYZE выделение",
+                    icon = "▣A",
+                    toneClass = "btn-outline-warning",
+                    buttonDisabled = (
+                        state.actionInProgress == "explain-analyze-selection-query" ||
+                            state.info?.configured != true ||
+                            pendingManualTransaction ||
+                            selectedSqlText.isBlank()
+                        ),
+                    onClick = onExplainAnalyzeSelection,
                 )
             }
             SqlToolbarActionGroup(

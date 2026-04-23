@@ -41,6 +41,80 @@ class SqlConsoleStoreExecutionSupportTest {
     }
 
     @Test
+    fun `strict safety blocks explain analyze for mutating query before api call`() {
+        var startCalls = 0
+        val store = SqlConsoleStore(
+            StubSqlConsoleApi(
+                startQueryHandler = {
+                    startCalls += 1
+                    error("startQuery should not be called")
+                },
+            ),
+        )
+
+        val next = runSuspend {
+            store.startQuery(
+                current = SqlConsolePageState(
+                    info = sampleSqlConsoleInfo(),
+                    draftSql = "explain analyze update public.offer set name = 'x'",
+                    selectedSourceNames = listOf("db1"),
+                    strictSafetyEnabled = true,
+                ),
+                workspaceId = "workspace-a",
+                ownerSessionId = "tab-1",
+            )
+        }
+
+        assertEquals(0, startCalls)
+        assertEquals(
+            "Строгая защита включена. Для выполнения изменяющего запроса сначала отключи этот режим.",
+            next.errorMessage,
+        )
+        assertNull(next.currentExecutionId)
+        assertNull(next.successMessage)
+    }
+
+    @Test
+    fun `strict safety still allows plan only explain for mutating query`() {
+        var startCalls = 0
+        val store = SqlConsoleStore(
+            StubSqlConsoleApi(
+                startQueryHandler = {
+                    startCalls += 1
+                    SqlConsoleStartQueryResponse(
+                        id = "exec-explain",
+                        status = "RUNNING",
+                        startedAt = "2026-04-23T11:00:00Z",
+                        cancelRequested = false,
+                        autoCommitEnabled = true,
+                        transactionState = "NONE",
+                        ownerToken = "token-1",
+                    )
+                },
+            ),
+        )
+
+        val next = runSuspend {
+            store.startQuery(
+                current = SqlConsolePageState(
+                    info = sampleSqlConsoleInfo(),
+                    draftSql = "explain update public.offer set name = 'x'",
+                    selectedSourceNames = listOf("db1"),
+                    strictSafetyEnabled = true,
+                ),
+                workspaceId = "workspace-a",
+                ownerSessionId = "tab-1",
+                successMessage = "EXPLAIN запущен.",
+            )
+        }
+
+        assertEquals(1, startCalls)
+        assertEquals("exec-explain", next.currentExecutionId)
+        assertEquals("EXPLAIN запущен.", next.successMessage)
+        assertNull(next.errorMessage)
+    }
+
+    @Test
     fun `heartbeat ownership loss clears owner token but keeps execution snapshot`() {
         val store = SqlConsoleStore(
             StubSqlConsoleApi(

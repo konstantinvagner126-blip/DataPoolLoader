@@ -673,6 +673,10 @@
     - execution mode становится явным: `текущий statement`, `выделение`, `весь script` существуют как три разные user-visible actions;
     - toolbar, Monaco hotkeys и run-scope summary должны показывать один и тот же contract, без скрытого `selection if exists else current`;
     - выполнение выделения остается чисто editor-local UX слоем и reuse-ит тот же `startQuery(sqlOverride)` boundary, без нового backend execution mode.
+  - пятый пакет тоже начат:
+    - `EXPLAIN` и `EXPLAIN ANALYZE` живут как отдельные toolbar actions, а не как скрытая временная подмена `draft SQL`;
+    - explain-scope остается явным и bounded: поддерживаются только `current statement` и `выделение`, без неочевидного `EXPLAIN всего script`;
+    - `EXPLAIN ANALYZE` не должен обходить safety-contract: shared SQL analysis обязан различать plan-only `EXPLAIN` и реально исполняющий `EXPLAIN ANALYZE` по внутреннему statement keyword.
 
 Критерий завершения:
 
