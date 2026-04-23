@@ -3,7 +3,7 @@ package com.sbrf.lt.platform.composeui.module_editor
 internal class ModuleEditorStoreConfigFormSupport(
     private val mutationSupport: ModuleEditorStoreConfigFormMutationSupport,
     private val sqlResourceSupport: ModuleEditorStoreConfigFormSqlResourceSupport,
-) {
+) : ModuleEditorSqlResourceFormSyncStore {
     constructor(api: ModuleEditorApi) : this(
         mutationSupport = ModuleEditorStoreConfigFormMutationSupport(api),
         sqlResourceSupport = ModuleEditorStoreConfigFormSqlResourceSupport(),
@@ -21,13 +21,13 @@ internal class ModuleEditorStoreConfigFormSupport(
     fun startConfigFormSync(current: ModuleEditorPageState): ModuleEditorPageState =
         mutationSupport.startConfigFormSync(current)
 
-    fun buildSqlResourceUsages(
+    override fun buildSqlResourceUsages(
         formState: ConfigFormStateDto?,
         path: String,
     ): List<String> =
         sqlResourceSupport.buildSqlResourceUsages(formState, path)
 
-    suspend fun applySqlResourceRename(
+    override suspend fun applySqlResourceRename(
         current: ModuleEditorPageState,
         currentPath: String,
         nextPath: String,

@@ -872,6 +872,14 @@ Review after Phase F:
       - добавлены common tests на save request mapping и save action error/refresh wiring:
         - [ModuleEditorStoreSaveRequestSupportTest.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonTest/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreSaveRequestSupportTest.kt)
         - [ModuleEditorStoreSaveActionSupportTest.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonTest/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreSaveActionSupportTest.kt)
+    - SQL-resource mutation слой больше не смешивает local draft mutation и rename workflow с form-sync side effects:
+      - узкий form-sync контракт вынесен в [ModuleEditorSqlResourceFormSyncStore.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorSqlResourceFormSyncStore.kt);
+      - create/delete local draft policy вынесен в [ModuleEditorStoreSqlResourceDraftMutationSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreSqlResourceDraftMutationSupport.kt);
+      - rename workflow вынесен в [ModuleEditorStoreSqlResourceRenameSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreSqlResourceRenameSupport.kt);
+      - [ModuleEditorStoreSqlResourceMutationSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreSqlResourceMutationSupport.kt) остался façade-слоем;
+      - добавлены common tests на create/delete policy и rename workflow:
+        - [ModuleEditorStoreSqlResourceDraftMutationSupportTest.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonTest/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreSqlResourceDraftMutationSupportTest.kt)
+        - [ModuleEditorStoreSqlResourceRenameSupportTest.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonTest/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreSqlResourceRenameSupportTest.kt)
   - начат cleanup `module_runs` shared-store кластера:
     - [ModuleRunsStoreLoadingSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsStoreLoadingSupport.kt) перестал держать initial load, database runtime fallback и run selection/details policy в одном helper;
     - runtime/fallback branching вынесен в [ModuleRunsStoreRuntimeSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsStoreRuntimeSupport.kt);

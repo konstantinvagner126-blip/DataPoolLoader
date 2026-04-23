@@ -81,6 +81,24 @@ internal class StubModuleEditorSelectedModuleRefreshStore(
     ): ModuleEditorPageState = handler(current, route, successMessage)
 }
 
+internal class StubModuleEditorSqlResourceFormSyncStore(
+    private val usagesHandler: (ConfigFormStateDto?, String) -> List<String> = { _, _ -> emptyList() },
+    private val renameHandler: suspend (ModuleEditorPageState, String, String) -> ModuleEditorPageState = { current, _, _ ->
+        current
+    },
+) : ModuleEditorSqlResourceFormSyncStore {
+    override fun buildSqlResourceUsages(
+        formState: ConfigFormStateDto?,
+        path: String,
+    ): List<String> = usagesHandler(formState, path)
+
+    override suspend fun applySqlResourceRename(
+        current: ModuleEditorPageState,
+        currentPath: String,
+        nextPath: String,
+    ): ModuleEditorPageState = renameHandler(current, currentPath, nextPath)
+}
+
 internal fun <T> runModuleEditorSuspend(block: suspend () -> T): T {
     var completed: Result<T>? = null
     block.startCoroutine(

@@ -26,7 +26,7 @@ internal fun createModuleEditorStoreDependencies(
             ),
             sqlResourceSupport = ModuleEditorStoreSqlResourceSupport(
                 mutationSupport = ModuleEditorStoreSqlResourceMutationSupport(
-                    configFormSupport = configFormSupport,
+                    formSyncStore = configFormSupport,
                     namingSupport = sqlResourceNamingSupport,
                 ),
             ),

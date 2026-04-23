@@ -8,7 +8,7 @@ internal class ModuleEditorStoreSqlResourceSupport(
         namingSupport: ModuleEditorStoreSqlResourceNamingSupport = ModuleEditorStoreSqlResourceNamingSupport(),
     ) : this(
         mutationSupport = ModuleEditorStoreSqlResourceMutationSupport(
-            configFormSupport = configFormSupport,
+            formSyncStore = configFormSupport,
             namingSupport = namingSupport,
         ),
     )
