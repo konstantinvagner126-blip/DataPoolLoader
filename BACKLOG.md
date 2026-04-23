@@ -934,6 +934,12 @@ Review after Phase F:
     - pure state transitions вынесены в [ModuleRunsStoreStateSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsStoreStateSupport.kt);
     - добавлены common tests на loaded/reload/failure state rules:
       - [ModuleRunsStoreStateSupportTest.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonTest/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsStoreStateSupportTest.kt)
+  - следующий bounded split в `run_history_cleanup` идет по loading-state, а не по уже reviewable action helper-ам:
+    - [RunHistoryCleanupStoreLoadingSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/run_history_cleanup/RunHistoryCleanupStoreLoadingSupport.kt) перестал держать runtime-unavailable state и preview/output error aggregation прямо в orchestration слое;
+    - pure loading state transitions вынесены в [RunHistoryCleanupStoreLoadingStateSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/run_history_cleanup/RunHistoryCleanupStoreLoadingStateSupport.kt);
+    - добавлены common tests на loading-state rules и load orchestration:
+      - [RunHistoryCleanupStoreLoadingStateSupportTest.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonTest/kotlin/com/sbrf/lt/platform/composeui/run_history_cleanup/RunHistoryCleanupStoreLoadingStateSupportTest.kt)
+      - [RunHistoryCleanupStoreLoadingSupportTest.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonTest/kotlin/com/sbrf/lt/platform/composeui/run_history_cleanup/RunHistoryCleanupStoreLoadingSupportTest.kt)
 
 ### 12. Финализировать boundary модульного редактора и storage contracts
 
