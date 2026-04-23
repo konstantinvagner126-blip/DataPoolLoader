@@ -26,6 +26,10 @@
 - long-running операции;
 - крупные Compose-экраны и store-слой.
 
+Для изменений, которые затрагивают state model, дополнительно обязательна сверка с:
+
+- [STATE_MODEL_MAP.md](/Users/kwdev/DataPoolLoader/STATE_MODEL_MAP.md)
+
 ## 1. Базовый контекст проекта
 
 Проект рассматривается как:
@@ -187,6 +191,10 @@
 
 ### 4.1. Любое состояние должно быть классифицировано
 
+Текущая инженерная карта состояний проекта поддерживается в:
+
+- [STATE_MODEL_MAP.md](/Users/kwdev/DataPoolLoader/STATE_MODEL_MAP.md)
+
 Каждое новое состояние должно быть явно отнесено к одному из типов:
 
 - transient runtime state;
@@ -197,6 +205,8 @@
 - operational history.
 
 Если при добавлении нового состояния неясно, к какому типу оно относится, архитектурное решение считается плохим.
+
+Если изменение добавляет новый значимый state boundary или меняет source of truth существующего состояния, соответствующее изменение в [STATE_MODEL_MAP.md](/Users/kwdev/DataPoolLoader/STATE_MODEL_MAP.md) обязательно.
 
 ### 4.2. Нельзя смешивать operational state и user preferences
 

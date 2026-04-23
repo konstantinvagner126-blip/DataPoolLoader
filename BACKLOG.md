@@ -21,6 +21,7 @@
 
 - [ARCHITECTURE_RULES.md](/Users/kwdev/DataPoolLoader/ARCHITECTURE_RULES.md)
 - [BACKLOG_HISTORY.md](/Users/kwdev/DataPoolLoader/BACKLOG_HISTORY.md)
+- [STATE_MODEL_MAP.md](/Users/kwdev/DataPoolLoader/STATE_MODEL_MAP.md)
 - [SQL_CONSOLE_FAILURE_SCENARIOS.md](/Users/kwdev/DataPoolLoader/SQL_CONSOLE_FAILURE_SCENARIOS.md)
 - [SQL_CONSOLE_MONACO_AUTOCOMPLETE.md](/Users/kwdev/DataPoolLoader/SQL_CONSOLE_MONACO_AUTOCOMPLETE.md)
 
@@ -33,10 +34,11 @@
 
 ## P0
 
-Текущий наивысший приоритет внутри `P0`:
+Текущее состояние `P0`:
 
-- сначала выполнить [8. Нормализовать build baseline на Java 21](/Users/kwdev/DataPoolLoader/BACKLOG.md);
-- до завершения этого пакета не начинать новые feature- или cleanup-циклы, кроме изменений, которые прямо нужны для green build на `Java 21`.
+- основные baseline-пакеты `P0` уже закрыты;
+- новые `P0` задачи заводятся только для реального нарушения build/runtime baseline, safety или архитектурного инварианта;
+- активная работа смещена в `P1/P2` architectural follow-up streams.
 
 ### 0. Архитектурная программа: вычистить `ui-server` как перегруженный boundary
 
@@ -110,7 +112,7 @@
 
 Статус:
 
-- частично реализовано
+- реализовано
 
 Цель:
 
@@ -139,6 +141,12 @@
 - run-state и credentials уже разведены по отдельным persisted моделям;
 - persisted state SQL-консоли уже разрезан на `workspace / library / preferences`, а combined legacy state переведен в migration-only роль;
 - source-of-truth для UI preferences и operational content стал заметно явнее;
+- собрана отдельная инженерная карта состояний в [STATE_MODEL_MAP.md](/Users/kwdev/DataPoolLoader/STATE_MODEL_MAP.md):
+  - persisted local state;
+  - runtime/process-local state;
+  - UI page/store state;
+  - operational config;
+  - recovery/cleanup rules;
 - подробная история выполненной волны вынесена в [BACKLOG_HISTORY.md](/Users/kwdev/DataPoolLoader/BACKLOG_HISTORY.md).
 
 Критерий завершения:
@@ -272,7 +280,7 @@
 
 Статус:
 
-- частично реализовано
+- реализовано
 
 Источник:
 
@@ -950,7 +958,7 @@ Review after Phase F:
 
 Статус:
 
-- частично реализовано
+- реализовано
 
 Цель:
 
@@ -1024,6 +1032,7 @@ Review after Phase F:
 
 - [ARCHITECTURE_RULES.md](/Users/kwdev/DataPoolLoader/ARCHITECTURE_RULES.md)
 - [AGENTS.md](/Users/kwdev/DataPoolLoader/AGENTS.md)
+- [STATE_MODEL_MAP.md](/Users/kwdev/DataPoolLoader/STATE_MODEL_MAP.md)
 
 Что нужно сделать:
 
@@ -1064,7 +1073,7 @@ Review after Phase F:
 
 Статус:
 
-- не реализовано
+- реализовано
 
 Цель:
 
@@ -1075,6 +1084,22 @@ Review after Phase F:
   - правила восстановления и очистки.
 
 Это нужно для дальнейшего рефакторинга и для предотвращения повторного смешения state-моделей.
+
+Что уже сделано:
+
+- добавлен [STATE_MODEL_MAP.md](/Users/kwdev/DataPoolLoader/STATE_MODEL_MAP.md);
+- карта состояния теперь явно разделяет:
+  - `operational config`;
+  - `persisted local state`;
+  - `operational history`;
+  - `UI preference`;
+  - `transient runtime state`;
+  - `cache`;
+- для ключевых state boundary задокументированы:
+  - source of truth;
+  - recovery rules;
+  - cleanup rules;
+- [ARCHITECTURE_RULES.md](/Users/kwdev/DataPoolLoader/ARCHITECTURE_RULES.md) обновлен так, чтобы state-model изменения требовали синхронизации с этим документом.
 
 ### 18. SQL-консоль: staged Monaco hints и autocomplete для PostgreSQL
 
