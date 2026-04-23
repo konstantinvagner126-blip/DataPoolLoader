@@ -9,6 +9,9 @@ out/
 **/output/
 !ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/model/output/
 !ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/model/output/**
+node_modules/
+tools/sql-console-browser-smoke/playwright-report/
+tools/sql-console-browser-smoke/test-results/
 
 # Local credentials
 gradle/credential.properties

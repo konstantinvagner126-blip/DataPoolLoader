@@ -3,6 +3,7 @@
   let monacoConfigured = false;
   let sqlSupportRegistered = false;
   const sqlStatementMarkerDecorations = new WeakMap();
+  const monacoEditorsByElementId = new Map();
   const monacoVsPath = "/static/compose-app/vendor/monaco-editor/min/vs";
   const DEFAULT_SQL_OBJECT_COMPLETION_LIMIT = 8;
   const MAX_SQL_OBJECT_SUGGESTIONS = 24;
@@ -1248,10 +1249,46 @@
       minimap: { enabled: false },
       ...options
     });
+    monacoEditorsByElementId.set(elementId, editor);
+    editor.onDidDispose(() => {
+      monacoEditorsByElementId.delete(elementId);
+    });
     if (options?.language === "sql" && options?.sqlObjectNavigation === true) {
       registerSqlObjectNavigationActions(editor);
     }
     return editor;
+  }
+
+  function findMonacoEditor(elementId) {
+    if (typeof elementId === "string" && elementId.trim()) {
+      return monacoEditorsByElementId.get(elementId.trim()) || null;
+    }
+    const firstEditor = monacoEditorsByElementId.values().next();
+    return firstEditor.done ? null : firstEditor.value;
+  }
+
+  function getEditorValue(elementId) {
+    const editor = findMonacoEditor(elementId);
+    return editor ? editor.getValue() : null;
+  }
+
+  function setEditorValue(value, elementId) {
+    const editor = findMonacoEditor(elementId);
+    if (!editor) {
+      return false;
+    }
+    editor.setValue(`${value ?? ""}`);
+    editor.focus();
+    return true;
+  }
+
+  function focusEditor(elementId) {
+    const editor = findMonacoEditor(elementId);
+    if (!editor) {
+      return false;
+    }
+    editor.focus();
+    return true;
   }
 
   function setSqlStatementMarkers(editor, markers) {
@@ -1313,4 +1350,7 @@
   namespace.setSqlMetadataContext = setSqlMetadataContext;
   namespace.setSqlObjectNavigationHandlers = setSqlObjectNavigationHandlers;
   namespace.setSqlStatementMarkers = setSqlStatementMarkers;
+  namespace.getEditorValue = getEditorValue;
+  namespace.setEditorValue = setEditorValue;
+  namespace.focusEditor = focusEditor;
 })(window);

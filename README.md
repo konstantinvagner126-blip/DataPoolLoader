@@ -596,22 +596,56 @@ http://localhost:8080
 
 ## SQL-консоль
 
-SQL-консоль использует `ui.sqlConsole.sources`.
+SQL-консоль использует глобальный contract:
+
+- `ui.sqlConsole.groups`
+- `ui.sqlConsole.sourceCatalog`
 
 Сейчас она умеет:
 
-- выполнять один SQL statement за запуск;
-- выбирать конкретные source через чекбоксы;
-- для `SELECT` показывать данные по каждому source отдельно;
-- для остальных команд показывать статус выполнения по каждому source;
-- работать асинхронно;
-- отменять запрос;
-- применять `queryTimeoutSec`.
+- работать как multi-tab workspace инструмент;
+- выбирать source через group-first модель с раскрываемыми группами и synthetic `Без группы`;
+- выполнять `текущий statement`, `выделение` или `весь script`;
+- безопасно вести manual transaction c ownership/heartbeat/rollback protection;
+- показывать `SELECT` в `Grid / Diff` режимах;
+- открывать object browser и lazy inspector объектов БД;
+- давать Monaco autocomplete/object navigation без тяжелого SQL LSP;
+- хранить per-workspace execution history.
 
-Если в `ui.sqlConsole.sources` используются `${...}`, перед запуском SQL через UI нужно:
+Если в `ui.sqlConsole.sourceCatalog` используются `${...}`, перед запуском SQL через UI нужно:
 
 - загрузить `credential.properties` через интерфейс;
 - или настроить fallback credentials.
+
+### Browser smoke coverage
+
+Для SQL-консоли есть отдельный browser-level smoke loop:
+
+```bash
+./scripts/run-sql-console-browser-smoke.sh
+```
+
+Что делает script:
+
+- поднимает изолированный UI runtime на отдельном порту;
+- использует отдельный `storageDir`, не смешивая smoke run с обычным пользовательским state;
+- готовит детерминированную schema `datapool_manual`;
+- гоняет 4 ключевых сценария:
+  - новая вкладка консоли;
+  - manual transaction -> rollback;
+  - object inspector -> `Открыть SELECT в консоли`;
+  - `Grid / Diff` navigation.
+
+По умолчанию script использует локальный PostgreSQL:
+
+- `jdbc:postgresql://127.0.0.1:5432/postgres`
+- `kwdev / dummy`
+
+Переопределение возможно через:
+
+- `LOCAL_MANUAL_DB_JDBC_URL`
+- `LOCAL_MANUAL_DB_USERNAME`
+- `LOCAL_MANUAL_DB_PASSWORD`
 
 ## Desktop package через `jpackage`
 

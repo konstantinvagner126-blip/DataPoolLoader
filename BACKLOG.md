@@ -42,7 +42,7 @@
 
 Статус:
 
-- частично реализовано
+- реализовано
 
 Цель:
 
@@ -617,6 +617,14 @@
 - после стабилизации interaction model добавить screen-level smoke coverage на ключевые UX/safety сценарии SQL-консоли;
 - закрепить SQL-консоль отдельными архитектурными и тестовыми инвариантами;
 - не допускать giant-file debt и размывания границ между `ui-compose-shared`, `ui-compose-web` и `ui-server`.
+- browser-level smoke coverage уже реализован отдельным bounded harness:
+  - [scripts/run-sql-console-browser-smoke.sh](/Users/kwdev/DataPoolLoader/scripts/run-sql-console-browser-smoke.sh) поднимает изолированный UI runtime со своим `storageDir`, отдельным port и smoke-config, не смешивая browser tests с пользовательским SQL-console state;
+  - [tools/sql-console-browser-smoke/tests/sql-console.smoke.spec.mjs](/Users/kwdev/DataPoolLoader/tools/sql-console-browser-smoke/tests/sql-console.smoke.spec.mjs) держит 4 ключевых сценария:
+    - multi-tab workspace clone без ложного banner про blocked popup;
+    - manual transaction -> `PENDING_COMMIT` -> `Rollback`;
+    - object inspector -> `Открыть SELECT в консоли`;
+    - result `Grid / Diff` navigation;
+  - smoke loop готовит детерминированную schema `datapool_manual`, чтобы object-browser и transactional сценарии не зависели от случайного user catalog state.
 - текущий regression package должен явно держать:
   - `group-first` runtime contract с synthetic `Без группы`;
   - одинаковое восстановление `selectedGroups / selectedSources / manual include-exclude` в основном экране и `sql-console-objects`;
@@ -692,20 +700,12 @@ Review after Phase F:
 - по итогам review первая продуктовая волна SQL-консоли считается реализованной:
   - safety/recovery, multi-tab, group-first selection, object inspector, main UX, Monaco, IDE-like enhancements и execution history уже собраны в рабочую подсистему;
   - backlog `6` больше не должен расширяться новыми product-идеями до отдельного нового решения;
-- блок `6` пока не закрывается формально, потому что остались три closure-task, уже относящиеся не к новым фичам, а к закреплению и cleanup:
-  1. browser-level smoke coverage для ключевых SQL-console сценариев:
-     - multi-tab workspace restore;
-     - pending-commit / rollback UX;
-     - object inspector -> `Открыть SELECT в консоли`;
-     - result `Grid / Diff` navigation;
-  2. structural cleanup `core` metadata-introspection слоя:
-     - [SqlConsoleMetadataJdbcSupport.kt](/Users/kwdev/DataPoolLoader/core/src/main/kotlin/com/sbrf/lt/datapool/sqlconsole/SqlConsoleMetadataJdbcSupport.kt) стал giant support-file и должен быть разрезан на более узкие postgres/generic search/inspect/details responsibilities;
-  3. structural cleanup SQL-console test layer:
-     - [SqlConsoleServiceTest.kt](/Users/kwdev/DataPoolLoader/core/src/test/kotlin/com/sbrf/lt/datapool/SqlConsoleServiceTest.kt),
-       [SqlConsoleQueryManagerTest.kt](/Users/kwdev/DataPoolLoader/ui-server/src/test/kotlin/com/sbrf/lt/platform/ui/sqlconsole/SqlConsoleQueryManagerTest.kt)
-       и SQL-console slice внутри [ServerTest.kt](/Users/kwdev/DataPoolLoader/ui-server/src/test/kotlin/com/sbrf/lt/platform/ui/server/ServerTest.kt)
-       нужно довести до более reviewable test-support/spec структуры;
-- следующий рабочий шаг после этого review: сначала добить пункт `2`, затем `3`, и только потом решать, нужен ли отдельный пакет smoke coverage или блок `6` можно закрывать с текущим уровнем косвенной страховки.
+- closure-task пакет этой review-волны закрыт:
+  1. browser-level smoke coverage реализован отдельным bounded Playwright harness без смешения с пользовательским runtime state;
+  2. giant metadata-introspection слой в `core` разрезан на отдельные postgres/generic search/inspect/details responsibilities;
+  3. SQL-console test layer разрезан на reviewable support/spec структуру для `core`, `ui-server` route-slice и `query manager`;
+- блок `6` теперь закрывается формально как текущий SQL-console baseline;
+- любые новые доработки SQL-консоли после этого момента должны идти уже как отдельная новая фаза в backlog, а не как бесконечный хвост старой программы.
 - update after review:
   - giant metadata-introspection слой в `core` уже приведен к более узкой структуре:
     - postgres search вынесен отдельно;
@@ -715,7 +715,19 @@ Review after Phase F:
   - SQL-console test-layer cleanup уже начат:
     - server-side SQL-console route/lifecycle/export slice вынесен из giant [ServerTest.kt](/Users/kwdev/DataPoolLoader/ui-server/src/test/kotlin/com/sbrf/lt/platform/ui/server/ServerTest.kt) в отдельный [SqlConsoleServerTest.kt](/Users/kwdev/DataPoolLoader/ui-server/src/test/kotlin/com/sbrf/lt/platform/ui/server/SqlConsoleServerTest.kt);
     - общие server test helper-ы вынесены в [ServerTestSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/test/kotlin/com/sbrf/lt/platform/ui/server/ServerTestSupport.kt);
-  - ближайший remaining closure-task теперь не metadata и не server route slice, а cleanup [SqlConsoleServiceTest.kt](/Users/kwdev/DataPoolLoader/core/src/test/kotlin/com/sbrf/lt/datapool/SqlConsoleServiceTest.kt) и [SqlConsoleQueryManagerTest.kt](/Users/kwdev/DataPoolLoader/ui-server/src/test/kotlin/com/sbrf/lt/platform/ui/sqlconsole/SqlConsoleQueryManagerTest.kt).
+    - giant [SqlConsoleServiceTest.kt](/Users/kwdev/DataPoolLoader/core/src/test/kotlin/com/sbrf/lt/datapool/SqlConsoleServiceTest.kt) разрезан на:
+      - [SqlConsoleServiceExecutionTest.kt](/Users/kwdev/DataPoolLoader/core/src/test/kotlin/com/sbrf/lt/datapool/SqlConsoleServiceExecutionTest.kt)
+      - [SqlConsoleServiceMetadataTest.kt](/Users/kwdev/DataPoolLoader/core/src/test/kotlin/com/sbrf/lt/datapool/SqlConsoleServiceMetadataTest.kt)
+      - [SqlConsoleServiceTestSupport.kt](/Users/kwdev/DataPoolLoader/core/src/test/kotlin/com/sbrf/lt/datapool/SqlConsoleServiceTestSupport.kt)
+    - giant [SqlConsoleQueryManagerTest.kt](/Users/kwdev/DataPoolLoader/ui-server/src/test/kotlin/com/sbrf/lt/platform/ui/sqlconsole/SqlConsoleQueryManagerTest.kt) разрезан на:
+      - [SqlConsoleQueryManagerExecutionTest.kt](/Users/kwdev/DataPoolLoader/ui-server/src/test/kotlin/com/sbrf/lt/platform/ui/sqlconsole/SqlConsoleQueryManagerExecutionTest.kt)
+      - [SqlConsoleQueryManagerTransactionSafetyTest.kt](/Users/kwdev/DataPoolLoader/ui-server/src/test/kotlin/com/sbrf/lt/platform/ui/sqlconsole/SqlConsoleQueryManagerTransactionSafetyTest.kt)
+      - [SqlConsoleQueryManagerTestSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/test/kotlin/com/sbrf/lt/platform/ui/sqlconsole/SqlConsoleQueryManagerTestSupport.kt)
+  - browser-level smoke coverage закрыт отдельным harness:
+    - [scripts/run-sql-console-browser-smoke.sh](/Users/kwdev/DataPoolLoader/scripts/run-sql-console-browser-smoke.sh)
+    - [tools/sql-console-browser-smoke/playwright.config.mjs](/Users/kwdev/DataPoolLoader/tools/sql-console-browser-smoke/playwright.config.mjs)
+    - [tools/sql-console-browser-smoke/tests/sql-console.smoke.spec.mjs](/Users/kwdev/DataPoolLoader/tools/sql-console-browser-smoke/tests/sql-console.smoke.spec.mjs)
+    - сценарии покрывают multi-tab clone, pending-commit rollback UX, object inspector -> `Открыть SELECT`, и `Grid / Diff` navigation на изолированном smoke runtime.
 
 Критерий завершения:
 
