@@ -750,6 +750,52 @@ class SqlConsoleQueryManagerTest {
         assertEquals(SqlConsoleExecutionStatus.CANCELLED, finishedSecond.status)
     }
 
+    @Test
+    fun `owner loss in one workspace does not remove control path from another workspace`() {
+        var now = Instant.parse("2026-04-23T00:00:00Z")
+        val releaseExecution = CountDownLatch(1)
+        val manager = SqlConsoleQueryManager(
+            sqlConsoleService = autoCommitBlockingService(releaseExecution),
+            clock = { now },
+            ownerLeaseDuration = Duration.ofSeconds(30),
+            ownerReleaseRecoveryWindow = Duration.ofSeconds(3),
+        )
+
+        val first = manager.startQuery(
+            sql = "select 1 as first_value",
+            credentialsPath = null,
+            workspaceId = "workspace-a",
+            ownerSessionId = "owner-a",
+        )
+        val second = manager.startQuery(
+            sql = "select 1 as second_value",
+            credentialsPath = null,
+            workspaceId = "workspace-b",
+            ownerSessionId = "owner-b",
+        )
+
+        manager.releaseOwnership(first.id, "owner-a", requireNotNull(first.ownerToken))
+        now = now.plusSeconds(4)
+        manager.enforceSafetyTimeouts()
+
+        val lostOwnerError = assertFailsWith<UiStateConflictException> {
+            manager.heartbeat(first.id, "owner-a", requireNotNull(first.ownerToken))
+        }
+        assertTrue(lostOwnerError.message!!.contains("потеряла владельца"))
+
+        val cancelledSecond = manager.cancel(second.id, "owner-b", requireNotNull(second.ownerToken))
+        assertTrue(cancelledSecond.cancelRequested)
+        assertEquals(first.id, manager.currentSnapshot("workspace-a")?.id)
+        assertEquals(second.id, manager.currentSnapshot("workspace-b")?.id)
+
+        releaseExecution.countDown()
+        val finishedFirst = waitForCompletion(manager, first.id)
+        val finishedSecond = waitForCompletion(manager, second.id)
+
+        assertEquals(SqlConsoleExecutionStatus.SUCCESS, finishedFirst.status)
+        assertEquals(SqlConsoleExecutionStatus.CANCELLED, finishedSecond.status)
+    }
+
     private fun serviceWithSuccess() = SqlConsoleService(
         config = SqlConsoleConfig(
             sourceCatalog = listOf(SqlConsoleSourceConfig("db1", "jdbc:test", "user", "pwd")),

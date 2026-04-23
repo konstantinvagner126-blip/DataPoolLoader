@@ -107,6 +107,7 @@ import java.sql.Connection
 import java.sql.PreparedStatement
 import java.sql.ResultSet
 import java.sql.ResultSetMetaData
+import java.time.Duration
 import java.time.Instant
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -1082,6 +1083,117 @@ class ServerTest {
             Thread.sleep(25)
         }
         error("manual SQL execution did not reach pending commit in time")
+    }
+
+    @Test
+    fun `expiring one workspace release does not remove cancel path from another workspace`() = testApplication {
+        val root = createProject()
+        val registry = ModuleRegistry(appsRoot = root.resolve("apps"))
+        val storageDir = Files.createTempDirectory("ui-server-state-")
+        val uiConfig = UiAppConfig(
+            storageDir = storageDir.toString(),
+            sqlConsole = SqlConsoleConfig(
+                queryTimeoutSec = 30,
+                sourceCatalog = listOf(SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user", "pwd")),
+            ),
+        )
+        val runManager = RunManager(moduleRegistry = registry, uiConfig = uiConfig)
+        val releaseExecution = CountDownLatch(1)
+        val sqlConsoleService = SqlConsoleService(
+            config = uiConfig.sqlConsole,
+            executor = ShardSqlExecutor { shard, _, _, _, _, control ->
+                repeat(100) {
+                    if (control.isCancelled()) {
+                        throw SqlConsoleExecutionCancelledException("Запрос отменен пользователем.")
+                    }
+                    if (releaseExecution.count == 0L) {
+                        return@ShardSqlExecutor RawShardExecutionResult(
+                            shardName = shard.name,
+                            status = "SUCCESS",
+                            columns = listOf("id"),
+                            rows = listOf(mapOf("id" to "1")),
+                        )
+                    }
+                    Thread.sleep(5)
+                }
+                releaseExecution.await()
+                RawShardExecutionResult(
+                    shardName = shard.name,
+                    status = "SUCCESS",
+                    columns = listOf("id"),
+                    rows = listOf(mapOf("id" to "1")),
+                )
+            },
+        )
+        val queryManager = SqlConsoleQueryManager(
+            sqlConsoleService = sqlConsoleService,
+            ownerLeaseDuration = Duration.ofSeconds(30),
+            ownerReleaseRecoveryWindow = Duration.ofMillis(100),
+        )
+        application {
+            uiModule(
+                moduleRegistry = registry,
+                runManager = runManager,
+                sqlConsoleService = sqlConsoleService,
+                sqlConsoleQueryManager = queryManager,
+            )
+        }
+
+        val startedFirst = client.post("/api/sql-console/query/start") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"sql":"select 1 as first_value","selectedSourceNames":["shard1"],"workspaceId":"workspace-a","ownerSessionId":"tab-1"}""")
+        }
+        assertEquals(HttpStatusCode.OK, startedFirst.status)
+        val startedFirstBody = startedFirst.bodyAsText()
+        val firstExecutionId = Regex(""""id":"([^"]+)"""").find(startedFirstBody)?.groupValues?.get(1)
+        assertNotNull(firstExecutionId)
+        val firstOwnerToken = Regex(""""ownerToken":"([^"]+)"""").find(startedFirstBody)?.groupValues?.get(1)
+        assertNotNull(firstOwnerToken)
+
+        val startedSecond = client.post("/api/sql-console/query/start") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"sql":"select 1 as second_value","selectedSourceNames":["shard1"],"workspaceId":"workspace-b","ownerSessionId":"tab-2"}""")
+        }
+        assertEquals(HttpStatusCode.OK, startedSecond.status)
+        val startedSecondBody = startedSecond.bodyAsText()
+        val secondExecutionId = Regex(""""id":"([^"]+)"""").find(startedSecondBody)?.groupValues?.get(1)
+        assertNotNull(secondExecutionId)
+        val secondOwnerToken = Regex(""""ownerToken":"([^"]+)"""").find(startedSecondBody)?.groupValues?.get(1)
+        assertNotNull(secondOwnerToken)
+
+        val released = client.post("/api/sql-console/query/$firstExecutionId/release") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"ownerSessionId":"tab-1","ownerToken":"$firstOwnerToken"}""")
+        }
+        assertEquals(HttpStatusCode.OK, released.status)
+
+        Thread.sleep(150)
+
+        val expiredHeartbeat = client.post("/api/sql-console/query/$firstExecutionId/heartbeat") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"ownerSessionId":"tab-1","ownerToken":"$firstOwnerToken"}""")
+        }
+        assertEquals(HttpStatusCode.Conflict, expiredHeartbeat.status)
+        assertTrue(expiredHeartbeat.bodyAsText().contains("потеряла владельца"))
+
+        val cancelledSecond = client.post("/api/sql-console/query/$secondExecutionId/cancel") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"ownerSessionId":"tab-2","ownerToken":"$secondOwnerToken"}""")
+        }
+        assertEquals(HttpStatusCode.OK, cancelledSecond.status)
+        assertTrue(cancelledSecond.bodyAsText().contains(""""cancelRequested":true"""))
+
+        releaseExecution.countDown()
+
+        repeat(20) {
+            val polled = client.get("/api/sql-console/query/$secondExecutionId").bodyAsText()
+            if (polled.contains("\"status\":\"CANCELLED\"")) {
+                assertTrue(polled.contains("Запрос отменен пользователем"))
+                return@testApplication
+            }
+            Thread.sleep(25)
+        }
+        error("second workspace SQL execution was not cancelled in time")
     }
 
     @Test

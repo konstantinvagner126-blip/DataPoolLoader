@@ -399,6 +399,8 @@
 - дополнительный hardening этого пакета уже закреплен regression coverage:
   - route-level `409 Conflict` с canonical user-facing message для попытки открыть вторую manual transaction при чужом `PENDING_COMMIT`;
   - manager-level invariant: release/cancel завершения одной execution session не должны затрагивать другую execution session в соседнем workspace.
+  - route-level same-tab recovery после `release` и route-level сценарий `close/release` одной вкладки без потери `cancel/control-path` у соседней вкладки;
+  - manager-level owner-loss timeout в одном workspace не должен ломать `current snapshot` и `control-path` в другом workspace.
 
 Фаза A3. Global source groups и selection model:
 
