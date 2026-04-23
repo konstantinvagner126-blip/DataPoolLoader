@@ -1060,6 +1060,102 @@
 - smoke launcher теперь умеет принимать `PLAYWRIGHT_TEST_ARGS`, чтобы запускать отдельный spec и обновлять snapshots без ad-hoc ручного редактирования script-а;
 - visual stream стартовал со стабильных экранов, не смешивая первый baseline с шумными runtime-heavy страницами.
 
+#### 16.3. Visual baseline для стабильных SQL-screen shell scenarios
+
+Статус:
+
+- реализовано
+
+Проблема:
+
+- после запуска visual stream покрытие ограничено только:
+  - главной страницей;
+  - страницей `О проекте`;
+- SQL-консоль и object inspector уже сильно влияют на ежедневную работу, но сейчас не защищены screenshot-baseline-ами от layout drift и потери pane hierarchy;
+- при этом нельзя сразу тащить в visual suite шумные result-heavy сценарии с runtime-sensitive output.
+
+Целевой контракт:
+
+- visual suite получает следующий bounded слой на стабильных SQL-screen сценариях:
+  - основной shell SQL-консоли без запущенного execution;
+  - экран объектов БД с загруженным inspector;
+- baseline должен опираться на локально воспроизводимый seeded scenario и не зависеть от динамических run-duration/rows/transaction-state;
+- visual assertions должны ловить:
+  - поломку navigator pane;
+  - деградацию editor/tool-window chrome;
+  - потерю inspector pane structure и direct-load layout.
+
+Что сделано:
+
+- visual suite расширен следующими screenshot-baseline сценариями:
+  - основной shell SQL-консоли без execution-heavy output;
+  - экран объектов БД с direct-loaded inspector на фиксированной вкладке `columns`;
+- baselines строятся на том же локальном seeded Postgres harness, что и browser smoke SQL-консоли;
+- новый пакет не зависит от динамических duration/rows/result-state и потому остается устойчивым как regression guard на pane hierarchy и inspector layout.
+
+#### 16.4. Visual baseline для module editor shell в файловом режиме
+
+Статус:
+
+- реализовано
+
+Проблема:
+
+- после `16.3` visual stream все еще не покрывает основной non-SQL рабочий экран проекта;
+- `module editor` остается центральным экраном ежедневной работы, и его shell/layout пока не защищены от visual drift;
+- для первого пакета нельзя брать create/publish/run scenarios, потому что они слишком stateful и дадут лишний шум.
+
+Целевой контракт:
+
+- visual suite получает стабильный screenshot-baseline для `module editor`:
+  - файловый режим;
+  - фиксированный `moduleId`;
+  - без run-heavy или modal-heavy state;
+- baseline должен ловить:
+  - деградацию navigator sidebar;
+  - поломку editor/content pane;
+  - layout drift toolbar/run-overview shell.
+
+Что сделано:
+
+- visual regression spec расширен screenshot-baseline-ом для `module editor` в `files` mode;
+- baseline фиксируется на явном `module=local-manual-test`, поэтому не зависит от auto-select policy и порядка каталога;
+- screenshot покрывает основной shell экрана:
+  - каталог модулей;
+  - toolbar редактора;
+  - content pane без запуска run/modal scenarios.
+
+#### 16.5. Visual baseline для module runs empty-state
+
+Статус:
+
+- реализовано
+
+Проблема:
+
+- visual suite пока покрывает shell главных рабочих экранов, но еще не страхует ключевые empty-state сценарии;
+- `module runs` является важным operational экраном, и регрессия его empty-state легко останется незамеченной без browser-level baseline.
+
+Целевой контракт:
+
+- visual regression suite получает screenshot-baseline для `module runs`:
+  - `files` mode;
+  - фиксированный `moduleId`;
+  - воспроизводимый сценарий без сохраненной истории запусков;
+- baseline должен ловить:
+  - поломку overview strip;
+  - деградацию hero/shell компоновки;
+  - потерю или разъезд empty-state блока истории запусков.
+
+Что сделано:
+
+- visual suite расширен screenshot-baseline-ом для `module runs` empty-state;
+- baseline фиксируется на явном `module=local-manual-test` в `files` mode;
+- regression guard теперь покрывает:
+  - hero и shell компоновку экрана истории запусков;
+  - overview strip;
+  - empty-state блок `Для этого модуля запусков пока нет.`
+
 2. `Comprehensive visual regression coverage`
    - расширить существующий browser smoke harness до visual regression уровня;
    - покрыть как минимум:

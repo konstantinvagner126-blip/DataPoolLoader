@@ -40,78 +40,80 @@ internal fun ModuleRunsPageContent(
         return
     }
 
-    SectionCard(
-        title = session?.moduleTitle ?: "Модуль не выбран",
-        subtitle = session?.moduleMeta ?: "Открой этот экран из карточки выбранного модуля.",
-    ) {}
+    Div({ classes("module-runs-content-shell") }) {
+        SectionCard(
+            title = session?.moduleTitle ?: "Модуль не выбран",
+            subtitle = session?.moduleMeta ?: "Открой этот экран из карточки выбранного модуля.",
+        ) {}
 
-    ModuleRunsOverviewStrip(
-        route = route,
-        session = session,
-        history = history,
-        details = details,
-        state = state,
-    )
+        ModuleRunsOverviewStrip(
+            route = route,
+            session = session,
+            history = history,
+            details = details,
+            state = state,
+        )
 
-    when {
-        databaseFallbackActive -> {
-            EmptyStateCard(
-                title = "История запусков БД недоступна",
-                text = buildDatabaseModeUnavailableMessage(
-                    runtimeContext?.fallbackReason,
-                    "Режим базы данных сейчас недоступен. История DB-запусков временно недоступна.",
-                ),
-            )
-        }
+        when {
+            databaseFallbackActive -> {
+                EmptyStateCard(
+                    title = "История запусков БД недоступна",
+                    text = buildDatabaseModeUnavailableMessage(
+                        runtimeContext?.fallbackReason,
+                        "Режим базы данных сейчас недоступен. История DB-запусков временно недоступна.",
+                    ),
+                )
+            }
 
-        history == null || history.runs.isEmpty() -> {
-            EmptyStateCard(
-                title = "История запусков",
-                text = "Для этого модуля запусков пока нет.",
-            )
-        }
+            history == null || history.runs.isEmpty() -> {
+                EmptyStateCard(
+                    title = "История запусков",
+                    text = "Для этого модуля запусков пока нет.",
+                )
+            }
 
-        else -> {
-            Div({ classes("row", "g-4") }) {
-                Div({ classes("col-12", "col-xl-4") }) {
-                    RunsHistoryPanel(
-                        state = state,
-                        runs = filteredRuns,
-                        onHistoryLimitChange = callbacks.onHistoryLimitChange,
-                        onHistoryFilterChange = callbacks.onHistoryFilterChange,
-                        onSearchQueryChange = callbacks.onSearchQueryChange,
-                        onSelectRun = if (filteredRuns.isEmpty()) {
-                            { }
-                        } else {
-                            callbacks.onSelectRun
-                        },
-                    )
-                }
+            else -> {
+                Div({ classes("row", "g-4") }) {
+                    Div({ classes("col-12", "col-xl-4") }) {
+                        RunsHistoryPanel(
+                            state = state,
+                            runs = filteredRuns,
+                            onHistoryLimitChange = callbacks.onHistoryLimitChange,
+                            onHistoryFilterChange = callbacks.onHistoryFilterChange,
+                            onSearchQueryChange = callbacks.onSearchQueryChange,
+                            onSelectRun = if (filteredRuns.isEmpty()) {
+                                { }
+                            } else {
+                                callbacks.onSelectRun
+                            },
+                        )
+                    }
 
-                Div({ classes("col-12", "col-xl-8") }) {
-                    when {
-                        filteredRuns.isEmpty() -> {
-                            EmptyStateCard(
-                                title = "Выбранный запуск",
-                                text = "По выбранным фильтрам или поиску запусков нет.",
-                            )
-                        }
+                    Div({ classes("col-12", "col-xl-8") }) {
+                        when {
+                            filteredRuns.isEmpty() -> {
+                                EmptyStateCard(
+                                    title = "Выбранный запуск",
+                                    text = "По выбранным фильтрам или поиску запусков нет.",
+                                )
+                            }
 
-                        details == null -> {
-                            EmptyStateCard(
-                                title = "Выбранный запуск",
-                                text = "Не удалось загрузить детали запуска.",
-                            )
-                        }
+                            details == null -> {
+                                EmptyStateCard(
+                                    title = "Выбранный запуск",
+                                    text = "Не удалось загрузить детали запуска.",
+                                )
+                            }
 
-                        else -> {
-                            ModuleRunDetailsPanel(
-                                details = details,
-                                history = history,
-                                structuredSummary = structuredSummary,
-                                showTechnicalDiagnostics = uiState.showTechnicalDiagnostics,
-                                onToggleTechnicalDiagnostics = callbacks.onToggleTechnicalDiagnostics,
-                            )
+                            else -> {
+                                ModuleRunDetailsPanel(
+                                    details = details,
+                                    history = history,
+                                    structuredSummary = structuredSummary,
+                                    showTechnicalDiagnostics = uiState.showTechnicalDiagnostics,
+                                    onToggleTechnicalDiagnostics = callbacks.onToggleTechnicalDiagnostics,
+                                )
+                            }
                         }
                     }
                 }
