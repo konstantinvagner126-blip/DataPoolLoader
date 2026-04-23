@@ -22,6 +22,7 @@ internal data class SqlConsolePageUiState(
     val credentialsMessage: String? = null,
     val credentialsMessageLevel: String = "success",
     val activeOutputTab: String = "data",
+    val activeDataView: String = "grid",
     val selectedStatementIndex: Int = 0,
     val selectedResultShard: String? = null,
     val currentDataPage: Int = 1,
@@ -69,6 +70,7 @@ internal data class SqlConsolePageCallbacks(
     val onExportZip: () -> Unit,
     val onSelectStatement: (Int) -> Unit,
     val onSelectOutputTab: (String) -> Unit,
+    val onSelectDataView: (String) -> Unit,
     val onSelectShard: (String?) -> Unit,
     val onSelectPage: (Int) -> Unit,
 )
@@ -146,6 +148,7 @@ internal fun sqlConsolePageCallbacks(
         onExportZip = executionBindings::exportZip,
         onSelectStatement = editorBindings::selectStatement,
         onSelectOutputTab = editorBindings::selectOutputTab,
+        onSelectDataView = editorBindings::selectDataView,
         onSelectShard = editorBindings::selectShard,
         onSelectPage = editorBindings::selectPage,
     )

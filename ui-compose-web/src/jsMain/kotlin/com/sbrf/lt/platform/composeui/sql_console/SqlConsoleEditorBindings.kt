@@ -87,6 +87,16 @@ internal class SqlConsoleEditorBindings(
         context.updateUiState { it.copy(activeOutputTab = tab) }
     }
 
+    fun selectDataView(view: String) {
+        context.updateUiState {
+            it.copy(
+                activeDataView = view,
+                selectedResultShard = null,
+                currentDataPage = 1,
+            )
+        }
+    }
+
     fun selectShard(shardName: String?) {
         context.updateUiState {
             it.copy(
@@ -111,7 +121,10 @@ internal class SqlConsoleEditorBindings(
 
     private fun shiftShard(delta: Int) {
         val successfulShards = context.exportableResult()
-            ?.takeIf { context.currentUiState().activeOutputTab == "data" }
+            ?.takeIf {
+                context.currentUiState().activeOutputTab == "data" &&
+                    context.currentUiState().activeDataView == "grid"
+            }
             ?.shardResults
             ?.filter { it.status.equals("SUCCESS", ignoreCase = true) && it.rows.isNotEmpty() }
             .orEmpty()
@@ -126,7 +139,11 @@ internal class SqlConsoleEditorBindings(
 
     private fun shiftPage(delta: Int) {
         val result = context.exportableResult()
-            ?.takeIf { context.currentUiState().activeOutputTab == "data" && it.statementType == "RESULT_SET" }
+            ?.takeIf {
+                context.currentUiState().activeOutputTab == "data" &&
+                    context.currentUiState().activeDataView == "grid" &&
+                    it.statementType == "RESULT_SET"
+            }
             ?: return
         val selectedShard = result.shardResults
             .filter { it.status.equals("SUCCESS", ignoreCase = true) && it.rows.isNotEmpty() }

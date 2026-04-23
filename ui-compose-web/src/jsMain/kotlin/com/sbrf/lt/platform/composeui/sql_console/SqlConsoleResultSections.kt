@@ -76,6 +76,7 @@ internal fun QueryOutputPanel(
     result: SqlConsoleQueryResult?,
     pageSize: Int,
     activeTab: String,
+    activeDataView: String,
     selectedShard: String?,
     currentPage: Int,
     onSelectTab: (String) -> Unit,
@@ -100,6 +101,7 @@ internal fun QueryOutputPanel(
                 execution = execution,
                 result = result,
                 pageSize = pageSize,
+                activeDataView = activeDataView,
                 selectedShard = selectedShard,
                 currentPage = currentPage,
             )

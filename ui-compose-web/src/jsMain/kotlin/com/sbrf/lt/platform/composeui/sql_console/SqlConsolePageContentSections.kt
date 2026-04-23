@@ -82,6 +82,7 @@ internal fun SqlConsolePageContent(
                 exportableResult = exportableResult,
                 activeExportShard = activeExportShard,
                 activeOutputTab = uiState.activeOutputTab,
+                activeDataView = uiState.activeDataView,
                 selectedStatementIndex = uiState.selectedStatementIndex,
                 selectedResultShard = uiState.selectedResultShard,
                 currentDataPage = uiState.currentDataPage,
@@ -117,6 +118,7 @@ internal fun SqlConsolePageContent(
                 onExportZip = callbacks.onExportZip,
                 onSelectStatement = callbacks.onSelectStatement,
                 onSelectOutputTab = callbacks.onSelectOutputTab,
+                onSelectDataView = callbacks.onSelectDataView,
                 onSelectShard = callbacks.onSelectShard,
                 onSelectPage = callbacks.onSelectPage,
             )

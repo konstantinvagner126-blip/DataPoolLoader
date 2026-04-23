@@ -12,11 +12,13 @@ internal fun SqlConsoleResultNavigator(
     statementResults: List<SqlConsoleStatementResult>,
     selectedStatementIndex: Int,
     activeTab: String,
+    activeDataView: String,
     result: SqlConsoleQueryResult?,
     selectedShard: String?,
     currentPage: Int,
     pageSize: Int,
     onSelectStatement: (Int) -> Unit,
+    onSelectDataView: (String) -> Unit,
     onSelectShard: (String?) -> Unit,
     onSelectPage: (Int) -> Unit,
 ) {
@@ -27,8 +29,9 @@ internal fun SqlConsoleResultNavigator(
     val normalizedStatementIndex = selectedStatementIndex.coerceIn(0, statementResults.lastIndex.coerceAtLeast(0))
     val activeStatement = statementResults.getOrNull(normalizedStatementIndex)
     val showDataNavigation = activeTab == "data" && result?.statementType == "RESULT_SET"
+    val showGridNavigation = showDataNavigation && activeDataView == "grid"
     val successfulShards = result
-        ?.takeIf { showDataNavigation }
+        ?.takeIf { showGridNavigation }
         ?.shardResults
         ?.filter { it.status.equals("SUCCESS", ignoreCase = true) && it.rows.isNotEmpty() }
         .orEmpty()
@@ -39,10 +42,10 @@ internal fun SqlConsoleResultNavigator(
     Div({ classes("sql-result-navigator") }) {
         Div({ classes("sql-result-navigator-head") }) {
             Div({ classes("sql-result-navigator-title") }) {
-                Text(buildNavigatorTitle(activeTab, activeStatement, normalizedStatementIndex))
+                Text(buildNavigatorTitle(activeTab, activeDataView, activeStatement, normalizedStatementIndex))
             }
             Div({ classes("sql-result-navigator-note") }) {
-                Text(buildNavigatorNote(activeTab, successfulShards.size, activeShard?.shardName, normalizedPage, totalPages))
+                Text(buildNavigatorNote(activeTab, activeDataView, successfulShards.size, activeShard?.shardName, normalizedPage, totalPages))
             }
         }
         Div({ classes("sql-result-navigator-groups") }) {
@@ -55,6 +58,22 @@ internal fun SqlConsoleResultNavigator(
                         ) {
                             Text("#${index + 1} ${statement.statementKeyword}")
                         }
+                    }
+                }
+            }
+            if (showDataNavigation) {
+                SqlResultNavigatorGroup(title = "Режим") {
+                    SqlResultNavigatorButton(
+                        active = activeDataView == "grid",
+                        onClick = { onSelectDataView("grid") },
+                    ) {
+                        Text("Grid")
+                    }
+                    SqlResultNavigatorButton(
+                        active = activeDataView == "diff",
+                        onClick = { onSelectDataView("diff") },
+                    ) {
+                        Text("Diff")
                     }
                 }
             }
@@ -125,16 +144,22 @@ private fun SqlResultNavigatorButton(
 
 private fun buildNavigatorTitle(
     activeTab: String,
+    activeDataView: String,
     activeStatement: SqlConsoleStatementResult?,
     statementIndex: Int,
 ): String {
     val statementLabel = activeStatement?.statementKeyword?.takeIf { it.isNotBlank() } ?: "SQL"
-    val viewLabel = if (activeTab == "status") "Статусы" else "Данные"
+    val viewLabel = when {
+        activeTab == "status" -> "Статусы"
+        activeDataView == "diff" -> "Diff"
+        else -> "Данные"
+    }
     return "$viewLabel для statement #${statementIndex + 1} $statementLabel"
 }
 
 private fun buildNavigatorNote(
     activeTab: String,
+    activeDataView: String,
     shardCount: Int,
     activeShardName: String?,
     currentPage: Int,
@@ -142,6 +167,7 @@ private fun buildNavigatorNote(
 ): String =
     when {
         activeTab == "status" -> "Выбери statement, чтобы смотреть итог по всем source без переключения контекста."
+        activeDataView == "diff" -> "Compare-режим показывает расхождения по всем source относительно baseline, не смешивая их с обычной grid."
         shardCount == 0 -> "Текущий statement не вернул табличные данные по source."
         totalPages > 1 && activeShardName != null ->
             "Активный source: $activeShardName. Страница $currentPage из $totalPages."

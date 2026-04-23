@@ -27,6 +27,7 @@ internal fun SelectResultPane(
     execution: SqlConsoleExecutionResponse?,
     result: SqlConsoleQueryResult?,
     pageSize: Int,
+    activeDataView: String,
     selectedShard: String?,
     currentPage: Int,
 ) {
@@ -45,6 +46,11 @@ internal fun SelectResultPane(
 
     if (readyResult.statementType != "RESULT_SET") {
         SqlResultPlaceholder("Команда ${readyResult.statementKeyword} не возвращает табличные данные. Смотри вкладку «Статусы».")
+        return
+    }
+
+    if (activeDataView == "diff") {
+        SqlConsoleDiffResultPane(result = readyResult)
         return
     }
 

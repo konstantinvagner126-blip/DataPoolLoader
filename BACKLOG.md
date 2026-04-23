@@ -677,6 +677,10 @@
     - `EXPLAIN` и `EXPLAIN ANALYZE` живут как отдельные toolbar actions, а не как скрытая временная подмена `draft SQL`;
     - explain-scope остается явным и bounded: поддерживаются только `current statement` и `выделение`, без неочевидного `EXPLAIN всего script`;
     - `EXPLAIN ANALYZE` не должен обходить safety-contract: shared SQL analysis обязан различать plan-only `EXPLAIN` и реально исполняющий `EXPLAIN ANALYZE` по внутреннему statement keyword.
+  - шестой пакет тоже начат:
+    - compare-friendly `Diff` живет как отдельный data-view режим, а не как домешивание mismatch-информации в обычную result grid;
+    - mismatch model считается client-side из уже загруженного `RESULT_SET`, без нового backend state и без искажения исходных DB results;
+    - diff обязан явно показывать `row count mismatch`, `value mismatch` и `source failure`, но оставаться bounded по числу detail-entries.
 
 Критерий завершения:
 
