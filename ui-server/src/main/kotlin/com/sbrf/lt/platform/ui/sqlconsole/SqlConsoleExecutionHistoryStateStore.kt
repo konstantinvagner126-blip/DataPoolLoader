@@ -7,7 +7,7 @@ internal class SqlConsoleExecutionHistoryStateStore(
     private val storageDir: Path,
     private val configLoader: ConfigLoader = ConfigLoader(),
 ) {
-    private val defaultStateFile: Path = storageDir.resolve("sql-console-execution-history-state.json")
+    private val defaultStateFile: Path = storageDir.resolve(SQL_CONSOLE_EXECUTION_HISTORY_STATE_DEFAULT_FILE_NAME)
 
     fun load(workspaceId: String? = null): PersistedSqlConsoleExecutionHistoryState =
         readOptionalSqlConsoleStateFile(
@@ -32,6 +32,6 @@ internal class SqlConsoleExecutionHistoryStateStore(
         if (workspaceId == DEFAULT_SQL_CONSOLE_WORKSPACE_ID) {
             defaultStateFile
         } else {
-            storageDir.resolve("sql-console-execution-history-state-${workspaceId.toFileNameToken()}.json")
+            storageDir.resolve("${SQL_CONSOLE_EXECUTION_HISTORY_STATE_FILE_PREFIX}${workspaceId.toFileNameToken()}.json")
         }
 }

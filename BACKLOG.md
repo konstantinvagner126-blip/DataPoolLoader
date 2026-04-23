@@ -352,7 +352,7 @@
 Текущий наивысший приоритет внутри `P1`:
 
 - [13. SQL-консоль: visual IDE refinement](/Users/kwdev/DataPoolLoader/BACKLOG.md);
-- до завершения первого пакета этой фазы не размывать активную работу новыми SQL-console фичами, если они не снимают явный safety или visual defect.
+- до завершения первых пакетов `13.0` и `13.1` не размывать активную работу новыми SQL-console фичами, если они не снимают явный safety, runtime или visual defect.
 
 ### 9. Операционная надежность long-running операций
 
@@ -489,27 +489,282 @@
 Дополнительный сигнал:
 
 - ручная проверка показала, что execution history per workspace в текущем виде слишком сильно раздувает главный экран и конкурирует с editor/result panes.
+- ручная проверка также показала runtime-defect в object inspector: inspector сейчас не отображает metadata в части сценариев и требует отдельного hardening-пакета до visual cleanup.
+
+Ближайший пакет:
+
+#### 13.0. Object inspector direct-load hardening
+
+Статус:
+
+- реализовано
+
+Проблема:
+
+- inspector сейчас завязан на цепочку `deep-link -> search result -> selection -> metadata load`;
+- в текущем web path metadata load фактически стартует только если `navigationTarget` нашелся в `searchResponse`;
+- если объект не совпал с текущим search result, не попал в ограниченный список результатов или search/load flow дал рассинхрон, inspector не показывает информацию вообще, хотя URL уже содержит достаточно данных для прямой загрузки metadata.
+
+Текущая зона риска:
+
+- [SqlConsoleObjectsPageEffects.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectsPageEffects.kt)
+- [SqlConsoleObjectsPageContentSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectsPageContentSections.kt)
+- [SqlConsoleObjectInspectorSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectInspectorSections.kt)
+
+Целевой контракт:
+
+- inspector должен уметь грузиться напрямую из `navigationTarget`, если в URL уже есть `source/schema/object/type`;
+- search result остается вспомогательным контекстом для списка объектов, но не является обязательным gate для inspector metadata;
+- deep-link на inspector должен быть устойчивым даже если:
+  - search result пуст;
+  - объект не попал в truncated result set;
+  - query изменился и больше не совпадает с navigation target;
+- UI должен явно различать:
+  - `inspector loading`;
+  - `inspector error`;
+  - `object not found by metadata request`;
+  - `search result does not currently contain object`, но inspector metadata при этом доступна.
+
+Что нужно сделать:
+
+1. отвязать inspector load от обязательного наличия selected object внутри `searchResponse`;
+2. ввести direct inspector request path от `navigationTarget`;
+3. сохранить search-first модель каталога, но перестать использовать search result как hard prerequisite для metadata render;
+4. выровнять empty/error states, чтобы inspector не исчезал молча;
+5. добавить regression coverage на deep-link inspector scenarios.
+
+Что сделано:
+
+- inspector load в web path больше не зависит от обязательного попадания объекта в `searchResponse`;
+- direct deep-link `source/schema/object/type` теперь грузит metadata отдельно, даже если search result пуст или не содержит объект;
+- убран state-race между `load/search/inspect/persist`, из-за которого object screen мог перетирать свежий inspector/search state stale snapshot-ом;
+- browser smoke теперь держит отдельный сценарий `deep-link inspector + empty search result`.
+
+Ближайший пакет:
+
+#### 13.1. Execution history на отдельный workspace-scoped экран
+
+Статус:
+
+- реализовано
+
+Проблема:
+
+- execution history сейчас рендерится как отдельный крупный блок на главном экране до library/tool-window слоя;
+- список из session-card’ов визуально конкурирует с editor/result panes и раздувает первый экран после первых же запусков;
+- history по смыслу является operational log текущего workspace, но по подаче сейчас выглядит как primary page content.
+
+Целевой контракт:
+
+- history остается `per workspace` capability c действиями `Подставить` и `Повторить`;
+- history полностью уходит с главного экрана SQL-консоли;
+- history живет на отдельном route, а не в secondary pane текущей страницы;
+- экран истории по умолчанию `workspace-scoped`:
+  - каждая вкладка SQL-консоли открывает историю только своего `workspaceId`;
+  - `Подставить` и `Повторить` работают в контексте этого же workspace;
+- главный экран SQL-консоли не показывает список execution session и не держит под него layout space;
+- на отдельном экране history может иметь более плотную IDE-like подачу:
+  - компактные строки вместо крупных cards;
+  - status, startedAt/duration, source set summary, SQL preview;
+  - действия `Подставить` и `Повторить` сохраняются;
+- если позже понадобится cross-workspace обзор, это должен быть отдельный read-only слой, а не смешение history разных вкладок в один operational экран.
+
+Что нужно сделать:
+
+1. убрать always-visible history block из текущего primary layout рядом с `Шаблоны и быстрые действия`;
+2. завести отдельный route экрана истории SQL-консоли;
+3. сделать этот экран строго `workspace-scoped` по текущему `workspaceId`;
+4. переделать visual model history:
+   - card list -> compact row list;
+   - меньше вертикального шума и декоративных подложек;
+5. оставить execution history отдельной operational сущностью и не смешивать ее с `recent queries`;
+6. добавить regression coverage:
+   - history больше не раздувает главный экран;
+   - `Подставить` и `Повторить` продолжают работать;
+   - workspace-scoped history contract не ломается;
+   - открытие истории из разных browser-вкладок не смешивает execution session.
+
+Что сделано:
+
+- history полностью убрана с главного экрана SQL-консоли и больше не занимает primary layout space;
+- добавлен отдельный route `/sql-console-history` с `workspaceId` forwarding;
+- history screen сделан `workspace-scoped` и использует тот же workspace contract для `Подставить` и `Повторить`;
+- `Повторить` на history route сохраняет owner-state перед возвратом в main SQL-console screen, чтобы execution не терялся при navigation;
+- browser smoke теперь отдельно держит сценарий `main screen -> history screen -> apply back to same workspace`.
+
+#### 13.2. SQL workspace state retention и cleanup stale вкладок
+
+Статус:
+
+- реализовано
+
+Проблема:
+
+- SQL-консоль сейчас пишет per-workspace state и per-workspace execution history в `ui.storageDir`;
+- для нестандартных `workspaceId` создаются отдельные файлы вида:
+  - `sql-console-workspace-state-<workspaceId>.json`
+  - `sql-console-execution-history-state-<workspaceId>.json`
+- вкладки могут открываться и закрываться много раз, а явной lifecycle/cleanup-модели для stale workspace сейчас нет;
+- без retention policy локальный storage будет накапливать orphan workspace state от давно закрытых вкладок.
+
+Текущая зона:
+
+- [SqlConsoleWorkspaceStateStore.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/sqlconsole/SqlConsoleWorkspaceStateStore.kt)
+- [SqlConsoleExecutionHistoryStateStore.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/sqlconsole/SqlConsoleExecutionHistoryStateStore.kt)
+- [SqlConsoleStateService.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/sqlconsole/SqlConsoleStateService.kt)
+- [SqlConsoleExecutionHistoryService.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/sqlconsole/SqlConsoleExecutionHistoryService.kt)
+
+Целевой контракт:
+
+- refresh той же вкладки продолжает восстанавливать ее workspace state;
+- активные и недавно использованные workspace не теряются;
+- stale workspace state и stale execution history не накапливаются бесконечно в `storageDir`;
+- cleanup не должен ломать multi-tab модель:
+  - нельзя удалять state активной вкладки;
+  - нельзя удалять workspace, который только что был открыт повторно;
+- cleanup policy должна быть явной и документированной:
+  - age-based retention;
+  - возможно bounded max-count;
+  - одинаковые правила для workspace-state и workspace execution-history.
+
+Что нужно сделать:
+
+1. определить durable lifecycle model для `workspaceId`:
+   - что считается active;
+   - что считается stale;
+   - когда stale workspace можно удалять;
+2. добавить persisted metadata, достаточную для cleanup decision:
+   - last accessed / updated timestamp;
+   - при необходимости version/marker для migration-safe cleanup;
+3. реализовать cleanup stale workspace files в `ui-server`;
+4. выровнять policy для:
+   - workspace draft/selection state;
+   - workspace execution history;
+5. задокументировать retention contract в backlog/state docs;
+6. добавить regression coverage на:
+   - refresh той же вкладки;
+   - reopen недавнего workspace;
+   - cleanup старых workspace;
+   - отсутствие удаления активного workspace.
+
+Что сделано:
+
+- в persisted workspace state и persisted execution history добавлен явный `lastAccessedAt`, чтобы cleanup опирался не на неявный browser/session guess, а на durable metadata;
+- введен отдельный server-side boundary [SqlConsoleWorkspaceRetentionService.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/sqlconsole/SqlConsoleWorkspaceRetentionService.kt), который:
+  - держит age-based retention policy;
+  - пинит workspace, к которым обращались в текущем процессе;
+  - чистит stale pair `workspace-state + execution-history` как одну operational сущность;
+- policy зафиксирована явно:
+  - non-default workspace cleanup идет по `30 days` inactivity retention;
+  - default workspace не удаляется автоматически;
+  - recent и pinned workspace не трогаются;
+- `SqlConsoleStateService` и `SqlConsoleExecutionHistoryService` теперь touch-ят workspace access metadata при `load/update/history access/record`;
+- добавлена regression coverage на stale cleanup, recent reopen и защиту активного workspace от cleanup.
+
+#### 13.3. Source navigator redesign
+
+Статус:
+
+- реализовано
+
+Проблема:
+
+- левая колонка SQL-консоли сейчас визуально подана как набор mini-card блоков на каждую группу и каждый source;
+- это дает dashboard feel и мешает считывать selection как navigator/tree-pane;
+- длинные explanatory messages на каждом source добавляют вертикальный шум и ослабляют IDE-like scan.
+
+Текущая зона:
+
+- [SqlConsoleSourceSelectionSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleSourceSelectionSections.kt)
+- [SqlConsoleSourceSidebarSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleSourceSidebarSections.kt)
+- [40-sql-results.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/40-sql-results.css)
+
+Целевой контракт:
+
+- группы и source читаются как navigator/tree-pane, а не как stack из отдельных cards;
+- строки становятся плотнее;
+- selection и partial-selection остаются визуально явными;
+- status по source остается читаемым, но не превращает каждый row в отдельную info-card;
+- explanatory noise снижается:
+  - full error/detail показывается только когда он реально есть;
+  - default helper text на каждой строке не нужен.
+
+Что сделано:
+
+- левая колонка источников переведена на более плотную navigator/tree-pane подачу вместо stack из mini-card блоков;
+- group rows и source rows уплотнены:
+  - меньше padding и радиусы;
+  - меньше card-like подложек;
+  - selection/partial-selection читаются как row state, а не как отдельная карточка;
+- group rows получили компактный count badge;
+- source rows теперь показывают detail line только при реальной ошибке или полезном runtime-message;
+- status по source переведен на более IDE-like row signal:
+  - компактный status text;
+  - status dot рядом с именем source;
+  - меньше цветной заливки на весь row.
+
+#### 13.4. Tool-window redesign для secondary-зоны
+
+Статус:
+
+- реализовано
+
+Проблема:
+
+- блоки `Шаблоны и быстрые действия` и `Избранные объекты` сейчас выглядят как dashboard widgets;
+- summary chips, мягкие подложки и крупные внутренние cards визуально конкурируют с editor/result pane;
+- secondary-зона читается как набор самостоятельных карточек, а не как компактные IDE tool windows.
+
+Текущая зона:
+
+- [SqlConsoleQueryLibrarySections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleQueryLibrarySections.kt)
+- [SqlConsoleFavoriteObjectSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleFavoriteObjectSections.kt)
+- [SqlConsoleQueryPickerSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleQueryPickerSections.kt)
+- [20-sql-console.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/20-sql-console.css)
+- [40-sql-results.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/40-sql-results.css)
+
+Целевой контракт:
+
+- `Шаблоны и быстрые действия` и `Избранные объекты` выглядят как compact tool windows;
+- shell secondary-зоны становится строже:
+  - меньше мягких фоновых плашек;
+  - меньше dashboard-like chips;
+  - компактнее headers и строки действий;
+- content внутри tool windows остается функционально тем же, но подается плотнее и спокойнее;
+- editor и result pane остаются визуальным центром экрана.
+
+Что сделано:
+
+- для secondary-зоны введен общий visual shell `tool window` и на него переведены:
+  - `Шаблоны и быстрые действия`;
+  - `Избранные объекты`;
+- headers, notes и open-actions стали компактнее и ближе к IDE tool-window chrome;
+- summary chips поджаты и перестали выглядеть как крупные dashboard counters;
+- query picker blocks получили более строгую section-подачу внутри tool window;
+- `Избранные объекты` переведены из более тяжелой card-grid подачи в более плотный stacked secondary list.
 
 Порядок реализации:
 
-1. `Execution history demotion`:
-   - execution history per workspace сохраняется как функциональный boundary, но не должна раздувать главный экран;
-   - history не должна быть постоянно раскрытым крупным блоком рядом с editor;
-   - первая целевая форма: secondary/collapsible tool window, collapsed by default или скрытая за явным tab/switch.
-2. `Source navigator redesign`:
+1. `Object inspector direct-load hardening`:
+   - сначала закрыть пакет `13.0`, потому что сейчас есть функциональный runtime-defect.
+2. `Execution history на отдельный экран`:
+   - затем закрыть пакет `13.1`, чтобы убрать текущий primary-screen bloat без смешения workspace.
+3. `Workspace retention и stale cleanup`:
+   - затем закрыть пакет `13.2`, чтобы multi-tab SQL-console не тащила бесконечный локальный state хвост.
+4. `Source navigator redesign`:
    - перевести левую колонку источников и групп ближе к navigator/tree-pane;
    - меньше card-like контейнеров на каждый source/group;
    - плотнее строки, чище row selection, честный explorer-like scan.
-3. `Tool-window redesign` для правой secondary-зоны:
+5. `Tool-window redesign` для правой secondary-зоны:
    - `Шаблоны и быстрые действия`, favorites и соседние secondary blocks должны выглядеть как IDE tool windows, а не как dashboard widgets;
    - меньше визуальной конкуренции с editor/result pane.
-4. `Shell densification`:
+6. `Shell densification`:
    - уменьшить cardification, слишком мягкие фоны, крупные радиусы и избыточные внутренние отступы;
    - усилить ощущение pane/panel hierarchy вместо набора dashboard-карточек.
-5. `Result pane densification`:
+7. `Result pane densification`:
    - довести chrome вокруг result area до более строгого IDE/data-grid вида;
    - меньше декоративных toolbar/panel подложек, больше ощущения единой рабочей области.
-6. `Status bar / working status line`:
+8. `Status bar / working status line`:
    - рассмотреть компактный нижний status bar для execution mode, selected sources count, transaction mode и текущего result context;
    - не возвращать page-level banners и не дублировать sidebar.
 
@@ -525,6 +780,39 @@
 - главный экран SQL-консоли ощущается как IDE-like workspace с pane hierarchy, а не как набор dashboard-карточек;
 - execution history больше не раздувает первый экран;
 - navigator/editor/result/tool-window иерархия читается с первого взгляда.
+
+### 14. Страница `О проекте`: минимизация до карточек разработчиков
+
+Статус:
+
+- не реализовано
+
+Проблема:
+
+- текущая страница `О проекте` содержит лишние вводные content-блоки про назначение проекта и архитектурный фокус;
+- пользовательский сценарий этой страницы сейчас проще: нужны карточки разработчиков, а остальная explanatory информация только раздувает экран.
+
+Текущая зона:
+
+- [AboutPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/about/AboutPage.kt)
+- [AboutPageSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/about/AboutPageSections.kt)
+
+Целевой контракт:
+
+- основной content страницы `О проекте` состоит только из карточек разработчиков;
+- информационные блоки `Назначение`, `Фокус` и сходный explanatory content убираются;
+- карточки разработчиков с именами, alias и текущим визуальным образом страницы остаются;
+- page shell может остаться минимальным:
+  - заголовок страницы;
+  - навигационные действия;
+  - без лишнего hero/dashboard content.
+
+Что нужно сделать:
+
+1. убрать лишние info-panels и chips из content страницы;
+2. оставить developer cards как единственный основной content block;
+3. при необходимости упростить hero/subtitle, чтобы они не дублировали удаленный explanatory content;
+4. не ломать существующий route `/about`.
 
 ## P2
 
@@ -543,11 +831,46 @@
 - добавить больше store-level tests;
 - усилить server contract tests;
 - добавить smoke-покрытие на критичные UI-сценарии;
+- ввести измеримый coverage target для server-side:
+  - минимум `80%` покрытия для server-side кода;
+  - зафиксировать, чем именно меряем (`Kover`) и где проходит граница server-side coverage scope;
+  - не ограничиваться общим report-only режимом, а довести это до явного контрольного критерия;
+- добавить отдельный visual regression stream:
+  - максимально полное browser-level покрытие визуала критичных экранов и состояний;
+  - screenshot/Playwright regressions для основных user-facing screens;
+  - визуальные тесты должны ловить layout drift, потерю блоков, поломку pane hierarchy и регрессии ключевых состояний;
 - отдельно страховать:
   - SQL console lifecycle;
   - run lifecycle;
   - cleanup/retention;
   - runtime fallback scenarios.
+
+Детализация:
+
+1. `Server-side coverage floor >= 80%`
+   - определить exact coverage scope:
+     - `ui-server` route/support/service/state boundary;
+     - при необходимости связанные server-side куски в `core`, если они участвуют в transport/runtime path;
+   - собрать reproducible coverage report;
+   - зафиксировать нижнюю границу не ниже `80%`;
+   - добавить backlog-пакет на закрытие больших coverage дыр, если до порога не дотягиваем.
+
+2. `Comprehensive visual regression coverage`
+   - расширить существующий browser smoke harness до visual regression уровня;
+   - покрыть как минимум:
+     - главную страницу;
+     - SQL-консоль;
+     - экран объектов БД / inspector;
+     - module editor;
+     - module runs;
+     - maintenance screens;
+     - страницу `О проекте`;
+   - отдельно проверить ключевые UI-состояния:
+     - loading;
+     - empty;
+     - error/warning;
+     - selected/active pane;
+     - compact/collapsed states там, где они критичны.
 
 ### 17. Формализовать карту состояния проекта
 

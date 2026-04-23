@@ -140,6 +140,10 @@ internal class SqlConsoleLibraryBindings(
         context.updateState { context.store.updateAutoCommitEnabled(it, enabled) }
     }
 
+    fun openExecutionHistory() {
+        window.location.href = buildSqlConsoleHistoryHref(context.currentUiState().workspaceId)
+    }
+
     fun openNewConsoleTab() {
         context.scope.launch {
             val targetWorkspaceId = generateSqlConsoleWorkspaceId()

@@ -30,6 +30,11 @@ async function gotoSqlConsoleObjects(page, workspaceId, params) {
   await expect(page.getByRole("heading", { name: "Объекты БД" })).toBeVisible();
 }
 
+async function gotoSqlConsoleHistory(page, workspaceId) {
+  await page.goto(`/sql-console-history?workspaceId=${encodeURIComponent(workspaceId)}`);
+  await expect(page.getByRole("heading", { name: "История запусков SQL-консоли" })).toBeVisible();
+}
+
 async function setEditorValue(page, value) {
   const success = await page.evaluate(nextValue => window.ComposeMonaco.setEditorValue(nextValue), value);
   expect(success).toBe(true);
@@ -108,6 +113,49 @@ test("object inspector can open SELECT back in SQL console workspace", async ({ 
   await expect
     .poll(async () => getEditorValue(page))
     .toContain('from "datapool_manual"."source_1"');
+
+  expect(pageErrors).toEqual([]);
+});
+
+test("object inspector direct-load works even when search result is empty", async ({ page }) => {
+  const pageErrors = trackPageErrors(page);
+  const workspaceId = buildWorkspaceId("sql-smoke-object-direct");
+  await gotoSqlConsoleObjects(page, workspaceId, {
+    source: "db1",
+    query: "zz_codex_no_search_match",
+    schema: "datapool_manual",
+    object: "source_1",
+    type: "TABLE"
+  });
+
+  await expect(page.getByRole("button", { name: "Открыть SELECT в консоли" })).toBeVisible();
+  await expect(page.getByText("По запросу ничего не найдено.")).toBeVisible();
+  await expect(
+    page.getByText("Объект не найден в текущем search result. Инспектор работает по прямому deep-link metadata path.")
+  ).toBeVisible();
+
+  expect(pageErrors).toEqual([]);
+});
+
+test("execution history lives on separate workspace-scoped screen", async ({ page }) => {
+  const pageErrors = trackPageErrors(page);
+  const workspaceId = buildWorkspaceId("sql-smoke-history");
+  await gotoSqlConsole(page, workspaceId);
+  await setEditorValue(page, "select 1 as history_screen_value;");
+
+  await page.getByTitle("Выполнить текущий statement").click();
+  await expect(page.getByText("История выполнения этой вкладки")).toHaveCount(0);
+  await page.getByRole("button", { name: "История запусков" }).click();
+
+  await page.waitForURL(/screen=sql-console-history/);
+  await expect(page.getByText("history_screen_value")).toBeVisible();
+  await page.getByRole("button", { name: "Подставить" }).click();
+
+  await page.waitForURL(/screen=sql-console/);
+  await waitForSqlConsoleEditor(page);
+  await expect
+    .poll(async () => getEditorValue(page))
+    .toContain("history_screen_value");
 
   expect(pageErrors).toEqual([]);
 });

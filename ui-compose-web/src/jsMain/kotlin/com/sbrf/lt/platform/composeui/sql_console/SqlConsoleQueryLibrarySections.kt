@@ -24,8 +24,7 @@ internal fun QueryLibraryBlock(
     onFavoriteSelected: (String) -> Unit,
     onApplyRecent: () -> Unit,
     onApplyFavorite: () -> Unit,
-    onApplyExecutionHistory: (SqlConsoleExecutionHistoryEntry) -> Unit,
-    onRepeatExecutionHistory: (SqlConsoleExecutionHistoryEntry) -> Unit,
+    onOpenExecutionHistory: () -> Unit,
     onRememberFavorite: () -> Unit,
     onRemoveFavorite: () -> Unit,
     onClearRecent: () -> Unit,
@@ -47,16 +46,12 @@ internal fun QueryLibraryBlock(
     onExportCsv: () -> Unit,
     onExportZip: () -> Unit,
 ) {
-    Div({ classes("sql-query-library", "mb-3") }) {
+    Div({ classes("sql-tool-window", "sql-query-library", "mb-3") }) {
         SqlConsoleQueryLibrarySummary(
             state = state,
             selectedRecentQuery = selectedRecentQuery,
             selectedFavoriteQuery = selectedFavoriteQuery,
-        )
-        SqlConsoleExecutionHistoryBlock(
-            history = state.executionHistory,
-            onApply = onApplyExecutionHistory,
-            onRepeat = onRepeatExecutionHistory,
+            onOpenExecutionHistory = onOpenExecutionHistory,
         )
         Div({ classes("sql-query-library-row") }) {
             SqlConsoleQueryPickerBlock(
@@ -128,19 +123,28 @@ private fun SqlConsoleQueryLibrarySummary(
     state: SqlConsolePageState,
     selectedRecentQuery: String,
     selectedFavoriteQuery: String,
+    onOpenExecutionHistory: () -> Unit,
 ) {
     Div({ classes("sql-query-library-summary") }) {
-        Div({ classes("d-flex", "flex-wrap", "align-items-start", "justify-content-between", "gap-3") }) {
-            Div {
+        Div({ classes("sql-tool-window-head") }) {
+            Div({ classes("sql-tool-window-heading") }) {
+                Div({ classes("eyebrow", "mb-1") }) { Text("Tool Window") }
                 Div({ classes("panel-title", "mb-1") }) { Text("Шаблоны и быстрые действия") }
-                Div({ classes("small", "text-secondary") }) {
+                Div({ classes("small", "text-secondary", "sql-tool-window-note") }) {
                     Text("Выбери готовый запрос, подставь его в редактор или закрепи текущий SQL без переключения контекста.")
                 }
             }
-            Div({ classes("sql-query-library-summary-chips") }) {
+            Div({ classes("sql-tool-window-actions", "sql-query-library-summary-chips") }) {
                 SqlQueryLibrarySummaryChip("История", state.recentQueries.size.toString())
                 SqlQueryLibrarySummaryChip("Избранное", state.favoriteQueries.size.toString())
                 SqlQueryLibrarySummaryChip("Объекты", state.favoriteObjects.size.toString())
+                Button(attrs = {
+                    classes("btn", "btn-outline-secondary", "btn-sm", "sql-tool-window-open-button")
+                    attr("type", "button")
+                    onClick { onOpenExecutionHistory() }
+                }) {
+                    Text("История запусков")
+                }
             }
         }
         buildSelectedQuerySummary(
@@ -155,7 +159,7 @@ private fun SqlConsoleQueryLibrarySummary(
 }
 
 @Composable
-private fun SqlQueryLibrarySummaryChip(
+internal fun SqlQueryLibrarySummaryChip(
     label: String,
     value: String,
 ) {

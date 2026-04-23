@@ -21,9 +21,9 @@ internal fun SqlConsoleQueryPickerBlock(
     onApply: () -> Unit,
     actions: @Composable () -> Unit,
 ) {
-    Div({ classes("sql-query-library-block") }) {
+    Div({ classes("sql-query-library-block", "sql-tool-window-section") }) {
         Label(attrs = {
-            classes("small", "text-secondary", "mb-1")
+            classes("small", "text-secondary", "mb-1", "sql-tool-window-section-title")
             attr("for", fieldId)
         }) { Text(label) }
         Div({ classes("d-flex", "flex-wrap", "gap-2") }) {

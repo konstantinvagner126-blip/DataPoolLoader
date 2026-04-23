@@ -8,7 +8,7 @@ class SqlConsoleWorkspaceStateStore(
     private val configLoader: ConfigLoader = ConfigLoader(),
     private val legacyStateStore: LegacySqlConsoleStateStore = LegacySqlConsoleStateStore(storageDir, configLoader),
 ) {
-    private val defaultStateFile: Path = storageDir.resolve("sql-console-workspace-state.json")
+    private val defaultStateFile: Path = storageDir.resolve(SQL_CONSOLE_WORKSPACE_STATE_DEFAULT_FILE_NAME)
 
     fun load(workspaceId: String? = null): PersistedSqlConsoleWorkspaceState {
         val normalizedWorkspaceId = normalizeSqlConsoleWorkspaceId(workspaceId)
@@ -47,7 +47,7 @@ class SqlConsoleWorkspaceStateStore(
         if (workspaceId == DEFAULT_SQL_CONSOLE_WORKSPACE_ID) {
             defaultStateFile
         } else {
-            storageDir.resolve("sql-console-workspace-state-${workspaceId.toFileNameToken()}.json")
+            storageDir.resolve("${SQL_CONSOLE_WORKSPACE_STATE_FILE_PREFIX}${workspaceId.toFileNameToken()}.json")
         }
 }
 

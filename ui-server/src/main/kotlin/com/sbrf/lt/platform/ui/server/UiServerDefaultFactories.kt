@@ -15,6 +15,7 @@ import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleAsyncQueryOperations
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleExecutionHistoryService
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleQueryManager
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleStateService
+import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleWorkspaceRetentionService
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
@@ -47,8 +48,17 @@ internal fun defaultRunManager(
 internal fun defaultSqlConsoleService(runtimeUiConfig: UiAppConfig): SqlConsoleOperations =
     SqlConsoleService(runtimeUiConfig.sqlConsole)
 
-internal fun defaultSqlConsoleExecutionHistoryService(uiConfig: UiAppConfig): SqlConsoleExecutionHistoryService =
-    SqlConsoleExecutionHistoryService(uiConfig.storageDirPath())
+internal fun defaultSqlConsoleWorkspaceRetentionService(uiConfig: UiAppConfig): SqlConsoleWorkspaceRetentionService =
+    SqlConsoleWorkspaceRetentionService(uiConfig.storageDirPath())
+
+internal fun defaultSqlConsoleExecutionHistoryService(
+    uiConfig: UiAppConfig,
+    workspaceRetentionService: SqlConsoleWorkspaceRetentionService,
+): SqlConsoleExecutionHistoryService =
+    SqlConsoleExecutionHistoryService(
+        stateStore = com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleExecutionHistoryStateStore(uiConfig.storageDirPath()),
+        workspaceRetentionService = workspaceRetentionService,
+    )
 
 internal fun defaultSqlConsoleQueryManager(
     sqlConsoleService: SqlConsoleOperations,
@@ -59,8 +69,16 @@ internal fun defaultSqlConsoleQueryManager(
         executionHistoryService = executionHistoryService,
     )
 
-internal fun defaultSqlConsoleStateService(uiConfig: UiAppConfig): SqlConsoleStateService =
-    SqlConsoleStateService(uiConfig.storageDirPath())
+internal fun defaultSqlConsoleStateService(
+    uiConfig: UiAppConfig,
+    workspaceRetentionService: SqlConsoleWorkspaceRetentionService,
+): SqlConsoleStateService =
+    SqlConsoleStateService(
+        workspaceStore = com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleWorkspaceStateStore(uiConfig.storageDirPath()),
+        libraryStore = com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleLibraryStateStore(uiConfig.storageDirPath()),
+        preferencesStore = com.sbrf.lt.platform.ui.sqlconsole.SqlConsolePreferencesStateStore(uiConfig.storageDirPath()),
+        workspaceRetentionService = workspaceRetentionService,
+    )
 
 internal fun defaultFilesRunHistoryService(
     moduleRegistry: ModuleRegistry,

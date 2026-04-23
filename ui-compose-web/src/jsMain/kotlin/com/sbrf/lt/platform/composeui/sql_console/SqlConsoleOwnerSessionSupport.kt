@@ -52,6 +52,9 @@ internal fun generateSqlConsoleWorkspaceId(): String =
 internal fun buildSqlConsoleWorkspaceHref(workspaceId: String): String =
     "/sql-console?workspaceId=${urlEncode(workspaceId)}"
 
+internal fun buildSqlConsoleHistoryHref(workspaceId: String): String =
+    "/sql-console-history?workspaceId=${urlEncode(workspaceId)}"
+
 internal fun openSqlConsoleWorkspaceInNewTab(workspaceId: String): Boolean =
     openHrefInNewTab(buildSqlConsoleWorkspaceHref(workspaceId))
 

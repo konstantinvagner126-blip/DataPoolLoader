@@ -26,9 +26,14 @@ internal fun SqlConsoleObjectsPageContent(
     val runtimeContext = state.runtimeContext
     val searchResponse = state.searchResponse
     val totalFoundObjects = searchResponse?.sourceResults?.sumOf { it.objects.size } ?: 0
-    val inspectorSelection = findSelectedObject(searchResponse, navigationTarget)
+    val targetInspectorSelection = directInspectorSelection(navigationTarget)
+    val searchInspectorSelection = findSelectedObjectInSearchResponse(searchResponse, navigationTarget)
+    val inspectorSelection = targetInspectorSelection ?: searchInspectorSelection
     val inspectorResponse = state.inspectorResponse
         ?.takeIf { inspectorMatchesSelection(it, inspectorSelection) }
+    val inspectorSearchMismatch = targetInspectorSelection != null &&
+        searchResponse != null &&
+        searchInspectorSelection == null
     val inspectorSelectionKey = inspectorResponse?.let { response ->
         "${response.sourceName}|${response.dbObject.schemaName}|${response.dbObject.objectName}|${response.dbObject.objectType}"
     }
@@ -64,6 +69,13 @@ internal fun SqlConsoleObjectsPageContent(
         )
     }
 
+    if (inspectorSearchMismatch) {
+        AlertBanner(
+            "Объект не найден в текущем search result. Инспектор работает по прямому deep-link metadata path.",
+            "warning",
+        )
+    }
+
     when {
         inspectorResponse != null -> {
             SqlObjectInspectorPanel(
@@ -91,10 +103,16 @@ internal fun SqlConsoleObjectsPageContent(
                 text = inspectorErrorMessage,
             )
         }
+        targetInspectorSelection != null -> {
+            LoadingStateCard(
+                title = "Инспектор объекта",
+                text = "Metadata выбранного объекта подготавливается к прямой загрузке по deep-link.",
+            )
+        }
         navigationTarget != null && searchResponse != null -> {
             EmptyStateCard(
                 title = "Объект не найден",
-                text = "Для выбранного deep-link объект не найден в текущем search result. Проверь source, схему и тип объекта.",
+                text = "Для текущего deep-link объект не найден в search result. Для прямой загрузки inspector укажи source, schema, object и type.",
             )
         }
     }

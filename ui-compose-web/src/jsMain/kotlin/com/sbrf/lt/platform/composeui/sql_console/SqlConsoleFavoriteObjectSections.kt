@@ -17,10 +17,13 @@ internal fun SqlFavoriteObjectsBlock(
     if (favorites.isEmpty()) {
         return
     }
-    Div({ classes("sql-query-library", "mb-3") }) {
-        Div({ classes("d-flex", "align-items-center", "justify-content-between", "gap-3", "mb-2") }) {
-            Div({ classes("panel-title", "mb-0") }) { Text("Избранные объекты") }
-            Div({ classes("small", "text-secondary") }) {
+    Div({ classes("sql-tool-window", "sql-tool-window-compact", "mb-3") }) {
+        Div({ classes("sql-tool-window-head", "sql-tool-window-head-compact") }) {
+            Div({ classes("sql-tool-window-heading") }) {
+                Div({ classes("eyebrow", "mb-1") }) { Text("Tool Window") }
+                Div({ classes("panel-title", "mb-0") }) { Text("Избранные объекты") }
+            }
+            Div({ classes("small", "text-secondary", "sql-tool-window-note") }) {
                 Text("Сначала выбери SQL-действие, затем при необходимости открой инспектор или выполни вспомогательные действия.")
             }
         }

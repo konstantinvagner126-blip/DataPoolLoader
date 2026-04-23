@@ -123,6 +123,8 @@
   [SqlConsoleWorkspaceStateStore.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/sqlconsole/SqlConsoleWorkspaceStateStore.kt)
 - Service:
   [SqlConsoleStateService.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/sqlconsole/SqlConsoleStateService.kt)
+- Retention:
+  [SqlConsoleWorkspaceRetentionService.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/sqlconsole/SqlConsoleWorkspaceRetentionService.kt)
 - Файлы:
   `sql-console-workspace-state.json`, `sql-console-workspace-state-<workspace>.json`
 
@@ -131,11 +133,13 @@
 - тип: `persisted local state`
 - source of truth: per-workspace persisted JSON + write-through in-memory cache в `SqlConsoleStateService`
 - что хранится:
-  `draftSql`, `selectedGroupNames`, `selectedSourceNames`
+  `draftSql`, `selectedGroupNames`, `selectedSourceNames`, `lastAccessedAt`
 - recovery:
   default workspace может мигрировать из legacy combined state; остальные workspace восстанавливаются из своих файлов
 - cleanup:
-  отсутствующие файлы означают default state; combined legacy file не должен возвращаться как source of truth
+  отсутствующие файлы означают default state; combined legacy file не должен возвращаться как source of truth;
+  non-default workspace file может быть удален retention-cleanup после `30 days` inactivity;
+  access в текущем процессе пинит workspace от cleanup до завершения процесса
 
 ### 3.4. SQL console library state
 
@@ -183,6 +187,8 @@
   [SqlConsoleExecutionHistoryStateStore.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/sqlconsole/SqlConsoleExecutionHistoryStateStore.kt)
 - Service:
   [SqlConsoleExecutionHistoryService.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/sqlconsole/SqlConsoleExecutionHistoryService.kt)
+- Retention:
+  [SqlConsoleWorkspaceRetentionService.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/sqlconsole/SqlConsoleWorkspaceRetentionService.kt)
 - Файлы:
   `sql-console-execution-history-state.json`, `sql-console-execution-history-state-<workspace>.json`
 
@@ -193,7 +199,9 @@
 - recovery:
   история восстанавливается на старте; entries нормализуются и ограничиваются по лимиту
 - cleanup:
-  устаревшие записи вытесняются лимитом; active execution не восстанавливается из этой истории
+  устаревшие записи вытесняются лимитом; active execution не восстанавливается из этой истории;
+  non-default workspace history file участвует в том же `30 days` retention cleanup, что и workspace-state pair;
+  cleanup не должен удалять history pinned workspace текущего процесса
 
 ### 3.7. Legacy SQL console state
 

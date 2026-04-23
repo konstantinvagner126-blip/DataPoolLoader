@@ -13,5 +13,10 @@ internal fun Route.registerPageSqlScreenRoutes() {
         "screen" to "sql-console-objects",
         forwardedParams = listOf("workspaceId", "query", "source", "schema", "object", "type"),
     )
+    registerComposeRedirect(
+        "/sql-console-history",
+        "screen" to "sql-console-history",
+        forwardedParams = listOf("workspaceId"),
+    )
     registerComposeRedirect("/run-history-cleanup", "screen" to "run-history-cleanup")
 }

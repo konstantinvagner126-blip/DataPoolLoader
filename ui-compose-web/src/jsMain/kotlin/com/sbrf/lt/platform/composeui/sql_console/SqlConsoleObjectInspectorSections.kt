@@ -18,7 +18,7 @@ internal data class SqlObjectInspectorSelection(
     val dbObject: SqlConsoleDatabaseObject,
 )
 
-internal fun findSelectedObject(
+internal fun findSelectedObjectInSearchResponse(
     searchResponse: SqlConsoleObjectSearchResponse?,
     navigationTarget: SqlObjectNavigationTarget?,
 ): SqlObjectInspectorSelection? {
@@ -33,6 +33,37 @@ internal fun findSelectedObject(
     }
     return null
 }
+
+internal fun directInspectorSelection(
+    navigationTarget: SqlObjectNavigationTarget?,
+): SqlObjectInspectorSelection? {
+    if (navigationTarget == null) {
+        return null
+    }
+    if (
+        navigationTarget.sourceName.isBlank() ||
+        navigationTarget.schemaName.isBlank() ||
+        navigationTarget.objectName.isBlank() ||
+        navigationTarget.objectType.isBlank()
+    ) {
+        return null
+    }
+    return SqlObjectInspectorSelection(
+        sourceName = navigationTarget.sourceName,
+        dbObject = SqlConsoleDatabaseObject(
+            schemaName = navigationTarget.schemaName,
+            objectName = navigationTarget.objectName,
+            objectType = navigationTarget.objectType,
+        ),
+    )
+}
+
+internal fun resolveInspectorSelection(
+    searchResponse: SqlConsoleObjectSearchResponse?,
+    navigationTarget: SqlObjectNavigationTarget?,
+): SqlObjectInspectorSelection? =
+    directInspectorSelection(navigationTarget)
+        ?: findSelectedObjectInSearchResponse(searchResponse, navigationTarget)
 
 internal fun inspectorMatchesSelection(
     response: SqlConsoleObjectInspectorResponse?,

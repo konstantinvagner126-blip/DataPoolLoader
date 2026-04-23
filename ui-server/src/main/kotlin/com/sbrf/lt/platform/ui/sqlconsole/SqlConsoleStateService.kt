@@ -4,11 +4,14 @@ import com.sbrf.lt.platform.ui.model.SqlConsoleStateResponse
 import com.sbrf.lt.platform.ui.model.SqlConsoleStateUpdateRequest
 import com.sbrf.lt.platform.ui.model.SqlConsoleFavoriteObjectResponse
 import java.nio.file.Path
+import java.time.Clock
 
-class SqlConsoleStateService(
+class SqlConsoleStateService internal constructor(
     private val workspaceStore: SqlConsoleWorkspaceStateStore,
     private val libraryStore: SqlConsoleLibraryStateStore,
     private val preferencesStore: SqlConsolePreferencesStateStore,
+    private val workspaceRetentionService: SqlConsoleWorkspaceRetentionService,
+    private val clock: Clock = Clock.systemUTC(),
 ) {
     private val lock = Any()
     private val workspaceStates: MutableMap<String, PersistedSqlConsoleWorkspaceState> = linkedMapOf(
@@ -21,10 +24,16 @@ class SqlConsoleStateService(
         workspaceStore = SqlConsoleWorkspaceStateStore(storageDir),
         libraryStore = SqlConsoleLibraryStateStore(storageDir),
         preferencesStore = SqlConsolePreferencesStateStore(storageDir),
+        workspaceRetentionService = SqlConsoleWorkspaceRetentionService(storageDir),
     )
 
     fun currentState(workspaceId: String? = null): SqlConsoleStateResponse = synchronized(lock) {
-        toResponse(currentWorkspaceState(workspaceId))
+        val normalizedWorkspaceId = normalizeSqlConsoleWorkspaceId(workspaceId)
+        val touchedWorkspaceState = touchWorkspaceState(
+            workspaceId = normalizedWorkspaceId,
+            workspaceState = currentWorkspaceState(normalizedWorkspaceId),
+        )
+        toResponse(touchedWorkspaceState)
     }
 
     fun updateState(
@@ -37,7 +46,7 @@ class SqlConsoleStateService(
             selectedGroupNames = request.selectedGroupNames,
             selectedSourceNames = request.selectedSourceNames,
         ).normalized()
-        workspaceStates[normalizedWorkspaceId] = workspaceState
+        val touchedWorkspaceState = touchWorkspaceState(normalizedWorkspaceId, workspaceState)
         libraryState = PersistedSqlConsoleLibraryState(
             recentQueries = request.recentQueries,
             favoriteQueries = request.favoriteQueries,
@@ -56,10 +65,9 @@ class SqlConsoleStateService(
             strictSafetyEnabled = request.strictSafetyEnabled,
             transactionMode = request.transactionMode,
         ).normalized()
-        workspaceStore.save(normalizedWorkspaceId, workspaceState)
         libraryStore.save(libraryState)
         preferencesStore.save(preferencesState)
-        toResponse(workspaceState)
+        toResponse(touchedWorkspaceState)
     }
 
     private fun currentWorkspaceState(workspaceId: String?): PersistedSqlConsoleWorkspaceState {
@@ -67,6 +75,18 @@ class SqlConsoleStateService(
         return workspaceStates.getOrPut(normalizedWorkspaceId) {
             workspaceStore.load(normalizedWorkspaceId)
         }
+    }
+
+    private fun touchWorkspaceState(
+        workspaceId: String,
+        workspaceState: PersistedSqlConsoleWorkspaceState,
+    ): PersistedSqlConsoleWorkspaceState {
+        val touchedWorkspaceState = workspaceState.touched(clock.instant())
+        workspaceStates[workspaceId] = touchedWorkspaceState
+        workspaceStore.save(workspaceId, touchedWorkspaceState)
+        workspaceRetentionService.markWorkspaceAccessed(workspaceId)
+        workspaceRetentionService.cleanupStaleWorkspaceFiles()
+        return touchedWorkspaceState
     }
 
     private fun toResponse(workspaceState: PersistedSqlConsoleWorkspaceState): SqlConsoleStateResponse = SqlConsoleStateResponse(

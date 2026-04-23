@@ -11,6 +11,7 @@ import com.sbrf.lt.platform.composeui.module_runs.ComposeModuleRunsPage
 import com.sbrf.lt.platform.composeui.module_runs.parseModuleRunsRoute
 import com.sbrf.lt.platform.composeui.run_history_cleanup.ComposeRunHistoryCleanupPage
 import com.sbrf.lt.platform.composeui.sql_console.ComposeSqlConsolePage
+import com.sbrf.lt.platform.composeui.sql_console.ComposeSqlConsoleHistoryPage
 import com.sbrf.lt.platform.composeui.sql_console.ComposeSqlConsoleObjectsPage
 
 @Composable
@@ -27,6 +28,7 @@ fun ComposeSpikeApp() {
         "run-history-cleanup" -> ComposeRunHistoryCleanupPage()
         "about" -> ComposeAboutPage()
         "sql-console" -> ComposeSqlConsolePage()
+        "sql-console-history" -> ComposeSqlConsoleHistoryPage(route.params)
         "sql-console-objects" -> ComposeSqlConsoleObjectsPage(route.params)
         else -> ComposeHomePage()
     }

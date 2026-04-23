@@ -101,12 +101,18 @@ internal fun SqlConsoleSourceGroupCard(
                     if (selected) {
                         attr("checked", "checked")
                     }
+                    attr("aria-label", "Выбрать группу ${group.name}")
                     onClick { onToggle() }
                 })
                 Div({ classes("sql-source-group-checkbox-body") }) {
                     Div({ classes("sql-source-group-checkbox-head") }) {
-                        Span({ classes("sql-source-group-checkbox-name") }) {
-                            Text(group.name)
+                        Div({ classes("sql-source-group-checkbox-title") }) {
+                            Span({ classes("sql-source-group-checkbox-name") }) {
+                                Text(group.name)
+                            }
+                            Span({ classes("sql-source-group-checkbox-count") }) {
+                                Text("${group.sources.size}")
+                            }
                         }
                         Span({ classes("sql-source-group-checkbox-status") }) {
                             Text(translateSourceGroupSelectionState(selectionState))
@@ -148,33 +154,37 @@ internal fun SqlConsoleSourceCheckbox(
     selected: Boolean,
     onToggle: () -> Unit,
 ) {
+    val sourceDetail = sourceStatusDetail(sourceStatus)
     Label(attrs = {
         classes("sql-source-checkbox", "sql-source-checkbox-${sourceStatusTone(sourceStatus)}")
         if (selected) {
             classes("sql-source-checkbox-selected")
         }
+        attr("title", sourceDetail ?: sourceName)
     }) {
         Input(type = InputType.Checkbox, attrs = {
             if (selected) {
                 attr("checked", "checked")
             }
+            attr("aria-label", "Выбрать source $sourceName")
             onClick { onToggle() }
         })
         Div({ classes("sql-source-checkbox-body") }) {
             Div({ classes("sql-source-checkbox-head") }) {
-                Span({ classes("sql-source-checkbox-name") }) {
-                    Text(sourceName)
+                Div({ classes("sql-source-checkbox-title") }) {
+                    Span({ classes("sql-source-checkbox-name") }) {
+                        Text(sourceName)
+                    }
+                    Span({ classes("sql-source-checkbox-status-dot") }) { }
                 }
                 Span({ classes("sql-source-checkbox-status") }) {
                     Text(sourceStatus?.let { translateConnectionStatus(it.status) } ?: "Не проверено")
                 }
             }
-            Div({ classes("sql-source-checkbox-message") }) {
-                Text(
-                    sourceStatus?.errorMessage
-                        ?: sourceStatus?.message
-                        ?: "Статус появится после проверки подключения или выполнения SQL по этому source.",
-                )
+            sourceDetail?.let { detail ->
+                Div({ classes("sql-source-checkbox-message") }) {
+                    Text(detail)
+                }
             }
         }
     }
@@ -191,6 +201,18 @@ private fun translateSourceGroupSelectionState(
 
 private fun buildSourceGroupMessage(group: SqlConsoleSourceGroup): String =
     when {
-        group.synthetic -> "Источники, которые не входят ни в одну явно настроенную группу."
-        else -> "Источников в группе: ${group.sources.size}. Выбор группы добавляет или снимает все ее source."
+        group.synthetic -> "Источники без явной группы."
+        else -> "Выбор группы переключает все ее source."
     }
+
+private fun sourceStatusDetail(sourceStatus: SqlConsoleSourceConnectionStatus?): String? =
+    sourceStatus?.errorMessage
+        ?.trim()
+        ?.takeIf { it.isNotEmpty() }
+        ?: sourceStatus?.message
+            ?.trim()
+            ?.takeIf {
+                it.isNotEmpty() &&
+                    it != "Подключение установлено." &&
+                    it != "Статус появится после проверки подключения или выполнения SQL по этому source."
+            }

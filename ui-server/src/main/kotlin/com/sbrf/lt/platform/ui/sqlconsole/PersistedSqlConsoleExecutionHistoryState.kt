@@ -7,6 +7,7 @@ internal const val DEFAULT_SQL_CONSOLE_EXECUTION_HISTORY_LIMIT = 20
 
 internal data class PersistedSqlConsoleExecutionHistoryState(
     val entries: List<PersistedSqlConsoleExecutionHistoryEntry> = emptyList(),
+    val lastAccessedAt: Instant? = null,
 ) {
     fun normalized(limit: Int = DEFAULT_SQL_CONSOLE_EXECUTION_HISTORY_LIMIT): PersistedSqlConsoleExecutionHistoryState =
         copy(
@@ -16,6 +17,8 @@ internal data class PersistedSqlConsoleExecutionHistoryState(
                 .distinctBy { it.executionId }
                 .take(limit),
         )
+
+    fun touched(at: Instant): PersistedSqlConsoleExecutionHistoryState = copy(lastAccessedAt = at)
 }
 
 internal data class PersistedSqlConsoleExecutionHistoryEntry(

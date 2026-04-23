@@ -34,25 +34,44 @@ internal fun SqlConsoleObjectsPageEffects(
         }
         setState(nextState)
         if (initialQuery.length >= 2) {
-            setState(store.beginAction(currentState(), "search"))
-            setState(store.search(currentState()))
+            val searchState = store.beginAction(nextState, "search")
+            setState(searchState)
+            setState(store.search(searchState))
         }
     }
 
-    LaunchedEffect(store, navigationTarget, currentState().searchResponse) {
-        val selection = findSelectedObject(currentState().searchResponse, navigationTarget)
+    LaunchedEffect(
+        store,
+        navigationTarget,
+        currentState().loading,
+        currentState().actionInProgress,
+        currentState().query,
+        currentState().searchResponse,
+    ) {
+        val state = currentState()
+        if (state.loading || state.info == null) {
+            return@LaunchedEffect
+        }
+        val hasDirectInspectorTarget = directInspectorSelection(navigationTarget) != null
+        val waitingForSearchResult = hasDirectInspectorTarget &&
+            state.query.trim().length >= 2 &&
+            state.searchResponse == null
+        if (state.actionInProgress == "search" || waitingForSearchResult) {
+            return@LaunchedEffect
+        }
+        val selection = resolveInspectorSelection(state.searchResponse, navigationTarget)
         if (selection == null) {
-            val state = currentState()
             if (state.inspectorLoading || state.inspectorErrorMessage != null || state.inspectorResponse != null) {
                 setState(store.clearInspector(state))
             }
             return@LaunchedEffect
         }
-        if (inspectorMatchesSelection(currentState().inspectorResponse, selection)) {
+        if (state.inspectorLoading || inspectorMatchesSelection(state.inspectorResponse, selection)) {
             return@LaunchedEffect
         }
-        setState(store.beginInspectorLoad(currentState()))
-        setState(store.loadInspector(currentState(), selection.sourceName, selection.dbObject))
+        val inspectorLoadingState = store.beginInspectorLoad(state)
+        setState(inspectorLoadingState)
+        setState(store.loadInspector(inspectorLoadingState, selection.sourceName, selection.dbObject))
     }
 
     LaunchedEffect(
@@ -60,11 +79,14 @@ internal fun SqlConsoleObjectsPageEffects(
         currentState().selectedGroupNames.joinToString("\u0001"),
         currentState().selectedSourceNames.joinToString("\u0001"),
     ) {
-        val state = currentState()
-        if (state.loading || state.info == null) {
+        if (currentState().loading || currentState().info == null) {
             return@LaunchedEffect
         }
         delay(300)
-        setState(store.persistState(state, workspaceId))
+        val latestState = currentState()
+        if (latestState.loading || latestState.info == null) {
+            return@LaunchedEffect
+        }
+        setState(store.persistState(latestState, workspaceId))
     }
 }

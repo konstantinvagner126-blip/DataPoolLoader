@@ -64,15 +64,22 @@ internal fun buildUiServerModuleContextDependencies(
     val resolvedRunManager = runManager ?: defaultRunManager(resolvedModuleRegistry, uiConfig, resolvedCredentialsService)
     val resolvedConfigFormService = configFormService ?: ConfigFormService()
     val resolvedSqlConsoleService = sqlConsoleService ?: defaultSqlConsoleService(resolvedRuntimeUiConfig)
+    val resolvedSqlConsoleWorkspaceRetentionService = defaultSqlConsoleWorkspaceRetentionService(uiConfig)
     val resolvedSqlConsoleExecutionHistoryService =
-        sqlConsoleExecutionHistoryService ?: defaultSqlConsoleExecutionHistoryService(uiConfig)
+        sqlConsoleExecutionHistoryService ?: defaultSqlConsoleExecutionHistoryService(
+            uiConfig = uiConfig,
+            workspaceRetentionService = resolvedSqlConsoleWorkspaceRetentionService,
+        )
     val resolvedSqlConsoleQueryManager =
         sqlConsoleQueryManager ?: defaultSqlConsoleQueryManager(
             sqlConsoleService = resolvedSqlConsoleService,
             executionHistoryService = resolvedSqlConsoleExecutionHistoryService,
         )
     val resolvedSqlConsoleExportService = sqlConsoleExportService ?: SqlConsoleExportService()
-    val resolvedSqlConsoleStateService = sqlConsoleStateService ?: defaultSqlConsoleStateService(uiConfig)
+    val resolvedSqlConsoleStateService = sqlConsoleStateService ?: defaultSqlConsoleStateService(
+        uiConfig = uiConfig,
+        workspaceRetentionService = resolvedSqlConsoleWorkspaceRetentionService,
+    )
     val resolvedUiConfigPersistenceService = uiConfigPersistenceService ?: UiConfigPersistenceService()
     val resolvedDatabaseModuleActiveRunRegistry =
         databaseModuleActiveRunRegistry ?: DatabaseModuleActiveRunRegistry()

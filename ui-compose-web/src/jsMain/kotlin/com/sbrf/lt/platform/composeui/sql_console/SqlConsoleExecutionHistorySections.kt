@@ -9,46 +9,29 @@ import org.jetbrains.compose.web.dom.Div
 import org.jetbrains.compose.web.dom.Text
 
 @Composable
-internal fun SqlConsoleExecutionHistoryBlock(
+internal fun SqlConsoleExecutionHistoryList(
     history: List<SqlConsoleExecutionHistoryEntry>,
     onApply: (SqlConsoleExecutionHistoryEntry) -> Unit,
     onRepeat: (SqlConsoleExecutionHistoryEntry) -> Unit,
 ) {
-    if (history.isEmpty()) {
-        return
-    }
-    Div({ classes("sql-history-block") }) {
-        Div({ classes("sql-history-block-head") }) {
-            Div {
-                Div({ classes("panel-title", "mb-1") }) { Text("История выполнения этой вкладки") }
-                Div({ classes("small", "text-secondary") }) {
-                    Text("Последние execution session текущего workspace: SQL, набор source, итог и длительность.")
-                }
-            }
-            Div({ classes("sql-query-library-summary-chip") }) {
-                Div({ classes("sql-query-library-summary-chip-label") }) { Text("Sessions") }
-                Div({ classes("sql-query-library-summary-chip-value") }) { Text(history.size.toString()) }
-            }
-        }
-        Div({ classes("sql-history-list") }) {
-            history.take(6).forEach { entry ->
-                SqlConsoleExecutionHistoryEntryCard(
-                    entry = entry,
-                    onApply = { onApply(entry) },
-                    onRepeat = { onRepeat(entry) },
-                )
-            }
+    Div({ classes("sql-history-screen-list") }) {
+        history.forEach { entry ->
+            SqlConsoleExecutionHistoryEntryRow(
+                entry = entry,
+                onApply = { onApply(entry) },
+                onRepeat = { onRepeat(entry) },
+            )
         }
     }
 }
 
 @Composable
-private fun SqlConsoleExecutionHistoryEntryCard(
+internal fun SqlConsoleExecutionHistoryEntryRow(
     entry: SqlConsoleExecutionHistoryEntry,
     onApply: () -> Unit,
     onRepeat: () -> Unit,
 ) {
-    Div({ classes("sql-history-entry") }) {
+    Div({ classes("sql-history-entry", "sql-history-entry-row") }) {
         Div({ classes("sql-history-entry-head") }) {
             Div({ classes("sql-history-entry-statuses") }) {
                 Div({ classes("sql-history-status", executionHistoryStatusClass(entry)) }) {
@@ -96,7 +79,7 @@ private fun SqlConsoleExecutionHistoryEntryCard(
     }
 }
 
-private fun buildExecutionHistoryOutcomeText(entry: SqlConsoleExecutionHistoryEntry): String =
+internal fun buildExecutionHistoryOutcomeText(entry: SqlConsoleExecutionHistoryEntry): String =
     when {
         entry.transactionState == "PENDING_COMMIT" -> "PENDING COMMIT"
         entry.transactionState == "COMMITTED" -> "COMMIT"
@@ -109,7 +92,7 @@ private fun buildExecutionHistoryOutcomeText(entry: SqlConsoleExecutionHistoryEn
         else -> entry.status
     }
 
-private fun executionHistoryStatusClass(entry: SqlConsoleExecutionHistoryEntry): String =
+internal fun executionHistoryStatusClass(entry: SqlConsoleExecutionHistoryEntry): String =
     when {
         entry.transactionState == "PENDING_COMMIT" -> "sql-history-status-pending"
         entry.transactionState in setOf("ROLLED_BACK", "ROLLED_BACK_BY_TIMEOUT", "ROLLED_BACK_BY_OWNER_LOSS") ->
@@ -121,7 +104,7 @@ private fun executionHistoryStatusClass(entry: SqlConsoleExecutionHistoryEntry):
         else -> "sql-history-status-neutral"
     }
 
-private fun buildExecutionHistoryMeta(entry: SqlConsoleExecutionHistoryEntry): String =
+internal fun buildExecutionHistoryMeta(entry: SqlConsoleExecutionHistoryEntry): String =
     buildString {
         append(formatDateTime(entry.startedAt))
         entry.durationMillis?.let {
@@ -134,7 +117,7 @@ private fun buildExecutionHistoryMeta(entry: SqlConsoleExecutionHistoryEntry): S
         }
     }
 
-private fun String.sqlHistoryPreview(maxLength: Int = 180): String {
+internal fun String.sqlHistoryPreview(maxLength: Int = 180): String {
     val normalized = replace('\n', ' ')
         .replace('\r', ' ')
         .split(" ")
