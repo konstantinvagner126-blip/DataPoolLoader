@@ -5,6 +5,7 @@ internal class ModuleRunsStoreLoadingSupport(
 ) {
     private val runtimeSupport = ModuleRunsStoreRuntimeSupport(api)
     private val selectionSupport = ModuleRunsStoreSelectionSupport(api)
+    private val stateSupport = ModuleRunsStoreStateSupport()
 
     suspend fun load(
         route: ModuleRunsRouteState,
@@ -19,9 +20,7 @@ internal class ModuleRunsStoreLoadingSupport(
             val history = api.loadHistory(route.storage, route.moduleId, historyLimit)
             val selectedRunId = resolveSelectedRunId(history, null)
             val details = selectionSupport.loadSelectedRunDetails(route, selectedRunId)
-            ModuleRunsPageState(
-                loading = false,
-                errorMessage = null,
+            stateSupport.createLoadedState(
                 runtimeContext = runtimeContext,
                 session = session,
                 history = history,
@@ -30,11 +29,7 @@ internal class ModuleRunsStoreLoadingSupport(
                 historyLimit = historyLimit,
             )
         }.getOrElse { error ->
-            ModuleRunsPageState(
-                loading = false,
-                errorMessage = error.message ?: "Не удалось загрузить историю запусков.",
-                historyLimit = historyLimit,
-            )
+            stateSupport.applyInitialLoadFailure(historyLimit, error)
         }
     }
 
@@ -52,18 +47,14 @@ internal class ModuleRunsStoreLoadingSupport(
                 )
             }
             val details = selectionSupport.loadSelectedRunDetails(route, runId)
-            current.copy(
-                loading = false,
-                errorMessage = null,
+            stateSupport.applySelectedRun(
+                current = current,
                 runtimeContext = runtimeContext,
-                selectedRunId = runId,
-                selectedRunDetails = details,
+                runId = runId,
+                details = details,
             )
         }.getOrElse { error ->
-            current.copy(
-                loading = false,
-                errorMessage = error.message ?: "Не удалось загрузить подробности запуска.",
-            )
+            stateSupport.applySelectRunFailure(current, error)
         }
     }
 
@@ -83,19 +74,15 @@ internal class ModuleRunsStoreLoadingSupport(
             val history = api.loadHistory(route.storage, route.moduleId, current.historyLimit)
             val selectedRunId = resolveSelectedRunId(history, current.selectedRunId, preferActiveRun)
             val details = selectionSupport.loadSelectedRunDetails(route, selectedRunId)
-            current.copy(
-                loading = false,
-                errorMessage = null,
+            stateSupport.applyReloadedHistory(
+                current = current,
                 runtimeContext = runtimeContext,
                 history = history,
                 selectedRunId = selectedRunId,
                 selectedRunDetails = details,
             )
         }.getOrElse { error ->
-            current.copy(
-                loading = false,
-                errorMessage = error.message ?: "Не удалось обновить историю запусков.",
-            )
+            stateSupport.applyReloadFailure(current, error)
         }
     }
 }

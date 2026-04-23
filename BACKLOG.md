@@ -929,6 +929,11 @@ Review after Phase F:
     - добавлены common tests на extracted selection/config-form snapshot rules:
       - [ModuleEditorStoreCatalogSelectionSupportTest.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonTest/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreCatalogSelectionSupportTest.kt)
       - [ModuleEditorStoreConfigFormSnapshotSupportTest.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonTest/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreConfigFormSnapshotSupportTest.kt)
+  - следующий bounded split в `module_runs` идет по state-policy, а не по runtime/selection helper-ам:
+    - [ModuleRunsStoreLoadingSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsStoreLoadingSupport.kt) перестал держать initial-load success state и select/reload error policy прямо в orchestration слое;
+    - pure state transitions вынесены в [ModuleRunsStoreStateSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsStoreStateSupport.kt);
+    - добавлены common tests на loaded/reload/failure state rules:
+      - [ModuleRunsStoreStateSupportTest.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonTest/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsStoreStateSupportTest.kt)
 
 ### 12. Финализировать boundary модульного редактора и storage contracts
 
