@@ -726,11 +726,16 @@
   - settings/connection flow вынесен в [SqlConsoleStoreSettingsSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleStoreSettingsSupport.kt);
   - query lifecycle вынесен в [SqlConsoleStoreQueryLifecycleSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleStoreQueryLifecycleSupport.kt);
   - owner actions и execution state helpers вынесены в [SqlConsoleStoreOwnerActionSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleStoreOwnerActionSupport.kt) и [SqlConsoleStoreExecutionStateSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleStoreExecutionStateSupport.kt).
+  - façade store SQL-консоли тоже начал худеть:
+    - [SqlConsoleStore.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleStore.kt) больше не смешивает orchestration API-вызовы и pure state mutations;
+    - pure state/input mutations вынесены в [SqlConsoleStoreStateSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleStoreStateSupport.kt);
+    - query-history/favorites UX-state вынесены в [SqlConsoleStoreLibrarySupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleStoreLibrarySupport.kt);
   - object-browser store cleanup тоже начат:
     - [SqlConsoleObjectsStoreActionSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectsStoreActionSupport.kt) больше не держит persistence/favorites/search/inspector flow в одном файле;
     - workspace persistence вынесен в [SqlConsoleObjectsStorePersistenceSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectsStorePersistenceSupport.kt);
     - favorites вынесены в [SqlConsoleObjectsStoreFavoriteSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectsStoreFavoriteSupport.kt);
     - search и inspector вынесены в [SqlConsoleObjectsStoreSearchSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectsStoreSearchSupport.kt) и [SqlConsoleObjectsStoreInspectorSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectsStoreInspectorSupport.kt).
+    - [SqlConsoleObjectsStore.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectsStore.kt) больше не держит inline query/selection/inspector UI-state helpers; они вынесены в [SqlConsoleObjectsStoreStateSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectsStoreStateSupport.kt).
 
 ### 12. Финализировать boundary модульного редактора и storage contracts
 

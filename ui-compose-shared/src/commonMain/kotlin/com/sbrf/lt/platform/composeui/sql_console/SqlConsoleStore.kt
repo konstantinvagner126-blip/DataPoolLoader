@@ -5,145 +5,94 @@ class SqlConsoleStore(
 ) {
     private val loadingSupport = SqlConsoleStoreLoadingSupport(api)
     private val executionSupport = SqlConsoleStoreExecutionSupport(api)
+    private val stateSupport = SqlConsoleStoreStateSupport()
+    private val librarySupport = SqlConsoleStoreLibrarySupport()
 
     suspend fun load(workspaceId: String? = null): SqlConsolePageState =
         loadingSupport.load(workspaceId)
 
     fun startLoading(current: SqlConsolePageState): SqlConsolePageState =
-        current.copy(loading = true, errorMessage = null, successMessage = null)
+        stateSupport.startLoading(current)
 
     fun updateDraftSql(
         current: SqlConsolePageState,
         value: String,
     ): SqlConsolePageState =
-        current.copy(draftSql = value)
+        stateSupport.updateDraftSql(current, value)
 
     fun updateSelectedSources(
         current: SqlConsolePageState,
         sourceName: String,
         enabled: Boolean,
-    ): SqlConsolePageState {
-        val selectionUpdate = toggleSelectedSourceWithGroups(
-            groups = current.info?.groups.orEmpty(),
-            currentSelectedGroupNames = current.selectedGroupNames,
-            currentSelectedSourceNames = current.selectedSourceNames,
-            manuallyIncludedSourceNames = current.manuallyIncludedSourceNames,
-            manuallyExcludedSourceNames = current.manuallyExcludedSourceNames,
-            sourceName = sourceName,
-            enabled = enabled,
-        )
-        return current.copy(
-            selectedSourceNames = selectionUpdate.selectedSourceNames,
-            selectedGroupNames = selectionUpdate.selectedGroupNames,
-            manuallyIncludedSourceNames = selectionUpdate.manuallyIncludedSourceNames,
-            manuallyExcludedSourceNames = selectionUpdate.manuallyExcludedSourceNames,
-        )
-    }
+    ): SqlConsolePageState =
+        stateSupport.updateSelectedSources(current, sourceName, enabled)
 
     fun updateSelectedSourceGroup(
         current: SqlConsolePageState,
         group: SqlConsoleSourceGroup,
         enabled: Boolean,
-    ): SqlConsolePageState {
-        val selectionUpdate = toggleSelectedSourceGroupNames(
-            groups = current.info?.groups.orEmpty(),
-            currentSelectedGroupNames = current.selectedGroupNames,
-            currentSelectedSourceNames = current.selectedSourceNames,
-            manuallyIncludedSourceNames = current.manuallyIncludedSourceNames,
-            manuallyExcludedSourceNames = current.manuallyExcludedSourceNames,
-            group = group,
-            enabled = enabled,
-        )
-        return current.copy(
-            selectedSourceNames = selectionUpdate.selectedSourceNames,
-            selectedGroupNames = selectionUpdate.selectedGroupNames,
-            manuallyIncludedSourceNames = selectionUpdate.manuallyIncludedSourceNames,
-            manuallyExcludedSourceNames = selectionUpdate.manuallyExcludedSourceNames,
-        )
-    }
+    ): SqlConsolePageState =
+        stateSupport.updateSelectedSourceGroup(current, group, enabled)
 
     fun updatePageSize(
         current: SqlConsolePageState,
         pageSize: Int,
     ): SqlConsolePageState =
-        current.copy(pageSize = normalizePageSize(pageSize))
+        stateSupport.updatePageSize(current, pageSize)
 
     fun updateStrictSafety(
         current: SqlConsolePageState,
         enabled: Boolean,
     ): SqlConsolePageState =
-        current.copy(strictSafetyEnabled = enabled)
+        stateSupport.updateStrictSafety(current, enabled)
 
     fun updateAutoCommitEnabled(
         current: SqlConsolePageState,
         enabled: Boolean,
     ): SqlConsolePageState =
-        current.copy(
-            transactionMode = if (enabled) "AUTO_COMMIT" else "TRANSACTION_PER_SHARD",
-        )
+        stateSupport.updateAutoCommitEnabled(current, enabled)
 
     fun updateMaxRowsPerShardDraft(
         current: SqlConsolePageState,
         value: String,
     ): SqlConsolePageState =
-        current.copy(maxRowsPerShardDraft = value)
+        stateSupport.updateMaxRowsPerShardDraft(current, value)
 
     fun updateQueryTimeoutDraft(
         current: SqlConsolePageState,
         value: String,
     ): SqlConsolePageState =
-        current.copy(queryTimeoutSecDraft = value)
+        stateSupport.updateQueryTimeoutDraft(current, value)
 
     fun applyRecentQuery(
         current: SqlConsolePageState,
         value: String,
     ): SqlConsolePageState =
-        if (value.isBlank()) current else current.copy(draftSql = value)
+        librarySupport.applyRecentQuery(current, value)
 
     fun applyFavoriteQuery(
         current: SqlConsolePageState,
         value: String,
     ): SqlConsolePageState =
-        if (value.isBlank()) current else current.copy(draftSql = value)
+        librarySupport.applyFavoriteQuery(current, value)
 
-    fun rememberFavoriteQuery(current: SqlConsolePageState): SqlConsolePageState {
-        val sql = current.draftSql.trim()
-        if (sql.isBlank()) {
-            return current.copy(errorMessage = "Сначала введи SQL-запрос.", successMessage = null)
-        }
-        return current.copy(
-            errorMessage = null,
-            successMessage = "Запрос добавлен в избранное.",
-            favoriteQueries = rememberQuery(current.favoriteQueries, sql, limit = 20),
-        )
-    }
+    fun rememberFavoriteQuery(current: SqlConsolePageState): SqlConsolePageState =
+        librarySupport.rememberFavoriteQuery(current)
 
     fun removeFavoriteQuery(
         current: SqlConsolePageState,
         value: String,
     ): SqlConsolePageState =
-        current.copy(
-            favoriteQueries = current.favoriteQueries.filterNot { it == value },
-            errorMessage = null,
-            successMessage = "Запрос убран из избранного.",
-        )
+        librarySupport.removeFavoriteQuery(current, value)
 
     fun removeFavoriteObject(
         current: SqlConsolePageState,
         value: SqlConsoleFavoriteObject,
     ): SqlConsolePageState =
-        current.copy(
-            favoriteObjects = current.favoriteObjects.filterNot { it.matches(value) },
-            errorMessage = null,
-            successMessage = "Объект убран из избранного.",
-        )
+        librarySupport.removeFavoriteObject(current, value)
 
     fun clearRecentQueries(current: SqlConsolePageState): SqlConsolePageState =
-        current.copy(
-            recentQueries = emptyList(),
-            errorMessage = null,
-            successMessage = "История последних запросов очищена.",
-        )
+        librarySupport.clearRecentQueries(current)
 
     suspend fun persistState(current: SqlConsolePageState): SqlConsolePageState =
         loadingSupport.persistState(current)
@@ -208,5 +157,5 @@ class SqlConsoleStore(
         current: SqlConsolePageState,
         actionName: String,
     ): SqlConsolePageState =
-        current.copy(actionInProgress = actionName, errorMessage = null, successMessage = null)
+        stateSupport.beginAction(current, actionName)
 }

@@ -5,68 +5,39 @@ class SqlConsoleObjectsStore(
 ) {
     private val loadingSupport = SqlConsoleObjectsStoreLoadingSupport(api)
     private val actionSupport = SqlConsoleObjectsStoreActionSupport(api)
+    private val stateSupport = SqlConsoleObjectsStoreStateSupport()
 
     suspend fun load(workspaceId: String? = null): SqlConsoleObjectsPageState =
         loadingSupport.load(workspaceId)
 
     fun startLoading(current: SqlConsoleObjectsPageState): SqlConsoleObjectsPageState =
-        current.copy(loading = true, errorMessage = null, successMessage = null)
+        stateSupport.startLoading(current)
 
     fun beginAction(
         current: SqlConsoleObjectsPageState,
         actionName: String,
     ): SqlConsoleObjectsPageState =
-        current.copy(actionInProgress = actionName, errorMessage = null, successMessage = null)
+        stateSupport.beginAction(current, actionName)
 
     fun updateQuery(
         current: SqlConsoleObjectsPageState,
         value: String,
     ): SqlConsoleObjectsPageState =
-        current.copy(query = value)
+        stateSupport.updateQuery(current, value)
 
     fun updateSelectedSources(
         current: SqlConsoleObjectsPageState,
         sourceName: String,
         enabled: Boolean,
-    ): SqlConsoleObjectsPageState {
-        val selectionUpdate = toggleSelectedSourceWithGroups(
-            groups = current.info?.groups.orEmpty(),
-            currentSelectedGroupNames = current.selectedGroupNames,
-            currentSelectedSourceNames = current.selectedSourceNames,
-            manuallyIncludedSourceNames = current.manuallyIncludedSourceNames,
-            manuallyExcludedSourceNames = current.manuallyExcludedSourceNames,
-            sourceName = sourceName,
-            enabled = enabled,
-        )
-        return current.copy(
-            selectedSourceNames = selectionUpdate.selectedSourceNames,
-            selectedGroupNames = selectionUpdate.selectedGroupNames,
-            manuallyIncludedSourceNames = selectionUpdate.manuallyIncludedSourceNames,
-            manuallyExcludedSourceNames = selectionUpdate.manuallyExcludedSourceNames,
-        )
-    }
+    ): SqlConsoleObjectsPageState =
+        stateSupport.updateSelectedSources(current, sourceName, enabled)
 
     fun updateSelectedSourceGroup(
         current: SqlConsoleObjectsPageState,
         group: SqlConsoleSourceGroup,
         enabled: Boolean,
-    ): SqlConsoleObjectsPageState {
-        val selectionUpdate = toggleSelectedSourceGroupNames(
-            groups = current.info?.groups.orEmpty(),
-            currentSelectedGroupNames = current.selectedGroupNames,
-            currentSelectedSourceNames = current.selectedSourceNames,
-            manuallyIncludedSourceNames = current.manuallyIncludedSourceNames,
-            manuallyExcludedSourceNames = current.manuallyExcludedSourceNames,
-            group = group,
-            enabled = enabled,
-        )
-        return current.copy(
-            selectedSourceNames = selectionUpdate.selectedSourceNames,
-            selectedGroupNames = selectionUpdate.selectedGroupNames,
-            manuallyIncludedSourceNames = selectionUpdate.manuallyIncludedSourceNames,
-            manuallyExcludedSourceNames = selectionUpdate.manuallyExcludedSourceNames,
-        )
-    }
+    ): SqlConsoleObjectsPageState =
+        stateSupport.updateSelectedSourceGroup(current, group, enabled)
 
     suspend fun toggleFavoriteObject(
         current: SqlConsoleObjectsPageState,
@@ -94,18 +65,10 @@ class SqlConsoleObjectsStore(
         actionSupport.search(current)
 
     fun beginInspectorLoad(current: SqlConsoleObjectsPageState): SqlConsoleObjectsPageState =
-        current.copy(
-            inspectorLoading = true,
-            inspectorErrorMessage = null,
-            inspectorResponse = null,
-        )
+        stateSupport.beginInspectorLoad(current)
 
     fun clearInspector(current: SqlConsoleObjectsPageState): SqlConsoleObjectsPageState =
-        current.copy(
-            inspectorLoading = false,
-            inspectorErrorMessage = null,
-            inspectorResponse = null,
-        )
+        stateSupport.clearInspector(current)
 
     suspend fun loadInspector(
         current: SqlConsoleObjectsPageState,
