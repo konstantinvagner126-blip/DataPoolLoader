@@ -858,6 +858,13 @@ Review after Phase F:
     - SQL-resource flow больше не смешивает naming rules и mutation lifecycle: naming вынесен в [ModuleEditorStoreSqlResourceNamingSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreSqlResourceNamingSupport.kt), mutations вынесены в [ModuleEditorStoreSqlResourceMutationSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreSqlResourceMutationSupport.kt);
     - config-form support больше не держит parsing/apply flow и SQL-resource tracking в одном файле: они разведены в [ModuleEditorStoreConfigFormMutationSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreConfigFormMutationSupport.kt) и [ModuleEditorStoreConfigFormSqlResourceSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreConfigFormSqlResourceSupport.kt);
     - добавлены первые common tests на чистые naming/resource-tracking правила `module_editor`, чтобы этот cleanup не остался без regression coverage.
+  - начат cleanup `module_runs` shared-store кластера:
+    - [ModuleRunsStoreLoadingSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsStoreLoadingSupport.kt) перестал держать initial load, database runtime fallback и run selection/details policy в одном helper;
+    - runtime/fallback branching вынесен в [ModuleRunsStoreRuntimeSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsStoreRuntimeSupport.kt);
+    - selected-run/details policy вынесен в [ModuleRunsStoreSelectionSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsStoreSelectionSupport.kt);
+    - добавлены common tests на database fallback, active-run preference и bounded details loading:
+      - [ModuleRunsStoreLoadingSupportTest.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonTest/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsStoreLoadingSupportTest.kt)
+      - [ModuleRunsStoreSelectionSupportTest.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonTest/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsStoreSelectionSupportTest.kt)
 
 ### 12. Финализировать boundary модульного редактора и storage contracts
 

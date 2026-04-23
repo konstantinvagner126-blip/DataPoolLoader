@@ -1,30 +1,24 @@
 package com.sbrf.lt.platform.composeui.module_runs
 
-import com.sbrf.lt.platform.composeui.model.ModuleStoreMode
-import com.sbrf.lt.platform.composeui.model.RuntimeContext
-
 internal class ModuleRunsStoreLoadingSupport(
     private val api: ModuleRunsApi,
 ) {
+    private val runtimeSupport = ModuleRunsStoreRuntimeSupport(api)
+    private val selectionSupport = ModuleRunsStoreSelectionSupport(api)
+
     suspend fun load(
         route: ModuleRunsRouteState,
         historyLimit: Int = 20,
     ): ModuleRunsPageState {
         return runCatching {
-            val runtimeContext = api.loadRuntimeContext()
-            if (route.storage == "database" && runtimeContext.effectiveMode != ModuleStoreMode.DATABASE) {
-                return ModuleRunsPageState(
-                    loading = false,
-                    errorMessage = runtimeContext.fallbackReason
-                        ?: "Режим базы данных сейчас недоступен.",
-                    runtimeContext = runtimeContext,
-                    historyLimit = historyLimit,
-                )
+            val runtimeContext = runtimeSupport.loadInitialRuntimeContext()
+            if (runtimeSupport.requiresDatabaseFallback(route, runtimeContext)) {
+                return runtimeSupport.buildInitialDatabaseFallbackState(runtimeContext, historyLimit)
             }
             val session = api.loadSession(route.storage, route.moduleId)
             val history = api.loadHistory(route.storage, route.moduleId, historyLimit)
             val selectedRunId = resolveSelectedRunId(history, null)
-            val details = selectedRunId?.let { api.loadRunDetails(route.storage, route.moduleId, it) }
+            val details = selectionSupport.loadSelectedRunDetails(route, selectedRunId)
             ModuleRunsPageState(
                 loading = false,
                 errorMessage = null,
@@ -50,14 +44,14 @@ internal class ModuleRunsStoreLoadingSupport(
         runId: String,
     ): ModuleRunsPageState {
         return runCatching {
-            val runtimeContext = loadDatabaseRuntimeContext(route) ?: current.runtimeContext
-            if (route.storage == "database" && runtimeContext?.effectiveMode != ModuleStoreMode.DATABASE) {
+            val runtimeContext = runtimeSupport.loadRouteRuntimeContext(route, current.runtimeContext)
+            if (runtimeSupport.requiresDatabaseFallback(route, runtimeContext)) {
                 return buildDatabaseFallbackState(
                     current = current,
                     runtimeContext = runtimeContext,
                 )
             }
-            val details = api.loadRunDetails(route.storage, route.moduleId, runId)
+            val details = selectionSupport.loadSelectedRunDetails(route, runId)
             current.copy(
                 loading = false,
                 errorMessage = null,
@@ -79,8 +73,8 @@ internal class ModuleRunsStoreLoadingSupport(
         preferActiveRun: Boolean = false,
     ): ModuleRunsPageState {
         return runCatching {
-            val runtimeContext = loadDatabaseRuntimeContext(route) ?: current.runtimeContext
-            if (route.storage == "database" && runtimeContext?.effectiveMode != ModuleStoreMode.DATABASE) {
+            val runtimeContext = runtimeSupport.loadRouteRuntimeContext(route, current.runtimeContext)
+            if (runtimeSupport.requiresDatabaseFallback(route, runtimeContext)) {
                 return buildDatabaseFallbackState(
                     current = current,
                     runtimeContext = runtimeContext,
@@ -88,7 +82,7 @@ internal class ModuleRunsStoreLoadingSupport(
             }
             val history = api.loadHistory(route.storage, route.moduleId, current.historyLimit)
             val selectedRunId = resolveSelectedRunId(history, current.selectedRunId, preferActiveRun)
-            val details = selectedRunId?.let { api.loadRunDetails(route.storage, route.moduleId, it) }
+            val details = selectionSupport.loadSelectedRunDetails(route, selectedRunId)
             current.copy(
                 loading = false,
                 errorMessage = null,
@@ -104,36 +98,4 @@ internal class ModuleRunsStoreLoadingSupport(
             )
         }
     }
-
-    private suspend fun loadDatabaseRuntimeContext(route: ModuleRunsRouteState) =
-        if (route.storage == "database") {
-            api.loadRuntimeContext()
-        } else {
-            null
-        }
 }
-
-internal fun buildDatabaseFallbackState(
-    current: ModuleRunsPageState,
-    runtimeContext: RuntimeContext?,
-): ModuleRunsPageState =
-    current.copy(
-        loading = false,
-        errorMessage = runtimeContext?.fallbackReason ?: "Режим базы данных сейчас недоступен.",
-        runtimeContext = runtimeContext,
-        history = null,
-        selectedRunId = null,
-        selectedRunDetails = null,
-    )
-
-internal fun resolveSelectedRunId(
-    history: ModuleRunHistoryResponse,
-    currentSelectedRunId: String?,
-    preferActiveRun: Boolean = false,
-): String? =
-    when {
-        preferActiveRun && !history.activeRunId.isNullOrBlank() -> history.activeRunId
-        currentSelectedRunId != null && history.runs.any { it.runId == currentSelectedRunId } -> currentSelectedRunId
-        !history.activeRunId.isNullOrBlank() -> history.activeRunId
-        else -> history.runs.firstOrNull()?.runId
-    }
