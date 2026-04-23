@@ -1030,7 +1030,7 @@
 
 Статус:
 
-- не реализовано
+- частично реализовано
 
 Источник:
 
@@ -1073,6 +1073,35 @@
 - SQL execution recovery regression tests:
   - закрепить route/manager сценарии для refresh recovery и stale-token conflict;
   - duplicate tab должен терять управление после ротации token, а не продолжать heartbeat параллельно.
+- SQL execution owner release flow:
+  - добавить explicit owner release endpoint для pagehide/network-loss сценариев;
+  - при release из `PENDING_COMMIT` выполнять immediate safe rollback, а при `RUNNING` помечать execution как owner-lost без дальнейшего ручного control-path.
+- SQL execution unload beacon integration:
+  - добавить browser-side best-effort release через `pagehide` / `sendBeacon`, не полагаясь на него как на единственную защиту;
+  - same-tab refresh recovery должен остаться рабочим, а уход вкладки должен пытаться закрыть owner control-path раньше lease timeout.
+- SQL execution owner release regression tests:
+  - закрепить manager/route сценарии для explicit release в `RUNNING` и `PENDING_COMMIT`;
+  - stale owner после release не должен иметь права на `Commit / Rollback / Cancel / Heartbeat`.
+
+Что уже сделано:
+
+- введены `ownerSessionId`, `ownerToken`, lease metadata и server-side ownership contract для async execution SQL-консоли;
+- heartbeat добавлен в `RUNNING` и `PENDING_COMMIT`, а `Commit / Rollback / Cancel` больше не работают без подтвержденного owner token;
+- реализованы automatic rollback по owner loss и hard TTL для `PENDING_COMMIT` со статусами `ROLLED_BACK_BY_OWNER_LOSS` и `ROLLED_BACK_BY_TIMEOUT`;
+- same-tab refresh recovery больше не теряет control-path без причины:
+  - ownership восстанавливается через browser session storage;
+  - stale token быстро fence-ится через rotation на heartbeat;
+- duplicate tab больше не должен auto-restore cloned control-path только по `sessionStorage`:
+  - recovery теперь требует совпадение `ownerSessionId` и `tabInstanceId`;
+- добавлен explicit owner release flow:
+  - `pagehide` делает best-effort release через beacon/keepalive path;
+  - release закрывает active control-path и оставляет только короткое recovery-window для same-tab refresh;
+  - если recovery не произошло, pending commit уходит в safe rollback, а manual transaction в `RUNNING` не получает долгий orphan `PENDING_COMMIT`;
+- route/manager tests уже покрывают:
+  - owner loss / timeout;
+  - refresh recovery;
+  - stale-token conflict;
+  - explicit release и recovery после release.
 
 Критерий завершения:
 

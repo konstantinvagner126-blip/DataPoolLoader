@@ -28,6 +28,15 @@ internal fun Route.registerSqlConsoleAsyncQueryRoutes(context: UiServerContext) 
         )
     }
 
+    post("/api/sql-console/query/{id}/release") {
+        call.respond(
+            context.releaseSqlConsoleExecutionOwnership(
+                executionId = call.requireSqlConsoleExecutionId(),
+                request = call.receive<SqlConsoleExecutionOwnerActionRequest>(),
+            ),
+        )
+    }
+
     post("/api/sql-console/query/{id}/cancel") {
         call.respond(
             context.cancelSqlConsoleExecution(

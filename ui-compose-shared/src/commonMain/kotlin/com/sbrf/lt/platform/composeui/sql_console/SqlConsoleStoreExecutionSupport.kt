@@ -312,5 +312,6 @@ private fun SqlConsolePageState.clearExecutionOwnership(message: String): SqlCon
 
 private fun String.indicatesOwnershipLoss(): Boolean =
     contains("не принадлежит", ignoreCase = true) ||
+        contains("control-path", ignoreCase = true) ||
         contains("потеряла владельца", ignoreCase = true) ||
         contains("владелец", ignoreCase = true) && contains("потерян", ignoreCase = true)

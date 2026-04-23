@@ -490,6 +490,65 @@ class SqlConsoleQueryManagerTest {
     }
 
     @Test
+    fun `release pending commit requires heartbeat recovery before commit`() {
+        val manager = SqlConsoleQueryManager(sqlConsoleService = manualTransactionService())
+
+        val started = manager.startQuery(
+            sql = "update demo set flag = true",
+            credentialsPath = null,
+            ownerSessionId = ownerSessionId,
+            transactionMode = SqlConsoleTransactionMode.TRANSACTION_PER_SHARD,
+        )
+        val initialToken = requireNotNull(started.ownerToken)
+        val pending = waitForCompletion(manager, started.id)
+
+        assertEquals(SqlConsoleExecutionTransactionState.PENDING_COMMIT, pending.transactionState)
+
+        val released = manager.releaseOwnership(started.id, ownerSessionId, initialToken)
+        assertEquals(SqlConsoleExecutionTransactionState.PENDING_COMMIT, released.transactionState)
+
+        val releasedCommitError = assertFailsWith<UiStateConflictException> {
+            manager.commit(started.id, ownerSessionId, initialToken)
+        }
+        assertTrue(releasedCommitError.message!!.contains("control-path"))
+
+        val recovered = manager.heartbeat(started.id, ownerSessionId, initialToken)
+        val recoveredToken = requireNotNull(recovered.ownerToken)
+        val committed = manager.commit(started.id, ownerSessionId, recoveredToken)
+
+        assertEquals(SqlConsoleExecutionTransactionState.COMMITTED, committed.transactionState)
+    }
+
+    @Test
+    fun `release pending commit auto rollbacks when recovery window expires`() {
+        var now = Instant.parse("2026-04-23T00:00:00Z")
+        val manager = SqlConsoleQueryManager(
+            sqlConsoleService = manualTransactionService(),
+            clock = { now },
+            ownerReleaseRecoveryWindow = Duration.ofSeconds(3),
+        )
+
+        val started = manager.startQuery(
+            sql = "update demo set flag = true",
+            credentialsPath = null,
+            ownerSessionId = ownerSessionId,
+            transactionMode = SqlConsoleTransactionMode.TRANSACTION_PER_SHARD,
+        )
+        val initialToken = requireNotNull(started.ownerToken)
+        val pending = waitForCompletion(manager, started.id)
+
+        assertEquals(SqlConsoleExecutionTransactionState.PENDING_COMMIT, pending.transactionState)
+
+        manager.releaseOwnership(started.id, ownerSessionId, initialToken)
+        now = now.plusSeconds(4)
+        manager.enforceSafetyTimeouts()
+        val rolledBack = manager.snapshot(started.id)
+
+        assertEquals(SqlConsoleExecutionTransactionState.ROLLED_BACK_BY_OWNER_LOSS, rolledBack.transactionState)
+        assertTrue(rolledBack.errorMessage!!.contains("владелец"))
+    }
+
+    @Test
     fun `auto rollbacks pending commit when ttl expires`() {
         var now = Instant.parse("2026-04-23T00:00:00Z")
         val manager = SqlConsoleQueryManager(
@@ -534,6 +593,33 @@ class SqlConsoleQueryManagerTest {
         )
 
         now = now.plusSeconds(6)
+        manager.enforceSafetyTimeouts()
+        releaseExecution.countDown()
+        val finished = waitForCompletion(manager, started.id)
+
+        assertEquals(SqlConsoleExecutionTransactionState.ROLLED_BACK_BY_OWNER_LOSS, finished.transactionState)
+        assertTrue(finished.errorMessage!!.contains("владелец"))
+    }
+
+    @Test
+    fun `release running manual transaction causes safe rollback after recovery window`() {
+        var now = Instant.parse("2026-04-23T00:00:00Z")
+        val releaseExecution = CountDownLatch(1)
+        val manager = SqlConsoleQueryManager(
+            sqlConsoleService = manualTransactionService(releaseExecution),
+            clock = { now },
+            ownerReleaseRecoveryWindow = Duration.ofSeconds(3),
+        )
+
+        val started = manager.startQuery(
+            sql = "update demo set flag = true",
+            credentialsPath = null,
+            ownerSessionId = ownerSessionId,
+            transactionMode = SqlConsoleTransactionMode.TRANSACTION_PER_SHARD,
+        )
+
+        manager.releaseOwnership(started.id, ownerSessionId, requireNotNull(started.ownerToken))
+        now = now.plusSeconds(4)
         manager.enforceSafetyTimeouts()
         releaseExecution.countDown()
         val finished = waitForCompletion(manager, started.id)

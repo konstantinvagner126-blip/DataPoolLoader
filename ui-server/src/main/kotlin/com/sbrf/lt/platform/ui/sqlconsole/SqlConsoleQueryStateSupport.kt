@@ -9,6 +9,7 @@ import java.util.UUID
 
 internal class SqlConsoleQueryStateSupport(
     private val ownerLeaseDuration: Duration = Duration.ofSeconds(15),
+    private val ownerReleaseRecoveryWindow: Duration = Duration.ofSeconds(5),
     private val pendingCommitTtl: Duration = Duration.ofMinutes(2),
     private val tokenFactory: () -> String = { UUID.randomUUID().toString() },
 ) {
@@ -63,11 +64,12 @@ internal class SqlConsoleQueryStateSupport(
                 ownerSessionId = current.ownerSessionId,
                 ownerToken = current.ownerToken,
                 ownerLost = current.ownerLost,
+                ownerReleaseDeadline = null,
             )
             return
         }
 
-        val ownerLost = current.ownerLost || isLeaseExpired(current.snapshot, now)
+        val ownerLost = current.ownerLost || isLeaseExpired(current.snapshot, now) || isOwnerReleaseExpired(current, now)
         if (ownerLost) {
             pendingTransaction.rollback()
             activeExecution = finalExecution.copy(
@@ -83,6 +85,22 @@ internal class SqlConsoleQueryStateSupport(
                 ownerSessionId = current.ownerSessionId,
                 ownerToken = current.ownerToken,
                 ownerLost = true,
+                ownerReleaseDeadline = null,
+            )
+            return
+        }
+
+        if (current.ownerReleaseDeadline != null) {
+            activeExecution = finalExecution.copy(
+                snapshot = finalExecution.snapshot.copy(
+                    ownerToken = current.ownerToken,
+                    ownerLeaseExpiresAt = current.ownerReleaseDeadline,
+                    pendingCommitExpiresAt = now.plus(pendingCommitTtl),
+                ),
+                ownerSessionId = current.ownerSessionId,
+                ownerToken = current.ownerToken,
+                ownerLost = false,
+                ownerReleaseDeadline = current.ownerReleaseDeadline,
             )
             return
         }
@@ -96,6 +114,7 @@ internal class SqlConsoleQueryStateSupport(
             ownerSessionId = current.ownerSessionId,
             ownerToken = current.ownerToken,
             ownerLost = false,
+            ownerReleaseDeadline = null,
         )
     }
 
@@ -113,7 +132,7 @@ internal class SqlConsoleQueryStateSupport(
         ownerToken: String,
         now: Instant,
     ): SqlConsoleExecutionSnapshot = synchronized(lock) {
-        val current = requireOwnedExecution(executionId, ownerSessionId, ownerToken)
+        val current = requireOwnedExecution(executionId, ownerSessionId, ownerToken, allowReleased = true)
         if (current.snapshot.status != SqlConsoleExecutionStatus.RUNNING &&
             current.snapshot.transactionState != SqlConsoleExecutionTransactionState.PENDING_COMMIT
         ) {
@@ -129,6 +148,30 @@ internal class SqlConsoleQueryStateSupport(
                 ownerLeaseExpiresAt = now.plus(ownerLeaseDuration),
             ),
             ownerToken = rotatedOwnerToken,
+            ownerReleaseDeadline = null,
+        )
+        activeExecution = updated
+        updated.snapshot
+    }
+
+    fun releaseOwnership(
+        executionId: String,
+        ownerSessionId: String,
+        ownerToken: String,
+        now: Instant,
+    ): SqlConsoleExecutionSnapshot = synchronized(lock) {
+        val current = requireOwnedExecution(executionId, ownerSessionId, ownerToken)
+        if (current.snapshot.status != SqlConsoleExecutionStatus.RUNNING &&
+            current.snapshot.transactionState != SqlConsoleExecutionTransactionState.PENDING_COMMIT
+        ) {
+            return current.snapshot
+        }
+        val releaseDeadline = now.plus(ownerReleaseRecoveryWindow)
+        val updated = current.copy(
+            snapshot = current.snapshot.copy(
+                ownerLeaseExpiresAt = releaseDeadline,
+            ),
+            ownerReleaseDeadline = releaseDeadline,
         )
         activeExecution = updated
         updated.snapshot
@@ -165,9 +208,13 @@ internal class SqlConsoleQueryStateSupport(
 
         if (current.snapshot.status == SqlConsoleExecutionStatus.RUNNING &&
             !current.ownerLost &&
-            isLeaseExpired(current.snapshot, now)
+            (isLeaseExpired(current.snapshot, now) || isOwnerReleaseExpired(current, now))
         ) {
-            activeExecution = current.copy(ownerLost = true)
+            activeExecution = current.copy(
+                snapshot = current.snapshot.copy(ownerLeaseExpiresAt = null),
+                ownerLost = true,
+                ownerReleaseDeadline = null,
+            )
             return activeExecution?.snapshot
         }
 
@@ -181,7 +228,8 @@ internal class SqlConsoleQueryStateSupport(
 
         val timeoutExpired = activePending.snapshot.pendingCommitExpiresAt?.let { !now.isBefore(it) } == true
         val ownerLeaseExpired = activePending.ownerLost || isLeaseExpired(activePending.snapshot, now)
-        if (!timeoutExpired && !ownerLeaseExpired) {
+        val ownerReleaseExpired = isOwnerReleaseExpired(activePending, now)
+        if (!timeoutExpired && !ownerLeaseExpired && !ownerReleaseExpired) {
             return activePending.snapshot
         }
 
@@ -204,7 +252,8 @@ internal class SqlConsoleQueryStateSupport(
                 },
             ),
             pendingTransaction = null,
-            ownerLost = ownerLeaseExpired,
+            ownerLost = ownerLeaseExpired || ownerReleaseExpired,
+            ownerReleaseDeadline = null,
         )
         return activeExecution?.snapshot
     }
@@ -221,6 +270,7 @@ internal class SqlConsoleQueryStateSupport(
         executionId: String,
         ownerSessionId: String,
         ownerToken: String,
+        allowReleased: Boolean = false,
     ): ActiveExecution {
         val execution = requireExecution(executionId)
         if (execution.ownerSessionId != ownerSessionId || execution.ownerToken != ownerToken) {
@@ -229,6 +279,9 @@ internal class SqlConsoleQueryStateSupport(
         if (execution.ownerLost) {
             throw UiStateConflictException("Execution session SQL-консоли уже потеряла владельца.")
         }
+        if (!allowReleased && execution.ownerReleaseDeadline != null) {
+            throw UiStateConflictException("Execution session SQL-консоли больше не принадлежит активному control-path этой вкладки.")
+        }
         return execution
     }
 
@@ -236,4 +289,9 @@ internal class SqlConsoleQueryStateSupport(
         snapshot: SqlConsoleExecutionSnapshot,
         now: Instant,
     ): Boolean = snapshot.ownerLeaseExpiresAt?.let { !now.isBefore(it) } == true
+
+    private fun isOwnerReleaseExpired(
+        execution: ActiveExecution,
+        now: Instant,
+    ): Boolean = execution.ownerReleaseDeadline?.let { !now.isBefore(it) } == true
 }

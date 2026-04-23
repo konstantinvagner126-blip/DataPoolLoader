@@ -27,10 +27,12 @@ class SqlConsoleQueryManager(
     private val scheduler: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor(),
     private val clock: () -> Instant = Instant::now,
     ownerLeaseDuration: Duration = Duration.ofSeconds(15),
+    ownerReleaseRecoveryWindow: Duration = Duration.ofSeconds(5),
     pendingCommitTtl: Duration = Duration.ofMinutes(2),
 ) : SqlConsoleAsyncQueryOperations {
     private val stateSupport = SqlConsoleQueryStateSupport(
         ownerLeaseDuration = ownerLeaseDuration,
+        ownerReleaseRecoveryWindow = ownerReleaseRecoveryWindow,
         pendingCommitTtl = pendingCommitTtl,
     )
     private val executionSupport = SqlConsoleQueryExecutionSupport(sqlConsoleService, transactionalOperations)
@@ -94,6 +96,15 @@ class SqlConsoleQueryManager(
     ): SqlConsoleExecutionSnapshot {
         enforceSafetyTimeouts()
         return stateSupport.heartbeat(executionId, ownerSessionId, ownerToken, clock())
+    }
+
+    override fun releaseOwnership(
+        executionId: String,
+        ownerSessionId: String,
+        ownerToken: String,
+    ): SqlConsoleExecutionSnapshot {
+        enforceSafetyTimeouts()
+        return stateSupport.releaseOwnership(executionId, ownerSessionId, ownerToken, clock())
     }
 
     override fun cancel(

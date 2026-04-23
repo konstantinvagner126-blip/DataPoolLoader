@@ -25,6 +25,12 @@ interface SqlConsoleAsyncQueryOperations {
         ownerToken: String,
     ): SqlConsoleExecutionSnapshot
 
+    fun releaseOwnership(
+        executionId: String,
+        ownerSessionId: String,
+        ownerToken: String,
+    ): SqlConsoleExecutionSnapshot
+
     fun cancel(
         executionId: String,
         ownerSessionId: String,

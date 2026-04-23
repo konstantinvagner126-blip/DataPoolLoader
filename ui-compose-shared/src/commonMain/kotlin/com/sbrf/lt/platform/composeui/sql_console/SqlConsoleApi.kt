@@ -26,6 +26,11 @@ interface SqlConsoleApi {
         request: SqlConsoleExecutionOwnerActionRequest,
     ): SqlConsoleExecutionResponse
 
+    suspend fun releaseExecution(
+        executionId: String,
+        request: SqlConsoleExecutionOwnerActionRequest,
+    ): SqlConsoleExecutionResponse
+
     suspend fun cancelExecution(
         executionId: String,
         request: SqlConsoleExecutionOwnerActionRequest,

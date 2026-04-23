@@ -848,9 +848,32 @@ class ServerTest {
         assertEquals(HttpStatusCode.Conflict, staleCancel.status)
         assertTrue(staleCancel.bodyAsText().contains("не принадлежит"))
 
-        val cancelled = client.post("/api/sql-console/query/$executionId/cancel") {
+        val released = client.post("/api/sql-console/query/$executionId/release") {
             contentType(ContentType.Application.Json)
             setBody("""{"ownerSessionId":"tab-1","ownerToken":"$rotatedOwnerToken"}""")
+        }
+        assertEquals(HttpStatusCode.OK, released.status)
+
+        val releasedCancel = client.post("/api/sql-console/query/$executionId/cancel") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"ownerSessionId":"tab-1","ownerToken":"$rotatedOwnerToken"}""")
+        }
+        assertEquals(HttpStatusCode.Conflict, releasedCancel.status)
+        assertTrue(releasedCancel.bodyAsText().contains("control-path"))
+
+        val recoveredHeartbeat = client.post("/api/sql-console/query/$executionId/heartbeat") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"ownerSessionId":"tab-1","ownerToken":"$rotatedOwnerToken"}""")
+        }
+        assertEquals(HttpStatusCode.OK, recoveredHeartbeat.status)
+        val recoveredBody = recoveredHeartbeat.bodyAsText()
+        val recoveredOwnerToken = Regex(""""ownerToken":"([^"]+)"""").find(recoveredBody)?.groupValues?.get(1)
+        assertNotNull(recoveredOwnerToken)
+        assertNotEquals(rotatedOwnerToken, recoveredOwnerToken)
+
+        val cancelled = client.post("/api/sql-console/query/$executionId/cancel") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"ownerSessionId":"tab-1","ownerToken":"$recoveredOwnerToken"}""")
         }.bodyAsText()
         assertTrue(cancelled.contains("\"cancelRequested\":true"))
 

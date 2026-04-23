@@ -41,6 +41,16 @@ internal fun UiServerContext.heartbeatSqlConsoleExecution(
         ownerToken = request.ownerToken,
     ).toResponse(includeOwnerToken = true)
 
+internal fun UiServerContext.releaseSqlConsoleExecutionOwnership(
+    executionId: String,
+    request: SqlConsoleExecutionOwnerActionRequest,
+): SqlConsoleExecutionResponse =
+    sqlConsoleQueryManager.releaseOwnership(
+        executionId = executionId,
+        ownerSessionId = request.ownerSessionId,
+        ownerToken = request.ownerToken,
+    ).toResponse()
+
 internal fun UiServerContext.cancelSqlConsoleExecution(
     executionId: String,
     request: SqlConsoleExecutionOwnerActionRequest,

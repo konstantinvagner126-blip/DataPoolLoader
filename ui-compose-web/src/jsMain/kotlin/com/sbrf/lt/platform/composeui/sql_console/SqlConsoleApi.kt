@@ -71,6 +71,17 @@ class SqlConsoleApiClient(
             deserializer = SqlConsoleExecutionResponse.serializer(),
         )
 
+    override suspend fun releaseExecution(
+        executionId: String,
+        request: SqlConsoleExecutionOwnerActionRequest,
+    ): SqlConsoleExecutionResponse =
+        httpClient.postJson(
+            path = "/api/sql-console/query/$executionId/release",
+            payload = request,
+            serializer = SqlConsoleExecutionOwnerActionRequest.serializer(),
+            deserializer = SqlConsoleExecutionResponse.serializer(),
+        )
+
     override suspend fun cancelExecution(
         executionId: String,
         request: SqlConsoleExecutionOwnerActionRequest,

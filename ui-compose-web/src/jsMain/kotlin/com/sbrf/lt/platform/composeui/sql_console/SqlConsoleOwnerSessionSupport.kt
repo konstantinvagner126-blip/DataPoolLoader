@@ -3,6 +3,7 @@ package com.sbrf.lt.platform.composeui.sql_console
 import kotlinx.browser.window
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import org.w3c.files.Blob
 import kotlin.js.Date
 import kotlin.random.Random
 
@@ -17,6 +18,7 @@ private val sqlConsoleOwnerJson = Json {
 internal data class SqlConsoleExecutionOwnerState(
     val executionId: String,
     val ownerSessionId: String,
+    val ownerTabInstanceId: String,
     val ownerToken: String,
 )
 
@@ -27,6 +29,16 @@ internal fun resolveSqlConsoleOwnerSessionId(): String {
     }
     return generateSqlConsoleOwnerSessionId().also { generated ->
         runCatching { window.sessionStorage.setItem(SQL_CONSOLE_OWNER_SESSION_KEY, generated) }
+    }
+}
+
+internal fun resolveSqlConsoleOwnerTabInstanceId(): String {
+    val existing = runCatching { window.name }.getOrNull()
+    if (!existing.isNullOrBlank() && existing.startsWith("sql-tab-")) {
+        return existing
+    }
+    return generateSqlConsoleOwnerTabInstanceId().also { generated ->
+        runCatching { window.name = generated }
     }
 }
 
@@ -51,5 +63,38 @@ internal fun clearSqlConsoleExecutionOwnerState() {
     runCatching { window.sessionStorage.removeItem(SQL_CONSOLE_EXECUTION_OWNER_KEY) }
 }
 
+internal fun tryReleaseSqlConsoleExecutionOwnership(
+    executionId: String,
+    ownerSessionId: String,
+    ownerToken: String,
+) {
+    val payload = sqlConsoleOwnerJson.encodeToString(
+        SqlConsoleExecutionOwnerActionRequest.serializer(),
+        SqlConsoleExecutionOwnerActionRequest(
+            ownerSessionId = ownerSessionId,
+            ownerToken = ownerToken,
+        ),
+    )
+    val url = "/api/sql-console/query/$executionId/release"
+    val beaconSent = runCatching {
+        val blobOptions = js("{}")
+        blobOptions.type = "application/json"
+        window.navigator.asDynamic().sendBeacon(url, Blob(arrayOf(payload), blobOptions)) as Boolean
+    }.getOrDefault(false)
+    if (!beaconSent) {
+        runCatching {
+            val options = js("{}")
+            options.method = "POST"
+            options.keepalive = true
+            options.headers = js("{\"Content-Type\":\"application/json\"}")
+            options.body = payload
+            window.fetch(url, options)
+        }
+    }
+}
+
 private fun generateSqlConsoleOwnerSessionId(): String =
     "sql-owner-${Date.now().toLong().toString(36)}-${Random.nextLong().toString(36)}"
+
+private fun generateSqlConsoleOwnerTabInstanceId(): String =
+    "sql-tab-${Date.now().toLong().toString(36)}-${Random.nextLong().toString(36)}"

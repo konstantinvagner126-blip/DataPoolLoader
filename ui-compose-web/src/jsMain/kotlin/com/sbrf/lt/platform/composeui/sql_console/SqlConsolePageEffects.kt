@@ -1,11 +1,14 @@
 package com.sbrf.lt.platform.composeui.sql_console
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import com.sbrf.lt.platform.composeui.foundation.http.ComposeHttpClient
 import com.sbrf.lt.platform.composeui.foundation.http.loadCredentialsStatus
 import com.sbrf.lt.platform.composeui.foundation.updates.PollingEffect
 import kotlinx.coroutines.delay
+import kotlinx.browser.window
+import org.w3c.dom.events.Event
 
 @Composable
 internal fun SqlConsolePageEffects(
@@ -31,7 +34,14 @@ internal fun SqlConsolePageEffects(
         setState(store.startLoading(currentState()))
         val loadedState = store.load()
         val restoredState = loadSqlConsoleExecutionOwnerState()
-            ?.takeIf { it.ownerSessionId == currentUiState().ownerSessionId }
+            ?.takeIf {
+                canRestoreSqlConsoleExecutionOwnership(
+                    storedOwnerSessionId = it.ownerSessionId,
+                    storedOwnerTabInstanceId = it.ownerTabInstanceId,
+                    currentOwnerSessionId = currentUiState().ownerSessionId,
+                    currentOwnerTabInstanceId = currentUiState().ownerTabInstanceId,
+                )
+            }
             ?.let { ownerState ->
                 store.restoreExecution(
                     current = loadedState,
@@ -106,11 +116,42 @@ internal fun SqlConsolePageEffects(
                 SqlConsoleExecutionOwnerState(
                     executionId = executionId,
                     ownerSessionId = currentUiState().ownerSessionId,
+                    ownerTabInstanceId = currentUiState().ownerTabInstanceId,
                     ownerToken = ownerToken,
                 ),
             )
         } else {
             clearSqlConsoleExecutionOwnerState()
+        }
+    }
+
+    DisposableEffect(
+        currentState().currentExecutionId,
+        currentExecution?.ownerToken,
+        currentExecution?.status,
+        currentExecution?.transactionState,
+        currentUiState().ownerSessionId,
+    ) {
+        val executionId = currentState().currentExecutionId
+        val ownerToken = currentExecution?.ownerToken
+        val releaseEnabled = executionId != null &&
+            ownerToken != null &&
+            (currentExecution.status == "RUNNING" || currentExecution.transactionState == "PENDING_COMMIT")
+        if (!releaseEnabled) {
+            onDispose { }
+        } else {
+            val ownerSessionId = currentUiState().ownerSessionId
+            val releaseHandler: (Event) -> Unit = {
+                tryReleaseSqlConsoleExecutionOwnership(
+                    executionId = requireNotNull(executionId),
+                    ownerSessionId = ownerSessionId,
+                    ownerToken = requireNotNull(ownerToken),
+                )
+            }
+            window.addEventListener("pagehide", releaseHandler)
+            onDispose {
+                window.removeEventListener("pagehide", releaseHandler)
+            }
         }
     }
 
