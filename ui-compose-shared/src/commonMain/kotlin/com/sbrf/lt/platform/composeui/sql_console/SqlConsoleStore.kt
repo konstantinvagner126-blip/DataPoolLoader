@@ -31,6 +31,19 @@ class SqlConsoleStore(
             ),
         )
 
+    fun updateSelectedSourceGroup(
+        current: SqlConsolePageState,
+        group: SqlConsoleSourceGroup,
+        enabled: Boolean,
+    ): SqlConsolePageState =
+        current.copy(
+            selectedSourceNames = toggleSelectedSourceGroupNames(
+                current = current.selectedSourceNames,
+                group = group,
+                enabled = enabled,
+            ),
+        )
+
     fun updatePageSize(
         current: SqlConsolePageState,
         pageSize: Int,

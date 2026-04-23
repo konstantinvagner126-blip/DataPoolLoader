@@ -9,6 +9,7 @@ data class SqlConsoleConfig(
     val queryTimeoutSec: Int? = null,
     @param:JsonAlias("shards")
     val sources: List<SqlConsoleSourceConfig> = emptyList(),
+    val sourceGroups: List<SqlConsoleSourceGroupConfig> = emptyList(),
 )
 
 data class SqlConsoleSourceConfig(
@@ -16,6 +17,11 @@ data class SqlConsoleSourceConfig(
     val jdbcUrl: String = "",
     val username: String = "",
     val password: String = "",
+)
+
+data class SqlConsoleSourceGroupConfig(
+    val name: String = "",
+    val sourceNames: List<String> = emptyList(),
 )
 
 data class ResolvedSqlConsoleShardConfig(
@@ -92,8 +98,14 @@ enum class SqlConsoleConnectionState {
 data class SqlConsoleInfo(
     val configured: Boolean,
     val sourceNames: List<String>,
+    val sourceGroups: List<SqlConsoleSourceGroup> = emptyList(),
     val maxRowsPerShard: Int,
     val queryTimeoutSec: Int?,
+)
+
+data class SqlConsoleSourceGroup(
+    val name: String,
+    val sourceNames: List<String> = emptyList(),
 )
 
 data class SqlConsoleQueryResult(

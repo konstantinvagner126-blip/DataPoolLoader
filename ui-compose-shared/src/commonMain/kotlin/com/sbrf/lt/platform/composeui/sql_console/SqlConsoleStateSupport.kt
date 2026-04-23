@@ -2,6 +2,12 @@ package com.sbrf.lt.platform.composeui.sql_console
 
 internal const val DEFAULT_SQL_CONSOLE_DRAFT: String = "select 1 as check_value"
 
+enum class SqlConsoleSourceGroupSelectionState {
+    NONE,
+    PARTIAL,
+    ALL,
+}
+
 internal fun defaultSqlConsoleStateSnapshot(): SqlConsoleStateSnapshot =
     SqlConsoleStateSnapshot(draftSql = DEFAULT_SQL_CONSOLE_DRAFT)
 
@@ -69,3 +75,41 @@ internal fun toggleSelectedSourceNames(
     } else {
         current.filterNot { it == sourceName }
     }
+
+internal fun toggleSelectedSourceGroupNames(
+    current: List<String>,
+    group: SqlConsoleSourceGroup,
+    enabled: Boolean,
+): List<String> {
+    val groupSourceNames = group.sourceNames
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
+        .distinct()
+    if (groupSourceNames.isEmpty()) {
+        return current
+    }
+    return if (enabled) {
+        (current + groupSourceNames).distinct()
+    } else {
+        current.filterNot { it in groupSourceNames.toSet() }
+    }
+}
+
+fun sourceGroupSelectionState(
+    group: SqlConsoleSourceGroup,
+    selectedSourceNames: List<String>,
+): SqlConsoleSourceGroupSelectionState {
+    val groupSourceNames = group.sourceNames
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
+        .distinct()
+    if (groupSourceNames.isEmpty()) {
+        return SqlConsoleSourceGroupSelectionState.NONE
+    }
+    val selectedCount = groupSourceNames.count { it in selectedSourceNames }
+    return when {
+        selectedCount == 0 -> SqlConsoleSourceGroupSelectionState.NONE
+        selectedCount == groupSourceNames.size -> SqlConsoleSourceGroupSelectionState.ALL
+        else -> SqlConsoleSourceGroupSelectionState.PARTIAL
+    }
+}

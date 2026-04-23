@@ -34,6 +34,10 @@ internal class SqlConsoleLibraryBindings(
         context.updateState { context.store.updateSelectedSources(it, sourceName, selected) }
     }
 
+    fun toggleSourceGroup(group: SqlConsoleSourceGroup, selected: Boolean) {
+        context.updateState { context.store.updateSelectedSourceGroup(it, group, selected) }
+    }
+
     fun selectCredentialsFile(file: File?) {
         context.updateUiState { it.copy(selectedCredentialsFile = file) }
     }

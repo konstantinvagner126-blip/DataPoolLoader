@@ -11,12 +11,36 @@ import org.jetbrains.compose.web.dom.Text
 
 @Composable
 internal fun SqlConsoleSourceSelectionBlock(
+    sourceGroups: List<SqlConsoleSourceGroup>,
     sourceNames: List<String>,
     selectedSourceNames: List<String>,
     connectionStatusBySource: Map<String, SqlConsoleSourceConnectionStatus>,
+    onToggleSourceGroup: (SqlConsoleSourceGroup, Boolean) -> Unit,
     onToggleSource: (String, Boolean) -> Unit,
 ) {
     Div({ classes("mt-3", "sql-source-selection") }) {
+        if (sourceGroups.isNotEmpty()) {
+            Div({ classes("sql-source-group-selection") }) {
+                Div({ classes("sql-source-selection-caption") }) {
+                    Text("Группы")
+                }
+                sourceGroups.forEach { sourceGroup ->
+                    val selectionState = sourceGroupSelectionState(sourceGroup, selectedSourceNames)
+                    SqlConsoleSourceGroupCheckbox(
+                        group = sourceGroup,
+                        selectionState = selectionState,
+                        onToggle = {
+                            onToggleSourceGroup(sourceGroup, selectionState != SqlConsoleSourceGroupSelectionState.ALL)
+                        },
+                    )
+                }
+            }
+        }
+        if (sourceNames.isNotEmpty()) {
+            Div({ classes("sql-source-selection-caption") }) {
+                Text("Источники")
+            }
+        }
         sourceNames.forEach { sourceName ->
             val sourceStatus = connectionStatusBySource[sourceName]
             val selected = sourceName in selectedSourceNames
@@ -26,6 +50,44 @@ internal fun SqlConsoleSourceSelectionBlock(
                 selected = selected,
                 onToggle = { onToggleSource(sourceName, !selected) },
             )
+        }
+    }
+}
+
+@Composable
+internal fun SqlConsoleSourceGroupCheckbox(
+    group: SqlConsoleSourceGroup,
+    selectionState: SqlConsoleSourceGroupSelectionState,
+    onToggle: () -> Unit,
+) {
+    val selected = selectionState == SqlConsoleSourceGroupSelectionState.ALL
+    Label(attrs = {
+        classes("sql-source-group-checkbox")
+        if (selected) {
+            classes("sql-source-group-checkbox-selected")
+        }
+        if (selectionState == SqlConsoleSourceGroupSelectionState.PARTIAL) {
+            classes("sql-source-group-checkbox-partial")
+        }
+    }) {
+        Input(type = InputType.Checkbox, attrs = {
+            if (selected) {
+                attr("checked", "checked")
+            }
+            onClick { onToggle() }
+        })
+        Div({ classes("sql-source-group-checkbox-body") }) {
+            Div({ classes("sql-source-group-checkbox-head") }) {
+                Span({ classes("sql-source-group-checkbox-name") }) {
+                    Text(group.name)
+                }
+                Span({ classes("sql-source-group-checkbox-status") }) {
+                    Text(translateSourceGroupSelectionState(selectionState))
+                }
+            }
+            Div({ classes("sql-source-group-checkbox-message") }) {
+                Text("Источников в группе: ${group.sourceNames.size}. Выбор группы добавляет или снимает все ее source.")
+            }
         }
     }
 }
@@ -68,3 +130,12 @@ internal fun SqlConsoleSourceCheckbox(
         }
     }
 }
+
+private fun translateSourceGroupSelectionState(
+    selectionState: SqlConsoleSourceGroupSelectionState,
+): String =
+    when (selectionState) {
+        SqlConsoleSourceGroupSelectionState.ALL -> "Все выбраны"
+        SqlConsoleSourceGroupSelectionState.PARTIAL -> "Частично"
+        SqlConsoleSourceGroupSelectionState.NONE -> "Не выбрана"
+    }

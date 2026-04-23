@@ -62,6 +62,7 @@ internal fun SqlConsolePageContent(
                 onMaxRowsDraftChange = callbacks.onMaxRowsDraftChange,
                 onTimeoutDraftChange = callbacks.onTimeoutDraftChange,
                 onSaveSettings = callbacks.onSaveSettings,
+                onToggleSourceGroup = callbacks.onToggleSourceGroup,
                 onToggleSource = callbacks.onToggleSource,
                 onCredentialsFileSelected = callbacks.onCredentialsFileSelected,
                 onUploadCredentials = callbacks.onUploadCredentials,

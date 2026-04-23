@@ -6,7 +6,8 @@ fun buildConsoleInfoText(info: SqlConsoleInfo?): String =
     when {
         info == null -> "Конфигурация не загружена."
         !info.configured -> "SQL-консоль не настроена. Проверь конфигурацию источников и credential.properties."
-        else -> "Доступно источников: ${info.sourceNames.size}. Лимит строк по умолчанию: ${info.maxRowsPerShard}."
+        info.sourceGroups.isEmpty() -> "Доступно источников: ${info.sourceNames.size}. Лимит строк по умолчанию: ${info.maxRowsPerShard}."
+        else -> "Доступно источников: ${info.sourceNames.size}, групп: ${info.sourceGroups.size}. Лимит строк по умолчанию: ${info.maxRowsPerShard}."
     }
 
 fun buildConnectionCheckStatusText(result: SqlConsoleConnectionCheckResponse): String {

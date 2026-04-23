@@ -1,6 +1,7 @@
 package com.sbrf.lt.platform.composeui
 
 import androidx.compose.runtime.Composable
+import com.sbrf.lt.platform.composeui.about.ComposeAboutPage
 import com.sbrf.lt.platform.composeui.foundation.navigation.currentComposeRoute
 import com.sbrf.lt.platform.composeui.home.ComposeHomePage
 import com.sbrf.lt.platform.composeui.module_editor.ComposeModuleEditorPage
@@ -24,6 +25,7 @@ fun ComposeSpikeApp() {
             ComposeModuleRunsPage(it)
         } ?: ComposeHomePage()
         "run-history-cleanup" -> ComposeRunHistoryCleanupPage()
+        "about" -> ComposeAboutPage()
         "sql-console" -> ComposeSqlConsolePage()
         "sql-console-objects" -> ComposeSqlConsoleObjectsPage(route.params)
         else -> ComposeHomePage()

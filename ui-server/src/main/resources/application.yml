@@ -16,6 +16,13 @@ ui:
     fetchSize: 1000
     maxRowsPerShard: 200
     queryTimeoutSec: 60
+    sourceGroups:
+    - name: "dev"
+      sourceNames: ["db1", "db2"]
+    - name: "ift"
+      sourceNames: ["db2", "db3", "db4"]
+    - name: "lt"
+      sourceNames: ["db4", "db5"]
     sources:
     - name: "db1"
       jdbcUrl: "${LOCAL_MANUAL_DB_JDBC_URL}"

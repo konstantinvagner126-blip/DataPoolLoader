@@ -17,6 +17,7 @@ import com.sbrf.lt.datapool.sqlconsole.SqlConsoleDatabaseObjectType
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleExecutionPolicy
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleTransactionMode
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleSourceConfig
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleSourceGroupConfig
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleService
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleStatementType
 import com.sbrf.lt.datapool.sqlconsole.ResolvedSqlConsoleShardConfig
@@ -569,6 +570,48 @@ class SqlConsoleServiceTest {
         )
 
         assertEquals(45, service.info().queryTimeoutSec)
+    }
+
+    @Test
+    fun `exposes source groups in info`() {
+        val service = SqlConsoleService(
+            config = SqlConsoleConfig(
+                sources = listOf(
+                    SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user1", "pwd1"),
+                    SqlConsoleSourceConfig("shard2", "jdbc:test:two", "user2", "pwd2"),
+                ),
+                sourceGroups = listOf(
+                    SqlConsoleSourceGroupConfig("dev", listOf("shard1", "shard2")),
+                    SqlConsoleSourceGroupConfig("ift", listOf("shard2")),
+                ),
+            ),
+            executor = ShardSqlExecutor { _, _, _, _, _, _ -> error("should not be called") },
+        )
+
+        assertEquals(listOf("dev", "ift"), service.info().sourceGroups.map { it.name })
+        assertEquals(listOf("shard1", "shard2"), service.info().sourceGroups.first().sourceNames)
+    }
+
+    @Test
+    fun `fails when source group references unknown source`() {
+        val service = SqlConsoleService(
+            config = SqlConsoleConfig(
+                sources = listOf(
+                    SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user1", "pwd1"),
+                ),
+                sourceGroups = listOf(
+                    SqlConsoleSourceGroupConfig("dev", listOf("shard1", "missing")),
+                ),
+            ),
+            executor = ShardSqlExecutor { _, _, _, _, _, _ -> error("should not be called") },
+            connectionChecker = ShardConnectionChecker { _, _ -> error("should not be called") },
+        )
+
+        val error = assertFailsWith<IllegalArgumentException> {
+            service.checkConnections(credentialsPath = null)
+        }
+
+        assertTrue(error.message!!.contains("missing"))
     }
 
     @Test

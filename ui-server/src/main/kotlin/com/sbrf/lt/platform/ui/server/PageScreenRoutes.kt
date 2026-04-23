@@ -6,6 +6,7 @@ import io.ktor.server.routing.get
 
 internal fun Route.registerPageScreenRoutes(context: UiServerContext) {
     get("/") { call.redirectToComposeBundle(call.request.queryParameters.toQueryParametersMap()) }
+    registerPageInfoRoutes()
     registerPageModuleScreenRoutes(context)
     registerPageSqlScreenRoutes()
 }

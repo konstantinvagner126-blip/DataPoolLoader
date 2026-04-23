@@ -9,6 +9,79 @@
   gap: 0.6rem;
 }
 
+.sql-source-selection-caption {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.sql-source-group-selection {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.sql-source-group-checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 12px;
+  background: rgba(248, 251, 255, 0.92);
+  border: 1px solid rgba(19, 34, 56, 0.08);
+  color: #23364d;
+}
+
+.sql-source-group-checkbox input {
+  margin: 0;
+  margin-top: 0.18rem;
+}
+
+.sql-source-group-checkbox-body {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.18rem;
+}
+
+.sql-source-group-checkbox-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.sql-source-group-checkbox-name {
+  font-weight: 700;
+  color: #132238;
+}
+
+.sql-source-group-checkbox-status {
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.sql-source-group-checkbox-message {
+  font-size: 0.78rem;
+  color: #52657e;
+  line-height: 1.4;
+}
+
+.sql-source-group-checkbox-selected {
+  border-color: rgba(29, 111, 216, 0.28);
+  box-shadow: 0 0 0 3px rgba(29, 111, 216, 0.08);
+}
+
+.sql-source-group-checkbox-partial {
+  border-color: rgba(245, 158, 11, 0.24);
+  background: rgba(245, 158, 11, 0.08);
+}
+
 .sql-source-limit-input {
   max-width: 140px;
 }

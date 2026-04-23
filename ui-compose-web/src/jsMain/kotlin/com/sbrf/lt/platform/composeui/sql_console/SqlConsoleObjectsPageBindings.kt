@@ -5,6 +5,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
 internal data class SqlConsoleObjectsPageCallbacks(
+    val onToggleSourceGroup: (SqlConsoleSourceGroup, Boolean) -> Unit,
     val onToggleSource: (String, Boolean) -> Unit,
     val onQueryChange: (String) -> Unit,
     val onSearch: () -> Unit,
@@ -21,6 +22,9 @@ internal fun sqlConsoleObjectsPageCallbacks(
     setState: (SqlConsoleObjectsPageState) -> Unit,
 ): SqlConsoleObjectsPageCallbacks =
     SqlConsoleObjectsPageCallbacks(
+        onToggleSourceGroup = { group, selected ->
+            setState(store.updateSelectedSourceGroup(currentState(), group, selected))
+        },
         onToggleSource = { sourceName, selected ->
             setState(store.updateSelectedSources(currentState(), sourceName, selected))
         },

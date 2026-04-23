@@ -37,6 +37,19 @@ class SqlConsoleObjectsStore(
             ),
         )
 
+    fun updateSelectedSourceGroup(
+        current: SqlConsoleObjectsPageState,
+        group: SqlConsoleSourceGroup,
+        enabled: Boolean,
+    ): SqlConsoleObjectsPageState =
+        current.copy(
+            selectedSourceNames = toggleSelectedSourceGroupNames(
+                current = current.selectedSourceNames,
+                group = group,
+                enabled = enabled,
+            ),
+        )
+
     suspend fun toggleFavoriteObject(
         current: SqlConsoleObjectsPageState,
         sourceName: String,

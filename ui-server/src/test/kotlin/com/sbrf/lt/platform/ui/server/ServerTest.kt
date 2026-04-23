@@ -19,6 +19,7 @@ import com.sbrf.lt.datapool.sqlconsole.SqlConsoleDatabaseObjectInspector
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleDatabaseObjectType
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleExecutionCancelledException
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleSourceConfig
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleSourceGroupConfig
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleService
 import com.sbrf.lt.datapool.app.ApplicationRunner
 import com.sbrf.lt.datapool.app.port.TargetImporter
@@ -245,6 +246,9 @@ class ServerTest {
             storageDir = storageDir.toString(),
             sqlConsole = SqlConsoleConfig(
                 queryTimeoutSec = 30,
+                sourceGroups = listOf(
+                    SqlConsoleSourceGroupConfig("dev", listOf("shard1")),
+                ),
                 sources = listOf(SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user", "pwd")),
             ),
         )
@@ -390,6 +394,13 @@ class ServerTest {
             composeSqlConsoleObjectsRedirect.headers[HttpHeaders.Location]
         )
 
+        val aboutRedirect = noRedirectClient.get("/about")
+        assertEquals(HttpStatusCode.Found, aboutRedirect.status)
+        assertEquals(
+            "/static/compose-app/index.html?screen=about",
+            aboutRedirect.headers[HttpHeaders.Location],
+        )
+
         val modulesRedirect = noRedirectClient.get("/modules")
         assertEquals(HttpStatusCode.Found, modulesRedirect.status)
         assertEquals(
@@ -441,6 +452,7 @@ class ServerTest {
 
         val info = client.get("/api/sql-console/info").bodyAsText()
         assertTrue(info.contains("\"sourceNames\":[\"shard1\"]"))
+        assertTrue(info.contains("\"sourceGroups\":[{\"name\":\"dev\",\"sourceNames\":[\"shard1\"]}]"))
         assertTrue(info.contains("\"queryTimeoutSec\":30"))
         assertTrue(info.contains("\"maxRowsPerShard\":200"))
 

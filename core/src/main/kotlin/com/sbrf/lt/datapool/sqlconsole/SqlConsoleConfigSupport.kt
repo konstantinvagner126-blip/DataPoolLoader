@@ -78,6 +78,19 @@ internal class SqlConsoleConfigSupport {
         require(config.sources.isNotEmpty()) {
             "В конфиге UI не настроены source-подключения. Заполни ui.sqlConsole.sources."
         }
+        val normalizedSourceNames = config.sources.map { it.name.trim() }
+        require(normalizedSourceNames.all { it.isNotEmpty() }) {
+            "В SQL-консоли имя source не должно быть пустым."
+        }
+        val duplicateSourceNames = normalizedSourceNames
+            .groupingBy { it }
+            .eachCount()
+            .filterValues { it > 1 }
+            .keys
+        require(duplicateSourceNames.isEmpty()) {
+            "В SQL-консоли имена source должны быть уникальны: ${duplicateSourceNames.joinToString(", ")}"
+        }
+        validateSourceGroups(config.sourceGroups, normalizedSourceNames.toSet())
     }
 
     private fun selectSourcesInternal(
@@ -205,6 +218,38 @@ internal class SqlConsoleConfigSupport {
             ?.let(statements::add)
 
         return statements
+    }
+}
+
+private fun validateSourceGroups(
+    sourceGroups: List<SqlConsoleSourceGroupConfig>,
+    configuredSourceNames: Set<String>,
+) {
+    val normalizedGroupNames = sourceGroups.map { it.name.trim() }
+    require(normalizedGroupNames.all { it.isNotEmpty() }) {
+        "В SQL-консоли имя группы source не должно быть пустым."
+    }
+    val duplicateGroupNames = normalizedGroupNames
+        .groupingBy { it }
+        .eachCount()
+        .filterValues { it > 1 }
+        .keys
+    require(duplicateGroupNames.isEmpty()) {
+        "В SQL-консоли имена групп должны быть уникальны: ${duplicateGroupNames.joinToString(", ")}"
+    }
+
+    sourceGroups.forEach { group ->
+        val normalizedSourceNames = group.sourceNames
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .distinct()
+        require(normalizedSourceNames.isNotEmpty()) {
+            "Группа SQL-консоли '${group.name.trim()}' должна содержать хотя бы один source."
+        }
+        val unknownSourceNames = normalizedSourceNames.filter { it !in configuredSourceNames }
+        require(unknownSourceNames.isEmpty()) {
+            "Группа SQL-консоли '${group.name.trim()}' содержит неизвестные source: ${unknownSourceNames.joinToString(", ")}"
+        }
     }
 }
 

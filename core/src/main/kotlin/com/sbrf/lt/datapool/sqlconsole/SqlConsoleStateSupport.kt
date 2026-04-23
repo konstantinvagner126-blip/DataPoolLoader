@@ -5,6 +5,12 @@ internal class SqlConsoleStateSupport {
         SqlConsoleInfo(
             configured = config.sources.isNotEmpty(),
             sourceNames = config.sources.map { it.name },
+            sourceGroups = config.sourceGroups.map { group ->
+                SqlConsoleSourceGroup(
+                    name = group.name.trim(),
+                    sourceNames = group.sourceNames.map { it.trim() }.filter { it.isNotEmpty() }.distinct(),
+                )
+            },
             maxRowsPerShard = config.maxRowsPerShard,
             queryTimeoutSec = config.queryTimeoutSec,
         )

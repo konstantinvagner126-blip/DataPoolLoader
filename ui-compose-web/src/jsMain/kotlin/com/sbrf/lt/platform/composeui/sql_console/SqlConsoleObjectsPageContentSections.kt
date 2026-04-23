@@ -8,6 +8,7 @@ import androidx.compose.runtime.setValue
 import com.sbrf.lt.platform.composeui.foundation.component.AlertBanner
 import com.sbrf.lt.platform.composeui.foundation.component.EmptyStateCard
 import com.sbrf.lt.platform.composeui.foundation.component.LoadingStateCard
+import com.sbrf.lt.platform.composeui.foundation.dom.classes
 import com.sbrf.lt.platform.composeui.foundation.runtime.buildRuntimeModeFallbackMessage
 import com.sbrf.lt.platform.composeui.foundation.runtime.hasModeFallback
 import org.jetbrains.compose.web.attributes.placeholder
@@ -127,6 +128,32 @@ internal fun SqlConsoleObjectsPageContent(
                 panelClasses = "panel h-100",
                 useParagraphNote = true,
             ) {
+                val sourceGroups = state.info?.sourceGroups.orEmpty()
+                if (sourceGroups.isNotEmpty()) {
+                    Div({ classes("sql-source-group-selection", "mb-3") }) {
+                        Div({ classes("sql-source-selection-caption") }) {
+                            Text("Группы")
+                        }
+                        sourceGroups.forEach { sourceGroup ->
+                            val selectionState = sourceGroupSelectionState(sourceGroup, state.selectedSourceNames)
+                            SqlConsoleSourceGroupCheckbox(
+                                group = sourceGroup,
+                                selectionState = selectionState,
+                                onToggle = {
+                                    callbacks.onToggleSourceGroup(
+                                        sourceGroup,
+                                        selectionState != SqlConsoleSourceGroupSelectionState.ALL,
+                                    )
+                                },
+                            )
+                        }
+                    }
+                }
+                if (!state.info?.sourceNames.isNullOrEmpty()) {
+                    Div({ classes("sql-source-selection-caption") }) {
+                        Text("Источники")
+                    }
+                }
                 state.info?.sourceNames?.forEach { sourceName ->
                     val selected = sourceName in state.selectedSourceNames
                     SqlObjectSourceCheckbox(

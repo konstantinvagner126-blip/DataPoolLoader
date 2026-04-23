@@ -4,6 +4,7 @@ import com.sbrf.lt.datapool.sqlconsole.RawShardExecutionResult
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleConnectionState
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleInfo
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleQueryResult
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleSourceGroup
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleStatementType
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleExecutionSnapshot
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleExecutionStatus
@@ -19,12 +20,18 @@ class UiModelsTest {
         val response = SqlConsoleInfo(
             configured = true,
             sourceNames = listOf("db1", "db2"),
+            sourceGroups = listOf(
+                SqlConsoleSourceGroup(name = "dev", sourceNames = listOf("db1")),
+                SqlConsoleSourceGroup(name = "ift", sourceNames = listOf("db1", "db2")),
+            ),
             maxRowsPerShard = 200,
             queryTimeoutSec = 60,
         ).toResponse()
 
         assertEquals(true, response.configured)
         assertEquals(listOf("db1", "db2"), response.sourceNames)
+        assertEquals(listOf("dev", "ift"), response.sourceGroups.map { it.name })
+        assertEquals(listOf("db1", "db2"), response.sourceGroups.last().sourceNames)
         assertEquals(200, response.maxRowsPerShard)
         assertEquals(60, response.queryTimeoutSec)
     }

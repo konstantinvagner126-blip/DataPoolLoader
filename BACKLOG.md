@@ -306,15 +306,20 @@
   - довести SQL execution lifecycle до состояния, где безопасность обеспечивается server-side механизмами, а не живой вкладкой браузера;
   - закрыть remaining recovery gaps вокруг `refresh / duplicate tab / network loss / server restart / release`;
   - закрепить route/manager tests на ownership, rollback и recovery как обязательную часть подсистемы.
-2. Фаза B. `sql-console-objects` и object inspector:
+2. Фаза A2. Multi-tab workspaces и parallel execution:
+  - цель фазы: превратить SQL-консоль из single-workspace/single-execution режима в локальный multi-tab инструмент с изолированными рабочими пространствами и безопасным параллельным запуском;
+  - эта фаза не считается чисто UI-доработкой: она требует новой execution/state model и отдельного recovery/safety контракта.
+3. Фаза A3. Global source groups и selection model:
+  - цель фазы: ввести глобальные группы источников как часть конфигурации приложения и перевести SQL-консоль на group-aware модель выбора source без потери явного source-level контроля.
+4. Фаза B. `sql-console-objects` и object inspector:
   - цель фазы: превратить object browser из search-card экрана в полноценный DBA-like inspector flow без превращения его во вторую SQL-консоль.
-3. Фаза C. Основной экран консоли: интерфейс, читаемость и control-flow UX:
+5. Фаза C. Основной экран консоли: интерфейс, читаемость и control-flow UX:
   - после object inspector привести main SQL screen к более читаемой и безопасной operational model;
   - убрать дублирующие presentation-формы и слабые execution/status affordance.
-4. Фаза D. Monaco hints и autocomplete:
+6. Фаза D. Monaco hints и autocomplete:
   - только после стабилизации object/search contract и main control-flow;
   - развивать Monaco по staged модели без тяжелого LSP-стека.
-5. Фаза E. SQL-console-specific regression coverage и invariants:
+7. Фаза E. SQL-console-specific regression coverage и invariants:
   - закрепить подсистему screen-level smoke coverage, server-side scenario tests и явными архитектурными инвариантами;
   - поддерживать SQL-консоль как отдельную инженерную программу, а не как временный набор UX-правок.
 
@@ -335,8 +340,89 @@
   - `Commit / Rollback / Cancel` не должны работать без подтвержденного owner token;
   - stale token и duplicate tab не должны сохранять control-path.
 - SQL execution unload/release flow:
-  - browser-side best-effort release через `pagehide` / `sendBeacon` допустим только как дополнительная защита;
+- browser-side best-effort release через `pagehide` / `sendBeacon` допустим только как дополнительная защита;
   - server-side safety должна работать и без него.
+
+Фаза A2. Multi-tab workspaces и parallel execution:
+
+- текущий single-execution/single-workspace режим нужно заменить на явную multi-tab модель без размывания safety-инвариантов;
+- первой целевой формой multi-tab режима считаются именно отдельные browser tabs, а не внутренний tab-strip внутри одного page-shell;
+- ввести отдельное понятие `console workspace` / `tab workspace` для SQL-консоли:
+  - draft SQL;
+  - selected groups;
+  - selected source set;
+  - page size / transaction mode / strict safety context;
+  - локальный UI execution context;
+  - эти данные не должны больше безусловно перетираться между вкладками через один shared workspace-state файл;
+- зафиксировать product contract новой вкладки:
+  - action `Открыть новую вкладку консоли` открывает именно новую browser-вкладку с новым `workspaceId`;
+  - новая вкладка по умолчанию клонирует текущий рабочий контекст:
+    - `draft SQL`;
+    - selected sources;
+    - `transaction mode`;
+    - `strict safety`;
+  - новая вкладка не клонирует текущий execution, owner token и pending transaction;
+  - сценарий `пустая новая вкладка` допустим только как отдельное явное follow-up расширение, а не как неявное поведение первой версии;
+- разделить shared и isolated state:
+  - tab-scoped: `draft SQL`, selected groups, selected sources, page size, current execution context;
+  - shared between tabs: `recent queries`, `favorite queries`, `favorite objects`;
+- перестроить server-side execution model:
+  - вместо одного `activeExecution` нужен явный registry независимых execution session;
+  - ownership, heartbeat, release, rollback TTL и recovery должны работать per execution session, а не на весь экран целиком;
+  - transport/API contract должен уметь возвращать и адресовать несколько execution session без скрытой зависимости от singleton state;
+- отдельно зафиксировать policy для параллельных manual transaction сценариев:
+  - на первом этапе разрешить параллельные `AUTO_COMMIT` execution в разных вкладках;
+  - на первом этапе не разрешать несколько `PENDING_COMMIT` одновременно;
+  - если уже есть одна незавершенная manual transaction session, сервер обязан блокировать следующую явно и честно;
+  - canonical user-facing conflict message для этого сценария:
+    `В другой вкладке SQL-консоли есть незавершенная транзакция. Сначала выполните Commit или Rollback в той вкладке. Пока транзакция не завершена, запуск новой ручной транзакции недоступен.`
+  - расширение до нескольких параллельных `PENDING_COMMIT` возможно только отдельным safety-review и отдельным backlog-пакетом;
+- в web/shared слоях перейти от single current execution view к явному tab/workspace-scoped current execution contract;
+- добавить в UI явную action-кнопку `Открыть новую вкладку консоли`:
+  - action должна открывать новый SQL-console tab/workspace, а не просто дублировать URL без model-level semantics;
+  - первый implementation contract: `clone current context` в новую browser-вкладку;
+- закрепить multi-tab сценарии отдельными tests:
+  - different tabs with different drafts;
+  - parallel auto-commit execution;
+  - ownership isolation между вкладками;
+  - refresh/reopen одного tab workspace;
+  - close одной вкладки без потери control-path другой.
+
+Фаза A3. Global source groups и selection model:
+
+- реализован первый пакет этой фазы:
+  - глобальный config contract `sqlConsole.sourceGroups` добавлен в `ui config -> core -> ui-server -> shared UI`;
+  - `sourceGroups` теперь входят в `/api/sql-console/info` и доступны обоим SQL-console экранам как runtime contract;
+  - конфиг валидируется: group names уникальны, пустые группы запрещены, unknown source в группе считается ошибкой конфигурации;
+  - основной экран SQL-консоли и `sql-console-objects` уже поддерживают group-aware selection UI с состояниями `all / partial / none`;
+  - source of truth по-прежнему остается `selectedSourceNames`, а group toggle работает как bulk-select/bulk-unselect layer;
+- группы источников считаются частью глобальной конфигурации приложения, а не локальным persisted state SQL-консоли;
+- конфигурация должна уметь явно описывать:
+  - `group name`;
+  - список `sourceNames`, входящих в группу;
+- типовые группы вроде `dev`, `ift`, `lt` должны задаваться в конфиге и читаться сервером как runtime contract;
+- один source может входить в несколько групп;
+- selection model SQL-консоли должна поддерживать одновременно:
+  - выбор одной или нескольких групп;
+  - выбор отдельных source внутри групп;
+  - выбор отдельных source вне групп, если это допустимо текущей конфигурацией;
+- для multi-tab режима выбранные группы и выбранные source должны запоминаться индивидуально для каждой вкладки/workspace, а не как один глобальный SQL-console selection state;
+- source of truth для execution по-прежнему остается список выбранных source, а не список выбранных групп;
+- выбор нескольких групп должен означать union всех источников из этих групп;
+- UI должен уметь честно показывать состояние группы:
+  - `all selected`;
+  - `partially selected`;
+  - `not selected`;
+- execution, connection status, diff и safety по-прежнему считаются по source, а не по группе;
+- object browser и основной экран SQL-консоли должны использовать один и тот же group-aware source selection contract;
+- первая версия этой модели не включает:
+  - вложенные группы;
+  - group-level permissions/policies;
+  - auto-generated группы без явной конфигурации.
+- оставшийся хвост этой фазы:
+  - tab/workspace-scoped persisted selection для `selectedGroups + selectedSources`;
+  - явный UX для group chips/summary в working context strip;
+  - интеграция с multi-tab workspaces из `Фазы A2`, чтобы выбор групп не был общим между вкладками.
 
 Фаза B. `sql-console-objects` и object inspector:
 
@@ -359,7 +445,7 @@
 - оставшийся хвост этой фазы:
   - не добивать inspector вторым кругом purely cosmetic split-ами;
   - идти только в реально недостающую metadata глубину: `comments / dependencies / grants / richer DDL`, если это дает новый DBA-сигнал;
-  - после стабилизации object inspector переходить в Фазу C, а не бесконечно расширять объектный экран.
+- после стабилизации object inspector переходить в Фазу C, а не бесконечно расширять объектный экран.
 - объектный экран должен оставаться search-first инструментом, а не превращаться в тяжёлый каталог со стартовой полной загрузкой схем;
 - source selection, search query, search action и summary последнего результата должны считываться из верхнего блока без прокрутки и без визуальной конкуренции со secondary panels;
 - `Текущий объект` и `Избранные объекты` должны оставаться вторичным контекстом и не вытеснять основной search/result flow ниже первого экрана;
@@ -372,7 +458,34 @@
 - source-level ошибка по одному источнику не должна перекрывать успешные результаты по другим источникам и не должна ломать общий search session UX;
 - contract inspectable object types должен быть явным:
   - первая волна inspector support: `TABLE`, `VIEW`, `MATERIALIZED_VIEW`, `INDEX`, `SEQUENCE`, `TRIGGER`, `SCHEMA`;
-  - для `TABLE/VIEW/MATERIALIZED_VIEW` inspector должен уметь показывать их schema metadata и связанные object details;
+- для `TABLE/VIEW/MATERIALIZED_VIEW` inspector должен уметь показывать их schema metadata и связанные object details;
+
+## P2
+
+### 20. Информационные страницы и project metadata
+
+Статус:
+
+- частично реализовано
+
+Что нужно сделать:
+
+- держать отдельные информационные страницы проекта как compose-screen routes, а не плодить новые static HTML-ветки без причины;
+- добавить страницу `О проекте` с кратким описанием проекта и явным списком разработчиков;
+- на карточках разработчиков добавить декоративные CSS-анимации двух черных спортивных мотоциклов, которые встают на заднее колесо и едут;
+- обеспечить прямой route `/about` и видимый вход на страницу с главного экрана;
+- список разработчиков должен быть частью page contract, а не скрытым текстом в footer.
+
+Что уже сделано:
+
+- есть отдельный экран справки `/help`, но он пока живет отдельно от compose-screen flow;
+- home-screen уже является точкой входа для сервисных и справочных страниц.
+
+Критерий завершения:
+
+- у проекта есть доступная страница `О проекте`;
+- на ней явно указаны разработчики и их engineering aliases;
+- route и навигация покрыты server-side redirect test.
   - для `INDEX` inspector нужен как отдельный сценарий просмотра DDL и привязки к таблице/колонкам;
   - для `SEQUENCE` inspector нужен как отдельный сценарий просмотра DDL и параметров последовательности (`increment`, `min/max`, `start`, `cache`, `cycle`, ownership/dependency к таблице/колонке там, где это доступно);
   - для `TRIGGER` inspector нужен как отдельный сценарий просмотра DDL, target table/view, `timing`, `events`, `enabled/disabled` state, связанной trigger function/procedure и других trigger metadata там, где это реально доступно;

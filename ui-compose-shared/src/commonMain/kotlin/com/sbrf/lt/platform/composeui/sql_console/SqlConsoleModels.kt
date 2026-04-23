@@ -7,8 +7,15 @@ import kotlinx.serialization.Serializable
 data class SqlConsoleInfo(
     val configured: Boolean,
     val sourceNames: List<String>,
+    val sourceGroups: List<SqlConsoleSourceGroup> = emptyList(),
     val maxRowsPerShard: Int,
     val queryTimeoutSec: Int? = null,
+)
+
+@Serializable
+data class SqlConsoleSourceGroup(
+    val name: String,
+    val sourceNames: List<String> = emptyList(),
 )
 
 @Serializable

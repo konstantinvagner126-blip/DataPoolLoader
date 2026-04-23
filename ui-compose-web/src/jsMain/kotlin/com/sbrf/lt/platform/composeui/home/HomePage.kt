@@ -167,6 +167,14 @@ fun ComposeHomePage(
                 action = "Открыть справку",
                 href = "/help",
             )
+
+            SimpleCard(
+                label = "Команда",
+                title = "О проекте",
+                text = "Краткое описание Load Testing Data Platform, список разработчиков и отдельная информационная страница проекта.",
+                action = "Открыть страницу проекта",
+                href = "/about",
+            )
         }
 
         Footer({ classes("footer-note", "text-center", "mt-4") }) {

@@ -23,6 +23,8 @@ class UiConfigTest {
         assertEquals(UiModuleStorePostgresConfig.DEFAULT_SCHEMA, config.moduleStore.postgres.schemaName())
         assertEquals(1000, config.sqlConsole.fetchSize)
         assertEquals(200, config.sqlConsole.maxRowsPerShard)
+        assertEquals(listOf("dev", "ift", "lt"), config.sqlConsole.sourceGroups.map { it.name })
+        assertEquals(listOf("db2", "db3", "db4"), config.sqlConsole.sourceGroups.first { it.name == "ift" }.sourceNames)
         assertEquals("\${LOCAL_MANUAL_DB_JDBC_URL}", config.moduleStore.postgres.jdbcUrl)
     }
 
@@ -107,6 +109,46 @@ class UiConfigTest {
         assertEquals("registry_pwd", config.moduleStore.postgres.password)
         assertEquals("/tmp/credentials.properties", config.defaultCredentialsFile)
         assertEquals(configFile.parent.toAbsolutePath().normalize().toString(), config.configBaseDir)
+    }
+
+    @Test
+    fun `loads sql console source groups from external file`() {
+        val configFile = Files.createTempDirectory("ui-sql-console-groups")
+            .resolve("application.yml")
+            .apply {
+                parent?.toFile()?.mkdirs()
+                writeText(
+                    """
+                    ui:
+                      sqlConsole:
+                        sourceGroups:
+                          - name: dev
+                            sourceNames: [db1, db2]
+                          - name: ift
+                            sourceNames: [db2, db3]
+                        sources:
+                          - name: db1
+                            jdbcUrl: jdbc:postgresql://localhost:5432/db1
+                            username: db1_user
+                            password: db1_pwd
+                          - name: db2
+                            jdbcUrl: jdbc:postgresql://localhost:5432/db2
+                            username: db2_user
+                            password: db2_pwd
+                          - name: db3
+                            jdbcUrl: jdbc:postgresql://localhost:5432/db3
+                            username: db3_user
+                            password: db3_pwd
+                    """.trimIndent()
+                )
+            }
+
+        val config = object : UiConfigLoader() {
+            override fun resolveExternalConfigPath() = configFile
+        }.load()
+
+        assertEquals(listOf("dev", "ift"), config.sqlConsole.sourceGroups.map { it.name })
+        assertEquals(listOf("db1", "db2"), config.sqlConsole.sourceGroups.first().sourceNames)
     }
 
     @Test

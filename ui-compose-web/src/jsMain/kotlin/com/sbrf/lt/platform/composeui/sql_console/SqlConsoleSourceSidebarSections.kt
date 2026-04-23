@@ -26,6 +26,7 @@ internal fun SqlConsoleSourceSidebar(
     onMaxRowsDraftChange: (String) -> Unit,
     onTimeoutDraftChange: (String) -> Unit,
     onSaveSettings: () -> Unit,
+    onToggleSourceGroup: (SqlConsoleSourceGroup, Boolean) -> Unit,
     onToggleSource: (String, Boolean) -> Unit,
     onCredentialsFileSelected: (File?) -> Unit,
     onUploadCredentials: () -> Unit,
@@ -64,9 +65,11 @@ internal fun SqlConsoleSourceSidebar(
             Text("Выбери, по каким источникам выполнять запрос.")
         }
         SqlConsoleSourceSelectionBlock(
+            sourceGroups = state.info?.sourceGroups.orEmpty(),
             sourceNames = state.info?.sourceNames.orEmpty(),
             selectedSourceNames = state.selectedSourceNames,
             connectionStatusBySource = connectionStatusBySource,
+            onToggleSourceGroup = onToggleSourceGroup,
             onToggleSource = onToggleSource,
         )
         SqlConsoleCredentialsPanel(
