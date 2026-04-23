@@ -190,6 +190,18 @@ internal fun SqlConsolePageEffects(
         updateSqlConsoleMonacoMetadataContext(currentState())
     }
 
+    LaunchedEffect(
+        currentUiState().editorInstance != null,
+        currentState().draftSql,
+        sqlConsoleStatementMarkerEffectKey(currentExecution),
+    ) {
+        updateSqlConsoleMonacoStatementMarkers(
+            editor = currentUiState().editorInstance,
+            draftSql = currentState().draftSql,
+            execution = currentExecution,
+        )
+    }
+
     PollingEffect(
         enabled = trackingExecution,
         intervalMs = 2000,

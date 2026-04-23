@@ -5,6 +5,70 @@
   overflow: hidden;
 }
 
+.sql-editor-frame .monaco-editor .compose-sql-statement-block {
+  border-left: 3px solid transparent;
+}
+
+.sql-editor-frame .monaco-editor .compose-sql-statement-block-success {
+  background: linear-gradient(90deg, rgba(25, 135, 84, 0.08), rgba(25, 135, 84, 0.02) 44%, transparent 76%);
+  border-left-color: rgba(25, 135, 84, 0.72);
+}
+
+.sql-editor-frame .monaco-editor .compose-sql-statement-block-failed {
+  background: linear-gradient(90deg, rgba(220, 53, 69, 0.1), rgba(220, 53, 69, 0.03) 44%, transparent 76%);
+  border-left-color: rgba(220, 53, 69, 0.8);
+}
+
+.sql-editor-frame .monaco-editor .compose-sql-statement-block-pending_commit,
+.sql-editor-frame .monaco-editor .compose-sql-statement-block-partial {
+  background: linear-gradient(90deg, rgba(255, 193, 7, 0.14), rgba(255, 193, 7, 0.04) 44%, transparent 76%);
+  border-left-color: rgba(193, 129, 3, 0.88);
+}
+
+.sql-editor-frame .monaco-editor .compose-sql-statement-block-running {
+  background: linear-gradient(90deg, rgba(13, 110, 253, 0.1), rgba(13, 110, 253, 0.03) 44%, transparent 76%);
+  border-left-color: rgba(13, 110, 253, 0.82);
+}
+
+.sql-editor-frame .monaco-editor .compose-sql-statement-block-cancelled,
+.sql-editor-frame .monaco-editor .compose-sql-statement-block-skipped {
+  background: linear-gradient(90deg, rgba(108, 117, 125, 0.1), rgba(108, 117, 125, 0.03) 44%, transparent 76%);
+  border-left-color: rgba(108, 117, 125, 0.8);
+}
+
+.sql-editor-frame .monaco-editor .compose-sql-statement-glyph {
+  box-sizing: border-box;
+  width: 10px !important;
+  height: 10px !important;
+  margin-left: 5px;
+  margin-top: 5px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.96);
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.18);
+}
+
+.sql-editor-frame .monaco-editor .compose-sql-statement-glyph-success {
+  background: #198754;
+}
+
+.sql-editor-frame .monaco-editor .compose-sql-statement-glyph-failed {
+  background: #dc3545;
+}
+
+.sql-editor-frame .monaco-editor .compose-sql-statement-glyph-pending_commit,
+.sql-editor-frame .monaco-editor .compose-sql-statement-glyph-partial {
+  background: #ffc107;
+}
+
+.sql-editor-frame .monaco-editor .compose-sql-statement-glyph-running {
+  background: #0d6efd;
+}
+
+.sql-editor-frame .monaco-editor .compose-sql-statement-glyph-cancelled,
+.sql-editor-frame .monaco-editor .compose-sql-statement-glyph-skipped {
+  background: #6c757d;
+}
+
 .sql-catalog-layout {
   display: grid;
   grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);

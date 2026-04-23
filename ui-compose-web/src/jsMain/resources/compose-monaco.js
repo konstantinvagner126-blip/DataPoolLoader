@@ -2,6 +2,7 @@
   const namespace = global.ComposeMonaco || (global.ComposeMonaco = {});
   let monacoConfigured = false;
   let sqlSupportRegistered = false;
+  const sqlStatementMarkerDecorations = new WeakMap();
   const monacoVsPath = "/static/compose-app/vendor/monaco-editor/min/vs";
   const DEFAULT_SQL_OBJECT_COMPLETION_LIMIT = 8;
   const MAX_SQL_OBJECT_SUGGESTIONS = 24;
@@ -973,8 +974,62 @@
     });
   }
 
+  function setSqlStatementMarkers(editor, markers) {
+    if (!editor || !global.monaco?.Range) {
+      return;
+    }
+    const previousDecorations = sqlStatementMarkerDecorations.get(editor) || [];
+    const nextDecorations = [];
+    (Array.isArray(markers) ? markers : []).forEach(marker => {
+      const startLine = Number(marker?.startLine);
+      const endLine = Number(marker?.endLine);
+      if (!Number.isFinite(startLine) || startLine < 1) {
+        return;
+      }
+      const normalizedEndLine = Number.isFinite(endLine) && endLine >= startLine ? endLine : startLine;
+      const status = `${marker?.status ?? "success"}`.trim().toLowerCase() || "success";
+      const hoverMessage = buildSqlStatementMarkerHoverMessage(marker);
+      nextDecorations.push({
+        range: new global.monaco.Range(startLine, 1, normalizedEndLine, 1),
+        options: {
+          isWholeLine: true,
+          className: `compose-sql-statement-block compose-sql-statement-block-${status}`,
+          hoverMessage
+        }
+      });
+      nextDecorations.push({
+        range: new global.monaco.Range(startLine, 1, startLine, 1),
+        options: {
+          isWholeLine: true,
+          glyphMarginClassName: `compose-sql-statement-glyph compose-sql-statement-glyph-${status}`,
+          glyphMarginHoverMessage: hoverMessage,
+          stickiness: global.monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges
+        }
+      });
+    });
+    const appliedDecorations = editor.deltaDecorations(previousDecorations, nextDecorations);
+    sqlStatementMarkerDecorations.set(editor, appliedDecorations);
+  }
+
+  function buildSqlStatementMarkerHoverMessage(marker) {
+    const parts = [];
+    const title = `${marker?.title ?? ""}`.trim();
+    if (title) {
+      parts.push({ value: `**${title}**` });
+    }
+    const details = Array.isArray(marker?.details) ? marker.details : [];
+    details
+      .map(value => `${value ?? ""}`.trim())
+      .filter(Boolean)
+      .forEach(value => {
+        parts.push({ value });
+      });
+    return parts.length > 0 ? parts : undefined;
+  }
+
   namespace.withMonacoReady = withMonacoReady;
   namespace.createMonacoEditor = createMonacoEditor;
   namespace.ensureSqlSupport = ensureSqlSupport;
   namespace.setSqlMetadataContext = setSqlMetadataContext;
+  namespace.setSqlStatementMarkers = setSqlStatementMarkers;
 })(window);

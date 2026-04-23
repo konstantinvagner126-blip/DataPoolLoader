@@ -15,7 +15,7 @@ import org.jetbrains.compose.web.dom.Div
 
 private var monacoEditorCounter = 0
 private const val MONACO_LOADER_URL = "/static/compose-app/vendor/monaco-editor/min/vs/loader.js"
-private const val MONACO_HELPER_URL = "/static/compose-app/compose-monaco.js?v=20260423d"
+private const val MONACO_HELPER_URL = "/static/compose-app/compose-monaco.js?v=20260423e"
 
 @Composable
 fun MonacoEditorPane(
@@ -23,6 +23,7 @@ fun MonacoEditorPane(
     language: String,
     value: String,
     readOnly: Boolean = false,
+    glyphMargin: Boolean = false,
     classNames: List<String> = listOf("editor-frame"),
     onEditorReady: ((dynamic) -> Unit)? = null,
     onValueChange: (String) -> Unit = {},
@@ -38,7 +39,7 @@ fun MonacoEditorPane(
         classes(*classNames.toTypedArray())
     })
 
-    DisposableEffect(elementId, language, readOnly) {
+    DisposableEffect(elementId, language, readOnly, glyphMargin) {
         var disposed = false
         ensureMonacoReady {
             val composeMonaco = window.asDynamic().ComposeMonaco
@@ -51,6 +52,7 @@ fun MonacoEditorPane(
                     options.value = value
                     options.language = language
                     options.readOnly = readOnly
+                    options.glyphMargin = glyphMargin
                     val editor = composeMonaco.createMonacoEditor(elementId, options)
                     editor.onDidChangeModelContent {
                         onValueChange(editor.getValue() as String)

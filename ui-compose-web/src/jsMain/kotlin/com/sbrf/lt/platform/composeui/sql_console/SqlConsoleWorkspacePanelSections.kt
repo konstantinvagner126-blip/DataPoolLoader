@@ -116,6 +116,7 @@ internal fun SqlConsoleWorkspacePanel(
             instanceKey = "compose-sql-console-editor",
             language = "sql",
             value = state.draftSql,
+            glyphMargin = true,
             classNames = listOf("editor-frame", "sql-editor-frame"),
             onEditorReady = { editor -> onEditorReady(editor) },
             onValueChange = onDraftSqlChange,

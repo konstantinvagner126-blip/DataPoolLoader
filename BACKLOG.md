@@ -322,6 +322,9 @@
 7. Фаза E. SQL-console-specific regression coverage и invariants:
   - закрепить подсистему screen-level smoke coverage, server-side scenario tests и явными архитектурными инвариантами;
   - поддерживать SQL-консоль как отдельную инженерную программу, а не как временный набор UX-правок.
+8. Фаза F. IDE-like enhancements:
+  - после формального закрытия safety/recovery/object browser/main UX/Monaco baseline;
+  - усиливать SQL-консоль только теми функциями, которые реально приближают ее к IDE/DBA-tool опыту без тяжелого LSP и без размывания execution architecture.
 
 Фаза A. Execution safety и ownership recovery:
 
@@ -620,6 +623,44 @@
   - shared-store safety contract для `strict safety` и ownership-loss handling execution actions;
   - object-browser action `Открыть SELECT в консоли` как deterministic workspace rewrite по source/draft, без скрытого смешения групп и selection.
 
+Фаза F. IDE-like enhancements:
+
+- следующий продуктовый пакет после закрытия текущего SQL-console baseline:
+  1. statement status markers прямо в Monaco:
+    - gutter/inline markers для `ok / error / rows / duration / pending commit`;
+    - markers должны жить как editor-native execution feedback, а не как новый page-level summary wall;
+  2. быстрый object navigation из редактора:
+    - hover/quick actions по `schema.table` и близким object references;
+    - действия минимум: открыть inspector, открыть `SELECT` в консоли, перейти к columns metadata;
+  3. result grid ergonomics ближе к IDE/data-grid:
+    - resize колонок;
+    - autosize по содержимому;
+    - `wrap / nowrap` toggle;
+    - copy row / copy column / copy cell;
+    - явное выделение активной ячейки;
+  4. statement-level run model:
+    - явно развести `выполнить текущий statement`, `выполнить выделение`, `выполнить весь script`;
+    - UX и hotkeys этих сценариев должны быть одинаково читаемыми и не конфликтовать с текущим safety-contract;
+  5. `EXPLAIN / EXPLAIN ANALYZE` как first-class actions:
+    - не заставлять пользователя писать их руками каждый раз;
+    - выполнять только через явные SQL actions, без скрытой подмены текста;
+  6. diff / mismatch view по source:
+    - показывать расхождения `row count / value mismatch / source failure` в compare-friendly форме;
+    - не смешивать этот режим с обычным result table без явного переключения;
+  7. execution history per workspace:
+    - короткая локальная история execution sessions именно для SQL-консоли;
+    - хранить SQL, source set, outcome и duration без превращения экрана в тяжелый audit log.
+
+- ограничения этой фазы:
+  - не тащить полноценный SQL LSP;
+  - не строить тяжелый parser/AST слой без доказанной необходимости;
+  - не вводить внутренние tabs внутри одной страницы вместо уже реализованных browser-tab workspaces;
+  - не размывать object browser, превращая его во вторую консоль или встроенный data preview screen.
+- уже начат первый пакет этой фазы:
+  - statement execution status markers добавляются прямо в Monaco как editor-native decorations;
+  - marker contract строится client-side из `script outline + execution result` без нового backend state;
+  - первый пакет не вводит тяжелый diagnostics engine и не подменяет result navigator отдельной marker-wall.
+
 Критерий завершения:
 
 - SQL-консоль рассматривается и поддерживается как самостоятельная подсистема, а не как “еще один экран”.
@@ -635,6 +676,7 @@
 - поддерживаемые inspectable object types и границы первой волны явно определены и не остаются скрытым допущением;
 - object inspector реализован как type-aware tabbed UI: содержимое и вкладки зависят от типа объекта, а не от одного универсального layout;
 - Monaco становится ощутимо полезнее, но не ломает execution lifecycle и не тащит тяжелую stateful backend-механику.
+- дальнейшие IDE-like enhancements идут отдельной фазой и не подменяют собой safety/recovery baseline.
 
 ### 7. SQL-консоль: safety hardening по аварийным сценариям
 
