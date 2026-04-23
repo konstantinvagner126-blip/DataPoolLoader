@@ -726,6 +726,11 @@
   - settings/connection flow вынесен в [SqlConsoleStoreSettingsSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleStoreSettingsSupport.kt);
   - query lifecycle вынесен в [SqlConsoleStoreQueryLifecycleSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleStoreQueryLifecycleSupport.kt);
   - owner actions и execution state helpers вынесены в [SqlConsoleStoreOwnerActionSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleStoreOwnerActionSupport.kt) и [SqlConsoleStoreExecutionStateSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleStoreExecutionStateSupport.kt).
+  - object-browser store cleanup тоже начат:
+    - [SqlConsoleObjectsStoreActionSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectsStoreActionSupport.kt) больше не держит persistence/favorites/search/inspector flow в одном файле;
+    - workspace persistence вынесен в [SqlConsoleObjectsStorePersistenceSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectsStorePersistenceSupport.kt);
+    - favorites вынесены в [SqlConsoleObjectsStoreFavoriteSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectsStoreFavoriteSupport.kt);
+    - search и inspector вынесены в [SqlConsoleObjectsStoreSearchSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectsStoreSearchSupport.kt) и [SqlConsoleObjectsStoreInspectorSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectsStoreInspectorSupport.kt).
 
 ### 12. Финализировать boundary модульного редактора и storage contracts
 
