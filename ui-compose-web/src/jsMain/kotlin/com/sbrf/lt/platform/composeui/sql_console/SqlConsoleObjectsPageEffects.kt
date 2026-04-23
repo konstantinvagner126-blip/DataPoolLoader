@@ -8,6 +8,7 @@ internal fun SqlConsoleObjectsPageEffects(
     store: SqlConsoleObjectsStore,
     initialQuery: String,
     initialSource: String,
+    navigationTarget: SqlObjectNavigationTarget?,
     currentState: () -> SqlConsoleObjectsPageState,
     setState: (SqlConsoleObjectsPageState) -> Unit,
 ) {
@@ -25,5 +26,21 @@ internal fun SqlConsoleObjectsPageEffects(
             setState(store.beginAction(currentState(), "search"))
             setState(store.search(currentState()))
         }
+    }
+
+    LaunchedEffect(store, navigationTarget, currentState().searchResponse) {
+        val selection = findSelectedObject(currentState().searchResponse, navigationTarget)
+        if (selection == null) {
+            val state = currentState()
+            if (state.inspectorLoading || state.inspectorErrorMessage != null || state.inspectorResponse != null) {
+                setState(store.clearInspector(state))
+            }
+            return@LaunchedEffect
+        }
+        if (inspectorMatchesSelection(currentState().inspectorResponse, selection)) {
+            return@LaunchedEffect
+        }
+        setState(store.beginInspectorLoad(currentState()))
+        setState(store.loadInspector(currentState(), selection.sourceName, selection.dbObject))
     }
 }

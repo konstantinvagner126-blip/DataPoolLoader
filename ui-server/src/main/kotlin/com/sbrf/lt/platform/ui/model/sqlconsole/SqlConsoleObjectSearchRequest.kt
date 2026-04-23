@@ -8,3 +8,10 @@ data class SqlConsoleObjectSearchRequest(
     val selectedSourceNames: List<String> = emptyList(),
     val maxObjectsPerSource: Int = 30,
 )
+
+data class SqlConsoleObjectInspectorRequest(
+    val sourceName: String,
+    val schemaName: String,
+    val objectName: String,
+    val objectType: String,
+)

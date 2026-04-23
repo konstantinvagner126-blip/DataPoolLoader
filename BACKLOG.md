@@ -33,6 +33,11 @@
 
 ## P0
 
+Текущий наивысший приоритет внутри `P0`:
+
+- сначала выполнить [8. Нормализовать build baseline на Java 21](/Users/kwdev/DataPoolLoader/BACKLOG.md);
+- до завершения этого пакета не начинать новые feature- или cleanup-циклы, кроме изменений, которые прямо нужны для green build на `Java 21`.
+
 ### 0. Архитектурная программа: вычистить `ui-server` как перегруженный boundary
 
 Статус:
@@ -57,110 +62,10 @@
 
 Что уже сделано:
 
-- transport-конфигурация `ui-server` больше не живет целиком в [Server.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/Server.kt);
-- JSON mapper, Ktor plugins и route wiring вынесены в отдельные support-файлы:
-  - [UiServerObjectMapper.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/UiServerObjectMapper.kt)
-  - [UiServerPlugins.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/UiServerPlugins.kt)
-  - [UiServerRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/UiServerRoutes.kt);
-- [Server.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/Server.kt) стал ближе к composition root, а не к transport-свалке.
-- сборка `UiServerContextDependencies` больше не живет прямо в `uiModule`:
-  - [UiServerModuleDependenciesFactory.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/UiServerModuleDependenciesFactory.kt)
-  - [Server.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/Server.kt) теперь не держит вручную graph assembly для `UiServerContext`;
-- `uiModule` больше не устанавливает Ktor plugins/routes напрямую:
-  - [UiServerApplicationSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/UiServerApplicationSupport.kt)
-  - [Server.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/Server.kt) теперь только собирает `UiServerContext` и делегирует transport-installation;
-- DB route layer больше не держится на одном смешанном support-файле:
-  - cleanup flow разрезан на payload/action слои:
-    - [DatabaseCleanupRoutePayloadSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseCleanupRoutePayloadSupport.kt)
-    - [DatabaseCleanupRouteActions.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseCleanupRouteActions.kt)
-  - sync/import flow больше не смешивает context, payload parsing и actions в одном файле:
-    - [DatabaseSyncRouteContexts.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseSyncRouteContexts.kt)
-    - [DatabaseSyncRoutePayloadSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseSyncRoutePayloadSupport.kt)
-    - [DatabaseSyncRouteActions.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseSyncRouteActions.kt)
-  - module flow вынесен в отдельные support-слои:
-    - [DatabaseModuleRouteContexts.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseModuleRouteContexts.kt)
-    - [DatabaseModuleServiceRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseModuleServiceRouteSupport.kt)
-    - [DatabaseModulesCatalogRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseModulesCatalogRouteSupport.kt);
-- [DatabaseRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseRoutes.kt) теперь агрегирует отдельные route groups:
-  - [DatabaseCleanupRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseCleanupRoutes.kt)
-  - [DatabaseSyncRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseSyncRoutes.kt)
-  - [DatabaseModuleRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseModuleRoutes.kt);
-- DB module route group дальше разрезан по ответственности:
-  - [DatabaseModuleLifecycleRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseModuleLifecycleRoutes.kt)
-  - [DatabaseModuleRunRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseModuleRunRoutes.kt);
-- SQL-console route support больше не смешивает metadata, export и async execution lifecycle в одном файле:
-  - [SqlConsoleMetadataRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/SqlConsoleMetadataRouteSupport.kt)
-  - [SqlConsoleExportRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/SqlConsoleExportRouteSupport.kt)
-  - execution flow дополнительно разрезан на:
-    - [SqlConsoleExecutionPathSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/SqlConsoleExecutionPathSupport.kt)
-    - sync execution в [SqlConsoleSyncExecutionSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/SqlConsoleSyncExecutionSupport.kt)
-    - async execution/session actions в [SqlConsoleAsyncExecutionSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/SqlConsoleAsyncExecutionSupport.kt);
-- [SqlConsoleRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/SqlConsoleRoutes.kt) теперь только агрегирует отдельные route groups:
-  - [SqlConsoleStateRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/SqlConsoleStateRoutes.kt)
-  - [SqlConsoleMetadataRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/SqlConsoleMetadataRoutes.kt)
-  - [SqlConsoleQueryRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/SqlConsoleQueryRoutes.kt)
-  - [SqlConsoleExportRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/SqlConsoleExportRoutes.kt)
-  - [SqlConsoleAsyncQueryRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/SqlConsoleAsyncQueryRoutes.kt);
-- `PageRoutes` больше не держит вручную повторяющийся redirect/static transport-код;
-- page-level routing support больше не смешивает redirect и static resource flow в одном файле:
-  - compose redirect registration и mode guards живут в [PageComposeRedirectSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/PageComposeRedirectSupport.kt)
-  - compose query/bundle helpers живут в [PageComposeQuerySupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/PageComposeQuerySupport.kt)
-  - static text pages и static resource proxy/migration живут в [PageStaticResourceSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/PageStaticResourceSupport.kt);
-- [PageRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/PageRoutes.kt) теперь только агрегирует route groups:
-  - [PageComposeAliasRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/PageComposeAliasRoutes.kt)
-  - [PageScreenRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/PageScreenRoutes.kt)
-  - [PageStaticRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/PageStaticRoutes.kt);
-- page screen route layer дальше разрезан:
-  - module-related screens живут в [PageModuleScreenRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/PageModuleScreenRoutes.kt)
-  - SQL/maintenance screens живут в [PageSqlScreenRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/PageSqlScreenRoutes.kt)
-  - [PageScreenRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/PageScreenRoutes.kt) остался тонким агрегатором;
-- `CommonRoutes`, `DatabaseRoutes` и `SqlConsoleRoutes` уже меньше знают о mode-specific maintenance flow, actor wiring, credentials/appsRoot orchestration и service resolution.
-- [CommonRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/CommonRoutes.kt) больше не смешивает runtime, files modules, files run, cleanup и websocket transport в одном файле;
-- общий files/runtime route layer разрезан на отдельные route groups:
-  - [CommonRuntimeRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/CommonRuntimeRoutes.kt)
-  - [CommonFilesModuleRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/CommonFilesModuleRoutes.kt)
-  - [CommonFilesRunRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/CommonFilesRunRoutes.kt)
-  - [CommonMaintenanceRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/CommonMaintenanceRoutes.kt);
-- общий route support больше не смешивает разные ответственности в одном файле:
-  - maintenance flow вынесен в отдельные support-слои:
-    - [CommonRunHistoryCleanupRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/CommonRunHistoryCleanupRouteSupport.kt)
-    - [CommonOutputRetentionRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/CommonOutputRetentionRouteSupport.kt)
-    - DB response adaptation для common cleanup preview/result вынесен в [DatabaseRunHistoryCleanupRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseRunHistoryCleanupRouteSupport.kt)
-  - config/module flow разрезан по отдельным support-слоям:
-    - [CommonRuntimeModeRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/CommonRuntimeModeRouteSupport.kt)
-    - [CommonFilesModuleRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/CommonFilesModuleRouteSupport.kt)
-    - [CommonConfigFormRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/CommonConfigFormRouteSupport.kt)
-  - credentials upload вынесен в [CommonCredentialsRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/CommonCredentialsRouteSupport.kt);
-- [ModuleRunRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/ModuleRunRoutes.kt) больше не держит вручную path parsing и service resolution;
-- для экрана `История и результаты` появился отдельный support-слой:
-  - route contexts живут в [ModuleRunRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/ModuleRunRouteSupport.kt)
-  - history service resolution живет в [ModuleRunHistoryRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/ModuleRunHistoryRouteSupport.kt)
-  - общие route param helpers живут в [RouteParamSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/RouteParamSupport.kt).
-- startup/bootstrap слой `ui-server` вынесен из [Server.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/Server.kt) в [UiServerStartup.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/UiServerStartup.kt);
-- сборка [UiServerContext.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/UiServerContext.kt) вынесена из [Server.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/Server.kt) в:
-  - [UiServerContextDependencies.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/UiServerContextDependencies.kt)
-  - [UiServerContextFactory.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/UiServerContextFactory.kt);
-- default factory wiring для `ModuleRegistry / RunManager / SqlConsole* / FilesRunHistoryService` теперь живет рядом со startup-слоем, а не в composition root;
-- startup слой дальше разрезан по ответственности:
-  - default factory wiring живет в [UiServerDefaultFactories.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/UiServerDefaultFactories.kt)
-  - static text/resource loading живет в [UiServerResourceLoading.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/UiServerResourceLoading.kt);
-- [UiServerContext.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/UiServerContext.kt) перестал быть knowledge-rich объектом:
-  - dynamic DB/files service resolution разрезан по mode-specific слоям:
-    - DB module/sync services живут в [UiServerDatabaseModuleDynamicServices.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/UiServerDatabaseModuleDynamicServices.kt)
-    - DB run/history/retention services живут в [UiServerDatabaseRunDynamicServices.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/UiServerDatabaseRunDynamicServices.kt)
-    - [UiServerFilesDynamicServices.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/UiServerFilesDynamicServices.kt)
-  - runtime guards и route query helpers разрезаны по отдельным слоям:
-    - DB sync/maintenance guards живут в [UiServerDatabaseSyncGuards.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/UiServerDatabaseSyncGuards.kt)
-    - DB mode availability logic живет в [UiServerDatabaseModeSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/UiServerDatabaseModeSupport.kt)
-    - DB actor extraction живет в [UiServerDatabaseActorSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/UiServerDatabaseActorSupport.kt)
-    - query parsing helpers живут в [UiServerRouteQuerySupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/UiServerRouteQuerySupport.kt)
-  - runtime config/context access вынесен в [UiServerRuntimeAccess.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/UiServerRuntimeAccess.kt);
-- DB module lifecycle route group дальше разрезан:
-  - read/catalog flow живет в [DatabaseModuleCatalogRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseModuleCatalogRoutes.kt)
-  - mutation flow агрегируется в [DatabaseModuleMutationRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseModuleMutationRoutes.kt) и разрезан на:
-    - [DatabaseModuleWorkingCopyRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseModuleWorkingCopyRoutes.kt)
-    - [DatabaseModuleRegistryMutationRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseModuleRegistryMutationRoutes.kt);
-- сам [UiServerContext.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/UiServerContext.kt) теперь ближе к carrier-объекту зависимостей, а не к смешанному service-locator/runtime-helper слою.
+- основная route/startup/page-route decomposition уже выполнена;
+- `Server.kt`, `UiServerContext`, route groups и page routing выведены из монолитного состояния и разрезаны на support/facade слои;
+- SQL-console, DB и common route flows уже не держатся на single-file orchestration;
+- подробная история выполненной волны вынесена в [BACKLOG_HISTORY.md](/Users/kwdev/DataPoolLoader/BACKLOG_HISTORY.md).
 
 Критерий завершения:
 
@@ -231,25 +136,10 @@
 
 Что уже сделано:
 
-- начат cleanup persisted state файлового run-layer;
-- `run-state.json` больше не хранит uploaded credentials;
-- credentials вынесены в отдельный `credentials-state.json` с legacy-миграцией из старого `run-state.json`;
-- это покрыто тестами на separation и migration;
-- SQL console persisted state больше не живет одним mixed-файлом;
-- `sql-console-state.json` переведен в legacy migration-only формат;
-- рабочее состояние SQL-консоли разделено на:
-  - `sql-console-workspace-state.json`
-  - `sql-console-library-state.json`
-  - `sql-console-preferences-state.json`;
-- сервис SQL-консоли теперь собирает единый response из двух отдельных source-of-truth.
-- query history, favorites и favorite objects больше не смешаны с execution/UI preferences;
-- `sql-console-preferences-state.json` теперь хранит только `pageSize`, `strictSafetyEnabled`, `transactionMode`;
-- пользовательский query/object content вынесен в отдельный `sql-console-library-state.json` с миграцией:
-  - из legacy `sql-console-state.json`
-  - из старого расширенного `sql-console-preferences-state.json`.
-- legacy combined SQL-console state больше не маскируется под рабочий store:
-  - [LegacySqlConsoleStateStore.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/sqlconsole/LegacySqlConsoleStateStore.kt) теперь держит явную legacy-only роль;
-  - [LegacySqlConsoleState.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/sqlconsole/LegacySqlConsoleState.kt) теперь моделирует именно legacy combined state.
+- run-state и credentials уже разведены по отдельным persisted моделям;
+- persisted state SQL-консоли уже разрезан на `workspace / library / preferences`, а combined legacy state переведен в migration-only роль;
+- source-of-truth для UI preferences и operational content стал заметно явнее;
+- подробная история выполненной волны вынесена в [BACKLOG_HISTORY.md](/Users/kwdev/DataPoolLoader/BACKLOG_HISTORY.md).
 
 Критерий завершения:
 
@@ -267,144 +157,16 @@
 - снизить стоимость изменений во frontend;
 - превратить крупные Compose-экраны в набор feature-блоков.
 
-Первый приоритет:
-
-- [SqlConsolePage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsolePage.kt)
-- [ModuleEditorPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPage.kt)
-- [ModuleRunsPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsPage.kt)
-- [ModuleEditorConfigForm.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorConfigForm.kt)
-
-Что нужно сделать:
-
-- выделить shell pages;
-- вынести action-panels и visual sections в отдельные компоненты;
-- уменьшить прямой объем page-файлов;
-- не тащить дополнительную логику обратно в page/store после декомпозиции.
-
 Что уже сделано:
 
-- начат реальный распил [SqlConsolePage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsolePage.kt);
-- крупные visual sections и helper-слои вынесены в:
-  - [SqlConsoleLibrarySections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleLibrarySections.kt)
-  - [SqlConsoleEditorSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleEditorSections.kt)
-  - [SqlConsoleResultSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleResultSections.kt)
-  - [SqlConsolePageSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsolePageSupport.kt);
-- page-файл перестал держать почти всю SQL-console подсистему в одном месте;
-- package-level SQL helper-ы нормализованы и переиспользуются между SQL-console экранами;
-- прежний second-level giant-файл `SqlConsolePageSections.kt` устранен.
-- начат реальный распил [ModuleEditorPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPage.kt);
-- editor visual sections и helper-слои вынесены в:
-  - [ModuleEditorShellSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorShellSections.kt)
-  - [ModuleEditorRunSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorRunSections.kt)
-  - [ModuleEditorWorkspaceSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorWorkspaceSections.kt)
-  - [ModuleEditorMetadataSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorMetadataSections.kt)
-  - [ModuleEditorPageSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPageSupport.kt);
-- прежний second-level giant-файл `ModuleEditorPageSections.kt` устранен.
-- начат реальный распил [ModuleEditorConfigForm.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorConfigForm.kt);
-- config-form sections и helper-слои вынесены в:
-  - [ModuleEditorConfigFormSettingsSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorConfigFormSettingsSections.kt)
-  - [ModuleEditorConfigFormSourceSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorConfigFormSourceSections.kt)
-  - [ModuleEditorConfigFormFieldSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorConfigFormFieldSupport.kt)
-  - [ModuleEditorConfigFormSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorConfigFormSupport.kt);
-- прежний second-level giant-файл `ModuleEditorConfigFormSections.kt` устранен.
-- начат реальный распил [ModuleRunsPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsPage.kt);
-- runs visual sections и helper-слои вынесены в:
-  - [ModuleRunsPageSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsPageSections.kt)
-  - [ModuleRunsPageSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsPageSupport.kt);
-- [ModuleRunsPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsPage.kt) сокращен до shell/wiring-слоя, а detail-pane вынесен в отдельные section-компоненты.
-- начат реальный распил [ModuleSyncPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncPage.kt);
-- sync visual sections и helper-слои вынесены в:
-  - [ModuleSyncPageSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncPageSections.kt)
-  - [ModuleSyncPageSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncPageSupport.kt);
-- [ModuleSyncPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncPage.kt) сокращен до shell/wiring-слоя.
-- начат реальный распил [RunHistoryCleanupPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/run_history_cleanup/RunHistoryCleanupPage.kt);
-- cleanup visual sections и helper-слои вынесены в:
-  - [RunHistoryCleanupPageSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/run_history_cleanup/RunHistoryCleanupPageSections.kt)
-  - [RunHistoryCleanupPageSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/run_history_cleanup/RunHistoryCleanupPageSupport.kt);
-- [RunHistoryCleanupPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/run_history_cleanup/RunHistoryCleanupPage.kt) сокращен до shell/wiring-слоя.
-- homepage visual sections и helper-слои вынесены в:
-  - [HomePageSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/home/HomePageSections.kt)
-  - [HomePageSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/home/HomePageSupport.kt);
-- [HomePage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/home/HomePage.kt) сокращен до shell/wiring-слоя и перестал держать hero/card/helper реализацию в одном файле.
-- после page-layer начат распил тяжелых shared store-файлов:
-  - loading/fallback/session assembly вынесены из [ModuleEditorStore.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStore.kt) в [ModuleEditorStoreLoadingSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreLoadingSupport.kt)
-  - action/mutation flow вынесен в [ModuleEditorStoreActionSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreActionSupport.kt)
-  - loading и sync action flow вынесены из [ModuleSyncStore.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncStore.kt) в [ModuleSyncStoreLoadingSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncStoreLoadingSupport.kt) и [ModuleSyncStoreActionSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncStoreActionSupport.kt);
-- shared store decomposition продолжен на остальных экранах:
-  - loading/fallback/history selection вынесены из [ModuleRunsStore.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsStore.kt) в [ModuleRunsStoreLoadingSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsStoreLoadingSupport.kt)
-  - loading/persisted-state assembly и execution lifecycle вынесены из [SqlConsoleStore.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleStore.kt) в [SqlConsoleStoreLoadingSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleStoreLoadingSupport.kt) и [SqlConsoleStoreExecutionSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleStoreExecutionSupport.kt)
-  - loading/refresh и cleanup/output action flow вынесены из [RunHistoryCleanupStore.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/run_history_cleanup/RunHistoryCleanupStore.kt) в [RunHistoryCleanupStoreLoadingSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/run_history_cleanup/RunHistoryCleanupStoreLoadingSupport.kt) и [RunHistoryCleanupStoreActionSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/run_history_cleanup/RunHistoryCleanupStoreActionSupport.kt)
-  - loading/search/favorite-object mutation вынесены из [SqlConsoleObjectsStore.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectsStore.kt) в [SqlConsoleObjectsStoreLoadingSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectsStoreLoadingSupport.kt) и [SqlConsoleObjectsStoreActionSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectsStoreActionSupport.kt)
-  - home loading/mode-switch flow вынесен из [HomePageStore.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/home/HomePageStore.kt) в [HomePageStoreSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/home/HomePageStoreSupport.kt);
-- `P0.3` перешел из чисто page-level декомпозиции в следующий слой: store/support separation без возврата orchestration обратно в page/store giant-файлы.
-- `ModuleRunsDetailSections.kt` больше не держит весь details-pane в одном knowledge-heavy файле:
-  - overview/summary flow вынесен в [ModuleRunsOverviewSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsOverviewSections.kt)
-  - source/events flow вынесен в [ModuleRunsSourceSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsSourceSections.kt)
-  - diagnostics/artifacts/raw-summary flow вынесен в [ModuleRunsArtifactSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsArtifactSections.kt);
-- [ModuleEditorStore.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStore.kt) дальше разрезан по ответственности:
-  - pure draft/dialog/mutation state вынесен в [ModuleEditorStoreDraftSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreDraftSupport.kt)
-  - config-form lifecycle и SQL-resource usage rules вынесены в [ModuleEditorStoreConfigFormSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreConfigFormSupport.kt)
-  - SQL-resource create/rename/delete flow вынесен в [ModuleEditorStoreSqlResourceSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreSqlResourceSupport.kt);
-- [SqlConsolePageBindings.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsolePageBindings.kt) больше не держит единый mixed callback-factory:
-  - shared binding context вынесен в [SqlConsolePageBindingContext.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsolePageBindingContext.kt)
-  - execution/export lifecycle вынесен в [SqlConsoleExecutionBindings.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleExecutionBindings.kt)
-  - library/settings/credentials flow вынесен в [SqlConsoleLibraryBindings.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleLibraryBindings.kt)
-  - editor/selection flow вынесен в [SqlConsoleEditorBindings.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleEditorBindings.kt).
-- [ModuleSyncPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncPage.kt) больше не держит загрузку, polling и action orchestration внутри page-shell:
-  - callbacks вынесены в [ModuleSyncPageBindings.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncPageBindings.kt)
-  - load/polling effects вынесены в [ModuleSyncPageEffects.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncPageEffects.kt)
-  - content flow вынесен в [ModuleSyncPageContentSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncPageContentSections.kt);
-- [RunHistoryCleanupPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/run_history_cleanup/RunHistoryCleanupPage.kt) тоже переведен в shell/wiring режим:
-  - callbacks вынесены в [RunHistoryCleanupPageBindings.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/run_history_cleanup/RunHistoryCleanupPageBindings.kt)
-  - initial-load effect вынесен в [RunHistoryCleanupPageEffects.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/run_history_cleanup/RunHistoryCleanupPageEffects.kt)
-  - page content вынесен в [RunHistoryCleanupPageContentSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/run_history_cleanup/RunHistoryCleanupPageContentSections.kt);
-- support-слой редактора модулей больше не держит loading/action flow в двух mixed-файлах:
-  - loading state factory и metadata/config snapshot helpers вынесены в [ModuleEditorStoreStateFactory.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreStateFactory.kt)
-  - DB fallback logic вынесена в [ModuleEditorStoreFallbackSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreFallbackSupport.kt)
-  - catalog/session loading flow разрезан на [ModuleEditorStoreCatalogLoadingSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreCatalogLoadingSupport.kt) и [ModuleEditorStoreSessionLoadingSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreSessionLoadingSupport.kt)
-  - action flow разрезан на [ModuleEditorStoreSaveActionSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreSaveActionSupport.kt), [ModuleEditorStoreRunActionSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreRunActionSupport.kt) и [ModuleEditorStoreDatabaseLifecycleActionSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreDatabaseLifecycleActionSupport.kt).
-- [RunHistoryCleanupPageSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/run_history_cleanup/RunHistoryCleanupPageSections.kt) больше не держит cleanup/output/overview в одном giant file:
-  - history cleanup flow вынесен в [RunHistoryCleanupHistorySections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/run_history_cleanup/RunHistoryCleanupHistorySections.kt)
-  - output retention flow вынесен в [RunHistoryCleanupOutputSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/run_history_cleanup/RunHistoryCleanupOutputSections.kt)
-  - shared overview/components вынесены в [RunHistoryCleanupOverviewSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/run_history_cleanup/RunHistoryCleanupOverviewSections.kt);
-- [SqlConsoleObjectsPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectsPage.kt) переведен на shell/binding/content split:
-  - page callbacks вынесены в [SqlConsoleObjectsPageBindings.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectsPageBindings.kt)
-  - initial-load/search effect вынесен в [SqlConsoleObjectsPageEffects.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectsPageEffects.kt)
-  - page content вынесен в [SqlConsoleObjectsPageContentSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectsPageContentSections.kt);
-- [ModuleEditorPageBindings.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPageBindings.kt) больше не является единым knowledge-heavy callback factory:
-  - общий binding context вынесен в [ModuleEditorPageBindingContext.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPageBindingContext.kt)
-  - catalog/route/credentials flow вынесен в [ModuleEditorPageCatalogBindings.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPageCatalogBindings.kt)
-  - run/save/publish/reload flow вынесен в [ModuleEditorPageExecutionBindings.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPageExecutionBindings.kt)
-  - create-module, config-form, SQL и metadata draft flow вынесен в [ModuleEditorPageDraftBindings.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPageDraftBindings.kt).
-- [SqlConsoleSidebarSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleSidebarSections.kt) разрезан по естественным subflow-слоям:
-  - navigation flow вынесен в [SqlConsoleNavSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleNavSections.kt)
-  - source sidebar/settings flow вынесен в [SqlConsoleSourceSidebarSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleSourceSidebarSections.kt)
-  - source selection flow вынесен в [SqlConsoleSourceSelectionSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleSourceSelectionSections.kt)
-  - credentials upload/details flow вынесен в [SqlConsoleCredentialsSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleCredentialsSections.kt);
-- [ModuleSyncHistorySections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncHistorySections.kt) больше не держит history/details/summary в одном файле:
-  - history list flow вынесен в [ModuleSyncRunHistorySections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncRunHistorySections.kt)
-  - run details flow вынесен в [ModuleSyncRunDetailSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncRunDetailSections.kt)
-  - summary metrics/value rows вынесены в [ModuleSyncRunSummarySections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncRunSummarySections.kt);
-- [ModuleEditorWorkspaceSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorWorkspaceSections.kt) разрезан по workspace-subflow:
-  - create-module flow вынесен в [ModuleEditorCreateModuleSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorCreateModuleSections.kt)
-  - SQL workspace flow вынесен в [ModuleEditorSqlWorkspaceSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorSqlWorkspaceSections.kt)
-  - config preview вынесен в [ModuleEditorConfigWorkspaceSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorConfigWorkspaceSections.kt)
-  - общие workspace action buttons вынесены в [ModuleEditorWorkspaceActionSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorWorkspaceActionSections.kt).
-- [ModuleEditorMetadataSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorMetadataSections.kt) больше не смешивает form-flow и field primitives:
-  - metadata form orchestration вынесен в [ModuleEditorMetadataFormSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorMetadataFormSections.kt)
-  - reusable metadata cards/fields вынесены в [ModuleEditorMetadataFieldSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorMetadataFieldSections.kt);
-- [ModuleEditorConfigFormSourceSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorConfigFormSourceSections.kt) разрезан по collection-subflow:
-  - source form flow вынесен в [ModuleEditorConfigFormSourcesSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorConfigFormSourcesSections.kt)
-  - quota flow вынесен в [ModuleEditorConfigFormQuotaSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorConfigFormQuotaSections.kt)
-  - shared collection card/action primitives вынесены в [ModuleEditorConfigFormCollectionSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorConfigFormCollectionSections.kt);
-- [ModuleEditorStore.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStore.kt) перестал быть большим mixed facade:
-  - explicit store contracts выделены в [ModuleEditorLoadingStore.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorLoadingStore.kt), [ModuleEditorDraftStore.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorDraftStore.kt) и [ModuleEditorWorkflowStore.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorWorkflowStore.kt)
-  - concrete facade wiring вынесен в [ModuleEditorStoreDependencies.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreDependencies.kt)
-  - draft/workflow delegation живет в [ModuleEditorDraftStoreSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorDraftStoreSupport.kt) и [ModuleEditorWorkflowStoreSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorWorkflowStoreSupport.kt).
-- архитектурный review этого этапа зафиксировал stop-condition:
-  - giant-file wave считается завершенной, когда top-offender файлы становятся reviewable и responsibility-coherent;
-  - line-count сам по себе больше не является достаточной причиной для нового распила;
-  - дальнейшие правки этих экранов должны идти только при наличии нового architectural smell, а не ради дополнительного дробления.
+- top-offender page/store/support файлы в `ui-compose-web` и `ui-compose-shared` переведены в shell/bindings/effects/content или facade/support модель;
+- экраны `sql console`, `module editor`, `module runs`, `module sync`, `run history cleanup` и соседние shared stores доведены до reviewable-состояния;
+- giant page/section/store файлы больше не являются основной точкой UI-долга;
+- stop-condition этой волны зафиксирован: второй круг распила без нового архитектурного эффекта запрещен.
+
+История:
+
+- подробная хронология вынесена в [BACKLOG_HISTORY.md](/Users/kwdev/DataPoolLoader/BACKLOG_HISTORY.md).
 
 Критерий завершения:
 
@@ -447,8 +209,12 @@
   - [30-run-history.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/30-run-history.css)
   - [35-sync-maintenance.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/35-sync-maintenance.css)
   - [40-sql-results.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/40-sql-results.css);
-- из split CSS уже убраны первые дублирующиеся selector-блоки, foundation/home-help слой физически разделен, а maintenance/sync экран больше не живет в foundation и unrelated result-styles;
+- первые дубли селекторов и нелогичные cross-feature зависимости уже убраны;
 - ресурсы проходят packaging и попадают в `ui-server` bundle.
+
+История:
+
+- подробная хронология вынесена в [BACKLOG_HISTORY.md](/Users/kwdev/DataPoolLoader/BACKLOG_HISTORY.md).
 
 Критерий завершения:
 
@@ -479,532 +245,46 @@
 
 Что уже сделано:
 
-- удален пустой переходный sync-layer [DatabaseSyncRouteSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/DatabaseSyncRouteSupport.kt), который после распила DB sync flow деградировал до одного `typealias`;
-- `LegacySqlConsoleStateStore` приведен к реальной migration-only роли:
-  - production-store больше не содержит write-path для `sql-console-state.json`;
-  - запись legacy state перенесена в тестовый код, а не остается внутри runtime-слоя.
-- из `LegacySqlConsoleState` удален мертвый legacy-хвост `executionPolicy`:
-  - поле больше не участвует в миграции;
-  - фиксированная политика `STOP_ON_FIRST_ERROR` обеспечивается рабочими SQL-console слоями, а не legacy-state моделью.
-- мертвое поле `executionPolicy` удалено и из живого публичного SQL-console контракта:
-  - shared models, server DTO и store-layer больше не носят это поле через `state/update/query` payloads;
-  - фиксированная политика `STOP_ON_FIRST_ERROR` остается только во внутренних execution-слоях, где она реально используется.
-- DB registry cleanup: удалены пустые переходные `typealias` вокруг создания модулей:
-  - `CreateModuleRequest` и `CreateModuleResult` больше не маскируют `RegistryModuleDraft` и `RegistryModuleCreationResult`;
-  - `ui-server` DB registry слой теперь использует реальные registry-модели без лишней псевдо-абстракции.
-- из `core` удалены неиспользуемые deprecated aliases:
-  - `PostgresExporter`
-  - `PostgresImporter`
-  они не использовались внутри проекта и оставались только как исторический API-хвост.
-- migration `uploadedCredentials` из `run-state.json` теперь не оставляет legacy-поле в файловом runtime-state:
-  - [UiCredentialsStateStore.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/UiCredentialsStateStore.kt) после успешной миграции очищает `uploadedCredentials` из старого `run-state.json`;
-  - legacy state перестает оставаться двусмысленным после первого чтения.
-- split-миграция SQL-console теперь дочищает legacy combined state до конца:
-  - `sql-console-state.json` удаляется только после того, как созданы `workspace/library/preferences` state-файлы;
-  - legacy combined state больше не остается на диске как конкурирующий источник данных после успешной полной миграции.
-- SQL-console helper cleanup: общие state/persistence helper-ы больше не дублируются между store-слоями:
-  - вынесены в [SqlConsoleStateSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleStateSupport.kt)
-  - `SqlConsoleStore` и `SqlConsoleObjectsStore` больше не держат параллельные реализации `matches`, state-update mapping и default draft logic.
-- runtime/UI helper cleanup:
-  - общая подпись режима хранения вынесена из `home`-пакета в [ModuleStoreModeLabels.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/model/ModuleStoreModeLabels.kt)
-  - runtime fallback warning и mode-mismatch predicate вынесены в [RuntimeContextUiSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/foundation/runtime/RuntimeContextUiSupport.kt)
-  - `SqlConsolePage`, `SqlConsoleObjectsPage`, `ModuleRunsPage` и `RunHistoryCleanupPage` больше не держат локальные дубли строковой сборки fallback-warning.
-- mode/fallback dedup cleanup продолжен:
-  - DB-unavailable тексты переведены на общий helper в [RuntimeContextUiSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/foundation/runtime/RuntimeContextUiSupport.kt)
-  - `ModuleEditorShellSections` / `ModuleSyncPageSections` / `ModuleRunsPage` больше не держат локальные `fallbackReason ?: ...` ветки
-  - `RuntimeModeSwitch`, `ModuleRunsPage`, `ModuleRunsPageSections` и `RunHistoryCleanupPageSections` больше не держат ручные `Файлы/База данных` label-ветки там, где уже есть общий `ModuleStoreMode.label`
-  - одноразовые wrapper-функции `buildSqlConsoleFallbackWarning` и `buildFallbackWarning` удалены, экраны используют общий runtime fallback builder напрямую.
-- `module_sync` helper cleanup:
-  - локальный `formatInstant` переведен на общий [Formatters.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/foundation/format/Formatters.kt)
-  - повторяющаяся сборка summary по `activeSingleSyncs` вынесена в один helper вместо параллельных `joinToString { describeActiveSingleSync(...) }` в section-слое.
-- DOM helper cleanup:
-  - строковые CSS class-list больше не токенизируются вручную по экранным файлам через `split/filter/toTypedArray`
-  - общий helper добавлен в [Attrs.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/foundation/dom/Attrs.kt)
-  - на него переведены foundation и экранные участки:
-    - [SectionCard.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/foundation/component/SectionCard.kt)
-    - [RunProgressWidget.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/foundation/component/RunProgressWidget.kt)
-    - [ModuleSyncPageSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncPageSections.kt)
-    - [ModuleRunsPageSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsPageSections.kt)
-    - [ModuleEditorRunSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorRunSections.kt).
-- live-updates helper cleanup:
-  - общий builder WebSocket URL вынесен в [LiveUpdates.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/foundation/updates/LiveUpdates.kt)
-  - feature-specific wrappers удалены из:
-    - [ModuleEditorPageSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPageSupport.kt)
-    - [ModuleRunsPageSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsPageSupport.kt)
-  - экраны используют foundation helper напрямую:
-    - [ModuleEditorPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPage.kt)
-    - [ModuleRunsPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsPage.kt).
-- межфичевой helper cleanup:
-  - generic CSS/status helper-ы вынесены из `module_runs` в foundation:
-    - [StatusClassSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/foundation/component/StatusClassSupport.kt)
-  - `module_editor` больше не зависит от `module_runs` ради `eventEntryCssClass` и `runStatusCssClass`
-  - старый feature-scoped helper-файл [ModuleRunsFormatters.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsFormatters.kt) удален.
-- shared run-view helper cleanup:
-  - общие run presentation/parsing helper-ы вынесены из `module_runs` в нейтральный shared пакет [run](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/run)
-  - `module_editor` больше не зависит от `module_runs` ради `translate* / detect* / parseStructuredRunSummary / buildCompactProgressEntries / format*` helper-логики
-  - старые feature-scoped shared helper-файлы удалены:
-    - [ModuleRunsLabels.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsLabels.kt)
-    - [ModuleRunsFormatting.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsFormatting.kt)
-    - [ModuleRunsSummary.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsSummary.kt).
-- SQL-console label/helper cleanup:
-  - web-слой больше не дублирует shared label/status helper-ы поверх [SqlConsoleLabels.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleLabels.kt)
-  - локальный duplicate-файл [SqlConsoleStatusTextSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleStatusTextSupport.kt) удален
-  - `SqlConsolePage.kt` и `SqlConsoleResultSections.kt` используют shared `runButtonTone / sourceStatusTone / sourceStatusSuffix / build*Text` напрямую, без промежуточных web-wrapper-ов.
-- module_sync display helper cleanup:
-  - локальный wrapper `formatInstant(...)` удален из [ModuleSyncPageSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncPageSupport.kt)
-  - `module_sync` section-слой использует общий [Formatters.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/foundation/format/Formatters.kt) напрямую
-  - fallback `startedByActorDisplayName ?: startedByActorId` сведен к одному helper `actorLabel(...)` вместо локального дублирования в support и sections.
-- cleanup formatting cleanup:
-  - локальные `formatInstant(...)` и `formatBytes(...)` удалены из [RunHistoryCleanupPageSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/run_history_cleanup/RunHistoryCleanupPageSupport.kt)
-  - общие formatter-ы `formatCompactDateTime(...)` и `formatByteSize(...)` добавлены в [Formatters.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/foundation/format/Formatters.kt)
-  - [RunHistoryCleanupPageSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/run_history_cleanup/RunHistoryCleanupPageSections.kt) теперь использует foundation formatting напрямую, без feature-only дублирования.
-- thin shared-store helper cleanup:
-  - одноразовый [HomePageStoreSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/home/HomePageStoreSupport.kt) удален;
-  - [HomePageStore.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/home/HomePageStore.kt) теперь держит свою небольшую orchestration-логику напрямую, без искусственного support-слоя.
-- module editor workflow cleanup:
-  - переходный агрегатор [ModuleEditorStoreActionSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreActionSupport.kt) удален;
-  - workflow-store теперь зависит напрямую от реальных action-support слоев `save/run/database lifecycle`, без лишнего промежуточного wrapper-а.
-- SQL-console persisted state cleanup:
-  - общий файловый JSON/persistence helper вынесен в [SqlConsoleStateFileSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/sqlconsole/SqlConsoleStateFileSupport.kt);
-  - [LegacySqlConsoleStateStore.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/sqlconsole/LegacySqlConsoleStateStore.kt), [SqlConsoleWorkspaceStateStore.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/sqlconsole/SqlConsoleWorkspaceStateStore.kt), [SqlConsolePreferencesStateStore.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/sqlconsole/SqlConsolePreferencesStateStore.kt) и [SqlConsoleLibraryStateStore.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/sqlconsole/SqlConsoleLibraryStateStore.kt) больше не дублируют одинаковый read/save/migration код;
-  - persisted state-слой SQL-консоли стал короче и менее хрупким без изменения behavior.
-- run-state persisted file cleanup:
-  - общий atomic file-store helper вынесен в [RunStateFileSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/RunStateFileSupport.kt);
-  - [RunStateStore.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/RunStateStore.kt) и [UiCredentialsStateStore.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/UiCredentialsStateStore.kt) больше не дублируют одинаковые `read/save/temp-file` паттерны.
-- UI config path cleanup:
-  - общий path-resolution helper вынесен в [UiConfigPathSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/config/UiConfigPathSupport.kt);
-  - [UiConfig.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/config/UiConfig.kt) и [UiConfigPersistenceService.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/config/UiConfigPersistenceService.kt) теперь используют один источник логики для explicit config path, packaged sidecar и default managed path.
-- UI config file IO cleanup:
-  - общий `UiRootConfig` read/write helper вынесен в [UiConfigFileSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/config/UiConfigFileSupport.kt);
-  - [UiConfig.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/config/UiConfig.kt) и [UiConfigPersistenceService.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/config/UiConfigPersistenceService.kt) больше не держат параллельную JSON/YAML file IO-логику поверх `UiRootConfig`.
-- run manager runtime-state cleanup:
-  - mutable history snapshots и updates flow вынесены из [RunManager.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/RunManager.kt) в [RunManagerRuntimeStateSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/RunManagerRuntimeStateSupport.kt);
-  - `RunManager` больше не смешивает orchestration запуска с runtime-state publication/persistence.
-- UI credentials service cleanup:
-  - fallback resolution и property parsing вынесены из [UiCredentialsService.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/UiCredentialsService.kt) в [UiCredentialsFallbackSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/UiCredentialsFallbackSupport.kt);
-  - persisted uploaded-credentials mapping вынесен в [UiCredentialsPersistenceSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/UiCredentialsPersistenceSupport.kt), а сам service остался facade-слоем.
-- SQL console async manager cleanup:
-  - start/lookup/cancel lifecycle вынесен из [SqlConsoleQueryManager.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/sqlconsole/SqlConsoleQueryManager.kt) в [SqlConsoleQueryStateSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/sqlconsole/SqlConsoleQueryStateSupport.kt);
-  - commit/rollback flow вынесен в [SqlConsoleQueryTransactionSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/sqlconsole/SqlConsoleQueryTransactionSupport.kt), а `SqlConsoleQueryManager` стал orchestration-фасадом над `state + execution + transaction`.
-- DB run details query split:
-  - summary lookup вынесен из [DatabaseRunStoreRunDetailsSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreRunDetailsSupport.kt) в [DatabaseRunStoreRunSummaryQuerySupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreRunSummaryQuerySupport.kt);
-  - related source/event/artifact loading вынесен в [DatabaseRunStoreRunRelatedQuerySupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreRunRelatedQuerySupport.kt), а `RunDetailsSupport` остался connection-orchestration слоем.
-- DB run history response mapping split:
-  - response/session mapping вынесен из [DatabaseModuleRunHistoryService.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/history/DatabaseModuleRunHistoryService.kt) в [DatabaseModuleRunHistoryResponseSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/history/DatabaseModuleRunHistoryResponseSupport.kt);
-  - service перестал смешивать backend orchestration и DTO translation.
-- files run history projection split:
-  - source/target projection вынесен из старого [FilesRunHistoryProjection.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/history/FilesRunHistoryProjection.kt) в [FilesRunSourceProjectionSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/history/FilesRunSourceProjectionSupport.kt);
-  - artifacts/events/summary вынесены в [FilesRunArtifactProjectionSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/history/FilesRunArtifactProjectionSupport.kt), [FilesRunEventProjectionSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/history/FilesRunEventProjectionSupport.kt) и [FilesRunSummaryProjectionSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/history/FilesRunSummaryProjectionSupport.kt);
-  - legacy mixed projection-файл удален, а files history слой стал явнее по ролям.
-- DB module run submission split:
-  - active-run registry и executor submission вынесены из [DatabaseModuleRunService.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleRunService.kt) в [DatabaseModuleRunSubmissionSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleRunSubmissionSupport.kt);
-  - `DatabaseModuleRunService` перестал смешивать start-context preparation, async submission и query facade в одном слое.
-- DB cleanup response mapping split:
-  - preview/result response mapping вынесен из [DatabaseRunStoreMaintenanceSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreMaintenanceSupport.kt) и [DatabaseRunStoreCleanupExecutionSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreCleanupExecutionSupport.kt) в [DatabaseRunStoreCleanupResponseSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreCleanupResponseSupport.kt);
-  - maintenance/cleanup слои больше не собирают transport-response inline поверх planning data.
-- DB cleanup transaction split:
-  - transaction boundary вынесен из [DatabaseRunStoreCleanupExecutionSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreCleanupExecutionSupport.kt) в [DatabaseRunStoreCleanupTransactionSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreCleanupTransactionSupport.kt);
-  - `CleanupExecutionSupport` теперь держит orchestration удаления, а не low-level `autoCommit/commit/rollback` lifecycle.
-- DB run progress write split:
-  - source lifecycle/progress writes вынесены из старого [DatabaseRunStoreProgressUpdateSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreSourceProgressSupport.kt) в [DatabaseRunStoreSourceProgressSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreSourceProgressSupport.kt);
-  - merge/target aggregate writes вынесены в [DatabaseRunStoreMergeTargetProgressSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreMergeTargetProgressSupport.kt);
-  - старый mixed progress-update файл удален.
-- DB execution store facade cleanup:
-  - [DatabaseRunStoreExecutionSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreExecutionSupport.kt) больше не зависит от смешанного progress-update слоя;
-  - execution store теперь агрегирует отдельные `source progress`, `merge/target progress`, `event/artifact` и `run lifecycle` responsibilities как явный facade, а не как полу-монолитный write hub.
-- DB module event log split:
-  - payload mapping вынесен из [DatabaseModuleRunEventLogSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleRunEventLogSupport.kt) в [DatabaseModuleRunEventPayloadSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleRunEventPayloadSupport.kt);
-  - append policy с `seqNo` increment и warn-on-failure вынесена в [DatabaseModuleRunEventAppendSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleRunEventAppendSupport.kt), а исходный event-log support остался thin facade-слоем.
-- DB source event split:
-  - `started/progress` flow вынесен из [DatabaseModuleRunSourceEventSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleRunSourceEventSupport.kt) в [DatabaseModuleRunSourceProgressSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleRunSourceProgressSupport.kt);
-  - `finished/schema-mismatch` flow вынесен в [DatabaseModuleRunSourceCompletionEventSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleRunSourceCompletionEventSupport.kt), а исходный source-event support остался тонким lifecycle facade-слоем.
-- DB merge/target event split:
-  - merge lifecycle вынесен из [DatabaseModuleRunMergeTargetEventSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleRunMergeTargetEventSupport.kt) в [DatabaseModuleRunMergeEventSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleRunMergeEventSupport.kt);
-  - target lifecycle вынесен в [DatabaseModuleRunTargetEventSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleRunTargetEventSupport.kt), а исходный merge-target support стал thin facade-слоем.
-- DB event/artifact persistence split:
-  - event persistence вынесен из [DatabaseRunStoreEventArtifactSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreEventArtifactSupport.kt) в [DatabaseRunStoreEventPersistenceSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreEventPersistenceSupport.kt);
-  - artifact persistence вынесен в [DatabaseRunStoreArtifactPersistenceSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreArtifactPersistenceSupport.kt), а исходный mixed support остался facade-слоем над двумя узкими write-ролями.
-- config form service cleanup:
-  - parser и writer responsibilities вынесены из [ConfigFormService.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/ConfigFormService.kt) в [ConfigFormParsingSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/ConfigFormParsingSupport.kt) и [ConfigFormUpdateSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/ConfigFormUpdateSupport.kt);
-  - `ConfigFormService` перестал быть смешанным `parse + apply + typed field decoding` монолитом и остался facade-слоем над двумя явными подролями.
-- module registry cleanup:
-  - metadata и SQL-catalog/file responsibilities вынесены из [ModuleRegistry.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/ModuleRegistry.kt) в [ModuleRegistryMetadataSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/ModuleRegistryMetadataSupport.kt) и [ModuleRegistrySqlFileSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/ModuleRegistrySqlFileSupport.kt);
-  - `ModuleRegistry` больше не держит в одном файле `module catalog + metadata parsing + SQL path resolution + SQL file discovery/save`.
-- files run history projection cleanup:
-  - event decoding и primitive field extraction вынесены в [FilesRunHistoryEventDecodingSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/history/FilesRunHistoryEventDecodingSupport.kt);
-  - stage/severity/message presentation вынесены в [FilesRunHistoryEventPresentationSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/history/FilesRunHistoryEventPresentationSupport.kt);
-  - artifact/path formatting вынесены в [FilesRunHistoryArtifactSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/history/FilesRunHistoryArtifactSupport.kt);
-  - [FilesRunHistoryProjection.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/history/FilesRunHistoryProjection.kt) больше не смешивает source/target projection с low-level event decoding и file artifact formatting.
-- DB module snapshot support cleanup:
-  - общий snapshot/hash контракт вынесен в [DatabaseModuleSnapshotSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/DatabaseModuleSnapshotSupport.kt);
-  - `working copy`, `execution snapshot` и revision content hash больше не собираются тремя разными способами в [DatabaseModuleRevisionWriter.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/DatabaseModuleRevisionWriter.kt), [DatabaseModuleExecutionSource.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleExecutionSource.kt) и store-layer.
-- DB module store contract cleanup:
-  - snapshot/persistence responsibilities вынесены из старого mixed store support в [DatabaseModuleSnapshotSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/DatabaseModuleSnapshotSupport.kt), а UI mapping/validation оставлены в [DatabaseModuleStorePresentationSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/DatabaseModuleStorePresentationSupport.kt);
-  - [DatabaseModuleStoreLifecycleSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/DatabaseModuleStoreLifecycleSupport.kt) больше не зависит от revision writer ради hash/snapshot сборки, а [DatabaseModuleStoreQuerySupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/DatabaseModuleStoreQuerySupport.kt) работает через явные `presentation + snapshot` контракты.
-- DB module revision/execution cleanup:
-  - SQL asset persistence вынесен в [DatabaseModuleRevisionSqlAssetSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/DatabaseModuleRevisionSqlAssetSupport.kt), а structure/target/quota persistence — в [DatabaseModuleRevisionStructureSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/DatabaseModuleRevisionStructureSupport.kt);
-  - [DatabaseModuleRevisionWriter.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/DatabaseModuleRevisionWriter.kt) и [DatabaseModuleExecutionSource.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleExecutionSource.kt) теперь стали facade-слоями над более узкими persistence/snapshot responsibilities.
-- DB module lifecycle lookup/persistence cleanup:
-  - lookup-ответственности вынесены из [DatabaseModuleStoreLifecycleSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/DatabaseModuleStoreLifecycleSupport.kt) в [DatabaseModuleStoreLookupSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/DatabaseModuleStoreLookupSupport.kt);
-  - write/persistence flow вынесен в [DatabaseModuleStorePersistenceSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/DatabaseModuleStorePersistenceSupport.kt), а lifecycle-слой остался тонким фасадом над lookup/persistence контрактами.
-- DB module mutation flow cleanup:
-  - transactional boundary вынесен в [DatabaseModuleStoreTransactionSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/DatabaseModuleStoreTransactionSupport.kt);
-  - personal working copy mutations вынесены в [DatabaseModuleWorkingCopyMutationSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/DatabaseModuleWorkingCopyMutationSupport.kt), а publish/create/delete flow — в [DatabaseModuleRevisionMutationSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/DatabaseModuleRevisionMutationSupport.kt).
-- DB module execution source cleanup:
-  - source/sql-file loading вынесен из [DatabaseModuleExecutionSource.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleExecutionSource.kt) в [DatabaseModuleExecutionQuerySupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleExecutionQuerySupport.kt);
-  - запись execution snapshot вынесена в [DatabaseModuleExecutionSnapshotPersistenceSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleExecutionSnapshotPersistenceSupport.kt), а основной source-класс оставлен orchestration/facade слоем.
-- config form parsing split cleanup:
-  - scalar field decoding вынесен из [ConfigFormParsingSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/ConfigFormParsingSupport.kt) в [ConfigFormScalarParsingSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/ConfigFormScalarParsingSupport.kt);
-  - sources/quotas collection parsing вынесен в [ConfigFormCollectionParsingSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/ConfigFormCollectionParsingSupport.kt), а основной parsing-класс остался facade-слоем над scalar/collection responsibilities.
-- module registry catalog/persistence cleanup:
-  - catalog/apps-root/build-descriptor flow вынесен из [ModuleRegistry.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/ModuleRegistry.kt) в [ModuleRegistryCatalogSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/ModuleRegistryCatalogSupport.kt);
-  - details/save flow вынесен в [ModuleRegistryPersistenceSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/module/ModuleRegistryPersistenceSupport.kt), а основной registry-класс оставлен facade-слоем над catalog/persistence контрактами.
-- database cleanup planning split cleanup:
-  - statement binding вынесен из [DatabaseRunStoreCleanupPlanningSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreCleanupPlanningSupport.kt) в [DatabaseRunStoreCleanupStatementSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreCleanupStatementSupport.kt);
-  - cleanup preview aggregation вынесен в [DatabaseRunStoreCleanupPreviewSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreCleanupPreviewSupport.kt);
-  - output-retention candidate loading вынесен в [DatabaseRunStoreCleanupCandidateSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreCleanupCandidateSupport.kt), а planning-класс оставлен thin facade-слоем.
-- output retention planner split cleanup:
-  - directory inspection/size calculation вынесены из [OutputRetentionPlanner.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/OutputRetentionPlanner.kt) в [OutputRetentionDirectoryInspectionSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/OutputRetentionDirectoryInspectionSupport.kt);
-  - recursive delete flow вынесен в [OutputRetentionDeletionSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/OutputRetentionDeletionSupport.kt), а planner остался фасадом над inspect/delete responsibilities.
-- output retention response cleanup:
-  - общая сборка `preview/result` response вынесена из [FilesOutputRetentionService.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/FilesOutputRetentionService.kt) и [DatabaseOutputRetentionService.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseOutputRetentionService.kt) в [OutputRetentionResponseSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/OutputRetentionResponseSupport.kt);
-  - files/database retention services больше не дублируют один и тот же response mapping поверх одинаковой `OutputRetentionPlan` модели.
-- DB run lifecycle query/mutation cleanup:
-  - active-run lookup вынесен из [DatabaseRunStoreRunLifecycleSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreRunLifecycleSupport.kt) в [DatabaseRunStoreActiveRunQuerySupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreActiveRunQuerySupport.kt);
-  - create/finish/fail mutation flow вынесен в [DatabaseRunStoreRunMutationSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreRunMutationSupport.kt), а lifecycle-фасад перестал смешивать query и transactional write responsibilities.
-- ui config model/path helper cleanup:
-  - path/credentials/storage helper-ы вынесены из [UiConfig.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/config/UiConfig.kt) в [UiConfigModelPathSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/config/UiConfigModelPathSupport.kt);
-  - основной config-модельный файл больше не смешивает data classes, loader и runtime path helpers в одном месте.
-- ui config loader cleanup:
-  - external source resolution вынесен из [UiConfig.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/config/UiConfig.kt) в [UiConfigExternalPathResolutionSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/config/UiConfigExternalPathResolutionSupport.kt);
-  - load flow вынесен в [UiConfigLoadSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/config/UiConfigLoadSupport.kt), а `UiConfigLoader` остался фасадом над resolution/load responsibilities.
-- ui config persistence cleanup:
-  - editable/managed path resolution вынесен из [UiConfigPersistenceService.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/config/UiConfigPersistenceService.kt) в [UiConfigPersistencePathSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/config/UiConfigPersistencePathSupport.kt);
-  - mutation/write flow вынесен в [UiConfigPersistenceMutationSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/config/UiConfigPersistenceMutationSupport.kt), а сервис остался orchestration-фасадом.
-- run presentation helper cleanup:
-  - generic run-display helper-ы вынесены из [ModuleRunsPageSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsPageSupport.kt) в нейтральный foundation-слой [RunPresentationSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/foundation/run/RunPresentationSupport.kt)
-  - `ModuleRunsPageSupport.kt` больше не держит `formatStageDuration / formatTimeoutSeconds / formatRowsInterval / formatBooleanFlag / extractArtifactName`
-  - [ModuleRunsPageSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsPageSections.kt) использует foundation run-support напрямую, а в feature support остались только route-specific и diagnostics-specific части.
-- module_sync badge cleanup:
-  - локальные `syncStatusBadgeClass(...)` и `syncActionBadgeClass(...)` удалены из [ModuleSyncPageSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncPageSupport.kt)
-  - shared `ModuleSyncLabels.kt` теперь держит `syncStatusTone(...)` и `syncActionTone(...)` рядом с `translate*` helper-ами
-  - [ModuleSyncPageSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncPageSections.kt) использует общий [StatusBadge](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/foundation/component/SectionCard.kt) вместо ручной сборки bootstrap badge-классов.
-- module_sync shared helper cleanup:
-  - `actorLabel(...)` вынесен из web support в shared [ModuleSyncLabels.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncLabels.kt)
-  - `filterSelectableModules(...)` вынесен из [ModuleSyncPageSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncPageSupport.kt) в shared [ModuleSyncFilters.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncFilters.kt)
-  - web `module_sync` больше не держит pure state/filter helper-логику, которая не зависит от browser/Compose runtime.
-- module_sync text helper cleanup:
-  - `buildMaintenanceMessage(...)`, `describeActiveSingleSync(...)`, `buildActiveSingleSyncSummary(...)` и `syncRunMeta(...)` вынесены из web support в shared [ModuleSyncLabels.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncLabels.kt) через formatter callback
-  - [ModuleSyncPageSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncPageSupport.kt) удален
-  - [ModuleSyncPageSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncPageSections.kt) использует shared text/presentation helper-ы напрямую, без отдельного web support-слоя.
-- screen-local helper cleanup продолжен:
-  - `SqlConsoleLibrarySections.kt` больше не держит две параллельные реализации query picker-блоков; общий локальный `SqlConsoleQueryPickerBlock(...)` закрывает recent/favorite queries
-  - `ModuleEditorShellSections.kt` больше не повторяет вручную `module-editor-toolbar-group` markup; toolbar-группы сведены к локальному `EditorToolbarGroup(...)`
-  - editor секции больше не дублируют кнопку `Свернуть/Развернуть`; общий `SectionExpandToggleButton(...)` вынесен в [ModuleEditorSectionStateSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorSectionStateSupport.kt) и используется в config/run слоях.
-- feature-local cleanup продолжен:
-  - `SqlConsoleResultSections.kt` больше не держит две параллельные placeholder-ветки для `execution/result == null`; общий локальный `RenderExecutionResultPlaceholder(...)` закрывает pending/error empty-states для data/status tabs
-  - `SqlConsoleObjectsPage.kt` больше не дублирует object identity markup между navigation target, favorites и object cards; общий локальный `SqlObjectIdentityBlock(...)` собирает name/context/detail presentation в одном месте
-  - `ModuleEditorConfigFormSourceSections.kt` больше не повторяет add/remove action-button markup для sources/quotas; общий локальный `ConfigCollectionActionButton(...)` закрывает эти collection actions.
-- form/result helper cleanup продолжен:
-  - `ModuleEditorConfigFormSettingsSections.kt` и `ModuleEditorConfigFormSourceSections.kt` больше не держат две параллельные `when (sqlState.mode)` ветки; общий `CommitSqlModeFields(...)` в [ModuleEditorConfigFormFieldSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorConfigFormFieldSupport.kt) собирает `INLINE/CATALOG/EXTERNAL` UI в одном месте
-  - `SqlConsoleResultSections.kt` больше не токенизирует class-string вручную через `split(\" \")`; status strip переведен на общий DOM helper `classesFromString(...)`
-  - `SqlConsoleEditorSections.kt` больше не токенизирует class-string вручную через `split(\" \")`; `CommandGuardrail` и `StatementRiskBadge` используют общий DOM helper `classesFromString(...)`.
-- metadata/workspace/result cleanup продолжен:
-  - `SqlConsoleResultSections.kt` больше не дублирует shard status badge markup между table/card presentation; общий локальный `ShardStatusBadge(...)` закрывает этот статусный фрагмент
-  - `ModuleEditorMetadataSections.kt` больше не повторяет editable row-shell для text/textarea полей; общий локальный `MetadataEditableRow(...)` держит label/help/value layout в одном месте
-  - `ModuleEditorWorkspaceSections.kt` больше не повторяет action-button markup в SQL catalog toolbar; общий локальный `SqlCatalogActionButton(...)` закрывает `Создать / Переименовать / Удалить`.
-- placeholder/nav/value-shell cleanup продолжен:
-  - `SqlConsoleResultSections.kt` больше не размазывает `sql-result-placeholder` markup по нескольким веткам; общий локальный `SqlResultPlaceholder(...)` закрывает этот экранный placeholder
-  - `SqlConsoleObjectsPage.kt` больше не повторяет hero navigation button markup; общий локальный `ObjectsNavActionButton(...)` закрывает `На главную / SQL-консоль / Объекты БД`
-  - `ModuleEditorMetadataSections.kt` больше не дублирует `module-metadata-value + helpText` shell между editable и checkbox полями; общий локальный `MetadataValueBlock(...)` закрывает этот value/help wrapper.
-- credentials upload helper cleanup:
-  - duplicate `uploadCredentialsFile(...)` больше не живет параллельно в `module_editor` и `sql_console`
-  - общий web-only helper вынесен в [CredentialsHttpSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/foundation/http/CredentialsHttpSupport.kt)
-  - [ModuleEditorPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPage.kt) и [SqlConsolePage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsolePage.kt) используют foundation helper напрямую вместо feature-scoped дублей.
-- credentials status helper cleanup:
-  - `loadCredentialsStatus(...)` тоже вынесен из SQL feature-layer в [CredentialsHttpSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/foundation/http/CredentialsHttpSupport.kt)
-  - [SqlConsolePageSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsolePageSupport.kt) больше не держит credentials HTTP lifecycle.
-- module_editor section-state cleanup:
-  - duplicate localStorage helper-ы для раскрытия секций больше не живут параллельно в `ModuleEditorPageSupport.kt` и `ModuleEditorConfigFormSupport.kt`
-  - общий helper вынесен в [ModuleEditorSectionStateSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorSectionStateSupport.kt)
-  - [ModuleEditorRunSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorRunSections.kt) и [ModuleEditorConfigFormFieldSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorConfigFormFieldSupport.kt) используют единый helper вместо двух локальных реализаций.
-- module_editor route/presentation cleanup:
-  - route URL builder-ы вынесены из page support в [ModuleEditorRoute.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorRoute.kt)
-  - query string для editor route больше не собирается вручную в [ModuleEditorPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPage.kt), а живет рядом с route builder-ами в [ModuleEditorRoute.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorRoute.kt)
-  - `formatEditorTimeoutSeconds(...)` заменен на общий foundation helper `formatTimeoutSeconds(...)`
-  - остаточный [ModuleEditorPageSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPageSupport.kt) удален, а одноразовый `validationBadgeClass(...)` локализован в [ModuleEditorPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPage.kt).
-- module_editor config form cleanup:
-  - mixed [ModuleEditorConfigFormSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorConfigFormSupport.kt) разрезан по ответственности
-  - mutation helper-ы вынесены в [ModuleEditorConfigFormMutationSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorConfigFormMutationSupport.kt)
-  - SQL mode state/apply helper-ы вынесены в [ModuleEditorConfigFormSqlModeSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorConfigFormSqlModeSupport.kt).
-- module_editor validation label cleanup:
-  - `validationBadgeClass(...)` вынесен из [ModuleEditorPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPage.kt) в shared [ModuleEditorLabels.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorLabels.kt) рядом с `translateValidationStatus(...)`
-  - page больше не держит локальный validation helper, который уже является частью общей presentation-модели редактора.
-- sql_console object SQL cleanup:
-  - object/favorite SQL builder-ы и object-type label helper-ы вынесены из mixed [SqlConsolePageSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsolePageSupport.kt) в focused [SqlConsoleObjectSqlSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectSqlSupport.kt)
-  - [SqlConsoleLibrarySections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleLibrarySections.kt) и [SqlConsoleObjectsPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectsPage.kt) используют общий object SQL helper-слой вместо локальных private-дублей
-  - `SqlConsolePageSupport.kt` больше не смешивает editor outline/editor actions и object metadata/favorite SQL generation в одном файле.
-- sql_console navigation cleanup:
-  - `SqlObjectNavigationTarget` и `matches(...)` вынесены из [SqlConsoleObjectsPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectsPage.kt) в focused [SqlConsoleObjectNavigationSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectNavigationSupport.kt)
-  - objects page больше не держит локальный navigation matching helper внутри экранного файла.
-- sql_console object display cleanup:
-  - display helper-ы `qualifiedName()/contextLabel()` для favorite/object/navigation target сведены в общий object support-слой
-  - [SqlConsoleObjectsPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectsPage.kt) и [SqlConsoleLibrarySections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleLibrarySections.kt) больше не держат локальные `schema.object` и `source • type` string-builder ветки.
-- sql_console script/editor cleanup:
-  - script outline и SQL formatting вынесены в [SqlConsoleScriptSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleScriptSupport.kt)
-  - Monaco/editor interaction helper-ы вынесены в [SqlConsoleEditorInteractionSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleEditorInteractionSupport.kt)
-  - data/result helper-ы вынесены в [SqlConsoleQueryResultSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleQueryResultSupport.kt)
-  - остаточный mixed [SqlConsolePageSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsolePageSupport.kt) удален.
-- sql_console result text cleanup:
-  - execution/shard summary text builder-ы вынесены из [SqlConsoleResultSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleResultSections.kt) в focused [SqlConsoleResultTextSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleResultTextSupport.kt)
-  - result sections больше не держат несколько локальных `buildString`-веток для execution meta, shard status и data-page summary в одном UI-файле.
-- sql_console status badge cleanup:
-  - локальный `StatusBadge(status)` удален из [SqlConsoleResultSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleResultSections.kt)
-  - SQL result sections используют foundation [StatusBadge](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/foundation/component/SectionCard.kt) и shared `sourceStatusBadgeTone(...)` из [SqlConsoleLabels.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleLabels.kt) вместо feature-scoped badge renderer-а.
-- module_editor numeric field cleanup:
-  - повторяющиеся wrapper-ы `CommitIntField/CommitOptionalIntField/CommitLongField/CommitOptionalLongField/CommitOptionalDoubleField` больше не держат копипасту parse-веток
-  - общий required/optional numeric commit helper живет внутри [ModuleEditorConfigFormFieldSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorConfigFormFieldSupport.kt), а typed wrapper-ы сведены к тонким adapter-функциям.
-- sql_console object table-reference cleanup:
-  - подпись связанной таблицы вынесена из [SqlConsoleObjectsPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectsPage.kt) в общий object helper [SqlConsoleObjectSqlSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectSqlSupport.kt)
-  - object card больше не собирает `Таблица: schema.table` строку локально внутри экранного файла.
-- sql_console object helper dedup:
-  - generic builder-ы `buildSqlObjectQualifiedName(...)` и `buildSqlObjectContextLabel(...)` сведены в [SqlConsoleObjectSqlSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectSqlSupport.kt)
-  - [SqlConsoleObjectNavigationSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectNavigationSupport.kt) больше не дублирует ту же string-building логику для navigation target.
-- module_editor field header cleanup:
-  - повторяющийся label/help markup вынесен в локальный `ConfigFieldHeader(...)` внутри [ModuleEditorConfigFormFieldSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorConfigFormFieldSupport.kt)
-  - `CommitTextField / CommitTextareaField / CommitSelectField / CommitNumericTextField` больше не держат одинаковые `Span(config-form-label/help)` ветки.
-- module_editor external SQL alert text cleanup:
-  - pure copy для внешней SQL-ссылки вынесена из web form-layer в shared [ModuleEditorLabels.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorLabels.kt)
-  - [ModuleEditorConfigFormFieldSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorConfigFormFieldSupport.kt) больше не держит route/storage-specific alert text inline.
-- module_editor shell action cleanup:
-  - дублирующийся link-button `История и результаты` вынесен из двух toolbar-веток в локальный `RunsHistoryLinkButton(...)` внутри [ModuleEditorShellSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorShellSections.kt)
-  - DB/files toolbar больше не держат две одинаковые anchor-конструкции с `buildRunsHref(...)`.
-- sql_console library toggle cleanup:
-  - checkbox-блоки `Read-only` и `Autocommit` сведены к одному `SqlConsoleSettingToggle(...)` внутри [SqlConsoleLibrarySections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleLibrarySections.kt)
-  - library sections больше не держат две почти одинаковые `Label + Input(type=Checkbox)` ветки.
-- sql_console navigation support cleanup:
-  - `SqlObjectNavigationTarget` и `matches(...)` схлопнуты в общий object helper-слой [SqlConsoleObjectSqlSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectSqlSupport.kt)
-  - отдельный tiny-файл [SqlConsoleObjectNavigationSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectNavigationSupport.kt) удален как слой без самостоятельной architectural ценности.
-- module_runs support cleanup:
-  - остаточный [ModuleRunsPageSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsPageSupport.kt) удален
-  - `backHref` перенесен в [ModuleRunsRoute.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsRoute.kt)
-  - `technicalDiagnosticsJson` локализован в [ModuleRunsPageSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsPageSections.kt), чтобы feature page больше не зависел от отдельного support-файла ради одной константы.
-- run_history_cleanup label cleanup:
-  - pure copy/helper-логика вынесена из web в shared [RunHistoryCleanupLabels.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/run_history_cleanup/RunHistoryCleanupLabels.kt)
-  - [RunHistoryCleanupPageSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/run_history_cleanup/RunHistoryCleanupPageSupport.kt) удален
-  - web cleanup-экран теперь держит только browser/compose formatting usage, а не дублирует shared copy-логику.
-- home page support cleanup:
-  - page-local helper-ы `buildModeStatusText / parseModeAccessError / buildModeAccessAlertText` локализованы прямо в [HomePage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/home/HomePage.kt)
-  - отдельный [HomePageSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/home/HomePageSupport.kt) удален как лишний одноразовый support-файл.
-- SQL store cleanup:
-  - общее переключение `selectedSourceNames` вынесено в [SqlConsoleStateSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleStateSupport.kt)
-  - `SqlConsoleStore` и `SqlConsoleObjectsStore` больше не держат одинаковые локальные реализации toggle-логики.
-- legacy-терминология убирается и из test-layer:
-  - тесты exporter/importer в `core` переименованы под актуальные классы `PostgresSourceExporter` и `PostgresTargetImporter`, без сохранения старых `PostgresExporter/PostgresImporter` имен.
-- sql_console result placeholder cleanup:
-  - повторяющиеся `sql-result-placeholder` ветки сведены к локальному `SqlResultPlaceholder(...)` в [SqlConsoleResultSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleResultSections.kt)
-  - секции результата больше не дублируют один и тот же empty/pending placeholder markup в нескольких местах.
-- module_editor metadata value-shell cleanup:
-  - общий layout `module-metadata-value + help text` сведен к локальному `MetadataValueBlock(...)` в [ModuleEditorMetadataSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorMetadataSections.kt)
-  - editable row и checkbox field больше не держат параллельные value-wrapper ветки с одинаковым help-text rendering.
-- sql_console objects hero nav cleanup:
-  - повторяющиеся hero navigation button-ы сведены к локальному `ObjectsNavActionButton(...)` в [SqlConsoleObjectsPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectsPage.kt)
-  - экран объектов БД больше не держит три отдельные `btn/anchor/button` ветки для одного и того же navigation pattern.
-- module_editor collection card cleanup:
-  - повторяющийся shell `config-form-card/config-form-card-body/config-form-fields` для `sources/quotas` сведен к локальному `ConfigCollectionCard(...)` в [ModuleEditorConfigFormSourceSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorConfigFormSourceSections.kt)
-  - source/quota sections больше не держат две параллельные card-header/remove/content ветки с одинаковым layout.
-- sql_console favorite action cleanup:
-  - action-button strip в `Избранных объектах` сведен к локальному `SqlFavoriteObjectActionButton(...)` в [SqlConsoleLibrarySections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleLibrarySections.kt)
-  - favorite object cards больше не повторяют пять одинаковых `btn + type=button + onClick` веток вручную.
-- module_editor workspace action cleanup:
-  - create-panel actions и SQL-catalog toolbar actions сведены к одному `WorkspaceActionButton(...)` в [ModuleEditorWorkspaceSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorWorkspaceSections.kt)
-  - workspace слой больше не держит два разных helper-а для одного и того же button pattern с различием только в `btn-sm` и disabled-state.
-- module_editor metadata row-shell cleanup:
-  - общий row-shell для `read-only / editable / checkbox` строк сведен к `MetadataRowShell(...)` в [ModuleEditorMetadataSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorMetadataSections.kt)
-  - metadata section больше не держит три параллельные ветки `module-metadata-row + label` markup.
-- module_editor shell toolbar cleanup:
-  - общий wrapper `module-editor-toolbar/module-editor-toolbar-row` сведен к локальному `EditorToolbar(...)` в [ModuleEditorShellSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorShellSections.kt)
-  - DB/files toolbar-ветки больше не дублируют одинаковый shell вокруг toolbar groups.
-- sql_console objects panel/action cleanup:
-  - panel shell для `Текущий объект / Избранные объекты / Sources / Поиск объектов` сведен к локальному `SqlObjectPanel(...)` в [SqlConsoleObjectsPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectsPage.kt)
-  - object card action-button markup сведен к `SqlObjectActionButton(...)`, поэтому `favorite/select/count` actions больше не повторяют один и тот же `btn-sm` pattern вручную.
-- sql_console output pane cleanup:
-  - повторяющийся wrapper `sql-output-pane + active` сведен к локальному `OutputPane(...)` в [SqlConsoleResultSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleResultSections.kt)
-  - `data/status` pane больше не держат две параллельные shell-ветки с одинаковым active-state markup.
-- sql_console muted result text cleanup:
-  - повторяющиеся `small text-secondary mb-3` summary-блоки сведены к локальному `ResultMutedText(...)` в [SqlConsoleResultSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleResultSections.kt)
-  - select/status/pending ветки больше не размазывают одинаковый muted summary markup по нескольким функциям.
-- sql_console library action cleanup:
-  - query picker и favorite object actions сведены к общему `SqlLibraryActionButton(...)` в [SqlConsoleLibrarySections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleLibrarySections.kt)
-  - library слой больше не держит отдельные `apply/clear/favorite object` button helper-ветки для одного и того же `btn-sm` action pattern.
-- module_editor hero nav cleanup:
-  - hero navigation button-ы сведены к локальному `ModuleEditorNavActionButton(...)` в [ModuleEditorPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPage.kt)
-  - editor page больше не держит отдельные `anchor + disabled button` ветки для одного и того же hero navigation pattern.
-- module_editor catalog sidebar cleanup:
-  - левый каталог модулей сведен к локальному `ModuleCatalogSidebar(...)` в [ModuleEditorPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPage.kt)
-  - page-level wiring больше не смешивает route actions, includeHidden toggle, catalog status и list rendering в одной большой inline-ветке.
-- module_editor catalog item cleanup:
-  - rendering одного элемента каталога вынесен в `ModuleCatalogListItem(...)` в [ModuleEditorPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPage.kt)
-  - module list больше не держит inline badge/title/tag rendering внутри большого sidebar-блока.
-- module_editor config-form action cleanup:
-  - action button-ы `Собрать форму заново / Перечитать из application.yml` сведены к `ConfigFormActionButton(...)` в [ModuleEditorConfigForm.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorConfigForm.kt)
-  - settings form больше не держит две отдельные button-ветки для одного и того же secondary action pattern.
-- sql_console editor block cleanup:
-  - muted text и button shell-ы для outline/statement selection сведены к `SqlEditorMutedText(...)`, `SqlEditorOutlineButton(...)` и `SqlEditorStatementButton(...)` в [SqlConsoleEditorSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleEditorSections.kt)
-  - editor sections больше не повторяют одинаковые `small text-secondary` и `btn btn-sm` ветки между outline и statement selector.
-- sql_console source-result panel cleanup:
-  - panel header и muted text для результатов по source сведены к `SqlObjectSourceResultPanel(...)` и `SqlObjectSourceMutedText(...)` в [SqlConsoleObjectsPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectsPage.kt)
-  - source result list больше не держит повторяющиеся header/summary/empty-state shell-ветки на каждом source.
-- sql_console objects control cleanup:
-  - source selection checkbox и search action сведены к `SqlObjectSourceCheckbox(...)` и `SqlObjectSearchButton(...)` в [SqlConsoleObjectsPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectsPage.kt)
-  - object browser больше не держит inline checkbox/search button markup внутри основного экранного файла.
-- module_editor run status cleanup:
-  - muted status text и validation severity badge сведены к `EditorRunMutedText(...)` и `ValidationSeverityBadge(...)` в [ModuleEditorRunSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorRunSections.kt)
-  - run panel больше не держит повторяющиеся `text-secondary small` и `severity badge` ветки в loading/empty/validation paths.
-- sql_console toolbar action cleanup:
-  - основная toolbar action-strip сведен к `SqlToolbarActionButton(...)` в [SqlConsolePage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsolePage.kt)
-  - workspace toolbar больше не повторяет восемь почти одинаковых `btn + type=button + disabled + onClick` веток для run/stop/commit/export действий.
-- sql_console page shell cleanup:
-  - hero navigation button-ы сведены к `SqlConsoleNavActionButton(...)` в [SqlConsolePage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsolePage.kt)
-  - source sidebar вынесен в `SqlConsoleSourceSidebar(...)`, а source selection в `SqlConsoleSourceSelectionBlock(...)` и `SqlConsoleSourceCheckbox(...)`
-  - page-level layout больше не смешивает hero, settings, source selection и sidebar wiring в одной большой inline-ветке.
-- sql_console credentials panel cleanup:
-  - credentials upload/details вынесены из page-layout в `SqlConsoleCredentialsPanel(...)` в [SqlConsolePage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsolePage.kt)
-  - SQL-консоль больше не держит inline file-input/upload status flow внутри общего sidebar-блока.
-- module_editor page shell cleanup:
-  - hero art вынесен в `ModuleEditorHeroArt(...)`, `DatabaseModuleHeroArt(...)` и `FilesModuleHeroArt(...)`
-  - catalog actions вынесены в `ModuleCatalogActionBar(...)`, а loading/list body в `ModuleCatalogBody(...)`
-  - [ModuleEditorPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPage.kt) стал ближе к shell/wiring-слою и меньше смешивает hero, catalog actions и catalog body.
-- sql_console workspace panel cleanup:
-  - правая workspace-ветка вынесена из [SqlConsolePage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsolePage.kt) в `SqlConsoleWorkspacePanel(...)`
-  - page-level shell больше не смешивает query library, favorites, Monaco editor, toolbar и output panel в одной длинной inline-ветке.
-- sql_console workspace toolbar cleanup:
-  - toolbar с page-size selector и query actions вынесен в `SqlConsoleWorkspaceToolbar(...)` в [SqlConsolePage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsolePage.kt)
-  - run/stop/commit/export control flow больше не живет inline внутри общего workspace layout.
-- module_editor content pane cleanup:
-  - правая content-ветка вынесена из [ModuleEditorPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPage.kt) в `ModuleEditorContentPane(...)`
-  - loading/empty/session/credentials/tabs/create-module/dialog flow больше не смешивается в основном page-shell.
-- sql_console page file split cleanup:
-  - screen subflows вынесены из [SqlConsolePage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsolePage.kt) в [SqlConsolePageShellSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsolePageShellSections.kt)
-  - `SqlConsolePage.kt` сокращен до shell/wiring-слоя, а sidebar/workspace/toolbar flow больше не держится внутри одного page-файла.
-- module_editor page file split cleanup:
-  - hero/content subflows вынесены из [ModuleEditorPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPage.kt) в [ModuleEditorPageShellSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPageShellSections.kt)
-  - сам page-файл больше не держит крупный content flow и hero-art реализацию inline.
-- module_editor catalog file split cleanup:
-  - catalog/sidebar list flow вынесен из [ModuleEditorPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPage.kt) в [ModuleEditorCatalogSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorCatalogSections.kt)
-  - catalog actions/body/item rendering теперь живут отдельным срезом, а не внутри основного page-файла.
-- sql_console second-level shell split cleanup:
-  - sidebar/navigation flow дальше разрезан из [SqlConsolePageShellSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsolePageShellSections.kt) в [SqlConsoleSidebarSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleSidebarSections.kt)
-  - workspace/toolbar flow вынесен в [SqlConsoleWorkspaceSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleWorkspaceSections.kt), а промежуточный mixed shell-файл удален.
-- module_editor second-level page-shell split cleanup:
-  - content/session flow дальше разрезан из [ModuleEditorPageShellSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPageShellSections.kt) в [ModuleEditorContentSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorContentSections.kt)
-  - hero/navigation flow вынесен в [ModuleEditorHeroSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorHeroSections.kt), а промежуточный shell-файл удален.
-- module_editor second-level catalog split cleanup:
-  - sidebar/body flow дальше разрезан из [ModuleEditorCatalogSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorCatalogSections.kt) в [ModuleEditorCatalogSidebarSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorCatalogSidebarSections.kt)
-  - rendering элемента каталога вынесен в [ModuleEditorCatalogItemSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorCatalogItemSections.kt), а старый mixed catalog-файл удален.
-- sql_console objects page split cleanup:
-  - shell/control секции вынесены из [SqlConsoleObjectsPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectsPage.kt) в [SqlConsoleObjectsShellSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectsShellSections.kt)
-  - result/card секции вынесены в [SqlConsoleObjectsResultSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectsResultSections.kt), поэтому основной page-файл больше не держит shell и result presentation в одном месте.
-- sql_console result sections split cleanup:
-  - data-pane flow вынесен из [SqlConsoleResultSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleResultSections.kt) в [SqlConsoleDataResultSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleDataResultSections.kt)
-  - status-pane flow вынесен в [SqlConsoleStatusResultSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleStatusResultSections.kt), а исходный файл остался aggregator/shared-ui слоем.
-- module_editor config field split cleanup:
-  - базовые text/select/checkbox form controls вынесены из [ModuleEditorConfigFormFieldSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorConfigFormFieldSupport.kt) в [ModuleEditorConfigFormBasicFieldSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorConfigFormBasicFieldSupport.kt)
-  - numeric form controls вынесены в [ModuleEditorConfigFormNumericFieldSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorConfigFormNumericFieldSupport.kt), а исходный файл оставлен для SQL-specific field flow.
-- sql_console page content split cleanup:
-  - page-level `content` flow вынесен из [SqlConsolePage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsolePage.kt) в [SqlConsolePageContentSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsolePageContentSections.kt)
-  - основной page-файл теперь ближе к state/effect orchestration и не держит sidebar/workspace layout в том же теле функции.
-- module_editor page content split cleanup:
-  - page-level `content` flow вынесен из [ModuleEditorPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPage.kt) в [ModuleEditorPageContentSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPageContentSections.kt)
-  - основной editor page больше не смешивает PageScaffold shell и catalog/content layout внутри одного длинного composable.
-- sql_console library split cleanup:
-  - mixed [SqlConsoleLibrarySections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleLibrarySections.kt) удален;
-  - hero flow вынесен в [SqlConsoleHeroSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleHeroSections.kt), query/settings flow — в [SqlConsoleQueryLibrarySections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleQueryLibrarySections.kt), favorite objects flow — в [SqlConsoleFavoriteObjectSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleFavoriteObjectSections.kt).
-- sql_console workspace file split cleanup:
-  - mixed [SqlConsoleWorkspaceSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleWorkspaceSections.kt) удален;
-  - workspace layout flow вынесен в [SqlConsoleWorkspacePanelSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleWorkspacePanelSections.kt), а toolbar/action flow — в [SqlConsoleWorkspaceToolbarSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleWorkspaceToolbarSections.kt).
-- module_editor run sections split cleanup:
-  - mixed [ModuleEditorRunSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorRunSections.kt) удален;
-  - run overview/live progress вынесен в [ModuleEditorRunOverviewSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorRunOverviewSections.kt), validation flow — в [ModuleEditorValidationSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorValidationSections.kt), credentials — в [ModuleEditorCredentialSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorCredentialSections.kt), tabs — в [ModuleEditorTabSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorTabSections.kt).
-- module_editor shell sections split cleanup:
-  - mixed [ModuleEditorShellSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorShellSections.kt) удален;
-  - message/alert flow вынесен в [ModuleEditorMessageSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorMessageSections.kt), toolbar/header flow — в [ModuleEditorToolbarSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorToolbarSections.kt), button/action layer — в [ModuleEditorActionSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorActionSections.kt).
-- sql_console page orchestration split cleanup:
-  - page-local UI state и callback wiring вынесены из [SqlConsolePage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsolePage.kt) в [SqlConsolePageBindings.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsolePageBindings.kt);
-  - `LaunchedEffect/PollingEffect` lifecycle вынесен в [SqlConsolePageEffects.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsolePageEffects.kt), а [SqlConsolePageContentSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsolePageContentSections.kt) больше не держит длинный lambda-contract.
-- module_editor page orchestration split cleanup:
-  - page-local UI state и callback wiring вынесены из [ModuleEditorPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPage.kt) в [ModuleEditorPageBindings.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPageBindings.kt);
-  - route/run-panel/websocket lifecycle вынесен в [ModuleEditorPageEffects.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPageEffects.kt), а [ModuleEditorPageContentSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPageContentSections.kt) теперь опирается на явный callback-contract вместо длинного списка action-параметров.
-- sql_console query library subflow split cleanup:
-  - picker flow вынесен из [SqlConsoleQueryLibrarySections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleQueryLibrarySections.kt) в [SqlConsoleQueryPickerSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleQueryPickerSections.kt);
-  - settings toggle flow вынесен в [SqlConsoleQuerySettingsSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleQuerySettingsSections.kt), а исходный library-файл оставлен aggregator/action слоем.
-- module_runs page orchestration split cleanup:
-  - page-local UI state и callback wiring вынесены из [ModuleRunsPage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsPage.kt) в [ModuleRunsPageBindings.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsPageBindings.kt);
-  - `LaunchedEffect/PollingEffect/WebSocketEffect` lifecycle вынесен в [ModuleRunsPageEffects.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsPageEffects.kt);
-  - page-level content flow вынесен в [ModuleRunsPageContentSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsPageContentSections.kt), а основной page-файл больше не держит long-running refresh и selection/filter orchestration в одном месте.
-- module_runs sections split cleanup:
-  - mixed [ModuleRunsPageSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsPageSections.kt) удален;
-  - history/overview flow вынесен в [ModuleRunsHistorySections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsHistorySections.kt);
-  - detail/result/diagnostics flow вынесен в [ModuleRunsDetailSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsDetailSections.kt).
-- module_sync sections split cleanup:
-  - mixed [ModuleSyncPageSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncPageSections.kt) удален;
-  - runtime/actions/overview flow вынесен в [ModuleSyncOverviewSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncOverviewSections.kt);
-  - selective module picker вынесен в [ModuleSyncSelectionSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncSelectionSections.kt);
-  - history/details flow вынесен в [ModuleSyncHistorySections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncHistorySections.kt).
-- run manager execution split cleanup:
-  - snapshot creation/event mutation/finalization вынесены из [RunManagerExecutionSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/RunManagerExecutionSupport.kt) в [RunManagerSnapshotSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/RunManagerSnapshotSupport.kt);
-  - execution pipeline вынесен в [RunManagerExecutionPipelineSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/RunManagerExecutionPipelineSupport.kt), а исходный support-класс стал thin facade над `snapshot + pipeline`.
-- DB module run event routing split cleanup:
-  - `RunStartedEvent -> createRun` flow вынесен из [DatabaseModuleRunEventSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleRunEventSupport.kt) в [DatabaseModuleRunStartEventSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleRunStartEventSupport.kt);
-  - routing `source/merge/target/run-finished/output-cleanup` вынесен в [DatabaseModuleRunEventRoutingSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleRunEventRoutingSupport.kt), а исходный event-support остался synchronized facade-слоем.
-- files run history event split cleanup:
-  - remaining mixed event-support больше не держит вместе type detection, primitive decoding и human-readable presentation;
-  - event typing/primitive accessors теперь живут в [FilesRunHistoryEventDecodingSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/history/FilesRunHistoryEventDecodingSupport.kt), а stage/severity/message mapping — в [FilesRunHistoryEventPresentationSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/history/FilesRunHistoryEventPresentationSupport.kt).
-- DB module run completion split cleanup:
-  - success/finalization flow вынесен из [DatabaseModuleRunCompletionSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleRunCompletionSupport.kt) в [DatabaseModuleRunSuccessSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleRunSuccessSupport.kt);
-  - fail-fast fallback и `markRunFailed` routing вынесены в [DatabaseModuleRunFailureSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleRunFailureSupport.kt), а исходный completion-support остался thin facade-слоем.
-- DB run mutation split cleanup:
-  - create flow вынесен из [DatabaseRunStoreRunMutationSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreRunMutationSupport.kt) в [DatabaseRunStoreRunCreationSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreRunCreationSupport.kt);
-  - finish flow вынесен в [DatabaseRunStoreRunCompletionMutationSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreRunCompletionMutationSupport.kt);
-  - fail mutation вынесен в [DatabaseRunStoreRunFailureMutationSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreRunFailureMutationSupport.kt), а исходный run-mutation support стал lifecycle facade-слоем.
-- files history cleanup response/execution split cleanup:
-  - preview response assembly вынесена из [RunManagerHistoryCleanupSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/RunManagerHistoryCleanupSupport.kt) в [RunManagerHistoryCleanupPreviewResponseSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/RunManagerHistoryCleanupPreviewResponseSupport.kt);
-  - execution mutation/result mapping вынесены в [RunManagerHistoryCleanupExecutionSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/RunManagerHistoryCleanupExecutionSupport.kt), а `RunManager` больше не опирается на mixed cleanup support-файл.
-- runtime config snapshot working-copy split cleanup:
-  - materialization `application.yml + SQL references` вынесен из [RuntimeConfigSnapshotFactory.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/RuntimeConfigSnapshotFactory.kt) в [RuntimeConfigWorkingCopySupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/RuntimeConfigWorkingCopySupport.kt);
-  - snapshot factory осталась facade-слоем над `working-copy -> ConfigLoader.load -> RuntimeModuleSnapshot`.
-- output retention service planning split cleanup:
-  - files candidate/current-usage planning вынесены из [FilesOutputRetentionService.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/FilesOutputRetentionService.kt) в [FilesOutputRetentionPlanningSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/FilesOutputRetentionPlanningSupport.kt);
-  - database candidate/current-usage planning вынесены из [DatabaseOutputRetentionService.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseOutputRetentionService.kt) в [DatabaseOutputRetentionPlanningSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseOutputRetentionPlanningSupport.kt);
-  - общий retention cutoff/policy helper вынесен в [OutputRetentionPolicySupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/OutputRetentionPolicySupport.kt), а оба service-слоя стали facade-уровнем.
-- DB execution snapshot preparation split cleanup:
-  - loading source/sql files, runtime snapshot assembly и content-hash preparation вынесены из [DatabaseModuleExecutionSource.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleExecutionSource.kt) в [DatabaseModuleExecutionRuntimeSnapshotSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleExecutionRuntimeSnapshotSupport.kt);
-  - `DatabaseModuleExecutionSource` теперь держит transaction boundary и persistence wiring, а не весь execution snapshot pipeline.
-- output retention planner split cleanup:
-  - normalization `outputDir` candidate-ов вынесена из [OutputRetentionPlanner.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/OutputRetentionPlanner.kt) в [OutputRetentionRunNormalizationSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/OutputRetentionRunNormalizationSupport.kt);
-  - module aggregation/summary вынесены в [OutputRetentionModuleSummarySupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/OutputRetentionModuleSummarySupport.kt), а planner остался facade над `normalize -> inspect -> summarize -> delete`.
-- DB cleanup preview split cleanup:
-  - module list preview вынесен из [DatabaseRunStoreCleanupPreviewSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreCleanupPreviewSupport.kt) в [DatabaseRunStoreCleanupModulePreviewSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreCleanupModulePreviewSupport.kt);
-  - aggregate count query вынесен в [DatabaseRunStoreCleanupCountSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreCleanupCountSupport.kt), а preview support стал thin facade над `modules + counts`.
-- DB history usage split cleanup:
-  - storage overview/bytes/top-modules вынесены из [DatabaseRunStoreHistoryUsageSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreHistoryUsageSupport.kt) в [DatabaseRunStoreHistoryStorageUsageSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreHistoryStorageUsageSupport.kt);
-  - current output usage candidates вынесены в [DatabaseRunStoreOutputUsageCandidateSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/DatabaseRunStoreOutputUsageCandidateSupport.kt), а исходный history-usage support остался фасадом.
+- legacy route/state/persistence хвосты уже сокращены:
+  - migration-only и deprecated ветки SQL-консоли и runtime-state приведены к явной роли;
+  - удалены пустые aliases, thin wrappers и transitional adapters;
+  - общие file/path/state helper-ы вынесены в shared support-слои вместо параллельных реализаций.
+- web/shared UI cleanup уже дал основной эффект:
+  - убраны крупные duplicate helper-islands в `sql_console`, `module_editor`, `module_runs`, `module_sync`, `run_history_cleanup`;
+  - удалены одноразовые support-файлы там, где они не давали архитектурной ценности;
+  - screen/store/page layers больше не держат явный historical noise ради старых решений.
+- server-side cleanup уже дошел до run/config/module/sqlconsole кластеров:
+  - `ui.config`, `run manager`, `output retention`, `run history`, `db module`, `config form`, `module registry` и соседние слои разрезаны на более узкие facade/support responsibilities;
+  - duplicated response/query/persistence/mutation code существенно сокращен;
+  - основная structural debt этого блока уже вынесена в историю.
+- cleanup-волна остается активной только для тех мест, где есть реальный duplicate/legacy debt, а не просто желание еще раз дробить уже нормализованные файлы.
+
+История:
+
+- подробная хронология вынесена в [BACKLOG_HISTORY.md](/Users/kwdev/DataPoolLoader/BACKLOG_HISTORY.md).
 
 Критерий завершения:
 
 - в проекте уменьшено число legacy-paths;
 - кодовая база чище, проще и с меньшим количеством “исторических хвостов”.
 
-### 6. Архитектурная программа: довести SQL-консоль как самостоятельную подсистему
+### 6. SQL-консоль: единая программа развития
 
 Статус:
 
 - частично реализовано
 
+Источник:
+
+- [ARCHITECTURE_RULES.md](/Users/kwdev/DataPoolLoader/ARCHITECTURE_RULES.md)
+- [SQL_CONSOLE_FAILURE_SCENARIOS.md](/Users/kwdev/DataPoolLoader/SQL_CONSOLE_FAILURE_SCENARIOS.md)
+- [SQL_CONSOLE_MONACO_AUTOCOMPLETE.md](/Users/kwdev/DataPoolLoader/SQL_CONSOLE_MONACO_AUTOCOMPLETE.md)
+
 Цель:
 
-- перестать относиться к SQL-консоли как к обычному экрану;
-- довести execution lifecycle, safety и архитектурные границы до устойчивого состояния.
+- вести SQL-консоль как самостоятельную подсистему, а не как набор разрозненных экранных задач;
+- выстроить единый порядок работ: сначала safety и ownership, затем object inspector и UI control-flow, затем Monaco и regression coverage;
+- не смешивать в backlog архитектурную основу, recovery, object browser, Monaco и UX в несвязанные куски.
 
 Что уже есть:
 
@@ -1014,34 +294,31 @@
 - object browser;
 - IDE-like UX;
 - отдельные support/contract-слои в backend.
+- server-side ownership contract:
+  - `ownerSessionId`, `ownerToken`, lease metadata;
+  - heartbeat в `RUNNING` и `PENDING_COMMIT`;
+  - automatic rollback по owner loss и hard TTL;
+  - refresh recovery, token fencing и explicit owner release.
 
-Что нужно сделать:
+Единая последовательность:
 
-- добить safety long-running execution;
-- дочистить lifecycle pending commit / rollback;
-- продолжить cleanup giant UI/page/store слоя SQL-консоли;
-- закрепить SQL-консоль отдельными архитектурными и тестовыми инвариантами.
+1. Фаза A. Execution safety и ownership recovery:
+  - довести SQL execution lifecycle до состояния, где безопасность обеспечивается server-side механизмами, а не живой вкладкой браузера;
+  - закрыть remaining recovery gaps вокруг `refresh / duplicate tab / network loss / server restart / release`;
+  - закрепить route/manager tests на ownership, rollback и recovery как обязательную часть подсистемы.
+2. Фаза B. `sql-console-objects` и object inspector:
+  - цель фазы: превратить object browser из search-card экрана в полноценный DBA-like inspector flow без превращения его во вторую SQL-консоль.
+3. Фаза C. Основной экран консоли: интерфейс, читаемость и control-flow UX:
+  - после object inspector привести main SQL screen к более читаемой и безопасной operational model;
+  - убрать дублирующие presentation-формы и слабые execution/status affordance.
+4. Фаза D. Monaco hints и autocomplete:
+  - только после стабилизации object/search contract и main control-flow;
+  - развивать Monaco по staged модели без тяжелого LSP-стека.
+5. Фаза E. SQL-console-specific regression coverage и invariants:
+  - закрепить подсистему screen-level smoke coverage, server-side scenario tests и явными архитектурными инвариантами;
+  - поддерживать SQL-консоль как отдельную инженерную программу, а не как временный набор UX-правок.
 
-Критерий завершения:
-
-- SQL-консоль рассматривается и поддерживается как самостоятельная подсистема, а не как “еще один экран”.
-
-### 7. SQL-консоль: safety hardening по аварийным сценариям
-
-Статус:
-
-- частично реализовано
-
-Источник:
-
-- [SQL_CONSOLE_FAILURE_SCENARIOS.md](/Users/kwdev/DataPoolLoader/SQL_CONSOLE_FAILURE_SCENARIOS.md)
-
-Цель:
-
-- исключить orphan execution и висящие транзакции;
-- довести SQL-консоль до состояния, где безопасность БД обеспечивается server-side механизмами, а не надеждой на живую вкладку браузера.
-
-Что нужно сделать:
+Фаза A. Execution safety и ownership recovery:
 
 - owner session и owner token для execution session;
 - heartbeat во время `RUNNING` и `PENDING_COMMIT`;
@@ -1054,59 +331,154 @@
   - network loss;
   - duplicate tab;
   - server restart.
-
 - SQL execution ownership contract:
-  - ввести `ownerSessionId`, `ownerToken` и lease metadata в async execution lifecycle SQL-консоли;
-  - `Commit / Rollback / Cancel` больше не должны работать без подтвержденного owner token.
-- SQL execution heartbeat flow:
-  - добавить heartbeat endpoint для `RUNNING` и `PENDING_COMMIT`;
-  - провести owner session/token end-to-end через `ui-server`, `ui-compose-shared` и `ui-compose-web`.
-- SQL execution safety timeout flow:
-  - добавить automatic rollback при потере owner lease и при hard TTL для `PENDING_COMMIT`;
-  - закрепить это server-side тестами на owner loss / timeout / unauthorized action.
-- SQL execution refresh recovery:
-  - восстановить ownership SQL execution session после refresh через browser session storage без потери server-side safety;
-  - same-tab reload должен поднимать heartbeat и current execution, а не обрывать control-path без причины.
-- SQL execution fencing token rotation:
-  - heartbeat должен ротировать owner token, чтобы stale token из duplicate tab быстро терял право на action/heartbeat;
-  - UI после ownership loss должен переходить в read-only snapshot без silent retry.
-- SQL execution recovery regression tests:
-  - закрепить route/manager сценарии для refresh recovery и stale-token conflict;
-  - duplicate tab должен терять управление после ротации token, а не продолжать heartbeat параллельно.
-- SQL execution owner release flow:
-  - добавить explicit owner release endpoint для pagehide/network-loss сценариев;
-  - при release из `PENDING_COMMIT` выполнять immediate safe rollback, а при `RUNNING` помечать execution как owner-lost без дальнейшего ручного control-path.
-- SQL execution unload beacon integration:
-  - добавить browser-side best-effort release через `pagehide` / `sendBeacon`, не полагаясь на него как на единственную защиту;
-  - same-tab refresh recovery должен остаться рабочим, а уход вкладки должен пытаться закрыть owner control-path раньше lease timeout.
-- SQL execution owner release regression tests:
-  - закрепить manager/route сценарии для explicit release в `RUNNING` и `PENDING_COMMIT`;
-  - stale owner после release не должен иметь права на `Commit / Rollback / Cancel / Heartbeat`.
+  - `Commit / Rollback / Cancel` не должны работать без подтвержденного owner token;
+  - stale token и duplicate tab не должны сохранять control-path.
+- SQL execution unload/release flow:
+  - browser-side best-effort release через `pagehide` / `sendBeacon` допустим только как дополнительная защита;
+  - server-side safety должна работать и без него.
 
-Что уже сделано:
+Фаза B. `sql-console-objects` и object inspector:
 
-- введены `ownerSessionId`, `ownerToken`, lease metadata и server-side ownership contract для async execution SQL-консоли;
-- heartbeat добавлен в `RUNNING` и `PENDING_COMMIT`, а `Commit / Rollback / Cancel` больше не работают без подтвержденного owner token;
-- реализованы automatic rollback по owner loss и hard TTL для `PENDING_COMMIT` со статусами `ROLLED_BACK_BY_OWNER_LOSS` и `ROLLED_BACK_BY_TIMEOUT`;
-- same-tab refresh recovery больше не теряет control-path без причины:
-  - ownership восстанавливается через browser session storage;
-  - stale token быстро fence-ится через rotation на heartbeat;
-- duplicate tab больше не должен auto-restore cloned control-path только по `sessionStorage`:
-  - recovery теперь требует совпадение `ownerSessionId` и `tabInstanceId`;
-- добавлен explicit owner release flow:
-  - `pagehide` делает best-effort release через beacon/keepalive path;
-  - release закрывает active control-path и оставляет только короткое recovery-window для same-tab refresh;
-  - если recovery не произошло, pending commit уходит в safe rollback, а manual transaction в `RUNNING` не получает долгий orphan `PENDING_COMMIT`;
-- route/manager tests уже покрывают:
-  - owner loss / timeout;
-  - refresh recovery;
-  - stale-token conflict;
-  - explicit release и recovery после release.
+- первый implementation package этой фазы должен включать:
+  - удаление heavy inline metadata из search results там, где она мешает scan-and-pick сценарию;
+  - введение отдельного object inspector flow для выбранного объекта;
+  - сохранение одной явной action-кнопки `Открыть SELECT в консоли` вместо встроенного data preview.
+- уже реализован первый package этой фазы для текущего search contract:
+  - search result cards больше не рендерят columns / indexes / definition inline;
+  - выбранный объект открывается в отдельном inspector panel;
+  - inspector уже оформлен как type-aware tabbed UI для metadata, которая реально приходит из текущего backend search;
+  - `Открыть SELECT в консоли` оставлен как явное действие, а не встроенный preview block;
+  - расширение inspector-а до полного DBeaver-like coverage и новых object types остается отдельным следующим пакетом, а не считается уже закрытым.
+- реализован следующий package этой фазы:
+  - search contract стал легким: heavy metadata больше не приезжает в `/objects/search`, а грузится отдельным inspector-запросом;
+  - появился lazy route `/api/sql-console/objects/inspect` и отдельный shared/web/server inspector contract;
+  - PostgreSQL object browser теперь умеет искать и инспектировать `TABLE`, `VIEW`, `MATERIALIZED_VIEW`, `INDEX`, `SEQUENCE`, `TRIGGER`, `SCHEMA`;
+  - inspector стал реально type-aware по содержимому вкладок: `columns / indexes / constraints / triggers / sequence / schema / ddl` зависят от типа объекта и доступной metadata;
+  - search results и inspector больше не смешивают ответственности в одном transport contract.
+- оставшийся хвост этой фазы:
+  - не добивать inspector вторым кругом purely cosmetic split-ами;
+  - идти только в реально недостающую metadata глубину: `comments / dependencies / grants / richer DDL`, если это дает новый DBA-сигнал;
+  - после стабилизации object inspector переходить в Фазу C, а не бесконечно расширять объектный экран.
+- объектный экран должен оставаться search-first инструментом, а не превращаться в тяжёлый каталог со стартовой полной загрузкой схем;
+- source selection, search query, search action и summary последнего результата должны считываться из верхнего блока без прокрутки и без визуальной конкуренции со secondary panels;
+- `Текущий объект` и `Избранные объекты` должны оставаться вторичным контекстом и не вытеснять основной search/result flow ниже первого экрана;
+- grouping по source должен ясно показывать: сколько объектов найдено, был ли truncation, была ли source-level ошибка и есть ли exact match по deep-link;
+- object actions должны иметь явную иерархию:
+  - primary action для открытия object inspector или SQL-действия;
+  - secondary action для вспомогательных действий вроде `COUNT(*)`;
+  - tertiary action для favorites/metadata.
+- object result presentation должен быть заточен под быстрый scan-and-pick сценарий: сначала identity и тип объекта, затем контекст, затем только действительно полезные details;
+- source-level ошибка по одному источнику не должна перекрывать успешные результаты по другим источникам и не должна ломать общий search session UX;
+- contract inspectable object types должен быть явным:
+  - первая волна inspector support: `TABLE`, `VIEW`, `MATERIALIZED_VIEW`, `INDEX`, `SEQUENCE`, `TRIGGER`, `SCHEMA`;
+  - для `TABLE/VIEW/MATERIALIZED_VIEW` inspector должен уметь показывать их schema metadata и связанные object details;
+  - для `INDEX` inspector нужен как отдельный сценарий просмотра DDL и привязки к таблице/колонкам;
+  - для `SEQUENCE` inspector нужен как отдельный сценарий просмотра DDL и параметров последовательности (`increment`, `min/max`, `start`, `cache`, `cycle`, ownership/dependency к таблице/колонке там, где это доступно);
+  - для `TRIGGER` inspector нужен как отдельный сценарий просмотра DDL, target table/view, `timing`, `events`, `enabled/disabled` state, связанной trigger function/procedure и других trigger metadata там, где это реально доступно;
+  - trigger metadata должно быть видно и внутри inspector-а таблицы/представления как связанный объект, и в самостоятельном inspector flow при прямом открытии trigger;
+  - для `SCHEMA` inspector нужен как отдельный сценарий просмотра schema DDL, owner, comments, privileges и агрегированной metadata по содержимому схемы без полной eager-загрузки всех вложенных объектов;
+  - `constraints/keys` в первой волне считаются частью inspector-а таблицы/представления, а не отдельным search object type;
+  - отдельная поддержка `FUNCTION`, `PROCEDURE` и других object types идет только как отдельное расширение introspection/search contract, а не молчаливо.
+- просмотр объекта должен быть ближе к DBeaver inspector flow, а не к длинной карточке в выдаче:
+  - search results остаются легкими и не разворачивают полный metadata dump inline;
+  - углубленный просмотр открывает отдельный inspector state для выбранного объекта;
+  - inspector не является одним универсальным полотном: отображаемая информация и composition экрана должны зависеть от `objectType`;
+  - основной visual container inspector-а должен быть tabbed UI в духе DBeaver, а не длинная вертикальная карточка;
+  - набор вкладок должен быть type-aware: для разных object types показываются разные tab groups и разный порядок приоритета;
+  - inspector как минимум показывает структурированные блоки `columns`, `DDL/definition`, `indexes`, `constraints/keys`;
+  - inspector не показывает row data/sample data как часть object inspection сценария;
+  - целевой ориентир для inspector-а: максимально полный schema metadata view в духе DBeaver, включая `comments`, `triggers`, `dependencies`, `grants/privileges` и прочие объектные metadata там, где это реально доступно через introspection;
+  - DDL и длинные SQL definitions должны показываться в удобном read-only SQL viewer, предпочтительно Monaco-native там, где это улучшает чтение;
+  - metadata inspector должен загружаться lazy/on-demand и не утяжелять search response для всех найденных объектов сразу;
+  - deep-link на объект должен приводить именно к object inspector сценарию, а не только подсвечивать карточку в длинном списке;
+  - для табличных данных достаточно одной явной action-кнопки `Открыть SELECT в консоли`; отдельный встроенный data preview для object browser не нужен.
+
+Фаза C. Основной экран консоли: интерфейс, читаемость и control-flow UX:
+
+- четко развести source/settings, editor, execution state, result output и transaction controls;
+- убрать визуальное смешение между рабочим контекстом и результатами запроса;
+- явно различать `Run`, `Cancel`, `Commit`, `Rollback`;
+- сделать опасные и необратимые состояния очевидными без banner-spam и лишнего дублирования;
+- улучшить presentation для pending/empty/error/success состояний;
+- упростить навигацию по statement/shard/page/result views;
+- для source/shard execution status не держать параллельно таблицу и карточки с одинаковыми данными: primary view должна оставаться таблица, карточный дубль нужно убрать;
+- сделать source selection, transaction mode, strict safety mode, page size и credentials state считываемыми с одного взгляда;
+- не прятать критические execution-инварианты в второстепенные блоки;
+- индикатор подключения по source должен обновляться не только после явного `Проверить подключение`, но и по факту реального SQL execution на выбранных source: успешный run обновляет статус в `available/ok`, connection-level failure обновляет статус в `failed/unavailable`, неучаствовавшие source не должны менять состояние;
+- сократить переключения контекста между recent queries, favorites, object browser и SQL editor;
+- улучшить сценарии insert/open/inspect для объектов и запросов;
+- удалить отдельный блок `Script outline` со списком SQL statement из page UI; если навигация по statement действительно нужна, она должна жить в Monaco-native форме, а не как параллельный внешний блок;
+- формализовать hotkeys и focus behavior вокруг Monaco, execution actions и result navigation;
+- исключить случайные конфликты browser shortcuts и editor actions.
+
+Фаза D. Monaco hints и autocomplete:
+
+- развивать Monaco постепенно, без тяжелого IDE/LSP-стека и без ущерба для архитектуры SQL-консоли;
+- уровень 1:
+  - local completion по keywords/functions/snippets;
+  - hover hints;
+- уровень 2:
+  - metadata-aware autocomplete по schema/table/view/index names;
+  - bounded search-first completion по объектам БД;
+  - exact object column lookup там, где это оправдано;
+- уровень 3:
+  - deeper language intelligence только при доказанной необходимости.
+
+Фаза E. SQL-console-specific regression coverage и invariants:
+
+- после стабилизации interaction model добавить screen-level smoke coverage на ключевые UX/safety сценарии SQL-консоли;
+- закрепить SQL-консоль отдельными архитектурными и тестовыми инвариантами;
+- не допускать giant-file debt и размывания границ между `ui-compose-shared`, `ui-compose-web` и `ui-server`.
 
 Критерий завершения:
 
+- SQL-консоль рассматривается и поддерживается как самостоятельная подсистема, а не как “еще один экран”.
 - manual transaction не может жить бесконтрольно;
-- при потере владельца система гарантированно уходит в безопасный rollback.
+- execution и transaction state понимаются без ручного обхода экрана;
+- экран не дублирует одну и ту же operational information в нескольких presentation-формах без нового сигнала;
+- navigation/help around SQL statements не существует как дублирующий внешний page-block, если тот же сценарий может быть закрыт editor-native поведением Monaco;
+- connection status по source отражает последний релевантный outcome реального взаимодействия, а не только результат отдельной ручной проверки;
+- object browser поддерживает быстрый сценарий `найти -> понять -> открыть SQL/preview`, а не заставляет пользователя вручную разбирать несколько конкурирующих блоков экрана;
+- просмотр объекта поддерживает отдельный inspector-сценарий уровня DBA-инструмента, без превращения search results в тяжелый metadata-dump;
+- object inspector сфокусирован на schema metadata и DDL, а не на показе табличных данных;
+- переход к данным из object browser решается одной явной action-кнопкой `Открыть SELECT в консоли`, без отдельного preview-режима на самом объектном экране;
+- поддерживаемые inspectable object types и границы первой волны явно определены и не остаются скрытым допущением;
+- object inspector реализован как type-aware tabbed UI: содержимое и вкладки зависят от типа объекта, а не от одного универсального layout;
+- Monaco становится ощутимо полезнее, но не ломает execution lifecycle и не тащит тяжелую stateful backend-механику.
+
+### 7. SQL-консоль: safety hardening по аварийным сценариям
+
+Статус:
+
+- объединено в пункт 6
+
+Активные safety-задачи SQL-консоли перенесены в master-блок [6. SQL-консоль: единая программа развития](/Users/kwdev/DataPoolLoader/BACKLOG.md).
+
+### 8. Нормализовать build baseline на Java 21
+
+Статус:
+
+- реализовано
+
+Цель:
+
+- перевести проект с legacy baseline `Java 17` на `Java 21`;
+- убрать ситуацию, где build-скрипты зашиты на `17`, а реальная сборка идет под `JDK 25` с fallback поведением Kotlin;
+- сделать toolchain проекта воспроизводимым и честным для локальной разработки и CI.
+
+Что сделано:
+
+- Gradle Java toolchain и Kotlin JVM target переведены на `21` в root, desktop и shared build-слоях;
+- добавлен reproducible toolchain resolution через Gradle daemon JVM criteria и auto-download;
+- build baseline больше не зависит от случайного локального `JDK 25`;
+- полный compile/test baseline прогнан уже под `Java 21`.
+
+Критерий завершения:
+
+- проект явно собирается и тестируется на `Java 21`;
+- в build-скриптах не остается legacy-настроек `17`;
+- baseline больше не зависит от случайной локальной `JDK 25`.
 
 ## P1
 
@@ -1257,32 +629,17 @@
 
 Статус:
 
-- не реализовано
+- объединено в пункт 6
 
-Источник:
+Активные Monaco/autocomplete-задачи SQL-консоли перенесены в master-блок [6. SQL-консоль: единая программа развития](/Users/kwdev/DataPoolLoader/BACKLOG.md).
 
-- [SQL_CONSOLE_MONACO_AUTOCOMPLETE.md](/Users/kwdev/DataPoolLoader/SQL_CONSOLE_MONACO_AUTOCOMPLETE.md)
+### 19. SQL-консоль: интерфейс, читаемость и control-flow UX
 
-Цель:
+Статус:
 
-- развивать Monaco постепенно, без тяжелого IDE/LSP-стека и без ущерба для архитектуры SQL-консоли.
+- объединено в пункт 6
 
-Этапы:
-
-- уровень 1:
-  - local completion по keywords/functions/snippets;
-  - hover hints;
-- уровень 2:
-  - metadata-aware autocomplete по schema/table/view/index names;
-  - bounded search-first completion по объектам БД;
-  - exact object column lookup там, где это оправдано;
-- уровень 3:
-  - deeper language intelligence только при доказанной необходимости.
-
-Критерий завершения:
-
-- Monaco становится ощутимо полезнее;
-- autocomplete не ломает execution lifecycle и не тащит тяжелую stateful backend-механику.
+Активные UX/object-browser/object-inspector-задачи SQL-консоли перенесены в master-блок [6. SQL-консоль: единая программа развития](/Users/kwdev/DataPoolLoader/BACKLOG.md).
 
 ## P3
 

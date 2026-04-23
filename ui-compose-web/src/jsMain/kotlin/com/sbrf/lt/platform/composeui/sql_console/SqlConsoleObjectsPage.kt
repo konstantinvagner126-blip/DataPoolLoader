@@ -44,6 +44,7 @@ fun ComposeSqlConsoleObjectsPage(
         store = store,
         initialQuery = initialQuery,
         initialSource = initialSource,
+        navigationTarget = navigationTarget,
         currentState = { state },
         setState = { state = it },
     )
@@ -51,7 +52,7 @@ fun ComposeSqlConsoleObjectsPage(
     PageScaffold(
         eyebrow = "MLP Platform",
         title = "Объекты БД",
-        subtitle = "Search-first просмотр таблиц, индексов и представлений по источникам SQL-консоли без полной загрузки большого каталога.",
+        subtitle = "Search-first просмотр объектов БД с отдельным lazy inspector flow по источникам SQL-консоли.",
         heroClassNames = listOf("hero-card-compact", "sql-console-hero"),
         heroCopyClassNames = listOf("sql-console-hero-copy"),
         heroHeader = {

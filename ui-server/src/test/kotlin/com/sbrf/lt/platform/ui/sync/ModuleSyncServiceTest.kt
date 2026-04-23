@@ -340,7 +340,7 @@ class ModuleSyncServiceTest {
         assertEquals("db-busy-module", item.details["activeSyncModuleCode"])
         assertEquals("other-user", item.details["activeSyncStartedByActorId"])
         assertTrue(result.errorMessage!!.contains("уже импортируется другим пользователем"))
-        assertTrue(preparedSql.any { it.contains("scope = 'ONE'") })
+        assertTrue(preparedSql.any { it.contains("scope in ('ONE', 'SELECTED')") })
     }
 
     @Test
@@ -411,7 +411,7 @@ class ModuleSyncServiceTest {
         assertEquals("ffffffff-ffff-ffff-ffff-ffffffffffff", activeSync.syncRunId)
         assertEquals("db-demo", activeSync.moduleCode)
         assertEquals("kwdev", activeSync.startedByActorDisplayName)
-        assertTrue(preparedSql.any { it.contains("scope = 'ONE'") })
+        assertTrue(preparedSql.any { it.contains("scope in ('ONE', 'SELECTED')") })
     }
 
     @Test
@@ -578,7 +578,7 @@ class ModuleSyncServiceTest {
                             sql.contains("from ui_registry.module_sync_run_item") &&
                                 sql.contains("where sync_run_id = ?::uuid") -> syncRunItemRows
                             sql.contains("from ui_registry.module_sync_run_item i") -> previousSyncRows
-                            sql.contains("from ui_registry.module_sync_run") && sql.contains("scope = 'ONE'") -> runningSingleSyncRows
+                            sql.contains("from ui_registry.module_sync_run") && sql.contains("scope in ('ONE', 'SELECTED')") -> runningSingleSyncRows
                             sql.contains("from ui_registry.module_sync_run") -> runningFullSyncRows
                             sql.contains("from ui_registry.module m") -> existingRows
                             else -> emptyList()

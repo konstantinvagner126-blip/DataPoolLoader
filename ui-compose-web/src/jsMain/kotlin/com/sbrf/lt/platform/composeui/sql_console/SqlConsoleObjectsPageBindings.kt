@@ -8,6 +8,7 @@ internal data class SqlConsoleObjectsPageCallbacks(
     val onToggleSource: (String, Boolean) -> Unit,
     val onQueryChange: (String) -> Unit,
     val onSearch: () -> Unit,
+    val onOpenInspector: (String, SqlConsoleDatabaseObject) -> Unit,
     val onToggleFavorite: (String, SqlConsoleDatabaseObject) -> Unit,
     val onOpenSelect: (String, SqlConsoleDatabaseObject) -> Unit,
     val onOpenCount: (String, SqlConsoleDatabaseObject) -> Unit,
@@ -31,6 +32,9 @@ internal fun sqlConsoleObjectsPageCallbacks(
                 setState(store.beginAction(currentState(), "search"))
                 setState(store.search(currentState()))
             }
+        },
+        onOpenInspector = { sourceName, dbObject ->
+            window.location.href = buildObjectInspectorHref(sourceName, dbObject)
         },
         onToggleFavorite = { sourceName, dbObject ->
             scope.launch {

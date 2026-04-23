@@ -64,6 +64,15 @@ fun interface ShardSqlObjectSearcher {
     ): ShardSqlObjectSearchResult
 }
 
+fun interface ShardSqlObjectInspector {
+    fun inspectObject(
+        shard: ResolvedSqlConsoleShardConfig,
+        schemaName: String,
+        objectName: String,
+        objectType: SqlConsoleDatabaseObjectType,
+    ): SqlConsoleDatabaseObjectInspector
+}
+
 data class ShardSqlObjectSearchResult(
     val objects: List<SqlConsoleDatabaseObject>,
     val truncated: Boolean = false,

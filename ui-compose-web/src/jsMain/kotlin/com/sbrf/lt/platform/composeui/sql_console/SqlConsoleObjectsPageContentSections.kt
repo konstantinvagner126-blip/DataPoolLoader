@@ -1,6 +1,10 @@
 package com.sbrf.lt.platform.composeui.sql_console
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import com.sbrf.lt.platform.composeui.foundation.component.AlertBanner
 import com.sbrf.lt.platform.composeui.foundation.component.EmptyStateCard
 import com.sbrf.lt.platform.composeui.foundation.component.LoadingStateCard
@@ -21,6 +25,15 @@ internal fun SqlConsoleObjectsPageContent(
     val runtimeContext = state.runtimeContext
     val searchResponse = state.searchResponse
     val totalFoundObjects = searchResponse?.sourceResults?.sumOf { it.objects.size } ?: 0
+    val inspectorSelection = findSelectedObject(searchResponse, navigationTarget)
+    val inspectorResponse = state.inspectorResponse
+        ?.takeIf { inspectorMatchesSelection(it, inspectorSelection) }
+    val inspectorSelectionKey = inspectorResponse?.let { response ->
+        "${response.sourceName}|${response.dbObject.schemaName}|${response.dbObject.objectName}|${response.dbObject.objectType}"
+    }
+    var activeInspectorTab by remember(inspectorSelectionKey) {
+        mutableStateOf(inspectorResponse?.let(::defaultInspectorTab) ?: "overview")
+    }
 
     state.errorMessage?.let { AlertBanner(it, "warning") }
     state.successMessage?.let { AlertBanner(it, "success") }
@@ -49,12 +62,37 @@ internal fun SqlConsoleObjectsPageContent(
         )
     }
 
-    navigationTarget?.let { target ->
-        SqlObjectPanel(title = "Текущий объект", panelClasses = "sql-object-target-card mb-4") {
-            SqlObjectIdentityBlock(
-                name = target.qualifiedName(),
-                note = target.contextLabel(),
-                nameClass = "sql-object-target-name",
+    when {
+        inspectorResponse != null -> {
+            SqlObjectInspectorPanel(
+                response = inspectorResponse,
+                activeTab = activeInspectorTab,
+                onTabSelect = { activeInspectorTab = it },
+                onOpenSelect = {
+                    callbacks.onOpenSelect(inspectorResponse.sourceName, inspectorResponse.dbObject)
+                },
+                onOpenCount = {
+                    callbacks.onOpenCount(inspectorResponse.sourceName, inspectorResponse.dbObject)
+                },
+            )
+        }
+        inspectorSelection != null && state.inspectorLoading -> {
+            LoadingStateCard(
+                title = "Инспектор объекта",
+                text = "Metadata выбранного объекта загружается отдельным inspector-запросом.",
+            )
+        }
+        inspectorSelection != null && state.inspectorErrorMessage != null -> {
+            val inspectorErrorMessage = state.inspectorErrorMessage ?: ""
+            EmptyStateCard(
+                title = "Не удалось загрузить инспектор",
+                text = inspectorErrorMessage,
+            )
+        }
+        navigationTarget != null && searchResponse != null -> {
+            EmptyStateCard(
+                title = "Объект не найден",
+                text = "Для выбранного deep-link объект не найден в текущем search result. Проверь source, схему и тип объекта.",
             )
         }
     }
@@ -172,6 +210,9 @@ internal fun SqlConsoleObjectsPageContent(
                                                     },
                                                     onToggleFavorite = {
                                                         callbacks.onToggleFavorite(sourceResult.sourceName, dbObject)
+                                                    },
+                                                    onOpenInspector = {
+                                                        callbacks.onOpenInspector(sourceResult.sourceName, dbObject)
                                                     },
                                                     onOpenSelect = {
                                                         callbacks.onOpenSelect(sourceResult.sourceName, dbObject)

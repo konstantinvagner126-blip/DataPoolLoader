@@ -8,6 +8,7 @@ class SqlConsoleService(
     private val executor: ShardSqlExecutor = JdbcShardSqlExecutor(),
     private val connectionChecker: ShardConnectionChecker = JdbcShardConnectionChecker(),
     private val objectSearcher: ShardSqlObjectSearcher = JdbcShardSqlObjectSearcher(),
+    private val objectInspector: ShardSqlObjectInspector = JdbcShardSqlObjectSearcher(),
 ) : SqlConsoleOperations, SqlConsoleTransactionalOperations {
     private val logger = LoggerFactory.getLogger(javaClass)
     private val configSupport = SqlConsoleConfigSupport()
@@ -21,6 +22,7 @@ class SqlConsoleService(
     private val metadataSupport = SqlConsoleMetadataSupport(
         configSupport = configSupport,
         objectSearcher = objectSearcher,
+        objectInspector = objectInspector,
     )
     @Volatile
     private var currentConfig: SqlConsoleConfig = config
@@ -99,5 +101,21 @@ class SqlConsoleService(
             credentialsPath = credentialsPath,
             selectedSourceNames = selectedSourceNames,
             maxObjectsPerSource = maxObjectsPerSource,
+        )
+
+    override fun inspectObject(
+        sourceName: String,
+        schemaName: String,
+        objectName: String,
+        objectType: SqlConsoleDatabaseObjectType,
+        credentialsPath: Path?,
+    ): SqlConsoleDatabaseObjectInspector =
+        metadataSupport.inspectObject(
+            config = currentConfig,
+            sourceName = sourceName,
+            schemaName = schemaName,
+            objectName = objectName,
+            objectType = objectType,
+            credentialsPath = credentialsPath,
         )
 }

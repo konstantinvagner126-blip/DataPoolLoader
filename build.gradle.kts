@@ -26,21 +26,21 @@ subprojects {
     apply(plugin = "org.jetbrains.kotlinx.kover")
 
     extensions.configure<org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension>("kotlin") {
-        jvmToolchain(17)
+        jvmToolchain(21)
     }
 
     extensions.configure<JavaPluginExtension>("java") {
         toolchain {
-            languageVersion.set(JavaLanguageVersion.of(17))
+            languageVersion.set(JavaLanguageVersion.of(21))
         }
     }
 
     tasks.withType<JavaCompile>().configureEach {
-        options.release.set(17)
+        options.release.set(21)
     }
 
     tasks.withType<KotlinJvmCompile>().configureEach {
-        compilerOptions.jvmTarget.set(JvmTarget.JVM_17)
+        compilerOptions.jvmTarget.set(JvmTarget.JVM_21)
     }
 
     dependencies {

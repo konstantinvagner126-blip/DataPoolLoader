@@ -3,6 +3,7 @@ package com.sbrf.lt.datapool
 import com.sbrf.lt.datapool.sqlconsole.RawShardExecutionResult
 import com.sbrf.lt.datapool.sqlconsole.RawShardConnectionCheckResult
 import com.sbrf.lt.datapool.sqlconsole.ShardConnectionChecker
+import com.sbrf.lt.datapool.sqlconsole.ShardSqlObjectInspector
 import com.sbrf.lt.datapool.sqlconsole.ShardSqlObjectSearchResult
 import com.sbrf.lt.datapool.sqlconsole.ShardSqlObjectSearcher
 import com.sbrf.lt.datapool.sqlconsole.ShardSqlScriptExecutor
@@ -11,6 +12,7 @@ import com.sbrf.lt.datapool.sqlconsole.ShardSqlTransactionalExecutor
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleConfig
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleDatabaseObject
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleDatabaseObjectColumn
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleDatabaseObjectInspector
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleDatabaseObjectType
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleExecutionPolicy
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleTransactionMode
@@ -643,14 +645,6 @@ class SqlConsoleServiceTest {
                             schemaName = "public",
                             objectName = "${shard.name}_offer",
                             objectType = SqlConsoleDatabaseObjectType.TABLE,
-                            columns = listOf(
-                                SqlConsoleDatabaseObjectColumn(
-                                    name = "id",
-                                    type = "bigint",
-                                    nullable = false,
-                                ),
-                            ),
-                            indexNames = listOf("${shard.name}_offer_idx"),
                         ),
                     ),
                 )
@@ -667,5 +661,46 @@ class SqlConsoleServiceTest {
         assertEquals(1, result.sourceResults.size)
         assertEquals("shard2", result.sourceResults.single().sourceName)
         assertEquals("public", result.sourceResults.single().objects.single().schemaName)
+    }
+
+    @Test
+    fun `loads inspector metadata only for requested source and object`() {
+        val inspected = mutableListOf<String>()
+        val service = SqlConsoleService(
+            config = SqlConsoleConfig(
+                sources = listOf(
+                    SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user1", "pwd1"),
+                    SqlConsoleSourceConfig("shard2", "jdbc:test:two", "user2", "pwd2"),
+                ),
+            ),
+            objectInspector = ShardSqlObjectInspector { shard, schemaName, objectName, objectType ->
+                inspected += "${shard.name}|$schemaName|$objectName|${objectType.name}"
+                SqlConsoleDatabaseObjectInspector(
+                    schemaName = schemaName,
+                    objectName = objectName,
+                    objectType = objectType,
+                    definition = "create view public.offer as select 1;",
+                    columns = listOf(
+                        SqlConsoleDatabaseObjectColumn(
+                            name = "id",
+                            type = "bigint",
+                            nullable = false,
+                        ),
+                    ),
+                )
+            },
+        )
+
+        val result = service.inspectObject(
+            sourceName = "shard2",
+            schemaName = "public",
+            objectName = "offer",
+            objectType = SqlConsoleDatabaseObjectType.VIEW,
+            credentialsPath = null,
+        )
+
+        assertEquals(listOf("shard2|public|offer|VIEW"), inspected)
+        assertEquals("create view public.offer as select 1;", result.definition)
+        assertEquals("id", result.columns.single().name)
     }
 }

@@ -17,6 +17,8 @@ interface SqlConsoleApi {
 
     suspend fun searchObjects(request: SqlConsoleObjectSearchRequest): SqlConsoleObjectSearchResponse
 
+    suspend fun inspectObject(request: SqlConsoleObjectInspectorRequest): SqlConsoleObjectInspectorResponse
+
     suspend fun startQuery(request: SqlConsoleQueryStartRequest): SqlConsoleStartQueryResponse
 
     suspend fun loadExecution(executionId: String): SqlConsoleExecutionResponse

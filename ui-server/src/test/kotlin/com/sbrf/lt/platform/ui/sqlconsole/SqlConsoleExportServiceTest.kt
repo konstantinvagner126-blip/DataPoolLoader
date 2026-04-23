@@ -40,7 +40,7 @@ class SqlConsoleExportServiceTest {
         }
         assertTrue(typeError.message!!.contains("SELECT"))
 
-        val shardError = assertFailsWith<IllegalStateException> {
+        val shardError = assertFailsWith<SqlConsoleShardResultNotFoundException> {
             service.exportShardCsv(
                 resultSetResponse(
                     SqlConsoleShardResultResponse(

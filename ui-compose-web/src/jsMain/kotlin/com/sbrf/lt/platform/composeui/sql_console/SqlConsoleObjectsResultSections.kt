@@ -57,6 +57,7 @@ internal fun SqlConsoleObjectCard(
     isSelectedObject: Boolean,
     isFavorite: Boolean,
     onToggleFavorite: () -> Unit,
+    onOpenInspector: () -> Unit,
     onOpenSelect: () -> Unit,
     onOpenCount: () -> Unit,
 ) {
@@ -80,52 +81,23 @@ internal fun SqlConsoleObjectCard(
         }
 
         Div({ classes("sql-object-action-row") }) {
-            SqlObjectActionButton(
-                if (supportsRowPreview(dbObject)) "SELECT *" else "В SQL",
-                "btn-dark",
-            ) { onOpenSelect() }
+            SqlObjectActionButton("Инспектор", "btn-dark") { onOpenInspector() }
             if (supportsRowPreview(dbObject)) {
+                SqlObjectActionButton("Открыть SELECT", "btn-outline-dark") { onOpenSelect() }
                 SqlObjectActionButton("COUNT(*)", "btn-outline-dark") { onOpenCount() }
             }
         }
 
-        if (dbObject.indexNames.isNotEmpty()) {
-            Div({ classes("small", "text-secondary", "mb-3") }) {
-                Text("Индексы: ${dbObject.indexNames.joinToString(", ")}")
-            }
-        }
-
-        dbObject.definition?.let { definition ->
-            Pre({ classes("sql-object-definition") }) {
-                Text(definition)
-            }
-        }
-
-        if (dbObject.columns.isNotEmpty()) {
-            Table({ classes("table", "table-sm", "sql-object-columns-table") }) {
-                Thead {
-                    Tr {
-                        Th { Text("Колонка") }
-                        Th { Text("Тип") }
-                        Th { Text("NULL") }
-                    }
-                }
-                Tbody {
-                    dbObject.columns.forEach { column ->
-                        Tr {
-                            Td { Text(column.name) }
-                            Td { Text(column.type) }
-                            Td { Text(if (column.nullable) "Да" else "Нет") }
-                        }
-                    }
-                }
+        if (!dbObject.tableReferenceLabel().isNullOrBlank()) {
+            Div({ classes("small", "text-secondary") }) {
+                Text(dbObject.tableReferenceLabel().orEmpty())
             }
         }
     }
 }
 
 @Composable
-private fun SqlObjectActionButton(
+internal fun SqlObjectActionButton(
     label: String,
     toneClass: String,
     onClick: () -> Unit,

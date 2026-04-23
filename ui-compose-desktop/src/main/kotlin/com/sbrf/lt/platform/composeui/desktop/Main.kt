@@ -30,13 +30,13 @@ import androidx.compose.ui.window.application
 import com.sbrf.lt.platform.composeui.home.HomePageData
 import com.sbrf.lt.platform.composeui.home.HomePageState
 import com.sbrf.lt.platform.composeui.home.HomePageStore
-import com.sbrf.lt.platform.composeui.home.label
 import com.sbrf.lt.platform.composeui.module_runs.ModuleRunsPageState
 import com.sbrf.lt.platform.composeui.module_runs.ModuleRunsRouteState
 import com.sbrf.lt.platform.composeui.module_runs.ModuleRunsStore
-import com.sbrf.lt.platform.composeui.module_runs.translateLaunchSource
-import com.sbrf.lt.platform.composeui.module_runs.translateRunStatus
 import com.sbrf.lt.platform.composeui.model.ModuleStoreMode
+import com.sbrf.lt.platform.composeui.model.label
+import com.sbrf.lt.platform.composeui.run.translateLaunchSource
+import com.sbrf.lt.platform.composeui.run.translateRunStatus
 import kotlinx.coroutines.launch
 
 fun main() = application {

@@ -63,12 +63,21 @@ internal fun buildCountSql(dbObject: SqlConsoleDatabaseObject): String =
 internal fun buildFavoriteMetadataHref(favorite: SqlConsoleFavoriteObject): String =
     "/sql-console-objects?query=${urlEncode(favorite.objectName)}&source=${urlEncode(favorite.sourceName)}&schema=${urlEncode(favorite.schemaName)}&object=${urlEncode(favorite.objectName)}&type=${urlEncode(favorite.objectType)}"
 
+internal fun buildObjectInspectorHref(
+    sourceName: String,
+    dbObject: SqlConsoleDatabaseObject,
+): String =
+    "/sql-console-objects?query=${urlEncode(dbObject.objectName)}&source=${urlEncode(sourceName)}&schema=${urlEncode(dbObject.schemaName)}&object=${urlEncode(dbObject.objectName)}&type=${urlEncode(dbObject.objectType)}"
+
 internal fun translateSqlObjectType(type: String): String =
     when (type.uppercase()) {
         "TABLE" -> "Таблица"
         "VIEW" -> "Представление"
         "MATERIALIZED_VIEW" -> "Материализованное представление"
         "INDEX" -> "Индекс"
+        "SEQUENCE" -> "Последовательность"
+        "TRIGGER" -> "Триггер"
+        "SCHEMA" -> "Схема"
         else -> type
     }
 

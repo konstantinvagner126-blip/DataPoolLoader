@@ -4,6 +4,8 @@ import com.sbrf.lt.datapool.sqlconsole.RawShardExecutionResult
 import com.sbrf.lt.datapool.sqlconsole.ShardSqlExecutor
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleConfig
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleConnectionCheckResult
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleDatabaseObjectInspector
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleDatabaseObjectType
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleExecutionCancelledException
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleExecutionControl
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleExecutionPolicy
@@ -187,6 +189,19 @@ class SqlConsoleQueryManagerTest {
                         query = rawQuery,
                         sourceResults = emptyList(),
                         maxObjectsPerSource = maxObjectsPerSource,
+                    )
+
+                override fun inspectObject(
+                    sourceName: String,
+                    schemaName: String,
+                    objectName: String,
+                    objectType: SqlConsoleDatabaseObjectType,
+                    credentialsPath: Path?,
+                ): SqlConsoleDatabaseObjectInspector =
+                    SqlConsoleDatabaseObjectInspector(
+                        schemaName = schemaName,
+                        objectName = objectName,
+                        objectType = objectType,
                     )
             },
         )

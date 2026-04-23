@@ -53,6 +53,27 @@ class SqlConsoleObjectsStore(
 
     suspend fun search(current: SqlConsoleObjectsPageState): SqlConsoleObjectsPageState =
         actionSupport.search(current)
+
+    fun beginInspectorLoad(current: SqlConsoleObjectsPageState): SqlConsoleObjectsPageState =
+        current.copy(
+            inspectorLoading = true,
+            inspectorErrorMessage = null,
+            inspectorResponse = null,
+        )
+
+    fun clearInspector(current: SqlConsoleObjectsPageState): SqlConsoleObjectsPageState =
+        current.copy(
+            inspectorLoading = false,
+            inspectorErrorMessage = null,
+            inspectorResponse = null,
+        )
+
+    suspend fun loadInspector(
+        current: SqlConsoleObjectsPageState,
+        sourceName: String,
+        value: SqlConsoleDatabaseObject,
+    ): SqlConsoleObjectsPageState =
+        actionSupport.loadInspector(current, sourceName, value)
 }
 
 internal fun SqlConsoleDatabaseObject.toFavoriteObject(sourceName: String): SqlConsoleFavoriteObject =

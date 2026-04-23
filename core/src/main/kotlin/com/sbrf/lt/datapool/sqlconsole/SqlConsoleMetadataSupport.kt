@@ -5,6 +5,7 @@ import java.nio.file.Path
 internal class SqlConsoleMetadataSupport(
     private val configSupport: SqlConsoleConfigSupport,
     private val objectSearcher: ShardSqlObjectSearcher,
+    private val objectInspector: ShardSqlObjectInspector,
 ) {
     fun searchObjects(
         config: SqlConsoleConfig,
@@ -46,6 +47,37 @@ internal class SqlConsoleMetadataSupport(
             query = query,
             sourceResults = sourceResults,
             maxObjectsPerSource = maxObjectsPerSource,
+        )
+    }
+
+    fun inspectObject(
+        config: SqlConsoleConfig,
+        sourceName: String,
+        schemaName: String,
+        objectName: String,
+        objectType: SqlConsoleDatabaseObjectType,
+        credentialsPath: Path?,
+    ): SqlConsoleDatabaseObjectInspector {
+        require(sourceName.isNotBlank()) {
+            "Укажи source для просмотра объекта БД."
+        }
+        require(schemaName.isNotBlank()) {
+            "Укажи схему объекта БД."
+        }
+        require(objectName.isNotBlank()) {
+            "Укажи имя объекта БД."
+        }
+        val shard = configSupport.resolveSources(
+            config = config,
+            credentialsPath = credentialsPath,
+            selectedSourceNames = listOf(sourceName),
+        ).singleOrNull()
+            ?: error("Не удалось разрешить source '$sourceName' для просмотра объекта БД.")
+        return objectInspector.inspectObject(
+            shard = shard,
+            schemaName = schemaName,
+            objectName = objectName,
+            objectType = objectType,
         )
     }
 }

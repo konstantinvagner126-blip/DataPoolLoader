@@ -456,6 +456,115 @@
 
 - `2026-04-19`
 
+### 0. `ui-server` boundary thinning wave
+
+Статус:
+
+- архивировано из рабочего backlog
+
+Ключевой результат:
+
+- `ui-server` перестал держать route/startup/context/runtime branching в нескольких монолитных файлах;
+- `Server.kt`, route groups, page routing, SQL-console routes и DB routes разрезаны на support/facade слои;
+- `UiServerContext` и startup/composition root стали заметно тоньше и предсказуемее.
+
+Основные даты:
+
+- `2026-04-20`
+- `2026-04-21`
+- `2026-04-22`
+- `2026-04-23`
+
+### 2. State model normalization wave
+
+Статус:
+
+- архивировано из рабочего backlog
+
+Ключевой результат:
+
+- persisted state SQL-консоли разрезан на `workspace / library / preferences` с legacy migration-only combined state;
+- `run-state.json` очищен от uploaded credentials, credentials вынесены в отдельный persisted state;
+- state-файлы и file-store helper-ы нормализованы, source-of-truth слои стали явнее.
+
+Основные даты:
+
+- `2026-04-20`
+- `2026-04-21`
+- `2026-04-22`
+- `2026-04-23`
+
+### 3. Giant UI/store file wave
+
+Статус:
+
+- реализовано
+
+Ключевой результат:
+
+- giant page/store files в `ui-compose-web` и `ui-compose-shared` разрезаны до reviewable shell/binding/effects/support состояния;
+- введен stop-condition: второй круг распила без нового архитектурного эффекта запрещен;
+- SQL console, module editor, module runs, module sync и cleanup screens переведены в более узкие section/store contracts.
+
+Основные даты:
+
+- `2026-04-20`
+- `2026-04-21`
+- `2026-04-22`
+- `2026-04-23`
+
+### 4. `styles.css` split wave
+
+Статус:
+
+- архивировано из рабочего backlog
+
+Ключевой результат:
+
+- giant `styles.css` переведен в ordered import-manifest;
+- стили разнесены по logical chunks (`foundation`, `home/help`, `config/editor`, `sql console`, `run history`, `maintenance`, `sql results`);
+- каскад сохранен, а CSS-долг перестал концентрироваться в одном файле.
+
+Основные даты:
+
+- `2026-04-20`
+- `2026-04-21`
+
+### 5. Legacy/dead code cleanup wave
+
+Статус:
+
+- архивировано из рабочего backlog
+
+Ключевой результат:
+
+- удалены legacy aliases, migration хвосты и thin wrappers, потерявшие архитектурную ценность;
+- cleanup затронул persisted state SQL-консоли, run-state, UI config, feature-local support/helpers, runtime fallback duplication и старые adapter-слои;
+- рабочий код стал короче, а historical compatibility paths отделены от production-flow.
+
+Основные даты:
+
+- `2026-04-21`
+- `2026-04-22`
+- `2026-04-23`
+
+### 6. SQL-console foundation and safety milestones
+
+Статус:
+
+- архивировано как выполненная часть активного потока
+
+Ключевой результат:
+
+- SQL-консоль сведена в единый master-stream backlog вместо разрозненных задач;
+- введены ownership, heartbeat, lease/TTL, release и recovery semantics для async execution;
+- object browser и основной экран консоли подготовлены к следующей фазе: object inspector и UX/control-flow improvements.
+
+Основные даты:
+
+- `2026-04-22`
+- `2026-04-23`
+
 ## P3
 
 ### 23. Структурирование DTO и `data class`

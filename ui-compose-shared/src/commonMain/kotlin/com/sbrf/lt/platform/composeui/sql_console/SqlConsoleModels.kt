@@ -140,6 +140,28 @@ data class SqlConsoleObjectSearchResponse(
 )
 
 @Serializable
+data class SqlConsoleObjectInspectorRequest(
+    val sourceName: String,
+    val schemaName: String,
+    val objectName: String,
+    val objectType: String,
+)
+
+@Serializable
+data class SqlConsoleObjectInspectorResponse(
+    val sourceName: String,
+    val dbObject: SqlConsoleDatabaseObject,
+    val definition: String? = null,
+    val columns: List<SqlConsoleDatabaseObjectColumn> = emptyList(),
+    val indexes: List<SqlConsoleDatabaseObjectIndex> = emptyList(),
+    val constraints: List<SqlConsoleDatabaseObjectConstraint> = emptyList(),
+    val relatedTriggers: List<SqlConsoleDatabaseObjectTrigger> = emptyList(),
+    val trigger: SqlConsoleDatabaseObjectTrigger? = null,
+    val sequence: SqlConsoleDatabaseObjectSequence? = null,
+    val schema: SqlConsoleDatabaseObjectSchema? = null,
+)
+
+@Serializable
 data class SqlConsoleObjectSourceResult(
     val sourceName: String,
     val status: String,
@@ -154,9 +176,6 @@ data class SqlConsoleDatabaseObject(
     val objectName: String,
     val objectType: String,
     val tableName: String? = null,
-    val columns: List<SqlConsoleDatabaseObjectColumn> = emptyList(),
-    val indexNames: List<String> = emptyList(),
-    val definition: String? = null,
 )
 
 @Serializable
@@ -164,6 +183,60 @@ data class SqlConsoleDatabaseObjectColumn(
     val name: String,
     val type: String,
     val nullable: Boolean,
+)
+
+@Serializable
+data class SqlConsoleDatabaseObjectIndex(
+    val name: String,
+    val tableName: String? = null,
+    val columns: List<String> = emptyList(),
+    val unique: Boolean? = null,
+    val primary: Boolean? = null,
+    val definition: String? = null,
+)
+
+@Serializable
+data class SqlConsoleDatabaseObjectConstraint(
+    val name: String,
+    val type: String,
+    val columns: List<String> = emptyList(),
+    val definition: String? = null,
+)
+
+@Serializable
+data class SqlConsoleDatabaseObjectTrigger(
+    val name: String,
+    val targetObjectName: String? = null,
+    val timing: String? = null,
+    val events: List<String> = emptyList(),
+    val enabled: Boolean? = null,
+    val functionName: String? = null,
+    val definition: String? = null,
+)
+
+@Serializable
+data class SqlConsoleDatabaseObjectSequence(
+    val incrementBy: String? = null,
+    val minimumValue: String? = null,
+    val maximumValue: String? = null,
+    val startValue: String? = null,
+    val cacheSize: String? = null,
+    val cycle: Boolean? = null,
+    val ownedBy: String? = null,
+)
+
+@Serializable
+data class SqlConsoleDatabaseObjectSchema(
+    val owner: String? = null,
+    val comment: String? = null,
+    val privileges: List<String> = emptyList(),
+    val objectCounts: List<SqlConsoleDatabaseObjectCount> = emptyList(),
+)
+
+@Serializable
+data class SqlConsoleDatabaseObjectCount(
+    val label: String,
+    val count: Int,
 )
 
 @Serializable
@@ -217,4 +290,7 @@ data class SqlConsoleObjectsPageState(
     val selectedSourceNames: List<String> = emptyList(),
     val favoriteObjects: List<SqlConsoleFavoriteObject> = emptyList(),
     val searchResponse: SqlConsoleObjectSearchResponse? = null,
+    val inspectorLoading: Boolean = false,
+    val inspectorErrorMessage: String? = null,
+    val inspectorResponse: SqlConsoleObjectInspectorResponse? = null,
 )

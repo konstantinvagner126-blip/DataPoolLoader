@@ -6,12 +6,16 @@ import io.ktor.client.plugins.websocket.webSocketSession
 import com.sbrf.lt.datapool.sqlconsole.RawShardExecutionResult
 import com.sbrf.lt.datapool.sqlconsole.RawShardConnectionCheckResult
 import com.sbrf.lt.datapool.sqlconsole.ShardConnectionChecker
+import com.sbrf.lt.datapool.sqlconsole.ShardSqlObjectInspector
 import com.sbrf.lt.datapool.sqlconsole.ShardSqlObjectSearchResult
 import com.sbrf.lt.datapool.sqlconsole.ShardSqlObjectSearcher
 import com.sbrf.lt.datapool.sqlconsole.ShardSqlExecutor
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleConfig
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleDatabaseObject
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleDatabaseObjectColumn
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleDatabaseObjectConstraint
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleDatabaseObjectIndex
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleDatabaseObjectInspector
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleDatabaseObjectType
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleExecutionCancelledException
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleSourceConfig
@@ -272,14 +276,42 @@ class ServerTest {
                             schemaName = "public",
                             objectName = "${shard.name}_offer",
                             objectType = SqlConsoleDatabaseObjectType.TABLE,
-                            columns = listOf(
-                                SqlConsoleDatabaseObjectColumn(
-                                    name = "id",
-                                    type = "bigint",
-                                    nullable = false,
-                                ),
-                            ),
-                            indexNames = listOf("${shard.name}_offer_idx"),
+                        ),
+                    ),
+                )
+            },
+            objectInspector = ShardSqlObjectInspector { shard, schemaName, objectName, objectType ->
+                assertEquals("shard1", shard.name)
+                assertEquals("public", schemaName)
+                assertEquals("shard1_offer", objectName)
+                assertEquals(SqlConsoleDatabaseObjectType.TABLE, objectType)
+                SqlConsoleDatabaseObjectInspector(
+                    schemaName = schemaName,
+                    objectName = objectName,
+                    objectType = objectType,
+                    definition = "create table public.shard1_offer (id bigint not null);",
+                    columns = listOf(
+                        SqlConsoleDatabaseObjectColumn(
+                            name = "id",
+                            type = "bigint",
+                            nullable = false,
+                        ),
+                    ),
+                    indexes = listOf(
+                        SqlConsoleDatabaseObjectIndex(
+                            name = "shard1_offer_idx",
+                            tableName = objectName,
+                            columns = listOf("id"),
+                            unique = true,
+                            definition = "create unique index shard1_offer_idx on public.shard1_offer (id);",
+                        ),
+                    ),
+                    constraints = listOf(
+                        SqlConsoleDatabaseObjectConstraint(
+                            name = "shard1_offer_pkey",
+                            type = "PRIMARY KEY",
+                            columns = listOf("id"),
+                            definition = "primary key (id)",
                         ),
                     ),
                 )
@@ -466,7 +498,16 @@ class ServerTest {
         assertTrue(objects.contains("\"query\":\"offer\""))
         assertTrue(objects.contains("\"sourceName\":\"shard1\""))
         assertTrue(objects.contains("\"objectName\":\"shard1_offer\""))
-        assertTrue(objects.contains("\"indexNames\":[\"shard1_offer_idx\"]"))
+        assertFalse(objects.contains("\"indexNames\""))
+
+        val inspector = client.post("/api/sql-console/objects/inspect") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"sourceName":"shard1","schemaName":"public","objectName":"shard1_offer","objectType":"TABLE"}""")
+        }.bodyAsText()
+        assertTrue(inspector.contains("\"sourceName\":\"shard1\""))
+        assertTrue(inspector.contains("\"objectName\":\"shard1_offer\""))
+        assertTrue(inspector.contains("\"definition\":\"create table public.shard1_offer (id bigint not null);\""))
+        assertTrue(inspector.contains("\"constraints\":["))
 
         val queryResponse = client.post("/api/sql-console/query") {
             contentType(ContentType.Application.Json)

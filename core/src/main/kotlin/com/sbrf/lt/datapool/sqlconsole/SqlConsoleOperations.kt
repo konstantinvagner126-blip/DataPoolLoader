@@ -32,6 +32,14 @@ interface SqlConsoleOperations {
         selectedSourceNames: List<String> = emptyList(),
         maxObjectsPerSource: Int = 30,
     ): SqlConsoleDatabaseObjectSearchResult
+
+    fun inspectObject(
+        sourceName: String,
+        schemaName: String,
+        objectName: String,
+        objectType: SqlConsoleDatabaseObjectType,
+        credentialsPath: Path?,
+    ): SqlConsoleDatabaseObjectInspector
 }
 
 interface SqlConsoleTransactionalOperations {

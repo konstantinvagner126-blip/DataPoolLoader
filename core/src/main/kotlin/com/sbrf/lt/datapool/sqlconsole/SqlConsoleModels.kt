@@ -52,6 +52,9 @@ enum class SqlConsoleDatabaseObjectType {
     VIEW,
     MATERIALIZED_VIEW,
     INDEX,
+    SEQUENCE,
+    TRIGGER,
+    SCHEMA,
 }
 
 data class SqlConsoleStatement(
@@ -126,15 +129,75 @@ data class SqlConsoleDatabaseObject(
     val objectName: String,
     val objectType: SqlConsoleDatabaseObjectType,
     val tableName: String? = null,
-    val columns: List<SqlConsoleDatabaseObjectColumn> = emptyList(),
-    val indexNames: List<String> = emptyList(),
-    val definition: String? = null,
 )
 
 data class SqlConsoleDatabaseObjectColumn(
     val name: String,
     val type: String,
     val nullable: Boolean,
+)
+
+data class SqlConsoleDatabaseObjectInspector(
+    val schemaName: String,
+    val objectName: String,
+    val objectType: SqlConsoleDatabaseObjectType,
+    val tableName: String? = null,
+    val definition: String? = null,
+    val columns: List<SqlConsoleDatabaseObjectColumn> = emptyList(),
+    val indexes: List<SqlConsoleDatabaseObjectIndex> = emptyList(),
+    val constraints: List<SqlConsoleDatabaseObjectConstraint> = emptyList(),
+    val relatedTriggers: List<SqlConsoleDatabaseObjectTrigger> = emptyList(),
+    val trigger: SqlConsoleDatabaseObjectTrigger? = null,
+    val sequence: SqlConsoleDatabaseObjectSequence? = null,
+    val schema: SqlConsoleDatabaseObjectSchema? = null,
+)
+
+data class SqlConsoleDatabaseObjectIndex(
+    val name: String,
+    val tableName: String? = null,
+    val columns: List<String> = emptyList(),
+    val unique: Boolean? = null,
+    val primary: Boolean? = null,
+    val definition: String? = null,
+)
+
+data class SqlConsoleDatabaseObjectConstraint(
+    val name: String,
+    val type: String,
+    val columns: List<String> = emptyList(),
+    val definition: String? = null,
+)
+
+data class SqlConsoleDatabaseObjectTrigger(
+    val name: String,
+    val targetObjectName: String? = null,
+    val timing: String? = null,
+    val events: List<String> = emptyList(),
+    val enabled: Boolean? = null,
+    val functionName: String? = null,
+    val definition: String? = null,
+)
+
+data class SqlConsoleDatabaseObjectSequence(
+    val incrementBy: String? = null,
+    val minimumValue: String? = null,
+    val maximumValue: String? = null,
+    val startValue: String? = null,
+    val cacheSize: String? = null,
+    val cycle: Boolean? = null,
+    val ownedBy: String? = null,
+)
+
+data class SqlConsoleDatabaseObjectSchema(
+    val owner: String? = null,
+    val comment: String? = null,
+    val privileges: List<String> = emptyList(),
+    val objectCounts: List<SqlConsoleDatabaseObjectCount> = emptyList(),
+)
+
+data class SqlConsoleDatabaseObjectCount(
+    val label: String,
+    val count: Int,
 )
 
 data class SqlConsoleExecutionRun(

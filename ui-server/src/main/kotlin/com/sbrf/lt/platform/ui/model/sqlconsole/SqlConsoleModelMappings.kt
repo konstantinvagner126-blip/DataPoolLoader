@@ -4,9 +4,16 @@ import com.sbrf.lt.datapool.sqlconsole.RawShardConnectionCheckResult
 import com.sbrf.lt.datapool.sqlconsole.RawShardExecutionResult
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleConnectionCheckResult
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleDatabaseObject
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleDatabaseObjectConstraint
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleDatabaseObjectColumn
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleDatabaseObjectCount
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleDatabaseObjectIndex
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleDatabaseObjectInspector
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleDatabaseObjectSearchResult
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleDatabaseObjectSchema
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleDatabaseObjectSequence
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleDatabaseObjectSourceResult
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleDatabaseObjectTrigger
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleInfo
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleQueryResult
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleStatementResult
@@ -34,6 +41,24 @@ fun SqlConsoleDatabaseObjectSearchResult.toResponse(): SqlConsoleObjectSearchRes
     query = query,
     maxObjectsPerSource = maxObjectsPerSource,
     sourceResults = sourceResults.map { it.toResponse() },
+)
+
+fun SqlConsoleDatabaseObjectInspector.toResponse(sourceName: String): SqlConsoleObjectInspectorResponse = SqlConsoleObjectInspectorResponse(
+    sourceName = sourceName,
+    dbObject = SqlConsoleDatabaseObject(
+        schemaName = schemaName,
+        objectName = objectName,
+        objectType = objectType,
+        tableName = tableName,
+    ).toResponse(),
+    definition = definition,
+    columns = columns.map { it.toResponse() },
+    indexes = indexes.map { it.toResponse() },
+    constraints = constraints.map { it.toResponse() },
+    relatedTriggers = relatedTriggers.map { it.toResponse() },
+    trigger = trigger?.toResponse(),
+    sequence = sequence?.toResponse(),
+    schema = schema?.toResponse(),
 )
 
 /**
@@ -130,9 +155,6 @@ private fun SqlConsoleDatabaseObject.toResponse(): SqlConsoleDatabaseObjectRespo
     objectName = objectName,
     objectType = objectType.name,
     tableName = tableName,
-    columns = columns.map { it.toResponse() },
-    indexNames = indexNames,
-    definition = definition,
 )
 
 private fun SqlConsoleDatabaseObjectColumn.toResponse(): SqlConsoleDatabaseObjectColumnResponse =
@@ -140,4 +162,58 @@ private fun SqlConsoleDatabaseObjectColumn.toResponse(): SqlConsoleDatabaseObjec
         name = name,
         type = type,
         nullable = nullable,
+    )
+
+private fun SqlConsoleDatabaseObjectIndex.toResponse(): SqlConsoleDatabaseObjectIndexResponse =
+    SqlConsoleDatabaseObjectIndexResponse(
+        name = name,
+        tableName = tableName,
+        columns = columns,
+        unique = unique,
+        primary = primary,
+        definition = definition,
+    )
+
+private fun SqlConsoleDatabaseObjectConstraint.toResponse(): SqlConsoleDatabaseObjectConstraintResponse =
+    SqlConsoleDatabaseObjectConstraintResponse(
+        name = name,
+        type = type,
+        columns = columns,
+        definition = definition,
+    )
+
+private fun SqlConsoleDatabaseObjectTrigger.toResponse(): SqlConsoleDatabaseObjectTriggerResponse =
+    SqlConsoleDatabaseObjectTriggerResponse(
+        name = name,
+        targetObjectName = targetObjectName,
+        timing = timing,
+        events = events,
+        enabled = enabled,
+        functionName = functionName,
+        definition = definition,
+    )
+
+private fun SqlConsoleDatabaseObjectSequence.toResponse(): SqlConsoleDatabaseObjectSequenceResponse =
+    SqlConsoleDatabaseObjectSequenceResponse(
+        incrementBy = incrementBy,
+        minimumValue = minimumValue,
+        maximumValue = maximumValue,
+        startValue = startValue,
+        cacheSize = cacheSize,
+        cycle = cycle,
+        ownedBy = ownedBy,
+    )
+
+private fun SqlConsoleDatabaseObjectSchema.toResponse(): SqlConsoleDatabaseObjectSchemaResponse =
+    SqlConsoleDatabaseObjectSchemaResponse(
+        owner = owner,
+        comment = comment,
+        privileges = privileges,
+        objectCounts = objectCounts.map { it.toResponse() },
+    )
+
+private fun SqlConsoleDatabaseObjectCount.toResponse(): SqlConsoleDatabaseObjectCountResponse =
+    SqlConsoleDatabaseObjectCountResponse(
+        label = label,
+        count = count,
     )
