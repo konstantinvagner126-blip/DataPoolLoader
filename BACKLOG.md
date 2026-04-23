@@ -396,6 +396,9 @@
   - ownership isolation между вкладками;
   - refresh/reopen одного tab workspace;
   - close одной вкладки без потери control-path другой.
+- дополнительный hardening этого пакета уже закреплен regression coverage:
+  - route-level `409 Conflict` с canonical user-facing message для попытки открыть вторую manual transaction при чужом `PENDING_COMMIT`;
+  - manager-level invariant: release/cancel завершения одной execution session не должны затрагивать другую execution session в соседнем workspace.
 
 Фаза A3. Global source groups и selection model:
 

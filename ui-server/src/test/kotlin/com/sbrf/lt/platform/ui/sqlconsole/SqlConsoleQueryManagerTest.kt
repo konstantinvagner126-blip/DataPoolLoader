@@ -714,12 +714,77 @@ class SqlConsoleQueryManagerTest {
         assertTrue(finished.errorMessage!!.contains("владелец"))
     }
 
+    @Test
+    fun `releasing one workspace execution does not affect another workspace execution`() {
+        val releaseExecution = CountDownLatch(1)
+        val manager = SqlConsoleQueryManager(
+            sqlConsoleService = autoCommitBlockingService(releaseExecution),
+        )
+
+        val first = manager.startQuery(
+            sql = "select 1 as first_value",
+            credentialsPath = null,
+            workspaceId = "workspace-a",
+            ownerSessionId = "owner-a",
+        )
+        val second = manager.startQuery(
+            sql = "select 1 as second_value",
+            credentialsPath = null,
+            workspaceId = "workspace-b",
+            ownerSessionId = "owner-b",
+        )
+
+        assertEquals(first.id, manager.currentSnapshot("workspace-a")?.id)
+        assertEquals(second.id, manager.currentSnapshot("workspace-b")?.id)
+
+        manager.releaseOwnership(first.id, "owner-a", requireNotNull(first.ownerToken))
+        val cancelledSecond = manager.cancel(second.id, "owner-b", requireNotNull(second.ownerToken))
+
+        assertTrue(cancelledSecond.cancelRequested)
+
+        releaseExecution.countDown()
+        val finishedFirst = waitForCompletion(manager, first.id)
+        val finishedSecond = waitForCompletion(manager, second.id)
+
+        assertEquals(SqlConsoleExecutionStatus.SUCCESS, finishedFirst.status)
+        assertEquals(SqlConsoleExecutionStatus.CANCELLED, finishedSecond.status)
+    }
+
     private fun serviceWithSuccess() = SqlConsoleService(
         config = SqlConsoleConfig(
             sourceCatalog = listOf(SqlConsoleSourceConfig("db1", "jdbc:test", "user", "pwd")),
         ),
         executor = ShardSqlExecutor { shard, statement, _, _, _, _ ->
             assertEquals("SELECT", statement.leadingKeyword)
+            RawShardExecutionResult(
+                shardName = shard.name,
+                status = "SUCCESS",
+                columns = listOf("id"),
+                rows = listOf(mapOf("id" to "1")),
+            )
+        },
+    )
+
+    private fun autoCommitBlockingService(releaseExecution: CountDownLatch) = SqlConsoleService(
+        config = SqlConsoleConfig(
+            sourceCatalog = listOf(SqlConsoleSourceConfig("db1", "jdbc:test", "user", "pwd")),
+        ),
+        executor = ShardSqlExecutor { shard, statement, _, _, _, control ->
+            repeat(100) {
+                if (control.isCancelled()) {
+                    throw SqlConsoleExecutionCancelledException("Запрос отменен пользователем.")
+                }
+                if (releaseExecution.count == 0L) {
+                    return@ShardSqlExecutor RawShardExecutionResult(
+                        shardName = shard.name,
+                        status = "SUCCESS",
+                        columns = listOf("id"),
+                        rows = listOf(mapOf("id" to "1")),
+                    )
+                }
+                Thread.sleep(5)
+            }
+            releaseExecution.await()
             RawShardExecutionResult(
                 shardName = shard.name,
                 status = "SUCCESS",

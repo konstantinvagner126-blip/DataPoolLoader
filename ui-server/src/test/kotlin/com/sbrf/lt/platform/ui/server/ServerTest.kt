@@ -975,6 +975,116 @@ class ServerTest {
     }
 
     @Test
+    fun `rejects second manual transaction route when another workspace already has pending commit`() = testApplication {
+        val root = createProject()
+        val registry = ModuleRegistry(appsRoot = root.resolve("apps"))
+        val storageDir = Files.createTempDirectory("ui-server-state-")
+        val uiConfig = UiAppConfig(
+            storageDir = storageDir.toString(),
+            sqlConsole = SqlConsoleConfig(
+                queryTimeoutSec = 30,
+                sourceCatalog = listOf(SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user", "pwd")),
+            ),
+        )
+        val runManager = RunManager(moduleRegistry = registry, uiConfig = uiConfig)
+        val sqlConsoleService = SqlConsoleService(
+            config = uiConfig.sqlConsole,
+            executor = object : ShardSqlExecutor, com.sbrf.lt.datapool.sqlconsole.ShardSqlTransactionalExecutor {
+                override fun execute(
+                    shard: com.sbrf.lt.datapool.sqlconsole.ResolvedSqlConsoleShardConfig,
+                    statement: com.sbrf.lt.datapool.sqlconsole.SqlConsoleStatement,
+                    fetchSize: Int,
+                    maxRows: Int,
+                    queryTimeoutSec: Int?,
+                    executionControl: com.sbrf.lt.datapool.sqlconsole.SqlConsoleExecutionControl,
+                ): RawShardExecutionResult =
+                    RawShardExecutionResult(
+                        shardName = shard.name,
+                        status = "SUCCESS",
+                        columns = listOf("id"),
+                        rows = listOf(mapOf("id" to "1")),
+                    )
+
+                override fun executeScriptInTransaction(
+                    shard: com.sbrf.lt.datapool.sqlconsole.ResolvedSqlConsoleShardConfig,
+                    statements: List<com.sbrf.lt.datapool.sqlconsole.SqlConsoleStatement>,
+                    fetchSize: Int,
+                    maxRows: Int,
+                    queryTimeoutSec: Int?,
+                    executionPolicy: com.sbrf.lt.datapool.sqlconsole.SqlConsoleExecutionPolicy,
+                    executionControl: com.sbrf.lt.datapool.sqlconsole.SqlConsoleExecutionControl,
+                ): com.sbrf.lt.datapool.sqlconsole.TransactionalShardScriptExecution =
+                    com.sbrf.lt.datapool.sqlconsole.TransactionalShardScriptExecution(
+                        results = statements.map {
+                            RawShardExecutionResult(
+                                shardName = shard.name,
+                                status = "SUCCESS",
+                                affectedRows = 1,
+                                message = "ok",
+                            )
+                        },
+                        pendingTransaction = object : com.sbrf.lt.datapool.sqlconsole.PendingShardTransaction {
+                            override val shardName: String = shard.name
+
+                            override fun commit() = Unit
+
+                            override fun rollback() = Unit
+                        },
+                    )
+            },
+        )
+        val queryManager = SqlConsoleQueryManager(sqlConsoleService)
+        application {
+            uiModule(
+                moduleRegistry = registry,
+                runManager = runManager,
+                sqlConsoleService = sqlConsoleService,
+                sqlConsoleQueryManager = queryManager,
+            )
+        }
+
+        val started = client.post("/api/sql-console/query/start") {
+            contentType(ContentType.Application.Json)
+            setBody(
+                """{"sql":"update demo set flag = true","selectedSourceNames":["shard1"],"workspaceId":"workspace-a","ownerSessionId":"tab-1","transactionMode":"TRANSACTION_PER_SHARD"}"""
+            )
+        }
+        assertEquals(HttpStatusCode.OK, started.status)
+        val startedBody = started.bodyAsText()
+        val executionId = Regex(""""id":"([^"]+)"""").find(startedBody)?.groupValues?.get(1)
+        assertNotNull(executionId)
+        val ownerToken = Regex(""""ownerToken":"([^"]+)"""").find(startedBody)?.groupValues?.get(1)
+        assertNotNull(ownerToken)
+
+        repeat(20) {
+            val polled = client.get("/api/sql-console/query/$executionId").bodyAsText()
+            if (polled.contains(""""transactionState":"PENDING_COMMIT"""")) {
+                val duplicateStart = client.post("/api/sql-console/query/start") {
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """{"sql":"update demo_again set flag = true","selectedSourceNames":["shard1"],"workspaceId":"workspace-b","ownerSessionId":"tab-2","transactionMode":"TRANSACTION_PER_SHARD"}"""
+                    )
+                }
+                assertEquals(HttpStatusCode.Conflict, duplicateStart.status)
+                assertTrue(
+                    duplicateStart.bodyAsText().contains(
+                        "В другой вкладке SQL-консоли есть незавершенная транзакция. Сначала выполните Commit или Rollback в той вкладке. Пока транзакция не завершена, запуск новой ручной транзакции недоступен."
+                    )
+                )
+
+                val rolledBack = client.post("/api/sql-console/query/$executionId/rollback") {
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"ownerSessionId":"tab-1","ownerToken":"$ownerToken"}""")
+                }
+                assertEquals(HttpStatusCode.OK, rolledBack.status)
+                return@testApplication
+            }
+            Thread.sleep(25)
+        }
+        error("manual SQL execution did not reach pending commit in time")
+    }
+
+    @Test
     fun `returns apps root diagnostics when modules path is not configured`() = testApplication {
         val uiConfig = UiAppConfig(storageDir = Files.createTempDirectory("ui-server-state-").toString())
         application {
