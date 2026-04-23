@@ -96,6 +96,25 @@ data class SqlConsoleExecutionResponse(
 )
 
 @Serializable
+data class SqlConsoleExecutionHistoryResponse(
+    val entries: List<SqlConsoleExecutionHistoryEntry> = emptyList(),
+)
+
+@Serializable
+data class SqlConsoleExecutionHistoryEntry(
+    val executionId: String,
+    val sql: String,
+    val selectedSourceNames: List<String> = emptyList(),
+    val autoCommitEnabled: Boolean = true,
+    val status: String,
+    val transactionState: String = "NONE",
+    val startedAt: String,
+    val finishedAt: String? = null,
+    val durationMillis: Long? = null,
+    val errorMessage: String? = null,
+)
+
+@Serializable
 data class SqlConsoleExecutionOwnerActionRequest(
     val ownerSessionId: String,
     val ownerToken: String,
@@ -310,6 +329,7 @@ data class SqlConsolePageState(
     val recentQueries: List<String> = emptyList(),
     val favoriteQueries: List<String> = emptyList(),
     val favoriteObjects: List<SqlConsoleFavoriteObject> = emptyList(),
+    val executionHistory: List<SqlConsoleExecutionHistoryEntry> = emptyList(),
     val selectedSourceNames: List<String> = emptyList(),
     val selectedGroupNames: List<String> = emptyList(),
     val manuallyIncludedSourceNames: List<String> = emptyList(),

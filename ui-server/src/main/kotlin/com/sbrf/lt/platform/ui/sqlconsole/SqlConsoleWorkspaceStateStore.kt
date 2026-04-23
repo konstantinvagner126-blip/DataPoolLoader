@@ -56,7 +56,7 @@ internal const val DEFAULT_SQL_CONSOLE_WORKSPACE_ID = "default"
 internal fun normalizeSqlConsoleWorkspaceId(value: String?): String =
     value?.trim()?.takeIf { it.isNotEmpty() } ?: DEFAULT_SQL_CONSOLE_WORKSPACE_ID
 
-private fun String.toFileNameToken(): String =
+internal fun String.toFileNameToken(): String =
     lowercase()
         .map { char ->
             when {

@@ -11,6 +11,9 @@ class SqlConsoleApiClient(
     private fun sqlConsoleStatePath(workspaceId: String? = null): String =
         "/api/sql-console/state?workspaceId=${urlEncode(workspaceId ?: resolveSqlConsoleWorkspaceId())}"
 
+    private fun sqlConsoleHistoryPath(workspaceId: String? = null): String =
+        "/api/sql-console/history?workspaceId=${urlEncode(workspaceId ?: resolveSqlConsoleWorkspaceId())}"
+
     override suspend fun loadRuntimeContext(): RuntimeContext =
         httpClient.get("/api/ui/runtime-context", RuntimeContext.serializer())
 
@@ -19,6 +22,9 @@ class SqlConsoleApiClient(
 
     override suspend fun loadState(workspaceId: String?): SqlConsoleStateSnapshot =
         httpClient.get(sqlConsoleStatePath(workspaceId), SqlConsoleStateSnapshot.serializer())
+
+    override suspend fun loadExecutionHistory(workspaceId: String?): SqlConsoleExecutionHistoryResponse =
+        httpClient.get(sqlConsoleHistoryPath(workspaceId), SqlConsoleExecutionHistoryResponse.serializer())
 
     override suspend fun saveState(
         request: SqlConsoleStateUpdate,

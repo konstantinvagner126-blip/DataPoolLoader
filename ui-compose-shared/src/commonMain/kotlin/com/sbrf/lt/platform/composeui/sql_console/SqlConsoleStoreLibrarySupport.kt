@@ -13,6 +13,29 @@ internal class SqlConsoleStoreLibrarySupport {
     ): SqlConsolePageState =
         if (value.isBlank()) current else current.copy(draftSql = value)
 
+    fun applyExecutionHistoryEntry(
+        current: SqlConsolePageState,
+        entry: SqlConsoleExecutionHistoryEntry,
+    ): SqlConsolePageState {
+        val info = current.info ?: return current.copy(draftSql = entry.sql)
+        val knownSourceNames = info.sourceCatalogNames().toSet()
+        val validSourceNames = entry.selectedSourceNames.filter { it in knownSourceNames }
+        val selectionState = initializeSelectedSourceState(info.groups, validSourceNames)
+        return current.copy(
+            draftSql = entry.sql,
+            selectedSourceNames = selectionState.selectedSourceNames,
+            selectedGroupNames = selectionState.selectedGroupNames,
+            manuallyIncludedSourceNames = selectionState.manuallyIncludedSourceNames,
+            manuallyExcludedSourceNames = selectionState.manuallyExcludedSourceNames,
+            errorMessage = null,
+            successMessage = if (validSourceNames.isEmpty()) {
+                "SQL восстановлен из истории выполнения, но исходные источники больше недоступны в текущей конфигурации."
+            } else {
+                "SQL и набор источников восстановлены из истории выполнения."
+            },
+        )
+    }
+
     fun rememberFavoriteQuery(current: SqlConsolePageState): SqlConsolePageState {
         val sql = current.draftSql.trim()
         if (sql.isBlank()) {

@@ -20,6 +20,7 @@ import com.sbrf.lt.platform.ui.run.RunManager
 import com.sbrf.lt.platform.ui.run.UiCredentialsService
 import com.sbrf.lt.platform.ui.run.history.ModuleRunHistoryService
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleAsyncQueryOperations
+import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleExecutionHistoryService
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleExportService
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleStateService
 
@@ -39,6 +40,7 @@ internal data class UiServerContextDependencies(
     val sqlConsoleService: SqlConsoleOperations,
     val sqlConsoleQueryManager: SqlConsoleAsyncQueryOperations,
     val sqlConsoleExportService: SqlConsoleExportService,
+    val sqlConsoleExecutionHistoryService: SqlConsoleExecutionHistoryService,
     val sqlConsoleStateService: SqlConsoleStateService,
     val uiConfigPersistenceService: UiConfigPersistenceService,
     val moduleSyncService: ModuleSyncService?,

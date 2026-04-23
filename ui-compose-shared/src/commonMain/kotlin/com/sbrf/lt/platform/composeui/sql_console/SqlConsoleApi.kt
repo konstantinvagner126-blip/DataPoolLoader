@@ -9,6 +9,8 @@ interface SqlConsoleApi {
 
     suspend fun loadState(workspaceId: String? = null): SqlConsoleStateSnapshot
 
+    suspend fun loadExecutionHistory(workspaceId: String? = null): SqlConsoleExecutionHistoryResponse
+
     suspend fun saveState(
         request: SqlConsoleStateUpdate,
         workspaceId: String? = null,

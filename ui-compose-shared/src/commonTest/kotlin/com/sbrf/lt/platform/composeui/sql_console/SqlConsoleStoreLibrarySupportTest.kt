@@ -30,4 +30,31 @@ class SqlConsoleStoreLibrarySupportTest {
         assertEquals("Сначала введи SQL-запрос.", updated.errorMessage)
         assertEquals(null, updated.successMessage)
     }
+
+    @Test
+    fun `apply execution history restores draft and exact source selection`() {
+        val current = SqlConsolePageState(
+            info = sampleSqlConsoleInfo(),
+            draftSql = "select 1",
+            selectedGroupNames = listOf("dev"),
+            selectedSourceNames = listOf("db1", "db2"),
+        )
+
+        val updated = support.applyExecutionHistoryEntry(
+            current = current,
+            entry = SqlConsoleExecutionHistoryEntry(
+                executionId = "exec-7",
+                sql = "select * from restored_table",
+                selectedSourceNames = listOf("db1", "db3"),
+                status = "SUCCESS",
+                startedAt = "2026-04-23T11:10:00Z",
+            ),
+        )
+
+        assertEquals("select * from restored_table", updated.draftSql)
+        assertEquals(listOf("db3", "db1"), updated.selectedSourceNames)
+        assertEquals(listOf("Без группы"), updated.selectedGroupNames)
+        assertEquals(listOf("db1"), updated.manuallyIncludedSourceNames)
+        assertEquals(emptyList(), updated.manuallyExcludedSourceNames)
+    }
 }

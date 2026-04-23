@@ -275,6 +275,117 @@
   gap: 1rem;
 }
 
+.sql-history-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 0.95rem;
+}
+
+.sql-history-block-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.sql-history-list {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.sql-history-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 0.8rem 0.9rem;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid rgba(19, 34, 56, 0.08);
+}
+
+.sql-history-entry-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+}
+
+.sql-history-entry-statuses {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.sql-history-status,
+.sql-history-mode {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.sql-history-status-success,
+.sql-history-status-commit {
+  background: rgba(25, 135, 84, 0.12);
+  color: #146c43;
+}
+
+.sql-history-status-pending {
+  background: rgba(255, 193, 7, 0.18);
+  color: #9a6700;
+}
+
+.sql-history-status-rollback,
+.sql-history-status-cancelled {
+  background: rgba(108, 117, 125, 0.14);
+  color: #495057;
+}
+
+.sql-history-status-failed {
+  background: rgba(220, 53, 69, 0.14);
+  color: #b42318;
+}
+
+.sql-history-status-neutral,
+.sql-history-mode {
+  background: rgba(29, 111, 216, 0.1);
+  color: #1d4ed8;
+}
+
+.sql-history-entry-meta,
+.sql-history-entry-sources {
+  font-size: 0.8rem;
+  color: #52657e;
+}
+
+.sql-history-entry-sql {
+  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: #132238;
+  word-break: break-word;
+}
+
+.sql-history-entry-error {
+  font-size: 0.8rem;
+  color: #b42318;
+}
+
+.sql-history-entry-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
 .sql-query-library-block {
   min-width: 0;
 }

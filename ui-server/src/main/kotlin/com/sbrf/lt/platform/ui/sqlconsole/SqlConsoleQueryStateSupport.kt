@@ -14,6 +14,7 @@ private const val MANUAL_TRANSACTION_RUNNING_CONFLICT_MESSAGE =
     "В другой вкладке SQL-консоли уже выполняется ручная транзакция. Дождись завершения или отмени ее, прежде чем запускать новую."
 
 internal class SqlConsoleQueryStateSupport(
+    private val executionHistoryService: SqlConsoleExecutionHistoryService? = null,
     private val ownerLeaseDuration: Duration = Duration.ofSeconds(15),
     private val ownerReleaseRecoveryWindow: Duration = Duration.ofSeconds(5),
     private val pendingCommitTtl: Duration = Duration.ofMinutes(2),
@@ -25,6 +26,8 @@ internal class SqlConsoleQueryStateSupport(
 
     fun prepareStart(
         autoCommitEnabled: Boolean,
+        sql: String,
+        selectedSourceNames: List<String>,
         workspaceId: String?,
         ownerSessionId: String,
         now: Instant,
@@ -49,6 +52,8 @@ internal class SqlConsoleQueryStateSupport(
                 ownerLeaseExpiresAt = now.plus(ownerLeaseDuration),
             ),
             control = SqlConsoleExecutionControl(),
+            sql = sql,
+            selectedSourceNames = selectedSourceNames,
             workspaceId = normalizedWorkspaceId,
             ownerSessionId = ownerSessionId,
             ownerToken = ownerToken,
@@ -138,6 +143,7 @@ internal class SqlConsoleQueryStateSupport(
         }
 
         executionsById[executionId] = updated
+        executionHistoryService?.recordExecutionSnapshot(updated)
         pruneCompletedExecutions()
     }
 
@@ -228,6 +234,7 @@ internal class SqlConsoleQueryStateSupport(
     ): SqlConsoleExecutionSnapshot = synchronized(lock) {
         val updated = update(requireOwnedExecution(executionId, ownerSessionId, ownerToken))
         executionsById[executionId] = updated
+        executionHistoryService?.recordExecutionSnapshot(updated)
         pruneCompletedExecutions()
         updated.snapshot
     }
@@ -286,6 +293,7 @@ internal class SqlConsoleQueryStateSupport(
 
             if (changed) {
                 executionsById[executionId] = updated
+                executionHistoryService?.recordExecutionSnapshot(updated)
                 lastChangedSnapshot = updated.snapshot
             }
         }

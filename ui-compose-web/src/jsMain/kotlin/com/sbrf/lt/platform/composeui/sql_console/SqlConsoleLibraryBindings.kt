@@ -93,6 +93,31 @@ internal class SqlConsoleLibraryBindings(
         context.focusEditor()
     }
 
+    fun applyExecutionHistory(entry: SqlConsoleExecutionHistoryEntry) {
+        context.updateState { context.store.applyExecutionHistoryEntry(it, entry) }
+        context.focusEditor()
+    }
+
+    fun repeatExecutionHistory(entry: SqlConsoleExecutionHistoryEntry) {
+        context.scope.launch {
+            val preparedState = context.store.applyExecutionHistoryEntry(context.currentState(), entry)
+            context.setState(preparedState)
+            if (preparedState.selectedSourceNames.isEmpty()) {
+                context.focusEditor()
+                return@launch
+            }
+            context.setState(
+                context.store.startQuery(
+                    current = preparedState,
+                    workspaceId = context.currentUiState().workspaceId,
+                    ownerSessionId = context.currentUiState().ownerSessionId,
+                    sqlOverride = entry.sql,
+                    successMessage = "Запрос из execution history запущен.",
+                ),
+            )
+        }
+    }
+
     fun rememberFavorite() {
         context.updateState { context.store.rememberFavoriteQuery(it) }
     }

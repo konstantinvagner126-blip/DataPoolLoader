@@ -131,6 +131,24 @@ internal fun SqlConsolePageEffects(
         }
     }
 
+    LaunchedEffect(
+        currentUiState().workspaceId,
+        currentState().currentExecutionId,
+        currentExecution?.status,
+        currentExecution?.transactionState,
+        currentExecution?.finishedAt,
+    ) {
+        if (currentState().loading || currentState().currentExecutionId == null || currentExecution == null) {
+            return@LaunchedEffect
+        }
+        val shouldRefreshHistory = currentExecution.transactionState == "PENDING_COMMIT" ||
+            currentExecution.status != "RUNNING"
+        if (!shouldRefreshHistory) {
+            return@LaunchedEffect
+        }
+        setState(store.refreshExecutionHistory(currentState(), currentUiState().workspaceId))
+    }
+
     DisposableEffect(
         currentState().currentExecutionId,
         currentExecution?.ownerToken,

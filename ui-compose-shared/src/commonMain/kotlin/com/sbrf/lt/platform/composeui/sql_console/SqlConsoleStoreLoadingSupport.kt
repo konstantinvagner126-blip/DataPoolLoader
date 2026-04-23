@@ -25,6 +25,7 @@ internal class SqlConsoleStoreLoadingSupport(
 
         val persistedStateResult = runCatching { api.loadState(workspaceId) }
         val persistedState = persistedStateResult.getOrDefault(defaultSqlConsoleStateSnapshot())
+        val executionHistory = runCatching { api.loadExecutionHistory(workspaceId).entries }.getOrDefault(emptyList())
         val allSourceNames = info.sourceCatalogNames()
         val selectedSources = persistedState.selectedSourceNames
             .filter { it in allSourceNames }
@@ -43,6 +44,7 @@ internal class SqlConsoleStoreLoadingSupport(
             recentQueries = persistedState.recentQueries,
             favoriteQueries = persistedState.favoriteQueries,
             favoriteObjects = persistedState.favoriteObjects,
+            executionHistory = executionHistory,
             selectedSourceNames = sourceSelectionState.selectedSourceNames,
             selectedGroupNames = sourceSelectionState.selectedGroupNames,
             manuallyIncludedSourceNames = sourceSelectionState.manuallyIncludedSourceNames,
@@ -71,6 +73,16 @@ internal class SqlConsoleStoreLoadingSupport(
         runCatching {
             api.saveState(current.toPersistedState(), workspaceId = workspaceId)
             current
+        }.getOrElse {
+            current
+        }
+
+    suspend fun refreshExecutionHistory(
+        current: SqlConsolePageState,
+        workspaceId: String,
+    ): SqlConsolePageState =
+        runCatching {
+            current.copy(executionHistory = api.loadExecutionHistory(workspaceId).entries)
         }.getOrElse {
             current
         }

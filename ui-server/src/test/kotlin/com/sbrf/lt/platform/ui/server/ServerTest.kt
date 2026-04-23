@@ -74,6 +74,7 @@ import com.sbrf.lt.platform.ui.run.RunStateStore
 import com.sbrf.lt.platform.ui.run.UiCredentialsService
 import com.sbrf.lt.platform.ui.run.UiCredentialsProvider
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleQueryManager
+import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleExecutionHistoryService
 import io.ktor.client.request.get
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
@@ -906,13 +907,18 @@ class ServerTest {
                 )
             },
         )
-        val queryManager = SqlConsoleQueryManager(sqlConsoleService)
+        val historyService = SqlConsoleExecutionHistoryService(storageDir)
+        val queryManager = SqlConsoleQueryManager(
+            sqlConsoleService = sqlConsoleService,
+            executionHistoryService = historyService,
+        )
         application {
             uiModule(
                 moduleRegistry = registry,
                 runManager = runManager,
                 sqlConsoleService = sqlConsoleService,
                 sqlConsoleQueryManager = queryManager,
+                sqlConsoleExecutionHistoryService = historyService,
             )
         }
 
@@ -1064,13 +1070,18 @@ class ServerTest {
                     )
             },
         )
-        val queryManager = SqlConsoleQueryManager(sqlConsoleService)
+        val historyService = SqlConsoleExecutionHistoryService(storageDir)
+        val queryManager = SqlConsoleQueryManager(
+            sqlConsoleService = sqlConsoleService,
+            executionHistoryService = historyService,
+        )
         application {
             uiModule(
                 moduleRegistry = registry,
                 runManager = runManager,
                 sqlConsoleService = sqlConsoleService,
                 sqlConsoleQueryManager = queryManager,
+                sqlConsoleExecutionHistoryService = historyService,
             )
         }
 
@@ -1090,6 +1101,10 @@ class ServerTest {
         repeat(20) {
             val polled = client.get("/api/sql-console/query/$executionId").bodyAsText()
             if (polled.contains(""""transactionState":"PENDING_COMMIT"""")) {
+                val historyBody = client.get("/api/sql-console/history?workspaceId=workspace-a").bodyAsText()
+                assertTrue(historyBody.contains(""""executionId":"$executionId""""))
+                assertTrue(historyBody.contains(""""transactionState":"PENDING_COMMIT""""))
+
                 val duplicateStart = client.post("/api/sql-console/query/start") {
                     contentType(ContentType.Application.Json)
                     setBody(

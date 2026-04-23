@@ -1253,6 +1253,38 @@ paths:
                 selectedSourceNames: ["db1"]
                 pageSize: 100
 
+  /api/sql-console/history:
+    get:
+      tags: [SQL Console]
+      summary: История execution session SQL-консоли
+      operationId: getSqlConsoleExecutionHistory
+      parameters:
+        - in: query
+          name: workspaceId
+          required: false
+          schema:
+            type: string
+          description: Идентификатор browser-tab workspace для истории execution session.
+      responses:
+        "200":
+          description: Последние execution session для указанного workspace
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SqlConsoleExecutionHistoryResponse"
+              example:
+                entries:
+                  - executionId: "397c4e99-602b-432d-9b39-37a28c42ba5e"
+                    sql: "update demo set flag = true"
+                    selectedSourceNames: ["db1"]
+                    autoCommitEnabled: false
+                    status: SUCCESS
+                    transactionState: COMMITTED
+                    startedAt: "2026-04-23T08:15:00Z"
+                    finishedAt: "2026-04-23T08:15:02Z"
+                    durationMillis: 2014
+                    errorMessage: null
+
   /api/sql-console/settings:
     post:
       tags: [SQL Console]
@@ -2838,6 +2870,52 @@ components:
             type: string
         pageSize:
           type: integer
+
+    SqlConsoleExecutionHistoryResponse:
+      type: object
+      required: [entries]
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/SqlConsoleExecutionHistoryEntryResponse"
+
+    SqlConsoleExecutionHistoryEntryResponse:
+      type: object
+      required:
+        - executionId
+        - sql
+        - selectedSourceNames
+        - autoCommitEnabled
+        - status
+        - transactionState
+        - startedAt
+      properties:
+        executionId:
+          type: string
+        sql:
+          type: string
+        selectedSourceNames:
+          type: array
+          items:
+            type: string
+        autoCommitEnabled:
+          type: boolean
+        status:
+          type: string
+        transactionState:
+          type: string
+        startedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: [string, "null"]
+          format: date-time
+        durationMillis:
+          type: [integer, "null"]
+          format: int64
+        errorMessage:
+          type: [string, "null"]
 
     SqlConsoleSettingsUpdateRequest:
       type: object

@@ -12,6 +12,7 @@ import com.sbrf.lt.platform.ui.run.RunManager
 import com.sbrf.lt.platform.ui.run.UiCredentialsService
 import com.sbrf.lt.platform.ui.run.history.FilesModuleRunHistoryService
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleAsyncQueryOperations
+import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleExecutionHistoryService
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleQueryManager
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleStateService
 import org.slf4j.Logger
@@ -46,8 +47,17 @@ internal fun defaultRunManager(
 internal fun defaultSqlConsoleService(runtimeUiConfig: UiAppConfig): SqlConsoleOperations =
     SqlConsoleService(runtimeUiConfig.sqlConsole)
 
-internal fun defaultSqlConsoleQueryManager(sqlConsoleService: SqlConsoleOperations): SqlConsoleAsyncQueryOperations =
-    SqlConsoleQueryManager(sqlConsoleService)
+internal fun defaultSqlConsoleExecutionHistoryService(uiConfig: UiAppConfig): SqlConsoleExecutionHistoryService =
+    SqlConsoleExecutionHistoryService(uiConfig.storageDirPath())
+
+internal fun defaultSqlConsoleQueryManager(
+    sqlConsoleService: SqlConsoleOperations,
+    executionHistoryService: SqlConsoleExecutionHistoryService,
+): SqlConsoleAsyncQueryOperations =
+    SqlConsoleQueryManager(
+        sqlConsoleService = sqlConsoleService,
+        executionHistoryService = executionHistoryService,
+    )
 
 internal fun defaultSqlConsoleStateService(uiConfig: UiAppConfig): SqlConsoleStateService =
     SqlConsoleStateService(uiConfig.storageDirPath())

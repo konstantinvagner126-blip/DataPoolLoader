@@ -19,10 +19,11 @@ enum class SqlConsoleExecutionStatus {
     CANCELLED,
 }
 
-class SqlConsoleQueryManager(
+internal class SqlConsoleQueryManager(
     private val sqlConsoleService: SqlConsoleOperations,
     private val transactionalOperations: SqlConsoleTransactionalOperations = sqlConsoleService as? SqlConsoleTransactionalOperations
         ?: error("SQL-консоль не поддерживает транзакционные execution session."),
+    private val executionHistoryService: SqlConsoleExecutionHistoryService? = null,
     private val executor: ExecutorService = Executors.newCachedThreadPool(),
     private val scheduler: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor(),
     private val clock: () -> Instant = Instant::now,
@@ -31,6 +32,7 @@ class SqlConsoleQueryManager(
     pendingCommitTtl: Duration = Duration.ofMinutes(2),
 ) : SqlConsoleAsyncQueryOperations {
     private val stateSupport = SqlConsoleQueryStateSupport(
+        executionHistoryService = executionHistoryService,
         ownerLeaseDuration = ownerLeaseDuration,
         ownerReleaseRecoveryWindow = ownerReleaseRecoveryWindow,
         pendingCommitTtl = pendingCommitTtl,
@@ -60,6 +62,8 @@ class SqlConsoleQueryManager(
         enforceSafetyTimeouts()
         val execution = stateSupport.prepareStart(
             autoCommitEnabled = transactionMode == SqlConsoleTransactionMode.AUTO_COMMIT,
+            sql = sql,
+            selectedSourceNames = selectedSourceNames,
             workspaceId = workspaceId,
             ownerSessionId = ownerSessionId,
             now = clock(),

@@ -10,6 +10,21 @@ class SqlConsoleStoreLoadingSupportTest {
         val support = SqlConsoleStoreLoadingSupport(
             StubSqlConsoleApi(
                 infoHandler = { sampleSqlConsoleInfo() },
+                loadExecutionHistoryHandler = {
+                    SqlConsoleExecutionHistoryResponse(
+                        entries = listOf(
+                            SqlConsoleExecutionHistoryEntry(
+                                executionId = "exec-1",
+                                sql = "select * from demo",
+                                selectedSourceNames = listOf("db1", "db3"),
+                                status = "SUCCESS",
+                                startedAt = "2026-04-23T11:00:00Z",
+                                finishedAt = "2026-04-23T11:00:02Z",
+                                durationMillis = 2_000,
+                            ),
+                        ),
+                    )
+                },
                 loadStateHandler = {
                     SqlConsoleStateSnapshot(
                     draftSql = "select * from demo",
@@ -33,6 +48,8 @@ class SqlConsoleStoreLoadingSupportTest {
         assertEquals(true, state.strictSafetyEnabled)
         assertEquals("TRANSACTION_PER_SHARD", state.transactionMode)
         assertEquals("select * from demo", state.draftSql)
+        assertEquals(1, state.executionHistory.size)
+        assertEquals("exec-1", state.executionHistory.single().executionId)
     }
 
     @Test

@@ -11,6 +11,8 @@ internal data class ActiveExecution(
     val snapshot: SqlConsoleExecutionSnapshot,
     val control: SqlConsoleExecutionControl,
     val pendingTransaction: SqlConsolePendingTransaction? = null,
+    val sql: String,
+    val selectedSourceNames: List<String>,
     val workspaceId: String,
     val ownerSessionId: String,
     val ownerToken: String,

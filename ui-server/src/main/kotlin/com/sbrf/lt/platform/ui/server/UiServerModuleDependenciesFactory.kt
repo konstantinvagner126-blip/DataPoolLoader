@@ -21,6 +21,7 @@ import com.sbrf.lt.platform.ui.run.RunManager
 import com.sbrf.lt.platform.ui.run.UiCredentialsService
 import com.sbrf.lt.platform.ui.run.history.ModuleRunHistoryService
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleAsyncQueryOperations
+import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleExecutionHistoryService
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleExportService
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleStateService
 
@@ -41,6 +42,7 @@ internal fun buildUiServerModuleContextDependencies(
     sqlConsoleService: SqlConsoleOperations? = null,
     sqlConsoleQueryManager: SqlConsoleAsyncQueryOperations? = null,
     sqlConsoleExportService: SqlConsoleExportService? = null,
+    sqlConsoleExecutionHistoryService: SqlConsoleExecutionHistoryService? = null,
     sqlConsoleStateService: SqlConsoleStateService? = null,
     uiConfigPersistenceService: UiConfigPersistenceService? = null,
     moduleSyncService: ModuleSyncService?,
@@ -62,8 +64,13 @@ internal fun buildUiServerModuleContextDependencies(
     val resolvedRunManager = runManager ?: defaultRunManager(resolvedModuleRegistry, uiConfig, resolvedCredentialsService)
     val resolvedConfigFormService = configFormService ?: ConfigFormService()
     val resolvedSqlConsoleService = sqlConsoleService ?: defaultSqlConsoleService(resolvedRuntimeUiConfig)
+    val resolvedSqlConsoleExecutionHistoryService =
+        sqlConsoleExecutionHistoryService ?: defaultSqlConsoleExecutionHistoryService(uiConfig)
     val resolvedSqlConsoleQueryManager =
-        sqlConsoleQueryManager ?: defaultSqlConsoleQueryManager(resolvedSqlConsoleService)
+        sqlConsoleQueryManager ?: defaultSqlConsoleQueryManager(
+            sqlConsoleService = resolvedSqlConsoleService,
+            executionHistoryService = resolvedSqlConsoleExecutionHistoryService,
+        )
     val resolvedSqlConsoleExportService = sqlConsoleExportService ?: SqlConsoleExportService()
     val resolvedSqlConsoleStateService = sqlConsoleStateService ?: defaultSqlConsoleStateService(uiConfig)
     val resolvedUiConfigPersistenceService = uiConfigPersistenceService ?: UiConfigPersistenceService()
@@ -88,6 +95,7 @@ internal fun buildUiServerModuleContextDependencies(
         sqlConsoleService = resolvedSqlConsoleService,
         sqlConsoleQueryManager = resolvedSqlConsoleQueryManager,
         sqlConsoleExportService = resolvedSqlConsoleExportService,
+        sqlConsoleExecutionHistoryService = resolvedSqlConsoleExecutionHistoryService,
         sqlConsoleStateService = resolvedSqlConsoleStateService,
         uiConfigPersistenceService = resolvedUiConfigPersistenceService,
         moduleSyncService = moduleSyncService,

@@ -22,6 +22,8 @@ import com.sbrf.lt.datapool.sqlconsole.SqlConsoleQueryResult
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleSourceGroup
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleStatementResult
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleExecutionSnapshot
+import com.sbrf.lt.platform.ui.sqlconsole.PersistedSqlConsoleExecutionHistoryEntry
+import com.sbrf.lt.platform.ui.sqlconsole.PersistedSqlConsoleExecutionHistoryState
 
 /**
  * Преобразования внутренних моделей SQL-консоли в UI DTO.
@@ -134,6 +136,24 @@ fun SqlConsoleExecutionSnapshot.toResponse(
     result = result?.toResponse(),
     errorMessage = errorMessage,
 )
+
+internal fun PersistedSqlConsoleExecutionHistoryState.toResponse(): SqlConsoleExecutionHistoryResponse = SqlConsoleExecutionHistoryResponse(
+    entries = entries.map { it.toResponse() },
+)
+
+private fun PersistedSqlConsoleExecutionHistoryEntry.toResponse(): SqlConsoleExecutionHistoryEntryResponse =
+    SqlConsoleExecutionHistoryEntryResponse(
+        executionId = executionId,
+        sql = sql,
+        selectedSourceNames = selectedSourceNames,
+        autoCommitEnabled = autoCommitEnabled,
+        status = status,
+        transactionState = transactionState,
+        startedAt = startedAt.toString(),
+        finishedAt = finishedAt?.toString(),
+        durationMillis = durationMillis,
+        errorMessage = errorMessage,
+    )
 
 private fun RawShardExecutionResult.toResponse(): SqlConsoleShardResultResponse = SqlConsoleShardResultResponse(
     shardName = shardName,

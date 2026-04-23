@@ -76,6 +76,12 @@ class SqlConsoleStore(
     ): SqlConsolePageState =
         librarySupport.applyFavoriteQuery(current, value)
 
+    fun applyExecutionHistoryEntry(
+        current: SqlConsolePageState,
+        entry: SqlConsoleExecutionHistoryEntry,
+    ): SqlConsolePageState =
+        librarySupport.applyExecutionHistoryEntry(current, entry)
+
     fun rememberFavoriteQuery(current: SqlConsolePageState): SqlConsolePageState =
         librarySupport.rememberFavoriteQuery(current)
 
@@ -102,6 +108,12 @@ class SqlConsoleStore(
         workspaceId: String,
     ): SqlConsolePageState =
         loadingSupport.persistState(current, workspaceId)
+
+    suspend fun refreshExecutionHistory(
+        current: SqlConsolePageState,
+        workspaceId: String,
+    ): SqlConsolePageState =
+        loadingSupport.refreshExecutionHistory(current, workspaceId)
 
     suspend fun saveSettings(current: SqlConsolePageState): SqlConsolePageState =
         executionSupport.saveSettings(current)

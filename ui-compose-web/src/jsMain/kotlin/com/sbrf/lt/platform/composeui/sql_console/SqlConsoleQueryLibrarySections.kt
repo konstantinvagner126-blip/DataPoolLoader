@@ -24,6 +24,8 @@ internal fun QueryLibraryBlock(
     onFavoriteSelected: (String) -> Unit,
     onApplyRecent: () -> Unit,
     onApplyFavorite: () -> Unit,
+    onApplyExecutionHistory: (SqlConsoleExecutionHistoryEntry) -> Unit,
+    onRepeatExecutionHistory: (SqlConsoleExecutionHistoryEntry) -> Unit,
     onRememberFavorite: () -> Unit,
     onRemoveFavorite: () -> Unit,
     onClearRecent: () -> Unit,
@@ -50,6 +52,11 @@ internal fun QueryLibraryBlock(
             state = state,
             selectedRecentQuery = selectedRecentQuery,
             selectedFavoriteQuery = selectedFavoriteQuery,
+        )
+        SqlConsoleExecutionHistoryBlock(
+            history = state.executionHistory,
+            onApply = onApplyExecutionHistory,
+            onRepeat = onRepeatExecutionHistory,
         )
         Div({ classes("sql-query-library-row") }) {
             SqlConsoleQueryPickerBlock(

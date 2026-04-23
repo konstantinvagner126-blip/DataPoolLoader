@@ -681,6 +681,10 @@
     - compare-friendly `Diff` живет как отдельный data-view режим, а не как домешивание mismatch-информации в обычную result grid;
     - mismatch model считается client-side из уже загруженного `RESULT_SET`, без нового backend state и без искажения исходных DB results;
     - diff обязан явно показывать `row count mismatch`, `value mismatch` и `source failure`, но оставаться bounded по числу detail-entries.
+  - седьмой пакет тоже начат:
+    - execution history живет как отдельный per-workspace boundary, а не как еще одно поле внутри persisted draft/library state SQL-консоли;
+    - история заполняется server-side из async execution lifecycle, поэтому фиксирует не только обычный finish, но и `PENDING_COMMIT`, manual `commit/rollback`, owner-loss и timeout rollback;
+    - UI показывает короткий bounded список последних execution session рядом с `Шаблоны и быстрые действия`, с действиями `Подставить` и `Повторить`, без превращения экрана в тяжелый audit log.
 
 Критерий завершения:
 

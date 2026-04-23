@@ -18,6 +18,14 @@ internal fun Route.registerSqlConsoleStateRoutes(context: UiServerContext) {
         call.respond(context.sqlConsoleStateService.currentState(call.request.queryParameters["workspaceId"]))
     }
 
+    get("/api/sql-console/history") {
+        call.respond(
+            context.sqlConsoleExecutionHistoryService.currentHistory(
+                workspaceId = call.request.queryParameters["workspaceId"],
+            ).toResponse(),
+        )
+    }
+
     post("/api/sql-console/state") {
         call.respond(
             context.sqlConsoleStateService.updateState(

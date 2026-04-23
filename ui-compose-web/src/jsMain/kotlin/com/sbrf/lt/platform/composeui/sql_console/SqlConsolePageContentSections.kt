@@ -90,6 +90,8 @@ internal fun SqlConsolePageContent(
                 onFavoriteSelected = callbacks.onFavoriteSelected,
                 onApplyRecent = callbacks.onApplyRecent,
                 onApplyFavorite = callbacks.onApplyFavorite,
+                onApplyExecutionHistory = callbacks.onApplyExecutionHistory,
+                onRepeatExecutionHistory = callbacks.onRepeatExecutionHistory,
                 onRememberFavorite = callbacks.onRememberFavorite,
                 onRemoveFavorite = callbacks.onRemoveFavorite,
                 onClearRecent = callbacks.onClearRecent,

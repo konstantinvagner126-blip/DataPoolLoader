@@ -44,6 +44,9 @@ internal class StubSqlConsoleApi(
     private val runtimeContextHandler: suspend () -> RuntimeContext = { sampleRuntimeContext() },
     private val infoHandler: suspend () -> SqlConsoleInfo = { sampleSqlConsoleInfo() },
     private val loadStateHandler: suspend (String?) -> SqlConsoleStateSnapshot = { defaultSqlConsoleStateSnapshot() },
+    private val loadExecutionHistoryHandler: suspend (String?) -> SqlConsoleExecutionHistoryResponse = {
+        SqlConsoleExecutionHistoryResponse()
+    },
     private val saveStateHandler: suspend (SqlConsoleStateUpdate, String?) -> SqlConsoleStateSnapshot = { _, _ ->
         error("saveState not configured")
     },
@@ -89,6 +92,9 @@ internal class StubSqlConsoleApi(
     override suspend fun loadInfo(): SqlConsoleInfo = infoHandler()
 
     override suspend fun loadState(workspaceId: String?): SqlConsoleStateSnapshot = loadStateHandler(workspaceId)
+
+    override suspend fun loadExecutionHistory(workspaceId: String?): SqlConsoleExecutionHistoryResponse =
+        loadExecutionHistoryHandler(workspaceId)
 
     override suspend fun saveState(
         request: SqlConsoleStateUpdate,

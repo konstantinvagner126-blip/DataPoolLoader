@@ -21,12 +21,13 @@ import com.sbrf.lt.platform.ui.run.history.FilesModuleRunHistoryService
 import com.sbrf.lt.platform.ui.run.history.ModuleRunHistoryService
 import com.sbrf.lt.datapool.module.sync.ModuleSyncService
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleAsyncQueryOperations
+import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleExecutionHistoryService
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleExportService
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleOperations
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleStateService
 import io.ktor.server.application.Application
 
-fun Application.uiModule(
+internal fun Application.uiModule(
     uiConfig: UiAppConfig = UiConfigLoader().load(),
     uiConfigLoader: UiConfigLoader? = null,
     credentialsService: UiCredentialsService? = null,
@@ -43,6 +44,7 @@ fun Application.uiModule(
     sqlConsoleService: SqlConsoleOperations? = null,
     sqlConsoleQueryManager: SqlConsoleAsyncQueryOperations? = null,
     sqlConsoleExportService: SqlConsoleExportService? = null,
+    sqlConsoleExecutionHistoryService: SqlConsoleExecutionHistoryService? = null,
     sqlConsoleStateService: SqlConsoleStateService? = null,
     uiConfigPersistenceService: UiConfigPersistenceService? = null,
     moduleSyncService: ModuleSyncService? = null,
@@ -71,6 +73,7 @@ fun Application.uiModule(
             sqlConsoleService = sqlConsoleService,
             sqlConsoleQueryManager = sqlConsoleQueryManager,
             sqlConsoleExportService = sqlConsoleExportService,
+            sqlConsoleExecutionHistoryService = sqlConsoleExecutionHistoryService,
             sqlConsoleStateService = sqlConsoleStateService,
             uiConfigPersistenceService = uiConfigPersistenceService,
             moduleSyncService = moduleSyncService,

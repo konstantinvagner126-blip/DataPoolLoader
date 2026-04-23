@@ -18,6 +18,7 @@ internal fun buildUiServerContext(deps: UiServerContextDependencies): UiServerCo
         sqlConsoleService = deps.sqlConsoleService,
         sqlConsoleQueryManager = deps.sqlConsoleQueryManager,
         sqlConsoleExportService = deps.sqlConsoleExportService,
+        sqlConsoleExecutionHistoryService = deps.sqlConsoleExecutionHistoryService,
         sqlConsoleStateService = deps.sqlConsoleStateService,
         uiConfigPersistenceService = deps.uiConfigPersistenceService,
         moduleSyncService = deps.moduleSyncService,

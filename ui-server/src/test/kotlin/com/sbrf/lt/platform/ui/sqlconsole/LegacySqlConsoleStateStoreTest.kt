@@ -7,6 +7,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.io.path.writeText
+import java.time.Instant
 
 class LegacySqlConsoleStateStoreTest {
 
@@ -189,5 +190,63 @@ class LegacySqlConsoleStateStoreTest {
         assertEquals(listOf("select * from ift_table"), workspaceA.recentQueries)
         assertEquals(25, workspaceA.pageSize)
         assertEquals(25, workspaceB.pageSize)
+    }
+
+    @Test
+    fun `execution history service keeps entries isolated by workspace and updates same execution`() {
+        val storageDir = Files.createTempDirectory("sql-console-history-service")
+        val service = SqlConsoleExecutionHistoryService(storageDir)
+        val baseSnapshot = SqlConsoleExecutionSnapshot(
+            id = "exec-1",
+            status = SqlConsoleExecutionStatus.SUCCESS,
+            startedAt = Instant.parse("2026-04-23T11:00:00Z"),
+            finishedAt = Instant.parse("2026-04-23T11:00:03Z"),
+            autoCommitEnabled = false,
+            transactionState = SqlConsoleExecutionTransactionState.PENDING_COMMIT,
+        )
+        service.recordExecutionSnapshot(
+            ActiveExecution(
+                snapshot = baseSnapshot,
+                control = com.sbrf.lt.datapool.sqlconsole.SqlConsoleExecutionControl(),
+                sql = "update demo set flag = true",
+                selectedSourceNames = listOf("db1", "db2"),
+                workspaceId = "workspace-a",
+                ownerSessionId = "tab-1",
+                ownerToken = "token-1",
+            ),
+        )
+        service.recordExecutionSnapshot(
+            ActiveExecution(
+                snapshot = baseSnapshot.copy(
+                    transactionState = SqlConsoleExecutionTransactionState.ROLLED_BACK,
+                ),
+                control = com.sbrf.lt.datapool.sqlconsole.SqlConsoleExecutionControl(),
+                sql = "update demo set flag = true",
+                selectedSourceNames = listOf("db1", "db2"),
+                workspaceId = "workspace-a",
+                ownerSessionId = "tab-1",
+                ownerToken = "token-1",
+            ),
+        )
+        service.recordExecutionSnapshot(
+            ActiveExecution(
+                snapshot = baseSnapshot.copy(id = "exec-2"),
+                control = com.sbrf.lt.datapool.sqlconsole.SqlConsoleExecutionControl(),
+                sql = "select * from demo",
+                selectedSourceNames = listOf("db3"),
+                workspaceId = "workspace-b",
+                ownerSessionId = "tab-2",
+                ownerToken = "token-2",
+            ),
+        )
+
+        val workspaceAHistory = service.currentHistory("workspace-a").entries
+        val workspaceBHistory = service.currentHistory("workspace-b").entries
+
+        assertEquals(1, workspaceAHistory.size)
+        assertEquals("ROLLED_BACK", workspaceAHistory.single().transactionState)
+        assertEquals(listOf("db1", "db2"), workspaceAHistory.single().selectedSourceNames)
+        assertEquals(1, workspaceBHistory.size)
+        assertEquals("exec-2", workspaceBHistory.single().executionId)
     }
 }

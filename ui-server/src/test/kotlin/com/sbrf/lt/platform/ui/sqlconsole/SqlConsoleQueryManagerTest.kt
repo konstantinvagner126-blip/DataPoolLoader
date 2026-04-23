@@ -371,6 +371,37 @@ class SqlConsoleQueryManagerTest {
     }
 
     @Test
+    fun `records execution history and updates same entry after commit`() {
+        val historyService = SqlConsoleExecutionHistoryService(Files.createTempDirectory("sql-console-history-manager"))
+        val manager = SqlConsoleQueryManager(
+            sqlConsoleService = manualTransactionService(),
+            executionHistoryService = historyService,
+        )
+
+        val started = manager.startQuery(
+            sql = "update demo set flag = true",
+            credentialsPath = null,
+            selectedSourceNames = listOf("db1"),
+            workspaceId = "workspace-a",
+            ownerSessionId = ownerSessionId,
+            transactionMode = SqlConsoleTransactionMode.TRANSACTION_PER_SHARD,
+        )
+        val pending = waitForCompletion(manager, started.id)
+        assertEquals(SqlConsoleExecutionTransactionState.PENDING_COMMIT, pending.transactionState)
+
+        val pendingHistory = historyService.currentHistory("workspace-a").entries.single()
+        assertEquals("update demo set flag = true", pendingHistory.sql)
+        assertEquals(listOf("db1"), pendingHistory.selectedSourceNames)
+        assertEquals("PENDING_COMMIT", pendingHistory.transactionState)
+
+        manager.commit(started.id, ownerSessionId, requireNotNull(started.ownerToken))
+
+        val committedHistory = historyService.currentHistory("workspace-a").entries.single()
+        assertEquals("COMMITTED", committedHistory.transactionState)
+        assertEquals("SUCCESS", committedHistory.status)
+    }
+
+    @Test
     fun `allows parallel auto commit starts and cleans up both directories`() {
         val firstCleanupDir = Files.createTempDirectory("sql-console-cleanup-a")
         val secondCleanupDir = Files.createTempDirectory("sql-console-cleanup-b")
