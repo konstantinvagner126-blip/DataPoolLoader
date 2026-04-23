@@ -8,6 +8,21 @@ import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.coroutines.startCoroutine
 
 internal class StubModuleEditorApi(
+    private val loadFilesCatalogHandler: suspend () -> FilesModulesCatalogResponse = {
+        error("loadFilesCatalog not configured")
+    },
+    private val loadDatabaseCatalogHandler: suspend (Boolean) -> DatabaseModulesCatalogResponse = {
+        error("loadDatabaseCatalog not configured")
+    },
+    private val loadRuntimeContextHandler: suspend () -> RuntimeContext = {
+        error("loadRuntimeContext not configured")
+    },
+    private val loadFilesSessionHandler: suspend (String) -> ModuleEditorSessionResponse = {
+        error("loadFilesSession not configured")
+    },
+    private val loadDatabaseSessionHandler: suspend (String) -> ModuleEditorSessionResponse = {
+        error("loadDatabaseSession not configured")
+    },
     private val saveFilesModuleHandler: suspend (String, SaveModuleRequestDto) -> SaveResultResponseDto = { _, _ ->
         error("saveFilesModule not configured")
     },
@@ -26,19 +41,22 @@ internal class StubModuleEditorApi(
     private val startDatabaseRunHandler: suspend (String) -> DatabaseRunStartResponseDto = {
         error("startDatabaseRun not configured")
     },
+    private val parseConfigFormHandler: suspend (String) -> ConfigFormStateDto = {
+        error("parseConfigForm not configured")
+    },
 ) : ModuleEditorApi {
-    override suspend fun loadFilesCatalog(): FilesModulesCatalogResponse = error("loadFilesCatalog not configured")
+    override suspend fun loadFilesCatalog(): FilesModulesCatalogResponse = loadFilesCatalogHandler()
 
     override suspend fun loadDatabaseCatalog(includeHidden: Boolean): DatabaseModulesCatalogResponse =
-        error("loadDatabaseCatalog not configured")
+        loadDatabaseCatalogHandler(includeHidden)
 
-    override suspend fun loadRuntimeContext(): RuntimeContext = error("loadRuntimeContext not configured")
+    override suspend fun loadRuntimeContext(): RuntimeContext = loadRuntimeContextHandler()
 
     override suspend fun loadFilesSession(moduleId: String): ModuleEditorSessionResponse =
-        error("loadFilesSession not configured")
+        loadFilesSessionHandler(moduleId)
 
     override suspend fun loadDatabaseSession(moduleId: String): ModuleEditorSessionResponse =
-        error("loadDatabaseSession not configured")
+        loadDatabaseSessionHandler(moduleId)
 
     override suspend fun saveFilesModule(
         moduleId: String,
@@ -69,7 +87,7 @@ internal class StubModuleEditorApi(
         startDatabaseRunHandler(moduleId)
 
     override suspend fun parseConfigForm(configText: String): ConfigFormStateDto =
-        error("parseConfigForm not configured")
+        parseConfigFormHandler(configText)
 
     override suspend fun applyConfigForm(
         configText: String,

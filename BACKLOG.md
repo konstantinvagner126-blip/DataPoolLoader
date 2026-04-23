@@ -921,6 +921,14 @@ Review after Phase F:
       - добавлены common tests на selection validation и sync action reload policy:
         - [ModuleSyncStoreActionSelectionSupportTest.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonTest/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncStoreActionSelectionSupportTest.kt)
         - [ModuleSyncStoreActionSupportTest.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonTest/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncStoreActionSupportTest.kt)
+  - следующий реальный thick shared-store spot после `module_sync` review смещен обратно в `module_editor` loading boundary:
+    - [ModuleEditorStoreCatalogLoadingSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreCatalogLoadingSupport.kt) перестал держать selected-module policy и config-form snapshot loading внутри catalog/session loading orchestration;
+    - selected-module policy вынесен в [ModuleEditorStoreCatalogSelectionSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreCatalogSelectionSupport.kt);
+    - config-form snapshot boundary вынесен в [ModuleEditorConfigFormSnapshotStore.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorConfigFormSnapshotStore.kt);
+    - [ModuleEditorStoreLoadingSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreLoadingSupport.kt) и [ModuleEditorStoreSessionLoadingSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreSessionLoadingSupport.kt) стали тоньше и перестали прокидывать inline parse-config lambda;
+    - добавлены common tests на extracted selection/config-form snapshot rules:
+      - [ModuleEditorStoreCatalogSelectionSupportTest.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonTest/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreCatalogSelectionSupportTest.kt)
+      - [ModuleEditorStoreConfigFormSnapshotSupportTest.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonTest/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreConfigFormSnapshotSupportTest.kt)
 
 ### 12. Финализировать boundary модульного редактора и storage contracts
 

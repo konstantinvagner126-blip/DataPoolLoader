@@ -6,28 +6,33 @@ internal class ModuleEditorStoreLoadingSupport(
 ) : ModuleEditorLoadingStore, ModuleEditorSelectedModuleRefreshStore {
     private val stateFactory = ModuleEditorStoreStateFactory()
     private val fallbackSupport = ModuleEditorStoreFallbackSupport(api)
+    private val selectionSupport = ModuleEditorStoreCatalogSelectionSupport()
+    private val configFormSnapshotStore = ModuleEditorStoreConfigFormSnapshotSupport(api)
     private val catalogLoadingSupport = ModuleEditorStoreCatalogLoadingSupport(
         api = api,
         syncRoute = syncRoute,
         stateFactory = stateFactory,
+        selectionSupport = selectionSupport,
+        configFormSnapshotStore = configFormSnapshotStore,
         fallbackSupport = fallbackSupport,
     )
     private val sessionLoadingSupport = ModuleEditorStoreSessionLoadingSupport(
         api = api,
         syncRoute = syncRoute,
         stateFactory = stateFactory,
+        configFormSnapshotStore = configFormSnapshotStore,
         fallbackSupport = fallbackSupport,
     )
 
     override suspend fun load(route: ModuleEditorRouteState): ModuleEditorPageState =
-        catalogLoadingSupport.load(route, ::loadConfigFormSnapshot)
+        catalogLoadingSupport.load(route)
 
     override suspend fun selectModule(
         current: ModuleEditorPageState,
         route: ModuleEditorRouteState,
         moduleId: String,
     ): ModuleEditorPageState =
-        sessionLoadingSupport.selectModule(current, route, moduleId, ::loadConfigFormSnapshot)
+        sessionLoadingSupport.selectModule(current, route, moduleId)
 
     override suspend fun refreshCatalog(
         current: ModuleEditorPageState,
@@ -46,17 +51,4 @@ internal class ModuleEditorStoreLoadingSupport(
             successMessage,
             ::selectModule,
         )
-
-    suspend fun loadConfigFormSnapshot(configText: String): ConfigFormSnapshot =
-        runCatching {
-            ConfigFormSnapshot(
-                state = api.parseConfigForm(configText),
-                errorMessage = null,
-            )
-        }.getOrElse { error ->
-            ConfigFormSnapshot(
-                state = null,
-                errorMessage = error.message ?: "Не удалось собрать визуальную форму.",
-            )
-        }
 }

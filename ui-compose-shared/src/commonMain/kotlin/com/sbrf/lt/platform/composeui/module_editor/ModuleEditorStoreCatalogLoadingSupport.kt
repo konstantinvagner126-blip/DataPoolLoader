@@ -4,25 +4,30 @@ internal class ModuleEditorStoreCatalogLoadingSupport(
     private val api: ModuleEditorApi,
     private val syncRoute: (storage: String, moduleId: String?, includeHidden: Boolean) -> Unit,
     private val stateFactory: ModuleEditorStoreStateFactory,
+    private val selectionSupport: ModuleEditorStoreCatalogSelectionSupport,
+    private val configFormSnapshotStore: ModuleEditorConfigFormSnapshotStore,
     private val fallbackSupport: ModuleEditorStoreFallbackSupport,
 ) {
-    suspend fun load(
-        route: ModuleEditorRouteState,
-        loadConfigFormSnapshot: suspend (String) -> ConfigFormSnapshot,
-    ): ModuleEditorPageState {
+    suspend fun load(route: ModuleEditorRouteState): ModuleEditorPageState {
         return runCatching {
             if (route.storage == "database") {
                 val catalog = api.loadDatabaseCatalog(route.includeHidden)
-                val selectedModuleId = stateFactory.resolveSelectedModuleId(route.moduleId, catalog.modules.map { it.id })
+                val selectedModuleId = selectionSupport.resolveInitialSelectedModuleId(
+                    route.moduleId,
+                    catalog.modules.map { it.id },
+                )
                 val session = selectedModuleId?.let { moduleId -> api.loadDatabaseSession(moduleId) }
-                val configForm = session?.let { loadConfigFormSnapshot(it.module.configText) }
+                val configForm = session?.let { configFormSnapshotStore.loadSnapshot(it.module.configText) }
                 syncRoute(route.storage, selectedModuleId, route.includeHidden)
                 stateFactory.createDatabaseLoadedState(catalog, selectedModuleId, session, configForm)
             } else {
                 val catalog = api.loadFilesCatalog()
-                val selectedModuleId = stateFactory.resolveSelectedModuleId(route.moduleId, catalog.modules.map { it.id })
+                val selectedModuleId = selectionSupport.resolveInitialSelectedModuleId(
+                    route.moduleId,
+                    catalog.modules.map { it.id },
+                )
                 val session = selectedModuleId?.let { moduleId -> api.loadFilesSession(moduleId) }
-                val configForm = session?.let { loadConfigFormSnapshot(it.module.configText) }
+                val configForm = session?.let { configFormSnapshotStore.loadSnapshot(it.module.configText) }
                 syncRoute(route.storage, selectedModuleId, route.includeHidden)
                 stateFactory.createFilesLoadedState(catalog, selectedModuleId, session, configForm)
             }
@@ -44,9 +49,10 @@ internal class ModuleEditorStoreCatalogLoadingSupport(
         runCatching {
             if (route.storage == "database") {
                 val catalog = api.loadDatabaseCatalog(route.includeHidden)
-                val selectedModuleId = current.selectedModuleId
-                    ?.takeIf { moduleId -> catalog.modules.any { it.id == moduleId } }
-                    ?: catalog.modules.firstOrNull()?.id
+                val selectedModuleId = selectionSupport.resolveRefreshedSelectedModuleId(
+                    current.selectedModuleId,
+                    catalog.modules.map { it.id },
+                )
                 current.copy(
                     loading = false,
                     databaseCatalog = catalog,
@@ -54,9 +60,10 @@ internal class ModuleEditorStoreCatalogLoadingSupport(
                 )
             } else {
                 val catalog = api.loadFilesCatalog()
-                val selectedModuleId = current.selectedModuleId
-                    ?.takeIf { moduleId -> catalog.modules.any { it.id == moduleId } }
-                    ?: catalog.modules.firstOrNull()?.id
+                val selectedModuleId = selectionSupport.resolveRefreshedSelectedModuleId(
+                    current.selectedModuleId,
+                    catalog.modules.map { it.id },
+                )
                 current.copy(
                     loading = false,
                     filesCatalog = catalog,

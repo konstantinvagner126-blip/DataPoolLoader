@@ -72,14 +72,6 @@ internal class ModuleEditorStoreStateFactory {
             configFormSourceText = if (configForm.state != null) session.module.configText else "",
         )
 
-    fun resolveSelectedModuleId(
-        preferredId: String?,
-        moduleIds: List<String>,
-    ): String? =
-        when {
-            preferredId != null && moduleIds.contains(preferredId) -> preferredId
-            else -> moduleIds.firstOrNull()
-        }
 }
 
 internal fun toModuleMetadataDraft(module: ModuleDetailsResponse): ModuleMetadataDraft =

@@ -4,13 +4,13 @@ internal class ModuleEditorStoreSessionLoadingSupport(
     private val api: ModuleEditorApi,
     private val syncRoute: (storage: String, moduleId: String?, includeHidden: Boolean) -> Unit,
     private val stateFactory: ModuleEditorStoreStateFactory,
+    private val configFormSnapshotStore: ModuleEditorConfigFormSnapshotStore,
     private val fallbackSupport: ModuleEditorStoreFallbackSupport,
 ) {
     suspend fun selectModule(
         current: ModuleEditorPageState,
         route: ModuleEditorRouteState,
         moduleId: String,
-        loadConfigFormSnapshot: suspend (String) -> ConfigFormSnapshot,
     ): ModuleEditorPageState {
         return runCatching {
             val session = if (route.storage == "database") {
@@ -18,7 +18,7 @@ internal class ModuleEditorStoreSessionLoadingSupport(
             } else {
                 api.loadFilesSession(moduleId)
             }
-            val configForm = loadConfigFormSnapshot(session.module.configText)
+            val configForm = configFormSnapshotStore.loadSnapshot(session.module.configText)
             syncRoute(route.storage, moduleId, route.includeHidden)
             stateFactory.applySelectedSession(current, moduleId, session, configForm)
         }.getOrElse { error ->
