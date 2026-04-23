@@ -104,3 +104,43 @@ test("module runs empty-state visual baseline", async ({ page }) => {
     caret: "hide"
   });
 });
+
+test("module sync shell visual baseline", async ({ page }) => {
+  await prepareVisualPage(page, "/compose-sync", "Импорт модулей из файлов");
+  await expect(page.getByText("Импорт модулей", { exact: true })).toBeVisible();
+  await expect(
+    page.locator(".module-sync-content-shell .panel-title").filter({ hasText: /^История импортов$/ }).first()
+  ).toBeVisible();
+  await expect(page.locator(".module-sync-content-shell")).toBeVisible();
+  await expect(page.locator(".module-sync-content-shell")).toHaveScreenshot("module-sync-shell.png", {
+    animations: "disabled",
+    caret: "hide"
+  });
+});
+
+test("run history cleanup shell visual baseline", async ({ page }) => {
+  await prepareVisualPage(page, "/run-history-cleanup", "Обслуживание запусков");
+  await expect(page.getByText("Retention output-каталогов", { exact: true })).toBeVisible();
+  await expect(page.locator(".run-history-cleanup-content-shell")).toBeVisible();
+  await expect(page.locator(".run-history-cleanup-content-shell")).toHaveScreenshot("run-history-cleanup-shell.png", {
+    animations: "disabled",
+    caret: "hide",
+    maxDiffPixels: 1024
+  });
+});
+
+test("sql console history empty-state visual baseline", async ({ page }) => {
+  const workspaceId = buildWorkspaceId("sql-history-empty");
+  await prepareVisualPage(
+    page,
+    `/sql-console-history?workspaceId=${encodeURIComponent(workspaceId)}`,
+    "История запусков SQL-консоли"
+  );
+  await expect(page.getByText("История пока пуста")).toBeVisible();
+  await expect(page.locator(".sql-history-content-shell")).toBeVisible();
+  await expect(page.locator(".sql-history-content-shell")).toHaveScreenshot("sql-console-history-empty-shell.png", {
+    animations: "disabled",
+    caret: "hide",
+    maxDiffPixels: 1024
+  });
+});

@@ -1156,6 +1156,84 @@
   - overview strip;
   - empty-state блок `Для этого модуля запусков пока нет.`
 
+#### 16.6. Visual baseline для module sync shell
+
+Статус:
+
+- реализовано
+
+Проблема:
+
+- maintenance/database import screen пока не защищен visual baseline-ом;
+- layout drift на экране импорта модулей из файлов может остаться незамеченным, хотя это один из основных operational screens DB-mode ветки.
+
+Целевой контракт:
+
+- visual suite получает screenshot-baseline для `module sync`;
+- baseline должен опираться на стабильный shell/fallback scenario без запуска sync-action;
+- regression guard должен ловить:
+  - поломку overview/actions pane;
+  - разъезд history/details layout;
+  - потерю runtime/fallback messaging.
+
+Что сделано:
+
+- для экрана импорта модулей добавлен стабильный shell target `module-sync-content-shell`;
+- visual spec расширен отдельным baseline-сценарием для `/compose-sync`;
+- committed snapshot `module-sync-shell` добавлен в visual suite и проходит browser regression.
+
+#### 16.7. Visual baseline для run history cleanup shell
+
+Статус:
+
+- реализовано
+
+Проблема:
+
+- cleanup/retention экран пока не входит в committed visual suite, хотя это чувствительный operational screen;
+- визуальная деградация safeguard/preview layout здесь слишком рискованна, чтобы оставлять ее без baseline-а.
+
+Целевой контракт:
+
+- visual suite получает screenshot-baseline для `run history cleanup`;
+- baseline должен покрывать shell без destructive action execution;
+- regression guard должен ловить:
+  - разъезд cleanup и output-retention секций;
+  - потерю safeguard controls;
+  - поломку warning/fallback message area.
+
+Что сделано:
+
+- для cleanup screen добавлен стабильный shell target `run-history-cleanup-content-shell`;
+- visual spec расширен screenshot-baseline-ом для `/run-history-cleanup`;
+- committed snapshot `run-history-cleanup-shell` добавлен в regression suite.
+
+#### 16.8. Visual baseline для SQL console history empty-state
+
+Статус:
+
+- реализовано
+
+Проблема:
+
+- отдельный экран истории SQL-консоли уже вынесен в product flow, но сейчас не защищен visual baseline-ом;
+- empty-state этого экрана важен, потому что именно он чаще всего встречается в новом `workspace`.
+
+Целевой контракт:
+
+- visual suite получает screenshot-baseline для `sql-console-history` в новом пустом workspace;
+- baseline должен быть workspace-scoped и не опираться на существующую execution history;
+- regression guard должен ловить:
+  - поломку screen header/summary;
+  - потерю empty-state copy;
+  - деградацию отдельного history-screen layout.
+
+Что сделано:
+
+- для history route добавлен стабильный shell target `sql-history-content-shell`;
+- visual spec получил отдельный workspace-scoped empty-state baseline для нового `workspaceId`;
+- committed snapshot `sql-console-history-empty-shell` добавлен в regression suite.
+
 2. `Comprehensive visual regression coverage`
    - расширить существующий browser smoke harness до visual regression уровня;
    - покрыть как минимум:

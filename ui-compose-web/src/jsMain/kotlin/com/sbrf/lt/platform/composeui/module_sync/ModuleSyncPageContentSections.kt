@@ -12,50 +12,52 @@ internal fun ModuleSyncPageContent(
     state: ModuleSyncPageState,
     callbacks: ModuleSyncPageCallbacks,
 ) {
-    state.errorMessage?.let { AlertBanner(it, "warning") }
-    state.successMessage?.let { AlertBanner(it, "success") }
+    Div({ classes("module-sync-content-shell") }) {
+        state.errorMessage?.let { AlertBanner(it, "warning") }
+        state.successMessage?.let { AlertBanner(it, "success") }
 
-    RuntimeAlert(state)
+        RuntimeAlert(state)
 
-    Div({ classes("panel") }) {
-        Div({ classes("panel-title") }) { Text("Импорт модулей") }
-        P({ classes("text-secondary", "small", "mt-2") }) {
-            Text(
-                "Импорт просматривает каталог apps, находит модули с application.yml и создает соответствующие записи в базе данных. " +
-                    "Модули с тем же составом конфигурации и SQL-ресурсов пропускаются.",
-            )
-        }
-
-        SyncOverviewPanel(state)
-
-        SyncActionsPanel(
-            state = state,
-            onToggleSelectiveSync = callbacks.onToggleSelectiveSync,
-            onSyncAll = callbacks.onSyncAll,
-            onSyncSelected = callbacks.onSyncSelected,
-        )
-
-        Div({ classes("row", "g-4", "mt-1") }) {
-            Div({ classes("col-12", "col-lg-4") }) {
-                if (state.selectiveSyncVisible) {
-                    SelectiveModulesPanel(
-                        state = state,
-                        onSearchQueryChange = callbacks.onSearchQueryChange,
-                        onToggleModule = callbacks.onToggleModule,
-                        onSelectAll = callbacks.onSelectAll,
-                        onClearSelection = callbacks.onClearSelection,
-                        onSyncSelected = callbacks.onSyncSelected,
-                    )
-                } else {
-                    SyncRunsHistoryPanel(
-                        state = state,
-                        onLimitChange = callbacks.onHistoryLimitChange,
-                        onSelectRun = callbacks.onSelectRun,
-                    )
-                }
+        Div({ classes("panel") }) {
+            Div({ classes("panel-title") }) { Text("Импорт модулей") }
+            P({ classes("text-secondary", "small", "mt-2") }) {
+                Text(
+                    "Импорт просматривает каталог apps, находит модули с application.yml и создает соответствующие записи в базе данных. " +
+                        "Модули с тем же составом конфигурации и SQL-ресурсов пропускаются.",
+                )
             }
-            Div({ classes("col-12", "col-lg-8") }) {
-                SyncRunDetailsPanel(state)
+
+            SyncOverviewPanel(state)
+
+            SyncActionsPanel(
+                state = state,
+                onToggleSelectiveSync = callbacks.onToggleSelectiveSync,
+                onSyncAll = callbacks.onSyncAll,
+                onSyncSelected = callbacks.onSyncSelected,
+            )
+
+            Div({ classes("row", "g-4", "mt-1") }) {
+                Div({ classes("col-12", "col-lg-4") }) {
+                    if (state.selectiveSyncVisible) {
+                        SelectiveModulesPanel(
+                            state = state,
+                            onSearchQueryChange = callbacks.onSearchQueryChange,
+                            onToggleModule = callbacks.onToggleModule,
+                            onSelectAll = callbacks.onSelectAll,
+                            onClearSelection = callbacks.onClearSelection,
+                            onSyncSelected = callbacks.onSyncSelected,
+                        )
+                    } else {
+                        SyncRunsHistoryPanel(
+                            state = state,
+                            onLimitChange = callbacks.onHistoryLimitChange,
+                            onSelectRun = callbacks.onSelectRun,
+                        )
+                    }
+                }
+                Div({ classes("col-12", "col-lg-8") }) {
+                    SyncRunDetailsPanel(state)
+                }
             }
         }
     }
