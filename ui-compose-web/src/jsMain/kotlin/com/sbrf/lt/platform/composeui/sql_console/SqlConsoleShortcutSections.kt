@@ -15,6 +15,7 @@ import org.jetbrains.compose.web.dom.Text
 @Composable
 internal fun SqlConsoleShortcutPanel(
     editorFocused: Boolean,
+    hasSelectedSql: Boolean,
     onFocusEditor: () -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -27,7 +28,11 @@ internal fun SqlConsoleShortcutPanel(
                         if (!expanded) {
                             "Блок свернут. Открой справку, если нужно быстро посмотреть editor-local shortcuts."
                         } else if (editorFocused) {
-                            "Курсор сейчас в редакторе. Команды работают editor-local и не лезут в глобальные browser shortcuts."
+                            if (hasSelectedSql) {
+                                "Курсор сейчас в редакторе, и в Monaco есть выделение. Команды работают editor-local и не лезут в глобальные browser shortcuts."
+                            } else {
+                                "Курсор сейчас в редакторе. Команды работают editor-local и не лезут в глобальные browser shortcuts."
+                            }
                         } else {
                             "Команды работают только когда фокус внутри Monaco. Верни фокус в редактор и повтори shortcut."
                         },
@@ -59,8 +64,9 @@ internal fun SqlConsoleShortcutPanel(
                 SqlShortcutGroup(
                     title = "Выполнение",
                     items = listOf(
-                        "Ctrl/Cmd + Enter -> Выполнить скрипт",
-                        "Ctrl/Cmd + Shift + Enter -> Выполнить текущий statement",
+                        "Ctrl/Cmd + Enter -> Выполнить текущий statement",
+                        "Ctrl/Cmd + Shift + Enter -> Выполнить выделение",
+                        "Ctrl/Cmd + Alt + Enter -> Выполнить весь script",
                         "Esc -> Остановить выполнение",
                         "Shift + Alt + F -> Форматировать SQL",
                     ),

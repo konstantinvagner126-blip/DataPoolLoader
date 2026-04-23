@@ -6,43 +6,48 @@ internal class SqlConsoleExecutionBindings(
     private val context: SqlConsolePageBindingContext,
 ) {
     fun runAll() {
-        val state = context.currentState()
-        if (state.actionInProgress != "run-query" && state.info?.configured == true && !context.pendingManualTransaction()) {
-            context.scope.launch {
-                val runningState = context.store.beginAction(context.currentState(), "run-query")
-                context.setState(
-                    context.store.startQuery(
-                        current = runningState,
-                        workspaceId = context.currentUiState().workspaceId,
-                        ownerSessionId = context.currentUiState().ownerSessionId,
-                    ),
-                )
-            }
-        }
+        launchQuery(
+            actionName = "run-query",
+            successMessage = "Весь script запущен.",
+        )
     }
 
     fun runCurrent() {
         val statementSql = context.currentOutlineItem()?.sql?.trim().orEmpty()
-        val state = context.currentState()
-        if (
-            statementSql.isNotBlank() &&
-            state.actionInProgress != "run-current-query" &&
-            state.info?.configured == true &&
-            !context.pendingManualTransaction()
-        ) {
-            context.scope.launch {
-                val runningState = context.store.beginAction(context.currentState(), "run-current-query")
-                context.setState(
-                    context.store.startQuery(
-                        current = runningState,
-                        workspaceId = context.currentUiState().workspaceId,
-                        ownerSessionId = context.currentUiState().ownerSessionId,
-                        sqlOverride = statementSql,
-                        successMessage = "Текущий statement запущен.",
-                    ),
+        if (statementSql.isBlank()) {
+            context.updateState {
+                it.copy(
+                    actionInProgress = null,
+                    errorMessage = "Под курсором нет SQL statement для выполнения.",
+                    successMessage = null,
                 )
             }
+            return
         }
+        launchQuery(
+            actionName = "run-current-query",
+            sqlOverride = statementSql,
+            successMessage = "Текущий statement запущен.",
+        )
+    }
+
+    fun runSelection() {
+        val selectedSql = context.currentUiState().selectedSqlText.trim()
+        if (selectedSql.isBlank()) {
+            context.updateState {
+                it.copy(
+                    actionInProgress = null,
+                    errorMessage = "Выдели SQL-фрагмент в редакторе.",
+                    successMessage = null,
+                )
+            }
+            return
+        }
+        launchQuery(
+            actionName = "run-selection-query",
+            sqlOverride = selectedSql,
+            successMessage = "Выделение запущено.",
+        )
     }
 
     fun formatSql() {
@@ -125,6 +130,29 @@ internal class SqlConsoleExecutionBindings(
                     )
                 }
             }
+        }
+    }
+
+    private fun launchQuery(
+        actionName: String,
+        sqlOverride: String? = null,
+        successMessage: String,
+    ) {
+        val state = context.currentState()
+        if (state.actionInProgress == actionName || state.info?.configured != true || context.pendingManualTransaction()) {
+            return
+        }
+        context.scope.launch {
+            val runningState = context.store.beginAction(context.currentState(), actionName)
+            context.setState(
+                context.store.startQuery(
+                    current = runningState,
+                    workspaceId = context.currentUiState().workspaceId,
+                    ownerSessionId = context.currentUiState().ownerSessionId,
+                    sqlOverride = sqlOverride,
+                    successMessage = successMessage,
+                ),
+            )
         }
     }
 }

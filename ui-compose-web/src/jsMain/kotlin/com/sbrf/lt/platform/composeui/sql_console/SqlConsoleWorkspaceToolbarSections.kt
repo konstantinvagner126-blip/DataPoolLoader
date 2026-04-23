@@ -15,6 +15,8 @@ import org.jetbrains.compose.web.dom.Text
 @Composable
 internal fun SqlConsoleWorkspaceToolbar(
     state: SqlConsolePageState,
+    selectedSqlText: String,
+    selectedSqlLineCount: Int,
     currentOutlineItem: SqlScriptOutlineItem?,
     runButtonClass: String,
     pendingManualTransaction: Boolean,
@@ -25,6 +27,7 @@ internal fun SqlConsoleWorkspaceToolbar(
     onFormatSql: () -> Unit,
     onOpenNewTab: () -> Unit,
     onRunCurrent: () -> Unit,
+    onRunSelection: () -> Unit,
     onRunAll: () -> Unit,
     onStop: () -> Unit,
     onCommit: () -> Unit,
@@ -70,6 +73,15 @@ internal fun SqlConsoleWorkspaceToolbar(
                     toneClass = "btn-outline-dark",
                     onClick = onOpenNewTab,
                 )
+            }
+            SqlToolbarActionGroup(
+                title = "Выполнение",
+                note = buildSqlRunScopeSummary(
+                    currentOutlineItem = currentOutlineItem,
+                    selectedSqlText = selectedSqlText,
+                    selectedSqlLineCount = selectedSqlLineCount,
+                ),
+            ) {
                 SqlToolbarActionButton(
                     title = "Выполнить текущий statement",
                     icon = "↦",
@@ -82,11 +94,21 @@ internal fun SqlConsoleWorkspaceToolbar(
                         ),
                     onClick = onRunCurrent,
                 )
-            }
-            SqlToolbarActionGroup("Выполнение") {
                 SqlToolbarActionButton(
-                    title = "Выполнить скрипт",
-                    icon = "▶",
+                    title = "Выполнить выделение",
+                    icon = "▣",
+                    toneClass = "btn-outline-dark",
+                    buttonDisabled = (
+                        state.actionInProgress == "run-selection-query" ||
+                            state.info?.configured != true ||
+                            pendingManualTransaction ||
+                            selectedSqlText.isBlank()
+                        ),
+                    onClick = onRunSelection,
+                )
+                SqlToolbarActionButton(
+                    title = "Выполнить весь script",
+                    icon = "≫",
                     toneClass = runButtonClass,
                     buttonDisabled = state.actionInProgress == "run-query" || state.info?.configured != true || pendingManualTransaction,
                     extraClasses = arrayOf("sql-toolbar-primary-action"),
@@ -139,15 +161,34 @@ internal fun SqlConsoleWorkspaceToolbar(
 @Composable
 private fun SqlToolbarActionGroup(
     title: String,
+    note: String? = null,
     content: @Composable () -> Unit,
 ) {
     Div({ classes("sql-toolbar-action-group") }) {
-        Span({ classes("sql-toolbar-action-group-title") }) { Text(title) }
+        Div({ classes("sql-toolbar-action-group-head") }) {
+            Span({ classes("sql-toolbar-action-group-title") }) { Text(title) }
+            note?.let {
+                Span({ classes("sql-toolbar-action-group-note") }) { Text(it) }
+            }
+        }
         Div({ classes("sql-toolbar-action-group-buttons") }) {
             content()
         }
     }
 }
+
+private fun buildSqlRunScopeSummary(
+    currentOutlineItem: SqlScriptOutlineItem?,
+    selectedSqlText: String,
+    selectedSqlLineCount: Int,
+): String =
+    when {
+        selectedSqlText.isNotBlank() ->
+            if (selectedSqlLineCount > 1) "Выделение: $selectedSqlLineCount строк" else "Выделение: 1 строка"
+        currentOutlineItem != null ->
+            "Под курсором: ${currentOutlineItem.keyword}"
+        else -> "Доступен только весь script"
+    }
 
 @Composable
 internal fun SqlToolbarActionButton(

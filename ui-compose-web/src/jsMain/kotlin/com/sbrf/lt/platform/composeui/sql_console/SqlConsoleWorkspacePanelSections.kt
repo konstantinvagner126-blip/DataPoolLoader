@@ -10,6 +10,8 @@ import org.jetbrains.compose.web.dom.Text
 internal fun SqlConsoleWorkspacePanel(
     state: SqlConsolePageState,
     editorFocused: Boolean,
+    selectedSqlText: String,
+    selectedSqlLineCount: Int,
     selectedRecentQuery: String,
     selectedFavoriteQuery: String,
     currentOutlineItem: SqlScriptOutlineItem?,
@@ -45,6 +47,7 @@ internal fun SqlConsoleWorkspacePanel(
     onFormatSql: () -> Unit,
     onOpenNewTab: () -> Unit,
     onRunCurrent: () -> Unit,
+    onRunSelection: () -> Unit,
     onRunAll: () -> Unit,
     onStop: () -> Unit,
     onCommit: () -> Unit,
@@ -68,6 +71,8 @@ internal fun SqlConsoleWorkspacePanel(
 
         QueryLibraryBlock(
             state = state,
+            selectedSqlText = selectedSqlText,
+            selectedSqlLineCount = selectedSqlLineCount,
             selectedRecentQuery = selectedRecentQuery,
             selectedFavoriteQuery = selectedFavoriteQuery,
             currentOutlineItem = currentOutlineItem,
@@ -89,6 +94,7 @@ internal fun SqlConsoleWorkspacePanel(
             onFormatSql = onFormatSql,
             onOpenNewTab = onOpenNewTab,
             onRunCurrent = onRunCurrent,
+            onRunSelection = onRunSelection,
             onRunAll = onRunAll,
             onStop = onStop,
             onCommit = onCommit,
@@ -125,6 +131,7 @@ internal fun SqlConsoleWorkspacePanel(
 
         SqlConsoleShortcutPanel(
             editorFocused = editorFocused,
+            hasSelectedSql = selectedSqlText.isNotBlank(),
             onFocusEditor = onFocusEditor,
         )
 

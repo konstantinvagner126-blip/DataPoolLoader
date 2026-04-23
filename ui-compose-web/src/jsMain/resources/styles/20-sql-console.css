@@ -324,12 +324,24 @@
   background: rgba(255, 255, 255, 0.82);
 }
 
+.sql-toolbar-action-group-head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.18rem;
+}
+
 .sql-toolbar-action-group-title {
   font-size: 0.68rem;
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: #64748b;
+}
+
+.sql-toolbar-action-group-note {
+  font-size: 0.78rem;
+  color: #52657e;
+  line-height: 1.4;
 }
 
 .sql-toolbar-action-group-buttons {

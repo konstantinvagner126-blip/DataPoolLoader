@@ -30,10 +30,32 @@ internal fun appendSqlText(
         else -> "$currentValue $text"
     }
 
+internal data class SqlConsoleEditorSelectionSnapshot(
+    val sql: String,
+    val lineCount: Int,
+)
+
+internal fun readSqlEditorSelection(editor: dynamic): SqlConsoleEditorSelectionSnapshot {
+    if (editor == null || editor.getSelection == undefined || editor.getModel == undefined) {
+        return SqlConsoleEditorSelectionSnapshot(sql = "", lineCount = 0)
+    }
+    val selection = editor.getSelection() ?: return SqlConsoleEditorSelectionSnapshot(sql = "", lineCount = 0)
+    val isEmptySelection = runCatching { selection.isEmpty() as Boolean }.getOrDefault(false)
+    if (isEmptySelection) {
+        return SqlConsoleEditorSelectionSnapshot(sql = "", lineCount = 0)
+    }
+    val selectedSql = runCatching { editor.getModel().getValueInRange(selection) as String }.getOrDefault("").trim()
+    return SqlConsoleEditorSelectionSnapshot(
+        sql = selectedSql,
+        lineCount = selectedSql.lineSequence().count { it.isNotBlank() }.coerceAtLeast(if (selectedSql.isBlank()) 0 else 1),
+    )
+}
+
 internal fun registerSqlConsoleEditorShortcuts(
     editor: dynamic,
-    onRun: () -> Unit,
     onRunCurrent: () -> Unit,
+    onRunSelection: () -> Unit,
+    onRunAll: () -> Unit,
     onFormat: () -> Unit,
     onStop: () -> Unit,
     onShowData: () -> Unit,
@@ -48,6 +70,7 @@ internal fun registerSqlConsoleEditorShortcuts(
     val monaco = window.asDynamic().monaco ?: return
     val ctrlEnter = (monaco.KeyMod.CtrlCmd as Int) or (monaco.KeyCode.Enter as Int)
     val ctrlShiftEnter = (monaco.KeyMod.CtrlCmd as Int) or (monaco.KeyMod.Shift as Int) or (monaco.KeyCode.Enter as Int)
+    val ctrlAltEnter = (monaco.KeyMod.CtrlCmd as Int) or (monaco.KeyMod.Alt as Int) or (monaco.KeyCode.Enter as Int)
     val shiftAltF = (monaco.KeyMod.Shift as Int) or (monaco.KeyMod.Alt as Int) or (monaco.KeyCode.KeyF as Int)
     val escape = monaco.KeyCode.Escape as Int
     val ctrlAltDigit1 = (monaco.KeyMod.CtrlCmd as Int) or (monaco.KeyMod.Alt as Int) or (monaco.KeyCode.Digit1 as Int)
@@ -58,8 +81,9 @@ internal fun registerSqlConsoleEditorShortcuts(
     val ctrlAltRight = (monaco.KeyMod.CtrlCmd as Int) or (monaco.KeyMod.Alt as Int) or (monaco.KeyCode.RightArrow as Int)
     val ctrlAltPageUp = (monaco.KeyMod.CtrlCmd as Int) or (monaco.KeyMod.Alt as Int) or (monaco.KeyCode.PageUp as Int)
     val ctrlAltPageDown = (monaco.KeyMod.CtrlCmd as Int) or (monaco.KeyMod.Alt as Int) or (monaco.KeyCode.PageDown as Int)
-    editor.addCommand(ctrlEnter) { onRun() }
-    editor.addCommand(ctrlShiftEnter) { onRunCurrent() }
+    editor.addCommand(ctrlEnter) { onRunCurrent() }
+    editor.addCommand(ctrlShiftEnter) { onRunSelection() }
+    editor.addCommand(ctrlAltEnter) { onRunAll() }
     editor.addCommand(shiftAltF) { onFormat() }
     editor.addCommand(escape) { onStop() }
     editor.addCommand(ctrlAltDigit1) { onShowData() }

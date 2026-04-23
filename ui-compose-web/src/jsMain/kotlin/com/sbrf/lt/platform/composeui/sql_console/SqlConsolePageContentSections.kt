@@ -67,6 +67,8 @@ internal fun SqlConsolePageContent(
             SqlConsoleWorkspacePanel(
                 state = state,
                 editorFocused = uiState.editorFocused,
+                selectedSqlText = uiState.selectedSqlText,
+                selectedSqlLineCount = uiState.selectedSqlLineCount,
                 selectedRecentQuery = uiState.selectedRecentQuery,
                 selectedFavoriteQuery = uiState.selectedFavoriteQuery,
                 currentOutlineItem = currentOutlineItem,
@@ -102,6 +104,7 @@ internal fun SqlConsolePageContent(
                 onFormatSql = callbacks.onFormatSql,
                 onOpenNewTab = callbacks.onOpenNewTab,
                 onRunCurrent = callbacks.onRunCurrent,
+                onRunSelection = callbacks.onRunSelection,
                 onRunAll = callbacks.onRunAll,
                 onStop = callbacks.onStop,
                 onCommit = callbacks.onCommit,

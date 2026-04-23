@@ -669,6 +669,10 @@
     - grid поддерживает global `wrap / nowrap`, autosize всех колонок, per-column resize и copy по ячейке, строке и колонке;
     - active cell остается локальным UI-state таблицы и не превращается в новый persisted/workspace state;
     - grid не получает client-side sort/filter, чтобы не создавать второй источник истины поверх реального DB result.
+  - четвертый пакет тоже начат:
+    - execution mode становится явным: `текущий statement`, `выделение`, `весь script` существуют как три разные user-visible actions;
+    - toolbar, Monaco hotkeys и run-scope summary должны показывать один и тот же contract, без скрытого `selection if exists else current`;
+    - выполнение выделения остается чисто editor-local UX слоем и reuse-ит тот же `startQuery(sqlOverride)` boundary, без нового backend execution mode.
 
 Критерий завершения:
 

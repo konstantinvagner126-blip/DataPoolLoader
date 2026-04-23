@@ -10,6 +10,8 @@ import org.jetbrains.compose.web.dom.Text
 @Composable
 internal fun QueryLibraryBlock(
     state: SqlConsolePageState,
+    selectedSqlText: String,
+    selectedSqlLineCount: Int,
     selectedRecentQuery: String,
     selectedFavoriteQuery: String,
     currentOutlineItem: SqlScriptOutlineItem?,
@@ -31,6 +33,7 @@ internal fun QueryLibraryBlock(
     onFormatSql: () -> Unit,
     onOpenNewTab: () -> Unit,
     onRunCurrent: () -> Unit,
+    onRunSelection: () -> Unit,
     onRunAll: () -> Unit,
     onStop: () -> Unit,
     onCommit: () -> Unit,
@@ -82,6 +85,8 @@ internal fun QueryLibraryBlock(
         )
         SqlConsoleWorkspaceToolbar(
             state = state,
+            selectedSqlText = selectedSqlText,
+            selectedSqlLineCount = selectedSqlLineCount,
             currentOutlineItem = currentOutlineItem,
             runButtonClass = runButtonClass,
             pendingManualTransaction = pendingManualTransaction,
@@ -92,6 +97,7 @@ internal fun QueryLibraryBlock(
             onFormatSql = onFormatSql,
             onOpenNewTab = onOpenNewTab,
             onRunCurrent = onRunCurrent,
+            onRunSelection = onRunSelection,
             onRunAll = onRunAll,
             onStop = onStop,
             onCommit = onCommit,

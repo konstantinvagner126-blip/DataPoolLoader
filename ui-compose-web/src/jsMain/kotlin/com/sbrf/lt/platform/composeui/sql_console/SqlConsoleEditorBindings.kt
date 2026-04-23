@@ -21,9 +21,25 @@ internal class SqlConsoleEditorBindings(
 
     fun onEditorReady(editor: Any) {
         val monacoEditor = editor.asDynamic()
-        context.updateUiState { it.copy(editorInstance = monacoEditor) }
+        val initialSelection = readSqlEditorSelection(monacoEditor)
+        context.updateUiState {
+            it.copy(
+                editorInstance = monacoEditor,
+                selectedSqlText = initialSelection.sql,
+                selectedSqlLineCount = initialSelection.lineCount,
+            )
+        }
         monacoEditor.onDidChangeCursorPosition { event ->
             context.updateUiState { current -> current.copy(editorCursorLine = event.position.lineNumber as Int) }
+        }
+        monacoEditor.onDidChangeCursorSelection {
+            val selection = readSqlEditorSelection(monacoEditor)
+            context.updateUiState { current ->
+                current.copy(
+                    selectedSqlText = selection.sql,
+                    selectedSqlLineCount = selection.lineCount,
+                )
+            }
         }
         monacoEditor.onDidFocusEditorText {
             context.updateUiState { current -> current.copy(editorFocused = true) }
@@ -33,8 +49,9 @@ internal class SqlConsoleEditorBindings(
         }
         registerSqlConsoleEditorShortcuts(
             editor = monacoEditor,
-            onRun = executionBindings::runAll,
             onRunCurrent = executionBindings::runCurrent,
+            onRunSelection = executionBindings::runSelection,
+            onRunAll = executionBindings::runAll,
             onFormat = executionBindings::formatSql,
             onStop = executionBindings::stop,
             onShowData = { selectOutputTab("data") },
