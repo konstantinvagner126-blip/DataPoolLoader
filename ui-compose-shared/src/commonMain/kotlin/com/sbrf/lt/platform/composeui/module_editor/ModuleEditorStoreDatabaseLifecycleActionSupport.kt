@@ -1,8 +1,8 @@
 package com.sbrf.lt.platform.composeui.module_editor
 
 internal class ModuleEditorStoreDatabaseLifecycleActionSupport(
-    private val api: ModuleEditorApi,
-    private val loadingSupport: ModuleEditorStoreLoadingSupport,
+    private val lifecycleStore: ModuleEditorDatabaseLifecycleStore,
+    private val loadingStore: ModuleEditorLoadingStore,
 ) {
     private val requestSupport = ModuleEditorStoreCreateModuleRequestSupport()
     private val stateSupport = ModuleEditorStoreDatabaseLifecycleStateSupport()
@@ -20,9 +20,9 @@ internal class ModuleEditorStoreDatabaseLifecycleActionSupport(
             )
         }
         return runCatching {
-            val response = api.createDatabaseModule(requestSupport.buildRequest(draft))
+            val response = lifecycleStore.createModule(requestSupport.buildRequest(draft))
             val nextRoute = stateSupport.nextRouteAfterCreate(route, draft, response)
-            val loaded = loadingSupport.load(nextRoute)
+            val loaded = loadingStore.load(nextRoute)
             stateSupport.applyCreatedModuleLoadedState(loaded, response)
         }.getOrElse { error ->
             current.copy(
@@ -38,8 +38,8 @@ internal class ModuleEditorStoreDatabaseLifecycleActionSupport(
     ): ModuleEditorPageState {
         val moduleId = current.selectedModuleId ?: return current
         return runCatching {
-            val response = api.deleteDatabaseModule(moduleId)
-            val loaded = loadingSupport.load(stateSupport.nextRouteAfterDelete(route))
+            val response = lifecycleStore.deleteModule(moduleId)
+            val loaded = loadingStore.load(stateSupport.nextRouteAfterDelete(route))
             stateSupport.applyDeletedModuleLoadedState(loaded, response)
         }.getOrElse { error ->
             current.copy(

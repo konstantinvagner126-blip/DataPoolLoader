@@ -985,6 +985,13 @@ Review after Phase F:
   - [ModuleEditorStoreRunActionSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreRunActionSupport.kt) перестал напрямую вызывать `startFilesRun / startDatabaseRun`;
   - [ModuleEditorWorkflowStoreSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorWorkflowStoreSupport.kt) сохраняет прежний facade-контракт, но run storage branching теперь живет внутри отдельного boundary;
   - добавлен targeted regression test на storage-aware run path: [ModuleEditorStorageRunSupportTest.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonTest/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStorageRunSupportTest.kt).
+- database lifecycle boundary вынесен из workflow/lifecycle path:
+  - [ModuleEditorDatabaseLifecycleStore.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorDatabaseLifecycleStore.kt) теперь инкапсулирует `create/delete` lifecycle contract для database storage;
+  - [ModuleEditorStoreDatabaseLifecycleActionSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreDatabaseLifecycleActionSupport.kt) больше не зависит от concrete [ModuleEditorStoreLoadingSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreLoadingSupport.kt) и raw API, а работает через [ModuleEditorLoadingStore.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorLoadingStore.kt) и новый lifecycle store;
+  - wiring в [ModuleEditorStoreDependencies.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreDependencies.kt) переведен на interface-based boundary;
+  - добавлены targeted tests:
+    - [ModuleEditorDatabaseLifecycleSupportTest.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonTest/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorDatabaseLifecycleSupportTest.kt)
+    - [ModuleEditorStoreDatabaseLifecycleActionSupportTest.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonTest/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreDatabaseLifecycleActionSupportTest.kt).
 
 Критерий завершения:
 

@@ -18,7 +18,10 @@ internal fun createModuleEditorStoreDependencies(
     val runActionSupport = ModuleEditorStoreRunActionSupport(
         runStore = ModuleEditorStorageRunSupport(api),
     )
-    val databaseLifecycleActionSupport = ModuleEditorStoreDatabaseLifecycleActionSupport(api, loadingSupport)
+    val databaseLifecycleActionSupport = ModuleEditorStoreDatabaseLifecycleActionSupport(
+        lifecycleStore = ModuleEditorDatabaseLifecycleSupport(api),
+        loadingStore = loadingSupport,
+    )
     val configFormSupport = ModuleEditorStoreConfigFormSupport(api)
     val sqlResourceNamingSupport = ModuleEditorStoreSqlResourceNamingSupport()
     return ModuleEditorStoreDependencies(
