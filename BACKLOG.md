@@ -611,6 +611,8 @@
   - `group-first` runtime contract с synthetic `Без группы`;
   - одинаковое восстановление `selectedGroups / selectedSources / manual include-exclude` в основном экране и `sql-console-objects`;
   - readonly exact-column lookup как отдельный boundary, не смешанный с inspector payload.
+  - shared-store safety contract для `strict safety` и ownership-loss handling execution actions;
+  - object-browser action `Открыть SELECT в консоли` как deterministic workspace rewrite по source/draft, без скрытого смешения групп и selection.
 
 Критерий завершения:
 
