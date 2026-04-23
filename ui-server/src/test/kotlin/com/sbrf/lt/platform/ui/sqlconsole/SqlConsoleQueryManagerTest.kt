@@ -19,6 +19,9 @@ import com.sbrf.lt.platform.ui.error.UiEntityNotFoundException
 import com.sbrf.lt.platform.ui.error.UiStateConflictException
 import java.nio.file.Files
 import java.nio.file.Path
+import java.time.Duration
+import java.time.Instant
+import java.util.concurrent.CountDownLatch
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -28,6 +31,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class SqlConsoleQueryManagerTest {
+    private val ownerSessionId = "owner-session-1"
 
     @Test
     fun `current snapshot is null before first start and cancel unknown execution fails`() {
@@ -38,7 +42,7 @@ class SqlConsoleQueryManagerTest {
         assertNull(manager.currentSnapshot())
 
         val error = assertFailsWith<UiEntityNotFoundException> {
-            manager.cancel("missing")
+            manager.cancel("missing", ownerSessionId, "missing-token")
         }
         assertTrue(error.message!!.contains("не найден"))
     }
@@ -47,7 +51,7 @@ class SqlConsoleQueryManagerTest {
     fun `completes query asynchronously`() {
         val manager = SqlConsoleQueryManager(sqlConsoleService = serviceWithSuccess())
 
-        val started = manager.startQuery("select 1 as id", null)
+        val started = manager.startQuery("select 1 as id", null, ownerSessionId = ownerSessionId)
         val snapshot = waitForCompletion(manager, started.id)
 
         assertEquals(SqlConsoleExecutionStatus.SUCCESS, snapshot.status)
@@ -79,8 +83,8 @@ class SqlConsoleQueryManagerTest {
             ),
         )
 
-        val started = manager.startQuery("select pg_sleep(10)", null)
-        manager.cancel(started.id)
+        val started = manager.startQuery("select pg_sleep(10)", null, ownerSessionId = ownerSessionId)
+        manager.cancel(started.id, ownerSessionId, requireNotNull(started.ownerToken))
         val snapshot = waitForCompletion(manager, started.id)
 
         assertEquals(SqlConsoleExecutionStatus.CANCELLED, snapshot.status)
@@ -100,7 +104,7 @@ class SqlConsoleQueryManagerTest {
             ),
         )
 
-        val started = manager.startQuery("select 1", null)
+        val started = manager.startQuery("select 1", null, ownerSessionId = ownerSessionId)
         assertEquals(started.id, manager.currentSnapshot()?.id)
         val snapshot = waitForCompletion(manager, started.id)
 
@@ -190,6 +194,7 @@ class SqlConsoleQueryManagerTest {
         val started = manager.startQuery(
             sql = "select 1 as id",
             credentialsPath = null,
+            ownerSessionId = ownerSessionId,
             executionPolicy = SqlConsoleExecutionPolicy.CONTINUE_ON_ERROR,
         )
         val snapshot = waitForCompletion(manager, started.id)
@@ -254,6 +259,7 @@ class SqlConsoleQueryManagerTest {
         val started = manager.startQuery(
             sql = "update demo set flag = true",
             credentialsPath = null,
+            ownerSessionId = ownerSessionId,
             transactionMode = SqlConsoleTransactionMode.TRANSACTION_PER_SHARD,
         )
         val pending = waitForCompletion(manager, started.id)
@@ -261,7 +267,7 @@ class SqlConsoleQueryManagerTest {
         assertEquals(SqlConsoleExecutionStatus.SUCCESS, pending.status)
         assertEquals(SqlConsoleExecutionTransactionState.PENDING_COMMIT, pending.transactionState)
 
-        val committed = manager.commit(started.id)
+        val committed = manager.commit(started.id, ownerSessionId, requireNotNull(started.ownerToken))
 
         assertEquals(SqlConsoleExecutionTransactionState.COMMITTED, committed.transactionState)
         assertTrue(committed.transactionShardNames.isEmpty())
@@ -324,6 +330,7 @@ class SqlConsoleQueryManagerTest {
         val started = manager.startQuery(
             sql = "select 1 as id",
             credentialsPath = null,
+            ownerSessionId = ownerSessionId,
             transactionMode = SqlConsoleTransactionMode.TRANSACTION_PER_SHARD,
         )
         val finished = waitForCompletion(manager, started.id)
@@ -358,9 +365,9 @@ class SqlConsoleQueryManagerTest {
             ),
         )
 
-        val started = manager.startQuery("select 1", null, cleanupDir = cleanupDir)
+        val started = manager.startQuery("select 1", null, ownerSessionId = ownerSessionId, cleanupDir = cleanupDir)
         val error = assertFailsWith<UiStateConflictException> {
-            manager.startQuery("select 2", null)
+            manager.startQuery("select 2", null, ownerSessionId = "owner-session-2")
         }
         assertTrue(error.message!!.contains("уже выполняется запрос"))
         waitForCompletion(manager, started.id)
@@ -389,12 +396,12 @@ class SqlConsoleQueryManagerTest {
             manager.snapshot("missing")
         }
 
-        val started = manager.startQuery("select 1", null)
+        val started = manager.startQuery("select 1", null, ownerSessionId = ownerSessionId)
         val finished = waitForCompletion(manager, started.id)
         assertEquals(SqlConsoleExecutionStatus.SUCCESS, finished.status)
 
         val error = assertFailsWith<UiStateConflictException> {
-            manager.cancel(started.id)
+            manager.cancel(started.id, ownerSessionId, requireNotNull(started.ownerToken))
         }
         assertTrue(error.message!!.contains("уже завершен"))
     }
@@ -413,7 +420,7 @@ class SqlConsoleQueryManagerTest {
             ),
         )
 
-        val started = manager.startQuery("select 1", null, cleanupDir = cleanupDir)
+        val started = manager.startQuery("select 1", null, ownerSessionId = ownerSessionId, cleanupDir = cleanupDir)
         val snapshot = waitForCompletion(manager, started.id)
 
         assertEquals(SqlConsoleExecutionStatus.SUCCESS, snapshot.status)
@@ -431,13 +438,86 @@ class SqlConsoleQueryManagerTest {
             ),
         )
 
-        val started = manager.startQuery("select 1", null, cleanupDir = cleanupDir)
+        val started = manager.startQuery("select 1", null, ownerSessionId = ownerSessionId, cleanupDir = cleanupDir)
         val snapshot = waitForCompletion(manager, started.id)
 
         assertEquals(SqlConsoleExecutionStatus.FAILED, snapshot.status)
         assertFalse(snapshot.cancelRequested)
         assertTrue(snapshot.errorMessage!!.contains("не настроены source-подключения"))
         assertTrue(!Files.exists(cleanupDir))
+    }
+
+    @Test
+    fun `rejects commit from another owner session`() {
+        val manager = SqlConsoleQueryManager(sqlConsoleService = manualTransactionService())
+
+        val started = manager.startQuery(
+            sql = "update demo set flag = true",
+            credentialsPath = null,
+            ownerSessionId = ownerSessionId,
+            transactionMode = SqlConsoleTransactionMode.TRANSACTION_PER_SHARD,
+        )
+        val pending = waitForCompletion(manager, started.id)
+
+        assertEquals(SqlConsoleExecutionTransactionState.PENDING_COMMIT, pending.transactionState)
+
+        val error = assertFailsWith<UiStateConflictException> {
+            manager.commit(started.id, "other-owner", requireNotNull(started.ownerToken))
+        }
+        assertTrue(error.message!!.contains("не принадлежит"))
+    }
+
+    @Test
+    fun `auto rollbacks pending commit when ttl expires`() {
+        var now = Instant.parse("2026-04-23T00:00:00Z")
+        val manager = SqlConsoleQueryManager(
+            sqlConsoleService = manualTransactionService(),
+            clock = { now },
+            pendingCommitTtl = Duration.ofSeconds(5),
+        )
+
+        val started = manager.startQuery(
+            sql = "update demo set flag = true",
+            credentialsPath = null,
+            ownerSessionId = ownerSessionId,
+            transactionMode = SqlConsoleTransactionMode.TRANSACTION_PER_SHARD,
+        )
+        val pending = waitForCompletion(manager, started.id)
+
+        assertEquals(SqlConsoleExecutionTransactionState.PENDING_COMMIT, pending.transactionState)
+        now = now.plusSeconds(6)
+
+        manager.enforceSafetyTimeouts()
+        val timedOut = manager.snapshot(started.id)
+
+        assertEquals(SqlConsoleExecutionTransactionState.ROLLED_BACK_BY_TIMEOUT, timedOut.transactionState)
+        assertTrue(timedOut.errorMessage!!.contains("TTL"))
+    }
+
+    @Test
+    fun `auto rollbacks completed manual transaction when owner lease was lost during running`() {
+        var now = Instant.parse("2026-04-23T00:00:00Z")
+        val releaseExecution = CountDownLatch(1)
+        val manager = SqlConsoleQueryManager(
+            sqlConsoleService = manualTransactionService(releaseExecution),
+            clock = { now },
+            ownerLeaseDuration = Duration.ofSeconds(5),
+        )
+
+        val started = manager.startQuery(
+            sql = "update demo set flag = true",
+            credentialsPath = null,
+            ownerSessionId = ownerSessionId,
+            transactionMode = SqlConsoleTransactionMode.TRANSACTION_PER_SHARD,
+        )
+
+        now = now.plusSeconds(6)
+        manager.enforceSafetyTimeouts()
+        releaseExecution.countDown()
+        val finished = waitForCompletion(manager, started.id)
+
+        assertEquals(SqlConsoleExecutionTransactionState.ROLLED_BACK_BY_OWNER_LOSS, finished.transactionState)
+        assertTrue(finished.errorMessage!!.contains("владелец"))
     }
 
     private fun serviceWithSuccess() = SqlConsoleService(
@@ -452,6 +532,57 @@ class SqlConsoleQueryManagerTest {
                 columns = listOf("id"),
                 rows = listOf(mapOf("id" to "1")),
             )
+        },
+    )
+
+    private fun manualTransactionService(releaseExecution: CountDownLatch? = null) = SqlConsoleService(
+        config = SqlConsoleConfig(
+            sources = listOf(SqlConsoleSourceConfig("db1", "jdbc:test", "user", "pwd")),
+        ),
+        executor = object : ShardSqlExecutor, com.sbrf.lt.datapool.sqlconsole.ShardSqlTransactionalExecutor {
+            override fun execute(
+                shard: com.sbrf.lt.datapool.sqlconsole.ResolvedSqlConsoleShardConfig,
+                statement: com.sbrf.lt.datapool.sqlconsole.SqlConsoleStatement,
+                fetchSize: Int,
+                maxRows: Int,
+                queryTimeoutSec: Int?,
+                executionControl: SqlConsoleExecutionControl,
+            ): RawShardExecutionResult =
+                RawShardExecutionResult(
+                    shardName = shard.name,
+                    status = "SUCCESS",
+                    columns = listOf("id"),
+                    rows = listOf(mapOf("id" to "1")),
+                )
+
+            override fun executeScriptInTransaction(
+                shard: com.sbrf.lt.datapool.sqlconsole.ResolvedSqlConsoleShardConfig,
+                statements: List<com.sbrf.lt.datapool.sqlconsole.SqlConsoleStatement>,
+                fetchSize: Int,
+                maxRows: Int,
+                queryTimeoutSec: Int?,
+                executionPolicy: SqlConsoleExecutionPolicy,
+                executionControl: SqlConsoleExecutionControl,
+            ): com.sbrf.lt.datapool.sqlconsole.TransactionalShardScriptExecution {
+                releaseExecution?.await()
+                return com.sbrf.lt.datapool.sqlconsole.TransactionalShardScriptExecution(
+                    results = statements.map {
+                        RawShardExecutionResult(
+                            shardName = shard.name,
+                            status = "SUCCESS",
+                            affectedRows = 1,
+                            message = "ok",
+                        )
+                    },
+                    pendingTransaction = object : com.sbrf.lt.datapool.sqlconsole.PendingShardTransaction {
+                        override val shardName: String = shard.name
+
+                        override fun commit() = Unit
+
+                        override fun rollback() = Unit
+                    },
+                )
+            }
         },
     )
 

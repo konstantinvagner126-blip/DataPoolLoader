@@ -1,6 +1,7 @@
 package com.sbrf.lt.platform.ui.server
 
 import com.sbrf.lt.platform.ui.model.SqlConsoleQueryRequest
+import com.sbrf.lt.platform.ui.model.SqlConsoleExecutionOwnerActionRequest
 import io.ktor.server.application.call
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
@@ -18,15 +19,39 @@ internal fun Route.registerSqlConsoleAsyncQueryRoutes(context: UiServerContext) 
         call.respond(context.loadSqlConsoleExecution(call.requireSqlConsoleExecutionId()))
     }
 
+    post("/api/sql-console/query/{id}/heartbeat") {
+        call.respond(
+            context.heartbeatSqlConsoleExecution(
+                executionId = call.requireSqlConsoleExecutionId(),
+                request = call.receive<SqlConsoleExecutionOwnerActionRequest>(),
+            ),
+        )
+    }
+
     post("/api/sql-console/query/{id}/cancel") {
-        call.respond(context.cancelSqlConsoleExecution(call.requireSqlConsoleExecutionId()))
+        call.respond(
+            context.cancelSqlConsoleExecution(
+                executionId = call.requireSqlConsoleExecutionId(),
+                request = call.receive<SqlConsoleExecutionOwnerActionRequest>(),
+            ),
+        )
     }
 
     post("/api/sql-console/query/{id}/commit") {
-        call.respond(context.commitSqlConsoleExecution(call.requireSqlConsoleExecutionId()))
+        call.respond(
+            context.commitSqlConsoleExecution(
+                executionId = call.requireSqlConsoleExecutionId(),
+                request = call.receive<SqlConsoleExecutionOwnerActionRequest>(),
+            ),
+        )
     }
 
     post("/api/sql-console/query/{id}/rollback") {
-        call.respond(context.rollbackSqlConsoleExecution(call.requireSqlConsoleExecutionId()))
+        call.respond(
+            context.rollbackSqlConsoleExecution(
+                executionId = call.requireSqlConsoleExecutionId(),
+                request = call.receive<SqlConsoleExecutionOwnerActionRequest>(),
+            ),
+        )
     }
 }

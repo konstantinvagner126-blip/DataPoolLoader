@@ -2,9 +2,7 @@ package com.sbrf.lt.platform.composeui.sql_console
 
 import com.sbrf.lt.platform.composeui.foundation.http.ComposeHttpClient
 import com.sbrf.lt.platform.composeui.model.RuntimeContext
-import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
-import kotlinx.serialization.builtins.nullable
 import kotlinx.serialization.builtins.serializer
 
 class SqlConsoleApiClient(
@@ -62,27 +60,47 @@ class SqlConsoleApiClient(
     override suspend fun loadExecution(executionId: String): SqlConsoleExecutionResponse =
         httpClient.get("/api/sql-console/query/$executionId", SqlConsoleExecutionResponse.serializer())
 
-    override suspend fun cancelExecution(executionId: String): SqlConsoleExecutionResponse =
+    override suspend fun heartbeatExecution(
+        executionId: String,
+        request: SqlConsoleExecutionOwnerActionRequest,
+    ): SqlConsoleExecutionResponse =
+        httpClient.postJson(
+            path = "/api/sql-console/query/$executionId/heartbeat",
+            payload = request,
+            serializer = SqlConsoleExecutionOwnerActionRequest.serializer(),
+            deserializer = SqlConsoleExecutionResponse.serializer(),
+        )
+
+    override suspend fun cancelExecution(
+        executionId: String,
+        request: SqlConsoleExecutionOwnerActionRequest,
+    ): SqlConsoleExecutionResponse =
         httpClient.postJson(
             path = "/api/sql-console/query/$executionId/cancel",
-            payload = emptyMap<String, String>(),
-            serializer = MapSerializer(String.serializer(), String.serializer()),
+            payload = request,
+            serializer = SqlConsoleExecutionOwnerActionRequest.serializer(),
             deserializer = SqlConsoleExecutionResponse.serializer(),
         )
 
-    override suspend fun commitExecution(executionId: String): SqlConsoleExecutionResponse =
+    override suspend fun commitExecution(
+        executionId: String,
+        request: SqlConsoleExecutionOwnerActionRequest,
+    ): SqlConsoleExecutionResponse =
         httpClient.postJson(
             path = "/api/sql-console/query/$executionId/commit",
-            payload = emptyMap<String, String>(),
-            serializer = MapSerializer(String.serializer(), String.serializer()),
+            payload = request,
+            serializer = SqlConsoleExecutionOwnerActionRequest.serializer(),
             deserializer = SqlConsoleExecutionResponse.serializer(),
         )
 
-    override suspend fun rollbackExecution(executionId: String): SqlConsoleExecutionResponse =
+    override suspend fun rollbackExecution(
+        executionId: String,
+        request: SqlConsoleExecutionOwnerActionRequest,
+    ): SqlConsoleExecutionResponse =
         httpClient.postJson(
             path = "/api/sql-console/query/$executionId/rollback",
-            payload = emptyMap<String, String>(),
-            serializer = MapSerializer(String.serializer(), String.serializer()),
+            payload = request,
+            serializer = SqlConsoleExecutionOwnerActionRequest.serializer(),
             deserializer = SqlConsoleExecutionResponse.serializer(),
         )
 }

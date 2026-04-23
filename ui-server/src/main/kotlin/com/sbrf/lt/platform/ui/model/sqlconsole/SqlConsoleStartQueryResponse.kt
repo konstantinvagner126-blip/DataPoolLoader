@@ -12,4 +12,7 @@ data class SqlConsoleStartQueryResponse(
     val cancelRequested: Boolean,
     val autoCommitEnabled: Boolean = true,
     val transactionState: String = "NONE",
+    val ownerToken: String? = null,
+    val ownerLeaseExpiresAt: Instant? = null,
+    val pendingCommitExpiresAt: Instant? = null,
 )

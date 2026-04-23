@@ -15,6 +15,9 @@ data class SqlConsoleExecutionSnapshot(
     val autoCommitEnabled: Boolean = true,
     val transactionState: SqlConsoleExecutionTransactionState = SqlConsoleExecutionTransactionState.NONE,
     val transactionShardNames: List<String> = emptyList(),
+    val ownerToken: String? = null,
+    val ownerLeaseExpiresAt: Instant? = null,
+    val pendingCommitExpiresAt: Instant? = null,
     val result: SqlConsoleQueryResult? = null,
     val errorMessage: String? = null,
 )
@@ -24,4 +27,6 @@ enum class SqlConsoleExecutionTransactionState {
     PENDING_COMMIT,
     COMMITTED,
     ROLLED_BACK,
+    ROLLED_BACK_BY_TIMEOUT,
+    ROLLED_BACK_BY_OWNER_LOSS,
 }

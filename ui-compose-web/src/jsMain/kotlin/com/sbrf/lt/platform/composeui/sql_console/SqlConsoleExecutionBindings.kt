@@ -10,7 +10,12 @@ internal class SqlConsoleExecutionBindings(
         if (state.actionInProgress != "run-query" && state.info?.configured == true && !context.pendingManualTransaction()) {
             context.scope.launch {
                 val runningState = context.store.beginAction(context.currentState(), "run-query")
-                context.setState(context.store.startQuery(runningState))
+                context.setState(
+                    context.store.startQuery(
+                        current = runningState,
+                        ownerSessionId = context.currentUiState().ownerSessionId,
+                    ),
+                )
             }
         }
     }
@@ -29,6 +34,7 @@ internal class SqlConsoleExecutionBindings(
                 context.setState(
                     context.store.startQuery(
                         current = runningState,
+                        ownerSessionId = context.currentUiState().ownerSessionId,
                         sqlOverride = statementSql,
                         successMessage = "Текущий statement запущен.",
                     ),
@@ -55,7 +61,7 @@ internal class SqlConsoleExecutionBindings(
         if (context.isRunning() && state.actionInProgress != "cancel-query") {
             context.scope.launch {
                 val cancelState = context.store.beginAction(context.currentState(), "cancel-query")
-                context.setState(context.store.cancelExecution(cancelState))
+                context.setState(context.store.cancelExecution(cancelState, context.currentUiState().ownerSessionId))
             }
         }
     }
@@ -63,14 +69,14 @@ internal class SqlConsoleExecutionBindings(
     fun commit() {
         context.scope.launch {
             val committingState = context.store.beginAction(context.currentState(), "commit-query")
-            context.setState(context.store.commitExecution(committingState))
+            context.setState(context.store.commitExecution(committingState, context.currentUiState().ownerSessionId))
         }
     }
 
     fun rollback() {
         context.scope.launch {
             val rollbackState = context.store.beginAction(context.currentState(), "rollback-query")
-            context.setState(context.store.rollbackExecution(rollbackState))
+            context.setState(context.store.rollbackExecution(rollbackState, context.currentUiState().ownerSessionId))
         }
     }
 

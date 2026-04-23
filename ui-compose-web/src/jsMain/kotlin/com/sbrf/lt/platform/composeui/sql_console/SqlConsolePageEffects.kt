@@ -24,6 +24,9 @@ internal fun SqlConsolePageEffects(
         setUiState(transform(currentUiState()))
     }
 
+    val trackingExecution = isRunning || currentExecution?.transactionState == "PENDING_COMMIT"
+    val heartbeatEnabled = trackingExecution && !currentExecution?.ownerToken.isNullOrBlank()
+
     LaunchedEffect(store) {
         setState(store.startLoading(currentState()))
         setState(store.load())
@@ -95,10 +98,23 @@ internal fun SqlConsolePageEffects(
     }
 
     PollingEffect(
-        enabled = isRunning,
+        enabled = trackingExecution,
         intervalMs = 2000,
         onTick = {
             setState(store.refreshExecution(currentState()))
+        },
+    )
+
+    PollingEffect(
+        enabled = heartbeatEnabled,
+        intervalMs = 5000,
+        onTick = {
+            setState(
+                store.heartbeatExecution(
+                    current = currentState(),
+                    ownerSessionId = currentUiState().ownerSessionId,
+                ),
+            )
         },
     )
 

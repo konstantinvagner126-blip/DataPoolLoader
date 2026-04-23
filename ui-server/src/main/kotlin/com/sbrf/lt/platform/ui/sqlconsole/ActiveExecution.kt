@@ -10,4 +10,7 @@ internal data class ActiveExecution(
     val snapshot: SqlConsoleExecutionSnapshot,
     val control: SqlConsoleExecutionControl,
     val pendingTransaction: SqlConsolePendingTransaction? = null,
+    val ownerSessionId: String,
+    val ownerToken: String,
+    val ownerLost: Boolean = false,
 )

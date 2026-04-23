@@ -45,6 +45,7 @@ data class SqlConsoleSettingsUpdate(
 data class SqlConsoleQueryStartRequest(
     val sql: String,
     val selectedSourceNames: List<String> = emptyList(),
+    val ownerSessionId: String,
     val transactionMode: String = "AUTO_COMMIT",
 )
 
@@ -56,6 +57,9 @@ data class SqlConsoleStartQueryResponse(
     val cancelRequested: Boolean,
     val autoCommitEnabled: Boolean = true,
     val transactionState: String = "NONE",
+    val ownerToken: String? = null,
+    val ownerLeaseExpiresAt: String? = null,
+    val pendingCommitExpiresAt: String? = null,
 )
 
 @Serializable
@@ -68,8 +72,17 @@ data class SqlConsoleExecutionResponse(
     val autoCommitEnabled: Boolean = true,
     val transactionState: String = "NONE",
     val transactionShardNames: List<String> = emptyList(),
+    val ownerToken: String? = null,
+    val ownerLeaseExpiresAt: String? = null,
+    val pendingCommitExpiresAt: String? = null,
     val result: SqlConsoleQueryResult? = null,
     val errorMessage: String? = null,
+)
+
+@Serializable
+data class SqlConsoleExecutionOwnerActionRequest(
+    val ownerSessionId: String,
+    val ownerToken: String,
 )
 
 @Serializable

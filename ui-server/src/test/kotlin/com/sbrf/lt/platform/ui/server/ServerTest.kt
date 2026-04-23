@@ -469,7 +469,7 @@ class ServerTest {
 
         val queryResponse = client.post("/api/sql-console/query") {
             contentType(ContentType.Application.Json)
-            setBody("""{"sql":"select 1 as id","selectedSourceNames":["shard1"]}""")
+            setBody("""{"sql":"select 1 as id","selectedSourceNames":["shard1"],"ownerSessionId":"tab-sync"}""")
         }
         assertEquals(HttpStatusCode.OK, queryResponse.status)
         val queryBody = queryResponse.bodyAsText()
@@ -810,25 +810,30 @@ class ServerTest {
 
         val started = client.post("/api/sql-console/query/start") {
             contentType(ContentType.Application.Json)
-            setBody("""{"sql":"delete from demo","selectedSourceNames":["shard1"]}""")
+            setBody("""{"sql":"delete from demo","selectedSourceNames":["shard1"],"ownerSessionId":"tab-1"}""")
         }
         assertEquals(HttpStatusCode.OK, started.status)
         val startedBody = started.bodyAsText()
         assertTrue(startedBody.contains("\"status\":\"RUNNING\""))
         val executionId = Regex(""""id":"([^"]+)"""").find(startedBody)?.groupValues?.get(1)
         assertNotNull(executionId)
+        val ownerToken = Regex(""""ownerToken":"([^"]+)"""").find(startedBody)?.groupValues?.get(1)
+        assertNotNull(ownerToken)
 
         val running = client.get("/api/sql-console/query/$executionId").bodyAsText()
         assertTrue(running.contains("\"status\":\"RUNNING\""))
 
         val duplicateStart = client.post("/api/sql-console/query/start") {
             contentType(ContentType.Application.Json)
-            setBody("""{"sql":"delete from demo_again","selectedSourceNames":["shard1"]}""")
+            setBody("""{"sql":"delete from demo_again","selectedSourceNames":["shard1"],"ownerSessionId":"tab-2"}""")
         }
         assertEquals(HttpStatusCode.Conflict, duplicateStart.status)
         assertTrue(duplicateStart.bodyAsText().contains("уже выполняется запрос"))
 
-        val cancelled = client.post("/api/sql-console/query/$executionId/cancel").bodyAsText()
+        val cancelled = client.post("/api/sql-console/query/$executionId/cancel") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"ownerSessionId":"tab-1","ownerToken":"$ownerToken"}""")
+        }.bodyAsText()
         assertTrue(cancelled.contains("\"cancelRequested\":true"))
 
         repeat(20) {

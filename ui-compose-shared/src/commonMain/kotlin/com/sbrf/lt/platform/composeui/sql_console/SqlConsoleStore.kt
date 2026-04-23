@@ -125,22 +125,38 @@ class SqlConsoleStore(
 
     suspend fun startQuery(
         current: SqlConsolePageState,
+        ownerSessionId: String,
         sqlOverride: String? = null,
         successMessage: String = "Запрос запущен.",
     ): SqlConsolePageState =
-        executionSupport.startQuery(current, sqlOverride, successMessage)
+        executionSupport.startQuery(current, ownerSessionId, sqlOverride, successMessage)
 
     suspend fun refreshExecution(current: SqlConsolePageState): SqlConsolePageState =
         executionSupport.refreshExecution(current)
 
-    suspend fun cancelExecution(current: SqlConsolePageState): SqlConsolePageState =
-        executionSupport.cancelExecution(current)
+    suspend fun heartbeatExecution(
+        current: SqlConsolePageState,
+        ownerSessionId: String,
+    ): SqlConsolePageState =
+        executionSupport.heartbeatExecution(current, ownerSessionId)
 
-    suspend fun commitExecution(current: SqlConsolePageState): SqlConsolePageState =
-        executionSupport.commitExecution(current)
+    suspend fun cancelExecution(
+        current: SqlConsolePageState,
+        ownerSessionId: String,
+    ): SqlConsolePageState =
+        executionSupport.cancelExecution(current, ownerSessionId)
 
-    suspend fun rollbackExecution(current: SqlConsolePageState): SqlConsolePageState =
-        executionSupport.rollbackExecution(current)
+    suspend fun commitExecution(
+        current: SqlConsolePageState,
+        ownerSessionId: String,
+    ): SqlConsolePageState =
+        executionSupport.commitExecution(current, ownerSessionId)
+
+    suspend fun rollbackExecution(
+        current: SqlConsolePageState,
+        ownerSessionId: String,
+    ): SqlConsolePageState =
+        executionSupport.rollbackExecution(current, ownerSessionId)
 
     fun beginAction(
         current: SqlConsolePageState,

@@ -21,9 +21,23 @@ interface SqlConsoleApi {
 
     suspend fun loadExecution(executionId: String): SqlConsoleExecutionResponse
 
-    suspend fun cancelExecution(executionId: String): SqlConsoleExecutionResponse
+    suspend fun heartbeatExecution(
+        executionId: String,
+        request: SqlConsoleExecutionOwnerActionRequest,
+    ): SqlConsoleExecutionResponse
 
-    suspend fun commitExecution(executionId: String): SqlConsoleExecutionResponse
+    suspend fun cancelExecution(
+        executionId: String,
+        request: SqlConsoleExecutionOwnerActionRequest,
+    ): SqlConsoleExecutionResponse
 
-    suspend fun rollbackExecution(executionId: String): SqlConsoleExecutionResponse
+    suspend fun commitExecution(
+        executionId: String,
+        request: SqlConsoleExecutionOwnerActionRequest,
+    ): SqlConsoleExecutionResponse
+
+    suspend fun rollbackExecution(
+        executionId: String,
+        request: SqlConsoleExecutionOwnerActionRequest,
+    ): SqlConsoleExecutionResponse
 }

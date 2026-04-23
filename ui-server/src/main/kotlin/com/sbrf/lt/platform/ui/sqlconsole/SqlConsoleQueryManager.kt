@@ -5,8 +5,12 @@ import com.sbrf.lt.datapool.sqlconsole.SqlConsoleTransactionMode
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleOperations
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleTransactionalOperations
 import java.nio.file.Path
+import java.time.Duration
+import java.time.Instant
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.TimeUnit
 
 enum class SqlConsoleExecutionStatus {
     RUNNING,
@@ -20,21 +24,41 @@ class SqlConsoleQueryManager(
     private val transactionalOperations: SqlConsoleTransactionalOperations = sqlConsoleService as? SqlConsoleTransactionalOperations
         ?: error("SQL-консоль не поддерживает транзакционные execution session."),
     private val executor: ExecutorService = Executors.newSingleThreadExecutor(),
+    private val scheduler: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor(),
+    private val clock: () -> Instant = Instant::now,
+    ownerLeaseDuration: Duration = Duration.ofSeconds(15),
+    pendingCommitTtl: Duration = Duration.ofMinutes(2),
 ) : SqlConsoleAsyncQueryOperations {
-    private val stateSupport = SqlConsoleQueryStateSupport()
+    private val stateSupport = SqlConsoleQueryStateSupport(
+        ownerLeaseDuration = ownerLeaseDuration,
+        pendingCommitTtl = pendingCommitTtl,
+    )
     private val executionSupport = SqlConsoleQueryExecutionSupport(sqlConsoleService, transactionalOperations)
     private val transactionSupport = SqlConsoleQueryTransactionSupport(stateSupport)
+
+    init {
+        scheduler.scheduleWithFixedDelay(
+            { runCatching { enforceSafetyTimeouts() } },
+            1,
+            1,
+            TimeUnit.SECONDS,
+        )
+    }
 
     override fun startQuery(
         sql: String,
         credentialsPath: Path?,
         selectedSourceNames: List<String>,
+        ownerSessionId: String,
         executionPolicy: SqlConsoleExecutionPolicy,
         transactionMode: SqlConsoleTransactionMode,
         cleanupDir: Path?,
     ): SqlConsoleExecutionSnapshot {
+        enforceSafetyTimeouts()
         val execution = stateSupport.prepareStart(
             autoCommitEnabled = transactionMode == SqlConsoleTransactionMode.AUTO_COMMIT,
+            ownerSessionId = ownerSessionId,
+            now = clock(),
         )
 
         executor.submit {
@@ -47,19 +71,58 @@ class SqlConsoleQueryManager(
                 transactionMode = transactionMode,
                 cleanupDir = cleanupDir,
             )
-            stateSupport.storeCompletedExecution(execution.snapshot.id, finalExecution)
+            stateSupport.storeCompletedExecution(execution.snapshot.id, finalExecution, clock())
         }
 
         return execution.snapshot
     }
 
-    override fun currentSnapshot(): SqlConsoleExecutionSnapshot? = stateSupport.currentSnapshot()
+    override fun currentSnapshot(): SqlConsoleExecutionSnapshot? {
+        enforceSafetyTimeouts()
+        return stateSupport.currentSnapshot()
+    }
 
-    override fun snapshot(executionId: String): SqlConsoleExecutionSnapshot = stateSupport.snapshot(executionId)
+    override fun snapshot(executionId: String): SqlConsoleExecutionSnapshot {
+        enforceSafetyTimeouts()
+        return stateSupport.snapshot(executionId)
+    }
 
-    override fun cancel(executionId: String): SqlConsoleExecutionSnapshot = stateSupport.cancel(executionId)
+    override fun heartbeat(
+        executionId: String,
+        ownerSessionId: String,
+        ownerToken: String,
+    ): SqlConsoleExecutionSnapshot {
+        enforceSafetyTimeouts()
+        return stateSupport.heartbeat(executionId, ownerSessionId, ownerToken, clock())
+    }
 
-    override fun commit(executionId: String): SqlConsoleExecutionSnapshot = transactionSupport.commit(executionId)
+    override fun cancel(
+        executionId: String,
+        ownerSessionId: String,
+        ownerToken: String,
+    ): SqlConsoleExecutionSnapshot {
+        enforceSafetyTimeouts()
+        return stateSupport.cancel(executionId, ownerSessionId, ownerToken)
+    }
 
-    override fun rollback(executionId: String): SqlConsoleExecutionSnapshot = transactionSupport.rollback(executionId)
+    override fun commit(
+        executionId: String,
+        ownerSessionId: String,
+        ownerToken: String,
+    ): SqlConsoleExecutionSnapshot {
+        enforceSafetyTimeouts()
+        return transactionSupport.commit(executionId, ownerSessionId, ownerToken)
+    }
+
+    override fun rollback(
+        executionId: String,
+        ownerSessionId: String,
+        ownerToken: String,
+    ): SqlConsoleExecutionSnapshot {
+        enforceSafetyTimeouts()
+        return transactionSupport.rollback(executionId, ownerSessionId, ownerToken)
+    }
+
+    internal fun enforceSafetyTimeouts(): SqlConsoleExecutionSnapshot? =
+        stateSupport.enforceSafetyTimeouts(clock())
 }

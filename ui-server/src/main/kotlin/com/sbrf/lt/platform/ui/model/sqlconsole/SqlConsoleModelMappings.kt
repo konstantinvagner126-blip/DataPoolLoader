@@ -51,19 +51,28 @@ fun SqlConsoleQueryResult.toResponse(): SqlConsoleQueryResponse = SqlConsoleQuer
 /**
  * Преобразует snapshot асинхронного запроса в краткий стартовый ответ.
  */
-fun SqlConsoleExecutionSnapshot.toStartResponse(): SqlConsoleStartQueryResponse = SqlConsoleStartQueryResponse(
+fun SqlConsoleExecutionSnapshot.toStartResponse(
+    includeOwnerToken: Boolean = false,
+    ownerToken: String? = null,
+): SqlConsoleStartQueryResponse = SqlConsoleStartQueryResponse(
     id = id,
     status = status.name,
     startedAt = startedAt,
     cancelRequested = cancelRequested,
     autoCommitEnabled = autoCommitEnabled,
     transactionState = transactionState.name,
+    ownerToken = if (includeOwnerToken) ownerToken ?: this.ownerToken else null,
+    ownerLeaseExpiresAt = ownerLeaseExpiresAt,
+    pendingCommitExpiresAt = pendingCommitExpiresAt,
 )
 
 /**
  * Преобразует snapshot асинхронного запроса в полное состояние для polling.
  */
-fun SqlConsoleExecutionSnapshot.toResponse(): SqlConsoleExecutionResponse = SqlConsoleExecutionResponse(
+fun SqlConsoleExecutionSnapshot.toResponse(
+    includeOwnerToken: Boolean = false,
+    ownerToken: String? = null,
+): SqlConsoleExecutionResponse = SqlConsoleExecutionResponse(
     id = id,
     status = status.name,
     startedAt = startedAt,
@@ -72,6 +81,9 @@ fun SqlConsoleExecutionSnapshot.toResponse(): SqlConsoleExecutionResponse = SqlC
     autoCommitEnabled = autoCommitEnabled,
     transactionState = transactionState.name,
     transactionShardNames = transactionShardNames,
+    ownerToken = if (includeOwnerToken) ownerToken ?: this.ownerToken else null,
+    ownerLeaseExpiresAt = ownerLeaseExpiresAt,
+    pendingCommitExpiresAt = pendingCommitExpiresAt,
     result = result?.toResponse(),
     errorMessage = errorMessage,
 )

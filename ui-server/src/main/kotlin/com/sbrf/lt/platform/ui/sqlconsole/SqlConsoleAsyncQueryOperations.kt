@@ -9,6 +9,7 @@ interface SqlConsoleAsyncQueryOperations {
         sql: String,
         credentialsPath: Path?,
         selectedSourceNames: List<String> = emptyList(),
+        ownerSessionId: String,
         executionPolicy: SqlConsoleExecutionPolicy = SqlConsoleExecutionPolicy.STOP_ON_FIRST_ERROR,
         transactionMode: SqlConsoleTransactionMode = SqlConsoleTransactionMode.AUTO_COMMIT,
         cleanupDir: Path? = null,
@@ -18,9 +19,27 @@ interface SqlConsoleAsyncQueryOperations {
 
     fun snapshot(executionId: String): SqlConsoleExecutionSnapshot
 
-    fun cancel(executionId: String): SqlConsoleExecutionSnapshot
+    fun heartbeat(
+        executionId: String,
+        ownerSessionId: String,
+        ownerToken: String,
+    ): SqlConsoleExecutionSnapshot
 
-    fun commit(executionId: String): SqlConsoleExecutionSnapshot
+    fun cancel(
+        executionId: String,
+        ownerSessionId: String,
+        ownerToken: String,
+    ): SqlConsoleExecutionSnapshot
 
-    fun rollback(executionId: String): SqlConsoleExecutionSnapshot
+    fun commit(
+        executionId: String,
+        ownerSessionId: String,
+        ownerToken: String,
+    ): SqlConsoleExecutionSnapshot
+
+    fun rollback(
+        executionId: String,
+        ownerSessionId: String,
+        ownerToken: String,
+    ): SqlConsoleExecutionSnapshot
 }

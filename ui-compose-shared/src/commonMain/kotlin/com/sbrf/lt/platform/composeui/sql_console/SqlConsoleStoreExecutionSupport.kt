@@ -62,6 +62,7 @@ internal class SqlConsoleStoreExecutionSupport(
 
     suspend fun startQuery(
         current: SqlConsolePageState,
+        ownerSessionId: String,
         sqlOverride: String? = null,
         successMessage: String = "Запрос запущен.",
     ): SqlConsolePageState {
@@ -86,6 +87,7 @@ internal class SqlConsoleStoreExecutionSupport(
                 SqlConsoleQueryStartRequest(
                     sql = sql,
                     selectedSourceNames = current.selectedSourceNames,
+                    ownerSessionId = ownerSessionId,
                     transactionMode = current.transactionMode,
                 ),
             )
@@ -101,6 +103,9 @@ internal class SqlConsoleStoreExecutionSupport(
                     cancelRequested = started.cancelRequested,
                     autoCommitEnabled = started.autoCommitEnabled,
                     transactionState = started.transactionState,
+                    ownerToken = started.ownerToken,
+                    ownerLeaseExpiresAt = started.ownerLeaseExpiresAt,
+                    pendingCommitExpiresAt = started.pendingCommitExpiresAt,
                 ),
                 recentQueries = rememberQuery(current.recentQueries, sql, limit = 15),
             )
@@ -117,10 +122,11 @@ internal class SqlConsoleStoreExecutionSupport(
         val executionId = current.currentExecutionId ?: return current
         return runCatching {
             val snapshot = api.loadExecution(executionId)
+            val preservedToken = current.currentExecution?.ownerToken
             current.copy(
                 actionInProgress = null,
                 errorMessage = null,
-                currentExecution = snapshot,
+                currentExecution = snapshot.withOwnerToken(preservedToken),
                 currentExecutionId = snapshot.id,
             )
         }.getOrElse { error ->
@@ -131,15 +137,47 @@ internal class SqlConsoleStoreExecutionSupport(
         }
     }
 
-    suspend fun cancelExecution(current: SqlConsolePageState): SqlConsolePageState {
+    suspend fun heartbeatExecution(
+        current: SqlConsolePageState,
+        ownerSessionId: String,
+    ): SqlConsolePageState {
         val executionId = current.currentExecutionId ?: return current
+        val actionRequest = current.ownerActionRequest(ownerSessionId) ?: return current
         return runCatching {
-            val snapshot = api.cancelExecution(executionId)
+            val snapshot = api.heartbeatExecution(executionId, actionRequest)
+            current.copy(
+                actionInProgress = null,
+                errorMessage = null,
+                currentExecution = snapshot.withOwnerToken(current.currentExecution?.ownerToken),
+                currentExecutionId = snapshot.id,
+            )
+        }.getOrElse { error ->
+            current.copy(
+                actionInProgress = null,
+                errorMessage = error.message ?: "Не удалось подтвердить владение SQL execution session.",
+                successMessage = null,
+            )
+        }
+    }
+
+    suspend fun cancelExecution(
+        current: SqlConsolePageState,
+        ownerSessionId: String,
+    ): SqlConsolePageState {
+        val executionId = current.currentExecutionId ?: return current
+        val actionRequest = current.ownerActionRequest(ownerSessionId)
+            ?: return current.copy(
+                actionInProgress = null,
+                errorMessage = "Execution session больше не принадлежит этой вкладке.",
+                successMessage = null,
+            )
+        return runCatching {
+            val snapshot = api.cancelExecution(executionId, actionRequest)
             current.copy(
                 actionInProgress = null,
                 errorMessage = null,
                 successMessage = "Запрос помечен на остановку.",
-                currentExecution = snapshot,
+                currentExecution = snapshot.withOwnerToken(current.currentExecution?.ownerToken),
                 currentExecutionId = snapshot.id,
             )
         }.getOrElse { error ->
@@ -151,15 +189,24 @@ internal class SqlConsoleStoreExecutionSupport(
         }
     }
 
-    suspend fun commitExecution(current: SqlConsolePageState): SqlConsolePageState {
+    suspend fun commitExecution(
+        current: SqlConsolePageState,
+        ownerSessionId: String,
+    ): SqlConsolePageState {
         val executionId = current.currentExecutionId ?: return current
+        val actionRequest = current.ownerActionRequest(ownerSessionId)
+            ?: return current.copy(
+                actionInProgress = null,
+                errorMessage = "Execution session больше не принадлежит этой вкладке.",
+                successMessage = null,
+            )
         return runCatching {
-            val snapshot = api.commitExecution(executionId)
+            val snapshot = api.commitExecution(executionId, actionRequest)
             current.copy(
                 actionInProgress = null,
                 errorMessage = null,
                 successMessage = "Транзакция зафиксирована.",
-                currentExecution = snapshot,
+                currentExecution = snapshot.withOwnerToken(current.currentExecution?.ownerToken),
                 currentExecutionId = snapshot.id,
             )
         }.getOrElse { error ->
@@ -171,15 +218,24 @@ internal class SqlConsoleStoreExecutionSupport(
         }
     }
 
-    suspend fun rollbackExecution(current: SqlConsolePageState): SqlConsolePageState {
+    suspend fun rollbackExecution(
+        current: SqlConsolePageState,
+        ownerSessionId: String,
+    ): SqlConsolePageState {
         val executionId = current.currentExecutionId ?: return current
+        val actionRequest = current.ownerActionRequest(ownerSessionId)
+            ?: return current.copy(
+                actionInProgress = null,
+                errorMessage = "Execution session больше не принадлежит этой вкладке.",
+                successMessage = null,
+            )
         return runCatching {
-            val snapshot = api.rollbackExecution(executionId)
+            val snapshot = api.rollbackExecution(executionId, actionRequest)
             current.copy(
                 actionInProgress = null,
                 errorMessage = null,
                 successMessage = "Транзакция откатана.",
-                currentExecution = snapshot,
+                currentExecution = snapshot.withOwnerToken(current.currentExecution?.ownerToken),
                 currentExecutionId = snapshot.id,
             )
         }.getOrElse { error ->
@@ -191,3 +247,20 @@ internal class SqlConsoleStoreExecutionSupport(
         }
     }
 }
+
+private fun SqlConsolePageState.ownerActionRequest(ownerSessionId: String): SqlConsoleExecutionOwnerActionRequest? {
+    val ownerToken = currentExecution?.ownerToken ?: return null
+    return SqlConsoleExecutionOwnerActionRequest(
+        ownerSessionId = ownerSessionId,
+        ownerToken = ownerToken,
+    )
+}
+
+private fun SqlConsoleExecutionResponse.withOwnerToken(ownerToken: String?): SqlConsoleExecutionResponse =
+    copy(
+        ownerToken = when {
+            this.ownerToken != null -> this.ownerToken
+            status == "RUNNING" || transactionState == "PENDING_COMMIT" -> ownerToken
+            else -> null
+        },
+    )

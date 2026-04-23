@@ -1,6 +1,7 @@
 package com.sbrf.lt.platform.ui.server
 
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleExecutionPolicy
+import com.sbrf.lt.platform.ui.model.SqlConsoleExecutionOwnerActionRequest
 import com.sbrf.lt.platform.ui.model.SqlConsoleExecutionResponse
 import com.sbrf.lt.platform.ui.model.SqlConsoleQueryRequest
 import com.sbrf.lt.platform.ui.model.SqlConsoleStartQueryResponse
@@ -16,10 +17,11 @@ internal fun UiServerContext.startSqlConsoleQuery(
             sql = request.sql,
             credentialsPath = executionPaths.credentialsPath,
             selectedSourceNames = request.selectedSourceNames,
+            ownerSessionId = request.ownerSessionId,
             executionPolicy = SqlConsoleExecutionPolicy.STOP_ON_FIRST_ERROR,
             transactionMode = request.toTransactionMode(),
             cleanupDir = executionPaths.cleanupDir,
-        ).toStartResponse()
+        ).toStartResponse(includeOwnerToken = true)
     } catch (ex: Exception) {
         executionPaths.cleanupDir.toFile().deleteRecursively()
         throw ex
@@ -29,11 +31,42 @@ internal fun UiServerContext.startSqlConsoleQuery(
 internal fun UiServerContext.loadSqlConsoleExecution(executionId: String): SqlConsoleExecutionResponse =
     sqlConsoleQueryManager.snapshot(executionId).toResponse()
 
-internal fun UiServerContext.cancelSqlConsoleExecution(executionId: String): SqlConsoleExecutionResponse =
-    sqlConsoleQueryManager.cancel(executionId).toResponse()
+internal fun UiServerContext.heartbeatSqlConsoleExecution(
+    executionId: String,
+    request: SqlConsoleExecutionOwnerActionRequest,
+): SqlConsoleExecutionResponse =
+    sqlConsoleQueryManager.heartbeat(
+        executionId = executionId,
+        ownerSessionId = request.ownerSessionId,
+        ownerToken = request.ownerToken,
+    ).toResponse(includeOwnerToken = true, ownerToken = request.ownerToken)
 
-internal fun UiServerContext.commitSqlConsoleExecution(executionId: String): SqlConsoleExecutionResponse =
-    sqlConsoleQueryManager.commit(executionId).toResponse()
+internal fun UiServerContext.cancelSqlConsoleExecution(
+    executionId: String,
+    request: SqlConsoleExecutionOwnerActionRequest,
+): SqlConsoleExecutionResponse =
+    sqlConsoleQueryManager.cancel(
+        executionId = executionId,
+        ownerSessionId = request.ownerSessionId,
+        ownerToken = request.ownerToken,
+    ).toResponse(includeOwnerToken = true, ownerToken = request.ownerToken)
 
-internal fun UiServerContext.rollbackSqlConsoleExecution(executionId: String): SqlConsoleExecutionResponse =
-    sqlConsoleQueryManager.rollback(executionId).toResponse()
+internal fun UiServerContext.commitSqlConsoleExecution(
+    executionId: String,
+    request: SqlConsoleExecutionOwnerActionRequest,
+): SqlConsoleExecutionResponse =
+    sqlConsoleQueryManager.commit(
+        executionId = executionId,
+        ownerSessionId = request.ownerSessionId,
+        ownerToken = request.ownerToken,
+    ).toResponse()
+
+internal fun UiServerContext.rollbackSqlConsoleExecution(
+    executionId: String,
+    request: SqlConsoleExecutionOwnerActionRequest,
+): SqlConsoleExecutionResponse =
+    sqlConsoleQueryManager.rollback(
+        executionId = executionId,
+        ownerSessionId = request.ownerSessionId,
+        ownerToken = request.ownerToken,
+    ).toResponse()

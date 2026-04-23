@@ -1055,6 +1055,16 @@
   - duplicate tab;
   - server restart.
 
+- SQL execution ownership contract:
+  - ввести `ownerSessionId`, `ownerToken` и lease metadata в async execution lifecycle SQL-консоли;
+  - `Commit / Rollback / Cancel` больше не должны работать без подтвержденного owner token.
+- SQL execution heartbeat flow:
+  - добавить heartbeat endpoint для `RUNNING` и `PENDING_COMMIT`;
+  - провести owner session/token end-to-end через `ui-server`, `ui-compose-shared` и `ui-compose-web`.
+- SQL execution safety timeout flow:
+  - добавить automatic rollback при потере owner lease и при hard TTL для `PENDING_COMMIT`;
+  - закрепить это server-side тестами на owner loss / timeout / unauthorized action.
+
 Критерий завершения:
 
 - manual transaction не может жить бесконтрольно;
