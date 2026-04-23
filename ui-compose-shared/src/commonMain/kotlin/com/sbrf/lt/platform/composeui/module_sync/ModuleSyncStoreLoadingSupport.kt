@@ -1,10 +1,11 @@
 package com.sbrf.lt.platform.composeui.module_sync
 
-import com.sbrf.lt.platform.composeui.model.ModuleStoreMode
-
 internal class ModuleSyncStoreLoadingSupport(
     private val api: ModuleSyncApi,
 ) {
+    private val runtimeSupport = ModuleSyncStoreRuntimeSupport(api)
+    private val selectionSupport = ModuleSyncStoreSelectionSupport(api)
+
     suspend fun load(
         historyLimit: Int = 20,
         preferredRunId: String? = null,
@@ -12,11 +13,10 @@ internal class ModuleSyncStoreLoadingSupport(
         selectedModuleCodes: Set<String> = emptySet(),
         moduleSearchQuery: String = "",
     ): ModuleSyncPageState {
-        val runtimeContextResult = runCatching { api.loadRuntimeContext() }
+        val runtimeContextResult = runtimeSupport.loadRuntimeContext()
         val runtimeContext = runtimeContextResult.getOrNull()
         if (runtimeContext == null) {
-            return ModuleSyncPageState(
-                loading = false,
+            return runtimeSupport.buildRuntimeUnavailableState(
                 errorMessage = runtimeContextResult.exceptionOrNull()?.message ?: "Не удалось загрузить экран импорта модулей.",
                 historyLimit = historyLimit,
                 selectiveSyncVisible = selectiveSyncVisible,
@@ -26,17 +26,17 @@ internal class ModuleSyncStoreLoadingSupport(
         }
 
         val syncStateResult = runCatching { api.loadSyncState() }
-        val filesModulesResult = runCatching { api.loadFilesModulesCatalog() }
+        val filesModulesResult = runtimeSupport.loadAvailableFileModules()
         val availableFileModules = filesModulesResult.getOrNull()?.modules.orEmpty()
-        val normalizedSelectedModuleCodes = selectedModuleCodes.filterTo(linkedSetOf()) { selectedCode ->
-            availableFileModules.any { it.id == selectedCode }
-        }
+        val normalizedSelectedModuleCodes = runtimeSupport.normalizeSelectedModuleCodes(
+            selectedModuleCodes = selectedModuleCodes,
+            availableFileModules = availableFileModules,
+        )
         val syncState = syncStateResult.getOrDefault(
             ModuleSyncStateResponse(message = "Не удалось загрузить состояние синхронизации."),
         )
-        if (runtimeContext.effectiveMode != ModuleStoreMode.DATABASE) {
-            return ModuleSyncPageState(
-                loading = false,
+        if (!runtimeSupport.isDatabaseMode(runtimeContext)) {
+            return runtimeSupport.buildNonDatabaseState(
                 runtimeContext = runtimeContext,
                 syncState = syncState,
                 availableFileModules = availableFileModules,
@@ -53,15 +53,13 @@ internal class ModuleSyncStoreLoadingSupport(
 
         val runsResult = runCatching { api.loadSyncRuns(historyLimit).runs }
         val runs = runsResult.getOrDefault(emptyList())
-        val selectedRunId = resolveSelectedRunId(runs, syncState, preferredRunId)
-        val detailsResult = selectedRunId?.let { runId ->
-            runCatching { api.loadSyncRunDetails(runId) }
-        }
-        val details = detailsResult?.getOrNull()
+        val selectedRunId = selectionSupport.resolveSelectedRunId(runs, syncState, preferredRunId)
+        val detailsResult = selectionSupport.loadSelectedRunDetails(selectedRunId)
+        val details = detailsResult.getOrNull()
         val firstError = listOfNotNull(
             syncStateResult.exceptionOrNull()?.message,
             runsResult.exceptionOrNull()?.message,
-            detailsResult?.exceptionOrNull()?.message,
+            detailsResult.exceptionOrNull()?.message,
         ).firstOrNull()
         return ModuleSyncPageState(
             loading = false,
@@ -105,19 +103,5 @@ internal class ModuleSyncStoreLoadingSupport(
                 loading = false,
                 errorMessage = error.message ?: "Не удалось загрузить детали импорта.",
             )
-        }
-
-    private fun resolveSelectedRunId(
-        runs: List<ModuleSyncRunSummaryResponse>,
-        syncState: ModuleSyncStateResponse,
-        preferredRunId: String?,
-    ): String? =
-        when {
-            preferredRunId != null && runs.any { it.syncRunId == preferredRunId } -> preferredRunId
-            syncState.activeFullSync != null && runs.any { it.syncRunId == syncState.activeFullSync.syncRunId } ->
-                syncState.activeFullSync.syncRunId
-            syncState.activeSingleSyncs.isNotEmpty() && runs.any { it.syncRunId == syncState.activeSingleSyncs.first().syncRunId } ->
-                syncState.activeSingleSyncs.first().syncRunId
-            else -> runs.firstOrNull()?.syncRunId
         }
 }

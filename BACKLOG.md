@@ -901,6 +901,17 @@ Review after Phase F:
     - добавлены первые common tests на preview refresh и cleanup message rules:
       - [RunHistoryCleanupStoreActionSupportTest.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonTest/kotlin/com/sbrf/lt/platform/composeui/run_history_cleanup/RunHistoryCleanupStoreActionSupportTest.kt)
       - [RunHistoryCleanupStoreExecutionMessageSupportTest.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonTest/kotlin/com/sbrf/lt/platform/composeui/run_history_cleanup/RunHistoryCleanupStoreExecutionMessageSupportTest.kt)
+  - review after current `module_editor` wave:
+    - `module_editor` main hotspots уже опущены до уровня reviewable support-слоев;
+    - remaining `DraftStoreSupport` / `WorkflowStoreSupport` сейчас выглядят как допустимые façade/store wiring слои, а не как новые top-offenders;
+    - следующий реальный thick shared-store cluster по `P1.10` смещается в `module_sync`.
+  - начат cleanup `module_sync` shared-store кластера:
+    - [ModuleSyncStoreLoadingSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncStoreLoadingSupport.kt) перестал держать runtime/fallback branching, file-module normalization и selected-run/details policy в одном helper;
+    - runtime/fallback и file-module normalization вынесены в [ModuleSyncStoreRuntimeSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncStoreRuntimeSupport.kt);
+    - selected-run/details policy вынесен в [ModuleSyncStoreSelectionSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncStoreSelectionSupport.kt);
+    - добавлены common tests на non-database fallback, selected module normalization и run selection policy:
+      - [ModuleSyncStoreLoadingSupportTest.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonTest/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncStoreLoadingSupportTest.kt)
+      - [ModuleSyncStoreSelectionSupportTest.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonTest/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncStoreSelectionSupportTest.kt)
 
 ### 12. Финализировать boundary модульного редактора и storage contracts
 
