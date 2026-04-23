@@ -865,6 +865,13 @@ Review after Phase F:
     - добавлены common tests на database fallback, active-run preference и bounded details loading:
       - [ModuleRunsStoreLoadingSupportTest.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonTest/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsStoreLoadingSupportTest.kt)
       - [ModuleRunsStoreSelectionSupportTest.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonTest/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsStoreSelectionSupportTest.kt)
+  - начат cleanup `run_history_cleanup` shared-store кластера:
+    - [RunHistoryCleanupStoreActionSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/run_history_cleanup/RunHistoryCleanupStoreActionSupport.kt) перестал держать preview refresh и cleanup execution flow в одном action helper;
+    - preview-side mutations вынесены в [RunHistoryCleanupStorePreviewSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/run_history_cleanup/RunHistoryCleanupStorePreviewSupport.kt);
+    - cleanup execution и success-message policy вынесены в [RunHistoryCleanupStoreExecutionSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/run_history_cleanup/RunHistoryCleanupStoreExecutionSupport.kt) и [RunHistoryCleanupStoreExecutionMessageSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/run_history_cleanup/RunHistoryCleanupStoreExecutionMessageSupport.kt);
+    - добавлены первые common tests на preview refresh и cleanup message rules:
+      - [RunHistoryCleanupStoreActionSupportTest.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonTest/kotlin/com/sbrf/lt/platform/composeui/run_history_cleanup/RunHistoryCleanupStoreActionSupportTest.kt)
+      - [RunHistoryCleanupStoreExecutionMessageSupportTest.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonTest/kotlin/com/sbrf/lt/platform/composeui/run_history_cleanup/RunHistoryCleanupStoreExecutionMessageSupportTest.kt)
 
 ### 12. Финализировать boundary модульного редактора и storage contracts
 
