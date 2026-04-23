@@ -32,6 +32,7 @@ fun ComposeSqlConsoleObjectsPage(
                     schemaName = initialParams["schema"]?.trim().orEmpty(),
                     objectName = objectName,
                     objectType = initialParams["type"]?.trim().orEmpty(),
+                    inspectorTab = initialParams["tab"]?.trim()?.takeIf { it.isNotBlank() },
                 )
             }
     }

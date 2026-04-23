@@ -14,6 +14,7 @@
   const sqlMetadataSearchCache = new Map();
   const sqlObjectColumnsCache = new Map();
   let sqlMetadataContext = normalizeSqlMetadataContext(global.__composeSqlConsoleMetadataContext);
+  let sqlObjectNavigationHandlers = normalizeSqlObjectNavigationHandlers(global.__composeSqlConsoleObjectNavigationHandlers);
 
   const SQL_KEYWORDS = [
     {
@@ -286,6 +287,18 @@
     sqlObjectColumnsCache.clear();
   }
 
+  function normalizeSqlObjectNavigationHandlers(handlers) {
+    return {
+      openInspector: typeof handlers?.openInspector === "function" ? handlers.openInspector : null,
+      openSelect: typeof handlers?.openSelect === "function" ? handlers.openSelect : null
+    };
+  }
+
+  function setSqlObjectNavigationHandlers(handlers) {
+    sqlObjectNavigationHandlers = normalizeSqlObjectNavigationHandlers(handlers);
+    global.__composeSqlConsoleObjectNavigationHandlers = sqlObjectNavigationHandlers;
+  }
+
   function buildCompletionContext(model, position) {
     const range = keywordRange(global.monaco, model, position);
     const linePrefix = model.getLineContent(position.lineNumber).slice(0, position.column - 1);
@@ -477,6 +490,117 @@
     return trimmed;
   }
 
+  function extractSqlReferenceAtPosition(model, position) {
+    const lineContent = model.getLineContent(position.lineNumber);
+    const lineIndex = Math.max(0, position.column - 1);
+    const isReferenceChar = char => /[A-Za-z0-9_$".]/.test(char);
+    let startIndex = lineIndex;
+    let endIndex = lineIndex;
+
+    while (startIndex > 0 && isReferenceChar(lineContent[startIndex - 1])) {
+      startIndex -= 1;
+    }
+    while (endIndex < lineContent.length && isReferenceChar(lineContent[endIndex])) {
+      endIndex += 1;
+    }
+
+    const rawReference = lineContent.slice(startIndex, endIndex).trim();
+    const parts = splitSqlReferenceChain(rawReference);
+    if (parts.length === 0) {
+      return null;
+    }
+
+    return {
+      rawReference,
+      parts,
+      startColumn: startIndex + 1,
+      endColumn: endIndex + 1
+    };
+  }
+
+  function splitSqlReferenceChain(value) {
+    const rawValue = `${value ?? ""}`.trim();
+    if (!rawValue || rawValue === ".") {
+      return [];
+    }
+    const parts = [];
+    let current = "";
+    let inDoubleQuote = false;
+
+    for (let index = 0; index < rawValue.length; index += 1) {
+      const char = rawValue[index];
+      const next = rawValue[index + 1];
+      if (char === '"') {
+        current += char;
+        if (inDoubleQuote && next === '"') {
+          current += next;
+          index += 1;
+          continue;
+        }
+        inDoubleQuote = !inDoubleQuote;
+        continue;
+      }
+      if (char === "." && !inDoubleQuote) {
+        if (current.trim() !== "") {
+          parts.push(normalizeSqlIdentifier(current));
+        }
+        current = "";
+        continue;
+      }
+      current += char;
+    }
+
+    if (current.trim() !== "") {
+      parts.push(normalizeSqlIdentifier(current));
+    }
+
+    return parts.map(part => `${part ?? ""}`.trim()).filter(Boolean);
+  }
+
+  function buildSqlObjectNavigationContext(model, position) {
+    const reference = extractSqlReferenceAtPosition(model, position);
+    if (!reference) {
+      return null;
+    }
+    if (reference.parts.length === 2) {
+      const aliasTarget = resolveSqlAliasColumnTarget(model, position, reference.parts[0]);
+      if (aliasTarget) {
+        return {
+          range: new global.monaco.Range(position.lineNumber, reference.startColumn, position.lineNumber, reference.endColumn),
+          sourceMode: "alias-columns",
+          schemaName: aliasTarget.schemaName?.toLowerCase() || null,
+          objectName: aliasTarget.objectName.toLowerCase(),
+          referenceText: reference.rawReference
+        };
+      }
+      return {
+        range: new global.monaco.Range(position.lineNumber, reference.startColumn, position.lineNumber, reference.endColumn),
+        sourceMode: "qualified-object",
+        schemaName: reference.parts[0].toLowerCase(),
+        objectName: reference.parts[1].toLowerCase(),
+        referenceText: reference.rawReference
+      };
+    }
+    if (reference.parts.length === 1 && isLikelyBareObjectReference(model, position, reference)) {
+      return {
+        range: new global.monaco.Range(position.lineNumber, reference.startColumn, position.lineNumber, reference.endColumn),
+        sourceMode: "bare-object",
+        schemaName: null,
+        objectName: reference.parts[0].toLowerCase(),
+        referenceText: reference.rawReference
+      };
+    }
+    return null;
+  }
+
+  function isLikelyBareObjectReference(model, position, reference) {
+    const linePrefix = model
+      .getLineContent(position.lineNumber)
+      .slice(0, Math.max(0, reference.startColumn - 1));
+    const sanitizedPrefix = sanitizeSqlForAliasLookup(linePrefix);
+    return /\b(?:from|join|update|into|table|truncate)\s*$/i.test(sanitizedPrefix);
+  }
+
   function buildObjectSearchCacheKey(request) {
     return JSON.stringify({
       query: request.query.toLowerCase(),
@@ -635,6 +759,34 @@
     return dbObject.schemaName.toLowerCase() === completionContext.schemaName;
   }
 
+  function matchesExactNavigationEntry(entry, navigationContext) {
+    const dbObject = entry.dbObject;
+    if (dbObject.objectName.toLowerCase() !== navigationContext.objectName) {
+      return false;
+    }
+    if (navigationContext.schemaName == null) {
+      return true;
+    }
+    return dbObject.schemaName.toLowerCase() === navigationContext.schemaName;
+  }
+
+  function findExactFavoriteNavigationEntries(navigationContext) {
+    const selectedSourceNames = sqlMetadataContext.selectedSourceNames;
+    const hasSelectedSources = selectedSourceNames.length > 0;
+    return sqlMetadataContext.favoriteObjects
+      .filter(value => !hasSelectedSources || selectedSourceNames.includes(value.sourceName))
+      .map(value => ({
+        sourceName: value.sourceName,
+        dbObject: {
+          schemaName: value.schemaName,
+          objectName: value.objectName,
+          objectType: value.objectType,
+          tableName: value.tableName
+        }
+      }))
+      .filter(entry => matchesExactNavigationEntry(entry, navigationContext));
+  }
+
   function isColumnLookupObjectType(objectType) {
     return objectType === "TABLE" || objectType === "VIEW" || objectType === "MATERIALIZED_VIEW";
   }
@@ -680,6 +832,53 @@
     return preferredTypeOrder
       .map(type => mergedEntries.find(entry => entry.dbObject.objectType === type))
       .find(Boolean) || null;
+  }
+
+  function pickSqlObjectNavigationTarget(localEntries, remoteEntries) {
+    const mergedEntries = mergeUniqueObjectEntries(localEntries, remoteEntries);
+    if (mergedEntries.length === 0) {
+      return null;
+    }
+    const preferredSourceNames = sqlMetadataContext.selectedSourceNames;
+    if (preferredSourceNames.length > 0) {
+      const preferredEntry = preferredSourceNames
+        .map(sourceName => mergedEntries.find(entry => entry.sourceName === sourceName))
+        .find(Boolean);
+      if (preferredEntry) {
+        return preferredEntry;
+      }
+    }
+    return mergedEntries[0] || null;
+  }
+
+  async function resolveSqlObjectNavigationTarget(model, position) {
+    if (!sqlObjectNavigationHandlers.openInspector && !sqlObjectNavigationHandlers.openSelect) {
+      return null;
+    }
+    const navigationContext = buildSqlObjectNavigationContext(model, position);
+    if (!navigationContext) {
+      return null;
+    }
+    const localEntries = findExactFavoriteNavigationEntries(navigationContext);
+    const remoteEntries = navigationContext.objectName.length >= 2
+      ? (await loadSqlMetadataSearchEntries({
+          query: navigationContext.objectName,
+          selectedSourceNames: sqlMetadataContext.selectedSourceNames,
+          maxObjectsPerSource: sqlMetadataContext.maxObjectsPerSource
+        })).filter(entry => matchesExactNavigationEntry(entry, navigationContext))
+      : [];
+    const targetEntry = pickSqlObjectNavigationTarget(localEntries, remoteEntries);
+    if (!targetEntry) {
+      return null;
+    }
+    return {
+      sourceName: targetEntry.sourceName,
+      schemaName: targetEntry.dbObject.schemaName,
+      objectName: targetEntry.dbObject.objectName,
+      objectType: targetEntry.dbObject.objectType,
+      range: navigationContext.range,
+      referenceText: navigationContext.referenceText
+    };
   }
 
   function buildColumnSuggestion(monaco, column, completionContext, index) {
@@ -823,6 +1022,79 @@
     return details.join("\n\n");
   }
 
+  function supportsSqlObjectSelectNavigation(objectType) {
+    return objectType === "TABLE" || objectType === "VIEW" || objectType === "MATERIALIZED_VIEW";
+  }
+
+  function buildSqlObjectNavigationHover(target) {
+    const contents = [
+      { value: `**${target.schemaName}.${target.objectName}**` },
+      { value: `${target.objectType} · ${target.sourceName}` }
+    ];
+    const quickActions = ["Inspector"];
+    if (supportsSqlObjectSelectNavigation(target.objectType)) {
+      quickActions.push("Columns", "SELECT");
+    } else {
+      quickActions.push("Columns");
+    }
+    contents.push({
+      value: `Быстрые действия: ${quickActions.join(" · ")}\n\nПКМ: открыть actions Monaco`
+    });
+    return {
+      range: target.range,
+      contents
+    };
+  }
+
+  async function runSqlObjectNavigationAction(editor, actionKind) {
+    if (!editor || !sqlObjectNavigationHandlers) {
+      return null;
+    }
+    const model = editor.getModel?.();
+    const position = editor.getPosition?.();
+    if (!model || !position) {
+      return null;
+    }
+    const target = await resolveSqlObjectNavigationTarget(model, position);
+    if (!target) {
+      return null;
+    }
+    if (actionKind === "inspector") {
+      return sqlObjectNavigationHandlers.openInspector?.(target, null) ?? null;
+    }
+    if (actionKind === "columns") {
+      return sqlObjectNavigationHandlers.openInspector?.(target, "columns") ?? null;
+    }
+    if (actionKind === "select" && supportsSqlObjectSelectNavigation(target.objectType)) {
+      return sqlObjectNavigationHandlers.openSelect?.(target) ?? null;
+    }
+    return null;
+  }
+
+  function registerSqlObjectNavigationActions(editor) {
+    editor.addAction({
+      id: "compose-sql-open-object-inspector",
+      label: "Открыть inspector объекта",
+      contextMenuGroupId: "navigation",
+      contextMenuOrder: 1.2,
+      run: () => runSqlObjectNavigationAction(editor, "inspector")
+    });
+    editor.addAction({
+      id: "compose-sql-open-object-columns",
+      label: "Открыть columns metadata",
+      contextMenuGroupId: "navigation",
+      contextMenuOrder: 1.3,
+      run: () => runSqlObjectNavigationAction(editor, "columns")
+    });
+    editor.addAction({
+      id: "compose-sql-open-object-select",
+      label: "Открыть SELECT в новой вкладке консоли",
+      contextMenuGroupId: "navigation",
+      contextMenuOrder: 1.4,
+      run: () => runSqlObjectNavigationAction(editor, "select")
+    });
+  }
+
   function completionKindForObjectType(monaco, objectType) {
     switch (objectType) {
       case "SCHEMA":
@@ -912,7 +1184,11 @@
     });
 
     monaco.languages.registerHoverProvider("sql", {
-      provideHover(model, position) {
+      async provideHover(model, position) {
+        const objectHover = await resolveSqlObjectNavigationTarget(model, position);
+        if (objectHover) {
+          return buildSqlObjectNavigationHover(objectHover);
+        }
         const wordAtPosition = model.getWordAtPosition(position);
         const word = wordAtPosition?.word?.toLowerCase();
         if (!word) {
@@ -966,12 +1242,16 @@
     if (!global.monaco?.editor) {
       throw new Error("Monaco editor не инициализирован.");
     }
-    return global.monaco.editor.create(element, {
+    const editor = global.monaco.editor.create(element, {
       theme: "vs",
       automaticLayout: true,
       minimap: { enabled: false },
       ...options
     });
+    if (options?.language === "sql" && options?.sqlObjectNavigation === true) {
+      registerSqlObjectNavigationActions(editor);
+    }
+    return editor;
   }
 
   function setSqlStatementMarkers(editor, markers) {
@@ -1031,5 +1311,6 @@
   namespace.createMonacoEditor = createMonacoEditor;
   namespace.ensureSqlSupport = ensureSqlSupport;
   namespace.setSqlMetadataContext = setSqlMetadataContext;
+  namespace.setSqlObjectNavigationHandlers = setSqlObjectNavigationHandlers;
   namespace.setSqlStatementMarkers = setSqlStatementMarkers;
 })(window);

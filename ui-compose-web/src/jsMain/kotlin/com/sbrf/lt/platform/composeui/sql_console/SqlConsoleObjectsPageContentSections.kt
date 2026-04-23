@@ -32,8 +32,9 @@ internal fun SqlConsoleObjectsPageContent(
     val inspectorSelectionKey = inspectorResponse?.let { response ->
         "${response.sourceName}|${response.dbObject.schemaName}|${response.dbObject.objectName}|${response.dbObject.objectType}"
     }
-    var activeInspectorTab by remember(inspectorSelectionKey) {
-        mutableStateOf(inspectorResponse?.let(::defaultInspectorTab) ?: "overview")
+    val requestedInspectorTab = navigationTarget?.inspectorTab
+    var activeInspectorTab by remember(inspectorSelectionKey, requestedInspectorTab) {
+        mutableStateOf(inspectorResponse?.let { resolveInspectorTab(it, requestedInspectorTab) } ?: "overview")
     }
 
     state.errorMessage?.let { AlertBanner(it, "warning") }

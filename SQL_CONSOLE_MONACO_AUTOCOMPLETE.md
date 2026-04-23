@@ -30,6 +30,10 @@
   - metadata-aware autocomplete по объектам БД через search-first backend;
   - exact object column lookup для сценария `schema.table.` через отдельный readonly columns contract.
   - bounded alias-aware column autocomplete для простых `FROM / JOIN / UPDATE alias.` сценариев.
+  - editor-native object navigation через Monaco hover/context actions:
+    - открыть inspector объекта;
+    - открыть `columns` tab инспектора;
+    - открыть `SELECT` в новой SQL-console workspace-вкладке для table-like объектов.
 
 ## Что Monaco умеет из коробки
 
@@ -185,6 +189,10 @@
   - object autocomplete по schema/object names работает;
   - exact object column lookup вынесен в отдельный readonly route и не использует full inspector payload;
   - для простых `FROM / JOIN / UPDATE alias.` сценариев alias-aware column autocomplete уже работает локально в Monaco-helper;
+  - быстрый object navigation reuse-ит этот же bounded metadata слой:
+    - qualified references и простые alias-column ссылки можно открыть editor-native actions без перехода через внешний catalog block;
+    - inspector deep-link поддерживает явный `tab`, поэтому editor navigation может сразу открывать `columns`, а не только общий overview;
+    - `Открыть SELECT` не перетирает текущий draft, а поднимает новую browser-tab workspace c клонированным контекстом и точечным rewrite под выбранный source/object;
   - полноценный alias resolution для сложных SQL-конструкций и более глубокий SQL context analysis по-прежнему не реализованы.
 
 ### Рекомендуемый этап 3
@@ -204,6 +212,7 @@
 - autocomplete не должен ломать текущий async lifecycle SQL-консоли;
 - metadata-запросы должны быть readonly;
 - autocomplete должен быть search-first и bounded;
+- object navigation из Monaco должен reuse-ить существующий readonly metadata boundary и browser-tab workspaces, а не вводить новый stateful editor session на backend;
 - exact object column lookup должен идти через отдельный readonly boundary, а не через stateful backend completion-session;
 - alias-aware autocomplete допустим только как lightweight local parsing по текущему SQL prefix, без server-side session state;
 - при недоступной БД UI должен деградировать до локальных keyword/snippet hints, а не ломаться полностью.

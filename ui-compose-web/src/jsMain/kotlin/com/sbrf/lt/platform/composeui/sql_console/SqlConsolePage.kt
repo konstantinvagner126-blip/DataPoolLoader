@@ -67,6 +67,12 @@ fun ComposeSqlConsolePage(
         isRunning = isRunning,
         currentExecution = currentExecution,
     )
+    SqlConsoleMonacoObjectNavigationEffect(
+        api = api,
+        scope = scope,
+        currentState = { state },
+        setState = { state = it },
+    )
 
     PageScaffold(
         eyebrow = "Load Testing Data Platform",

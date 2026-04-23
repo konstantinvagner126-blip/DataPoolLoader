@@ -117,6 +117,7 @@ internal fun SqlConsoleWorkspacePanel(
             language = "sql",
             value = state.draftSql,
             glyphMargin = true,
+            sqlObjectNavigation = true,
             classNames = listOf("editor-frame", "sql-editor-frame"),
             onEditorReady = { editor -> onEditorReady(editor) },
             onValueChange = onDraftSqlChange,

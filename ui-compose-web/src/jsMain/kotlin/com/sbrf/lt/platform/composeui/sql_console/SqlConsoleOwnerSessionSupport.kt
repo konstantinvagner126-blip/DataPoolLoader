@@ -53,8 +53,11 @@ internal fun buildSqlConsoleWorkspaceHref(workspaceId: String): String =
     "/sql-console?workspaceId=${urlEncode(workspaceId)}"
 
 internal fun openSqlConsoleWorkspaceInNewTab(workspaceId: String): Boolean =
+    openHrefInNewTab(buildSqlConsoleWorkspaceHref(workspaceId))
+
+internal fun openHrefInNewTab(href: String): Boolean =
     runCatching {
-        window.open(buildSqlConsoleWorkspaceHref(workspaceId), "_blank", "noopener,noreferrer") != null
+        window.open(href, "_blank", "noopener,noreferrer") != null
     }.getOrDefault(false)
 
 internal fun loadSqlConsoleExecutionOwnerState(): SqlConsoleExecutionOwnerState? =

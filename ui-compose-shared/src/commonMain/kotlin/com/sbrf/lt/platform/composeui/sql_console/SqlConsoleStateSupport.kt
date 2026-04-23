@@ -19,6 +19,19 @@ internal fun defaultSqlConsoleStateSnapshot(): SqlConsoleStateSnapshot =
     SqlConsoleStateSnapshot(draftSql = DEFAULT_SQL_CONSOLE_DRAFT)
 
 internal fun SqlConsolePageState.toPersistedState(): SqlConsoleStateUpdate =
+    toPersistedState(
+        draftSql = draftSql,
+        favoriteObjects = favoriteObjects,
+        selectedGroupNames = selectedGroupNames,
+        selectedSourceNames = selectedSourceNames,
+    )
+
+internal fun SqlConsolePageState.toPersistedState(
+    draftSql: String,
+    favoriteObjects: List<SqlConsoleFavoriteObject>,
+    selectedGroupNames: List<String>,
+    selectedSourceNames: List<String>,
+): SqlConsoleStateUpdate =
     SqlConsoleStateUpdate(
         draftSql = draftSql,
         recentQueries = recentQueries,

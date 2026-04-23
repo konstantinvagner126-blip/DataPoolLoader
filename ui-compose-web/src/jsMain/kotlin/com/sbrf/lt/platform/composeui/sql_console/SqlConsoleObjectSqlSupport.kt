@@ -5,6 +5,7 @@ internal data class SqlObjectNavigationTarget(
     val schemaName: String,
     val objectName: String,
     val objectType: String,
+    val inspectorTab: String? = null,
 )
 
 internal fun SqlConsoleFavoriteObject.qualifiedName(): String =
@@ -63,6 +64,7 @@ internal fun buildCountSql(dbObject: SqlConsoleDatabaseObject): String =
 internal fun buildFavoriteMetadataHref(
     favorite: SqlConsoleFavoriteObject,
     workspaceId: String = resolveSqlConsoleWorkspaceId(),
+    inspectorTab: String? = null,
 ): String =
     buildSqlConsoleObjectsHref(
         workspaceId = workspaceId,
@@ -71,12 +73,14 @@ internal fun buildFavoriteMetadataHref(
         schemaName = favorite.schemaName,
         objectName = favorite.objectName,
         objectType = favorite.objectType,
+        inspectorTab = inspectorTab,
     )
 
 internal fun buildObjectInspectorHref(
     sourceName: String,
     dbObject: SqlConsoleDatabaseObject,
     workspaceId: String = resolveSqlConsoleWorkspaceId(),
+    inspectorTab: String? = null,
 ): String =
     buildSqlConsoleObjectsHref(
         workspaceId = workspaceId,
@@ -85,6 +89,7 @@ internal fun buildObjectInspectorHref(
         schemaName = dbObject.schemaName,
         objectName = dbObject.objectName,
         objectType = dbObject.objectType,
+        inspectorTab = inspectorTab,
     )
 
 internal fun translateSqlObjectType(type: String): String =
@@ -207,6 +212,7 @@ private fun buildSqlConsoleObjectsHref(
     schemaName: String? = null,
     objectName: String? = null,
     objectType: String? = null,
+    inspectorTab: String? = null,
 ): String {
     val queryParams = buildList {
         add("workspaceId=${urlEncode(workspaceId)}")
@@ -215,6 +221,7 @@ private fun buildSqlConsoleObjectsHref(
         schemaName?.takeIf { it.isNotBlank() }?.let { add("schema=${urlEncode(it)}") }
         objectName?.takeIf { it.isNotBlank() }?.let { add("object=${urlEncode(it)}") }
         objectType?.takeIf { it.isNotBlank() }?.let { add("type=${urlEncode(it)}") }
+        inspectorTab?.takeIf { it.isNotBlank() }?.let { add("tab=${urlEncode(it)}") }
     }
     return "/sql-console-objects?${queryParams.joinToString("&")}"
 }

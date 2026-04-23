@@ -660,6 +660,15 @@
   - statement execution status markers добавляются прямо в Monaco как editor-native decorations;
   - marker contract строится client-side из `script outline + execution result` без нового backend state;
   - первый пакет не вводит тяжелый diagnostics engine и не подменяет result navigator отдельной marker-wall.
+  - второй пакет тоже начат:
+    - быстрый object navigation живет editor-native через Monaco hover/context actions, а не через новый page-level shortcut block;
+    - действия `открыть inspector`, `перейти к columns metadata` и `открыть SELECT в новой вкладке консоли` должны reuse-ить существующий search-first object contract и browser-tab workspace model;
+    - object browser deep-link поддерживает явный `tab`, чтобы editor navigation мог открывать не только overview, но и целевую inspector-вкладку.
+  - третий пакет тоже начат:
+    - `SELECT` result table получает bounded data-grid ergonomics без client-side искажения результата БД;
+    - grid поддерживает global `wrap / nowrap`, autosize всех колонок, per-column resize и copy по ячейке, строке и колонке;
+    - active cell остается локальным UI-state таблицы и не превращается в новый persisted/workspace state;
+    - grid не получает client-side sort/filter, чтобы не создавать второй источник истины поверх реального DB result.
 
 Критерий завершения:
 

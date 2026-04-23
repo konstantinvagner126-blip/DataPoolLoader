@@ -61,6 +61,16 @@ internal fun defaultInspectorTab(response: SqlConsoleObjectInspectorResponse): S
         else -> "overview"
     }
 
+internal fun resolveInspectorTab(
+    response: SqlConsoleObjectInspectorResponse,
+    requestedTab: String?,
+): String {
+    val normalizedRequestedTab = requestedTab?.trim()?.lowercase()
+    return normalizedRequestedTab
+        ?.takeIf { it in inspectorTabIds(response).toSet() }
+        ?: defaultInspectorTab(response)
+}
+
 internal fun inspectorTabIds(response: SqlConsoleObjectInspectorResponse): List<String> = buildList {
     add("overview")
     if (response.columns.isNotEmpty()) add("columns")
