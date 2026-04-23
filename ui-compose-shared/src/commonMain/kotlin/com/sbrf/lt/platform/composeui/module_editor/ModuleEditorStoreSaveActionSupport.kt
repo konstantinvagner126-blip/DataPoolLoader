@@ -2,6 +2,7 @@ package com.sbrf.lt.platform.composeui.module_editor
 
 internal class ModuleEditorStoreSaveActionSupport(
     private val saveStore: ModuleEditorStorageSaveStore,
+    private val workingCopyLifecycleStore: ModuleEditorWorkingCopyLifecycleStore,
     private val refreshStore: ModuleEditorSelectedModuleRefreshStore,
 ) {
     private val requestSupport = ModuleEditorStoreSaveRequestSupport()
@@ -32,7 +33,7 @@ internal class ModuleEditorStoreSaveActionSupport(
     ): ModuleEditorPageState {
         val moduleId = current.selectedModuleId ?: return current
         return runCatching {
-            val response = saveStore.discardWorkingCopy(moduleId)
+            val response = workingCopyLifecycleStore.discardWorkingCopy(moduleId)
             refreshStore.refreshSelectedModule(current, route, response.message)
         }.getOrElse { error ->
             current.copy(
@@ -48,7 +49,7 @@ internal class ModuleEditorStoreSaveActionSupport(
     ): ModuleEditorPageState {
         val moduleId = current.selectedModuleId ?: return current
         return runCatching {
-            val response = saveStore.publishWorkingCopy(moduleId)
+            val response = workingCopyLifecycleStore.publishWorkingCopy(moduleId)
             refreshStore.refreshSelectedModule(current, route, response.message)
         }.getOrElse { error ->
             current.copy(

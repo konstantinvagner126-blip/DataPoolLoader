@@ -992,6 +992,14 @@ Review after Phase F:
   - добавлены targeted tests:
     - [ModuleEditorDatabaseLifecycleSupportTest.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonTest/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorDatabaseLifecycleSupportTest.kt)
     - [ModuleEditorStoreDatabaseLifecycleActionSupportTest.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonTest/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreDatabaseLifecycleActionSupportTest.kt).
+- working copy lifecycle boundary вынесен из save path:
+  - [ModuleEditorWorkingCopyLifecycleStore.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorWorkingCopyLifecycleStore.kt) теперь инкапсулирует `publish/discard` contract для database working copy semantics;
+  - [ModuleEditorStorageSaveStore.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStorageSaveStore.kt) снова отвечает только за `save`, без lifecycle side-effects;
+  - [ModuleEditorStoreSaveActionSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreSaveActionSupport.kt) перестал смешивать `save` и `publish/discard` через один storage boundary;
+  - wiring в [ModuleEditorStoreDependencies.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreDependencies.kt) обновлен под отдельный working-copy lifecycle store;
+  - добавлены targeted tests:
+    - [ModuleEditorWorkingCopyLifecycleSupportTest.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonTest/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorWorkingCopyLifecycleSupportTest.kt)
+    - расширен [ModuleEditorStoreSaveActionSupportTest.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonTest/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreSaveActionSupportTest.kt) на `publish/discard` orchestration.
 
 Критерий завершения:
 

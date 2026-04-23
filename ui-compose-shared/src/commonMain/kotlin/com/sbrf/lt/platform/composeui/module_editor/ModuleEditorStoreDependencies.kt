@@ -13,6 +13,7 @@ internal fun createModuleEditorStoreDependencies(
     val loadingSupport = ModuleEditorStoreLoadingSupport(api, syncRoute)
     val saveActionSupport = ModuleEditorStoreSaveActionSupport(
         saveStore = ModuleEditorStorageSaveSupport(api),
+        workingCopyLifecycleStore = ModuleEditorWorkingCopyLifecycleSupport(api),
         refreshStore = loadingSupport,
     )
     val runActionSupport = ModuleEditorStoreRunActionSupport(

@@ -23,7 +23,8 @@ class ModuleEditorStoreSaveActionSupportTest {
                     capturedRequest = request
                     return SaveResultResponseDto(message = "saved")
                 }
-
+            },
+            workingCopyLifecycleStore = object : ModuleEditorWorkingCopyLifecycleStore {
                 override suspend fun discardWorkingCopy(moduleId: String): SaveResultResponseDto =
                     error("not used")
 
@@ -73,7 +74,8 @@ class ModuleEditorStoreSaveActionSupportTest {
                     moduleId: String,
                     request: SaveModuleRequestDto,
                 ): SaveResultResponseDto = error("not used")
-
+            },
+            workingCopyLifecycleStore = object : ModuleEditorWorkingCopyLifecycleStore {
                 override suspend fun discardWorkingCopy(moduleId: String): SaveResultResponseDto =
                     error("not used")
 
@@ -99,6 +101,51 @@ class ModuleEditorStoreSaveActionSupportTest {
         }
 
         assertEquals("Не удалось опубликовать черновик.", state.errorMessage)
+        assertEquals(null, state.actionInProgress)
+    }
+
+    @Test
+    fun `discardDatabaseWorkingCopy delegates to working copy lifecycle store`() {
+        var capturedModuleId: String? = null
+        var refreshMessage: String? = null
+        val support = ModuleEditorStoreSaveActionSupport(
+            saveStore = object : ModuleEditorStorageSaveStore {
+                override suspend fun save(
+                    route: ModuleEditorRouteState,
+                    moduleId: String,
+                    request: SaveModuleRequestDto,
+                ): SaveResultResponseDto = error("not used")
+            },
+            workingCopyLifecycleStore = object : ModuleEditorWorkingCopyLifecycleStore {
+                override suspend fun discardWorkingCopy(moduleId: String): SaveResultResponseDto {
+                    capturedModuleId = moduleId
+                    return SaveResultResponseDto("discarded")
+                }
+
+                override suspend fun publishWorkingCopy(moduleId: String): SaveResultResponseDto =
+                    error("not used")
+            },
+            refreshStore = StubModuleEditorSelectedModuleRefreshStore(
+                handler = { current, _, successMessage ->
+                    refreshMessage = successMessage
+                    current.copy(successMessage = successMessage, actionInProgress = null)
+                },
+            ),
+        )
+
+        val state = runModuleEditorSuspend {
+            support.discardDatabaseWorkingCopy(
+                current = ModuleEditorPageState(
+                    selectedModuleId = "module-a",
+                    actionInProgress = "discardDatabaseWorkingCopy",
+                ),
+                route = ModuleEditorRouteState(storage = "database", moduleId = "module-a"),
+            )
+        }
+
+        assertEquals("module-a", capturedModuleId)
+        assertEquals("discarded", refreshMessage)
+        assertEquals("discarded", state.successMessage)
         assertEquals(null, state.actionInProgress)
     }
 }

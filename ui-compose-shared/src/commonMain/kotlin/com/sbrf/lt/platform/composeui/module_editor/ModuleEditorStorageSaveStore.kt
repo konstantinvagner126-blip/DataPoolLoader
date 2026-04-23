@@ -6,10 +6,6 @@ internal interface ModuleEditorStorageSaveStore {
         moduleId: String,
         request: SaveModuleRequestDto,
     ): SaveResultResponseDto
-
-    suspend fun discardWorkingCopy(moduleId: String): SaveResultResponseDto
-
-    suspend fun publishWorkingCopy(moduleId: String): SaveResultResponseDto
 }
 
 internal class ModuleEditorStorageSaveSupport(
@@ -25,10 +21,4 @@ internal class ModuleEditorStorageSaveSupport(
         } else {
             api.saveFilesModule(moduleId, request)
         }
-
-    override suspend fun discardWorkingCopy(moduleId: String): SaveResultResponseDto =
-        api.discardDatabaseWorkingCopy(moduleId)
-
-    override suspend fun publishWorkingCopy(moduleId: String): SaveResultResponseDto =
-        api.publishDatabaseWorkingCopy(moduleId)
 }
