@@ -6,6 +6,8 @@ import com.sbrf.lt.datapool.sqlconsole.SqlConsoleConnectionCheckResult
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleDatabaseObject
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleDatabaseObjectConstraint
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleDatabaseObjectColumn
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleDatabaseObjectColumnLookupResult
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleDatabaseObjectColumnSourceResult
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleDatabaseObjectCount
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleDatabaseObjectIndex
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleDatabaseObjectInspector
@@ -72,6 +74,13 @@ fun SqlConsoleDatabaseObjectInspector.toResponse(sourceName: String): SqlConsole
     trigger = trigger?.toResponse(),
     sequence = sequence?.toResponse(),
     schema = schema?.toResponse(),
+)
+
+fun SqlConsoleDatabaseObjectColumnLookupResult.toResponse(): SqlConsoleObjectColumnsResponse = SqlConsoleObjectColumnsResponse(
+    schemaName = schemaName,
+    objectName = objectName,
+    objectType = objectType.name,
+    sourceResults = sourceResults.map { it.toResponse() },
 )
 
 /**
@@ -161,6 +170,13 @@ private fun SqlConsoleDatabaseObjectSourceResult.toResponse(): SqlConsoleObjectS
     status = status,
     objects = objects.map { it.toResponse() },
     truncated = truncated,
+    errorMessage = errorMessage,
+)
+
+private fun SqlConsoleDatabaseObjectColumnSourceResult.toResponse(): SqlConsoleObjectColumnSourceResponse = SqlConsoleObjectColumnSourceResponse(
+    sourceName = sourceName,
+    status = status,
+    columns = columns.map { it.toResponse() },
     errorMessage = errorMessage,
 )
 

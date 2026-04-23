@@ -19,12 +19,16 @@
   - hover;
   - signature help;
   - diagnostics;
-  сейчас нет.
+  раньше не было.
 
 Вывод:
 
 - базовая подсветка SQL есть;
-- PostgreSQL-специфичных подсказок и автодополнения по объектам БД сейчас нет.
+- уже реализованы:
+  - local keyword/function/snippet completions;
+  - lightweight hover;
+  - metadata-aware autocomplete по объектам БД через search-first backend;
+  - exact object column lookup для сценария `schema.table.` через отдельный readonly columns contract.
 
 ## Что Monaco умеет из коробки
 
@@ -174,6 +178,13 @@
 
 Это уже даст практический autocomplete ближе к IDE, но без полноценного language server.
 
+Статус:
+
+- этап 2 уже частично реализован:
+  - object autocomplete по schema/object names работает;
+  - exact object column lookup вынесен в отдельный readonly route и не использует full inspector payload;
+  - для column autocomplete по-прежнему не реализованы alias resolution и более глубокий SQL context analysis.
+
 ### Рекомендуемый этап 3
 
 - только если после этапов 1 и 2 останется реальный запрос на более глубокую SQL-навигацию;
@@ -191,6 +202,7 @@
 - autocomplete не должен ломать текущий async lifecycle SQL-консоли;
 - metadata-запросы должны быть readonly;
 - autocomplete должен быть search-first и bounded;
+- exact object column lookup должен идти через отдельный readonly boundary, а не через stateful backend completion-session;
 - при недоступной БД UI должен деградировать до локальных keyword/snippet hints, а не ломаться полностью.
 
 ## Практический вывод

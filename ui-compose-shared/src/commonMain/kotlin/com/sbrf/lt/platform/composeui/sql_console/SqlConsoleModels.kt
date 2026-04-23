@@ -165,6 +165,14 @@ data class SqlConsoleObjectInspectorRequest(
 )
 
 @Serializable
+data class SqlConsoleObjectColumnsRequest(
+    val schemaName: String,
+    val objectName: String,
+    val objectType: String,
+    val selectedSourceNames: List<String> = emptyList(),
+)
+
+@Serializable
 data class SqlConsoleObjectInspectorResponse(
     val sourceName: String,
     val dbObject: SqlConsoleDatabaseObject,
@@ -176,6 +184,22 @@ data class SqlConsoleObjectInspectorResponse(
     val trigger: SqlConsoleDatabaseObjectTrigger? = null,
     val sequence: SqlConsoleDatabaseObjectSequence? = null,
     val schema: SqlConsoleDatabaseObjectSchema? = null,
+)
+
+@Serializable
+data class SqlConsoleObjectColumnsResponse(
+    val schemaName: String,
+    val objectName: String,
+    val objectType: String,
+    val sourceResults: List<SqlConsoleObjectColumnSourceResult>,
+)
+
+@Serializable
+data class SqlConsoleObjectColumnSourceResult(
+    val sourceName: String,
+    val status: String,
+    val columns: List<SqlConsoleDatabaseObjectColumn> = emptyList(),
+    val errorMessage: String? = null,
 )
 
 @Serializable

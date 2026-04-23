@@ -582,6 +582,10 @@
   - добавлен metadata-aware autocomplete по объектам БД через текущий search-first backend, без нового stateful completion-session слоя;
   - autocomplete учитывает выбранные source, использует избранные объекты как zero-latency local source и держит только session-local bounded cache;
   - сценарий `schema.` теперь умеет подсказывать объекты схемы editor-native способом, без возврата внешнего `Script outline` или catalog preload;
+  - exact object column lookup теперь тоже реализован в `search-first` форме:
+    - добавлен readonly columns contract для exact object по выбранным source;
+    - Monaco умеет подсказывать колонки в сценарии `schema.table.` через bounded session-local cache;
+    - autocomplete колонок не тащит full inspector payload и не создает stateful backend completion-session;
 
 - развивать Monaco постепенно, без тяжелого IDE/LSP-стека и без ущерба для архитектуры SQL-консоли;
 - уровень 1:
@@ -599,6 +603,10 @@
 - после стабилизации interaction model добавить screen-level smoke coverage на ключевые UX/safety сценарии SQL-консоли;
 - закрепить SQL-консоль отдельными архитектурными и тестовыми инвариантами;
 - не допускать giant-file debt и размывания границ между `ui-compose-shared`, `ui-compose-web` и `ui-server`.
+- текущий regression package должен явно держать:
+  - `group-first` runtime contract с synthetic `Без группы`;
+  - одинаковое восстановление `selectedGroups / selectedSources / manual include-exclude` в основном экране и `sql-console-objects`;
+  - readonly exact-column lookup как отдельный boundary, не смешанный с inspector payload.
 
 Критерий завершения:
 

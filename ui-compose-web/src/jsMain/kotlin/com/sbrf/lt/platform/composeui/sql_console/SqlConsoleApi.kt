@@ -63,6 +63,14 @@ class SqlConsoleApiClient(
             deserializer = SqlConsoleObjectInspectorResponse.serializer(),
         )
 
+    override suspend fun loadObjectColumns(request: SqlConsoleObjectColumnsRequest): SqlConsoleObjectColumnsResponse =
+        httpClient.postJson(
+            path = "/api/sql-console/objects/columns",
+            payload = request,
+            serializer = SqlConsoleObjectColumnsRequest.serializer(),
+            deserializer = SqlConsoleObjectColumnsResponse.serializer(),
+        )
+
     override suspend fun startQuery(request: SqlConsoleQueryStartRequest): SqlConsoleStartQueryResponse =
         httpClient.postJson(
             path = "/api/sql-console/query/start",

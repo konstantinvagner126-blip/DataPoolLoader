@@ -6,6 +6,7 @@ import io.ktor.client.plugins.websocket.webSocketSession
 import com.sbrf.lt.datapool.sqlconsole.RawShardExecutionResult
 import com.sbrf.lt.datapool.sqlconsole.RawShardConnectionCheckResult
 import com.sbrf.lt.datapool.sqlconsole.ShardConnectionChecker
+import com.sbrf.lt.datapool.sqlconsole.ShardSqlObjectColumnLoader
 import com.sbrf.lt.datapool.sqlconsole.ShardSqlObjectInspector
 import com.sbrf.lt.datapool.sqlconsole.ShardSqlObjectSearchResult
 import com.sbrf.lt.datapool.sqlconsole.ShardSqlObjectSearcher
@@ -321,6 +322,24 @@ class ServerTest {
                     ),
                 )
             },
+            objectColumnLoader = ShardSqlObjectColumnLoader { shard, schemaName, objectName, objectType ->
+                assertEquals("shard1", shard.name)
+                assertEquals("public", schemaName)
+                assertEquals("shard1_offer", objectName)
+                assertEquals(SqlConsoleDatabaseObjectType.TABLE, objectType)
+                listOf(
+                    SqlConsoleDatabaseObjectColumn(
+                        name = "id",
+                        type = "bigint",
+                        nullable = false,
+                    ),
+                    SqlConsoleDatabaseObjectColumn(
+                        name = "created_at",
+                        type = "timestamp",
+                        nullable = true,
+                    ),
+                )
+            },
         )
         var savedMaxRows: Int? = null
         var savedTimeout: Int? = null
@@ -550,6 +569,17 @@ class ServerTest {
         assertTrue(inspector.contains("\"objectName\":\"shard1_offer\""))
         assertTrue(inspector.contains("\"definition\":\"create table public.shard1_offer (id bigint not null);\""))
         assertTrue(inspector.contains("\"constraints\":["))
+
+        val objectColumns = client.post("/api/sql-console/objects/columns") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"schemaName":"public","objectName":"shard1_offer","objectType":"TABLE","selectedSourceNames":["shard1"]}""")
+        }.bodyAsText()
+        assertTrue(objectColumns.contains("\"schemaName\":\"public\""))
+        assertTrue(objectColumns.contains("\"objectName\":\"shard1_offer\""))
+        assertTrue(objectColumns.contains("\"objectType\":\"TABLE\""))
+        assertTrue(objectColumns.contains("\"sourceName\":\"shard1\""))
+        assertTrue(objectColumns.contains("\"name\":\"created_at\""))
+        assertFalse(objectColumns.contains("\"definition\""))
 
         val queryResponse = client.post("/api/sql-console/query") {
             contentType(ContentType.Application.Json)

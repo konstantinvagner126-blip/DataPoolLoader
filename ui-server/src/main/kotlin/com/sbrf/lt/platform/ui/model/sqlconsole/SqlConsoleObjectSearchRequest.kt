@@ -15,3 +15,10 @@ data class SqlConsoleObjectInspectorRequest(
     val objectName: String,
     val objectType: String,
 )
+
+data class SqlConsoleObjectColumnsRequest(
+    val schemaName: String,
+    val objectName: String,
+    val objectType: String,
+    val selectedSourceNames: List<String> = emptyList(),
+)

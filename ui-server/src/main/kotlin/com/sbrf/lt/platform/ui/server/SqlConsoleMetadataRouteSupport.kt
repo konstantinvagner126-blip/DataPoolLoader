@@ -1,6 +1,8 @@
 package com.sbrf.lt.platform.ui.server
 
 import com.sbrf.lt.platform.ui.model.SqlConsoleConnectionCheckResponse
+import com.sbrf.lt.platform.ui.model.SqlConsoleObjectColumnsRequest
+import com.sbrf.lt.platform.ui.model.SqlConsoleObjectColumnsResponse
 import com.sbrf.lt.platform.ui.model.SqlConsoleObjectInspectorRequest
 import com.sbrf.lt.platform.ui.model.SqlConsoleObjectInspectorResponse
 import com.sbrf.lt.platform.ui.model.SqlConsoleObjectSearchRequest
@@ -38,4 +40,17 @@ internal fun UiServerContext.inspectSqlConsoleObject(
             objectType = SqlConsoleDatabaseObjectType.valueOf(request.objectType.uppercase()),
             credentialsPath = credentialsPath,
         ).toResponse(request.sourceName)
+    }
+
+internal fun UiServerContext.loadSqlConsoleObjectColumns(
+    request: SqlConsoleObjectColumnsRequest,
+): SqlConsoleObjectColumnsResponse =
+    withSqlConsoleCredentialsPath("datapool-ui-sql-console-objects-") { credentialsPath ->
+        sqlConsoleService.loadObjectColumns(
+            schemaName = request.schemaName,
+            objectName = request.objectName,
+            objectType = SqlConsoleDatabaseObjectType.valueOf(request.objectType.uppercase()),
+            credentialsPath = credentialsPath,
+            selectedSourceNames = request.selectedSourceNames,
+        ).toResponse()
     }

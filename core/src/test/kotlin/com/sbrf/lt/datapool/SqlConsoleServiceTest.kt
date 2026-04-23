@@ -3,6 +3,7 @@ package com.sbrf.lt.datapool
 import com.sbrf.lt.datapool.sqlconsole.RawShardExecutionResult
 import com.sbrf.lt.datapool.sqlconsole.RawShardConnectionCheckResult
 import com.sbrf.lt.datapool.sqlconsole.ShardConnectionChecker
+import com.sbrf.lt.datapool.sqlconsole.ShardSqlObjectColumnLoader
 import com.sbrf.lt.datapool.sqlconsole.ShardSqlObjectInspector
 import com.sbrf.lt.datapool.sqlconsole.ShardSqlObjectSearchResult
 import com.sbrf.lt.datapool.sqlconsole.ShardSqlObjectSearcher
@@ -593,6 +594,30 @@ class SqlConsoleServiceTest {
     }
 
     @Test
+    fun `exposes synthetic ungrouped source group in info`() {
+        val service = SqlConsoleService(
+            config = SqlConsoleConfig(
+                sourceCatalog = listOf(
+                    SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user1", "pwd1"),
+                    SqlConsoleSourceConfig("shard2", "jdbc:test:two", "user2", "pwd2"),
+                    SqlConsoleSourceConfig("shard3", "jdbc:test:three", "user3", "pwd3"),
+                ),
+                groups = listOf(
+                    SqlConsoleSourceGroupConfig("dev", listOf("shard1", "shard2")),
+                ),
+            ),
+            executor = ShardSqlExecutor { _, _, _, _, _, _ -> error("should not be called") },
+        )
+
+        val info = service.info()
+
+        assertEquals(listOf("dev", "Без группы"), info.groups.map { it.name })
+        assertEquals(false, info.groups.first().synthetic)
+        assertEquals(true, info.groups.last().synthetic)
+        assertEquals(listOf("shard3"), info.groups.last().sources)
+    }
+
+    @Test
     fun `fails when source group references unknown source`() {
         val service = SqlConsoleService(
             config = SqlConsoleConfig(
@@ -785,5 +810,44 @@ class SqlConsoleServiceTest {
         assertEquals(listOf("shard2|public|offer|VIEW"), inspected)
         assertEquals("create view public.offer as select 1;", result.definition)
         assertEquals("id", result.columns.single().name)
+    }
+
+    @Test
+    fun `loads object columns only for selected sources`() {
+        val loaded = mutableListOf<String>()
+        val service = SqlConsoleService(
+            config = SqlConsoleConfig(
+                sourceCatalog = listOf(
+                    SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user1", "pwd1"),
+                    SqlConsoleSourceConfig("shard2", "jdbc:test:two", "user2", "pwd2"),
+                ),
+            ),
+            objectColumnLoader = ShardSqlObjectColumnLoader { shard, schemaName, objectName, objectType ->
+                loaded += "${shard.name}|$schemaName|$objectName|${objectType.name}"
+                listOf(
+                    SqlConsoleDatabaseObjectColumn(
+                        name = "${shard.name}_id",
+                        type = "bigint",
+                        nullable = false,
+                    ),
+                )
+            },
+        )
+
+        val result = service.loadObjectColumns(
+            schemaName = "public",
+            objectName = "offer",
+            objectType = SqlConsoleDatabaseObjectType.TABLE,
+            credentialsPath = null,
+            selectedSourceNames = listOf("shard2"),
+        )
+
+        assertEquals(listOf("shard2|public|offer|TABLE"), loaded)
+        assertEquals("public", result.schemaName)
+        assertEquals("offer", result.objectName)
+        assertEquals(SqlConsoleDatabaseObjectType.TABLE, result.objectType)
+        assertEquals(1, result.sourceResults.size)
+        assertEquals("shard2", result.sourceResults.single().sourceName)
+        assertEquals("shard2_id", result.sourceResults.single().columns.single().name)
     }
 }

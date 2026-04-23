@@ -204,6 +204,20 @@ class SqlConsoleQueryManagerTest {
                         objectName = objectName,
                         objectType = objectType,
                     )
+
+                override fun loadObjectColumns(
+                    schemaName: String,
+                    objectName: String,
+                    objectType: SqlConsoleDatabaseObjectType,
+                    credentialsPath: Path?,
+                    selectedSourceNames: List<String>,
+                ): com.sbrf.lt.datapool.sqlconsole.SqlConsoleDatabaseObjectColumnLookupResult =
+                    com.sbrf.lt.datapool.sqlconsole.SqlConsoleDatabaseObjectColumnLookupResult(
+                        schemaName = schemaName,
+                        objectName = objectName,
+                        objectType = objectType,
+                        sourceResults = emptyList(),
+                    )
             },
         )
 

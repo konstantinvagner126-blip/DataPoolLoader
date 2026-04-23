@@ -1,6 +1,7 @@
 package com.sbrf.lt.platform.ui.server
 
 import com.sbrf.lt.platform.ui.model.SqlConsoleObjectInspectorRequest
+import com.sbrf.lt.platform.ui.model.SqlConsoleObjectColumnsRequest
 import com.sbrf.lt.platform.ui.model.SqlConsoleObjectSearchRequest
 import io.ktor.server.application.call
 import io.ktor.server.request.receive
@@ -16,5 +17,9 @@ internal fun Route.registerSqlConsoleMetadataRoutes(context: UiServerContext) {
     post("/api/sql-console/objects/inspect") {
         val request = call.receive<SqlConsoleObjectInspectorRequest>()
         call.respond(context.inspectSqlConsoleObject(request))
+    }
+    post("/api/sql-console/objects/columns") {
+        val request = call.receive<SqlConsoleObjectColumnsRequest>()
+        call.respond(context.loadSqlConsoleObjectColumns(request))
     }
 }

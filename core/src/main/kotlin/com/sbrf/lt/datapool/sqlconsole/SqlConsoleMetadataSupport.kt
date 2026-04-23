@@ -6,6 +6,7 @@ internal class SqlConsoleMetadataSupport(
     private val configSupport: SqlConsoleConfigSupport,
     private val objectSearcher: ShardSqlObjectSearcher,
     private val objectInspector: ShardSqlObjectInspector,
+    private val objectColumnLoader: ShardSqlObjectColumnLoader,
 ) {
     fun searchObjects(
         config: SqlConsoleConfig,
@@ -78,6 +79,53 @@ internal class SqlConsoleMetadataSupport(
             schemaName = schemaName,
             objectName = objectName,
             objectType = objectType,
+        )
+    }
+
+    fun loadObjectColumns(
+        config: SqlConsoleConfig,
+        schemaName: String,
+        objectName: String,
+        objectType: SqlConsoleDatabaseObjectType,
+        credentialsPath: Path?,
+        selectedSourceNames: List<String>,
+    ): SqlConsoleDatabaseObjectColumnLookupResult {
+        require(schemaName.isNotBlank()) {
+            "Укажи схему объекта БД."
+        }
+        require(objectName.isNotBlank()) {
+            "Укажи имя объекта БД."
+        }
+        val resolvedSources = configSupport.resolveSources(
+            config = config,
+            credentialsPath = credentialsPath,
+            selectedSourceNames = selectedSourceNames,
+        )
+        val sourceResults = resolvedSources.map { shard ->
+            runCatching {
+                SqlConsoleDatabaseObjectColumnSourceResult(
+                    sourceName = shard.name,
+                    status = "SUCCESS",
+                    columns = objectColumnLoader.loadObjectColumns(
+                        shard = shard,
+                        schemaName = schemaName,
+                        objectName = objectName,
+                        objectType = objectType,
+                    ),
+                )
+            }.getOrElse { error ->
+                SqlConsoleDatabaseObjectColumnSourceResult(
+                    sourceName = shard.name,
+                    status = "FAILED",
+                    errorMessage = error.message ?: "Не удалось получить колонки объекта БД.",
+                )
+            }
+        }
+        return SqlConsoleDatabaseObjectColumnLookupResult(
+            schemaName = schemaName,
+            objectName = objectName,
+            objectType = objectType,
+            sourceResults = sourceResults,
         )
     }
 }

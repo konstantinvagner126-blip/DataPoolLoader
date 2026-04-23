@@ -22,6 +22,20 @@ data class SqlConsoleObjectInspectorResponse(
     val schema: SqlConsoleDatabaseObjectSchemaResponse? = null,
 )
 
+data class SqlConsoleObjectColumnsResponse(
+    val schemaName: String,
+    val objectName: String,
+    val objectType: String,
+    val sourceResults: List<SqlConsoleObjectColumnSourceResponse>,
+)
+
+data class SqlConsoleObjectColumnSourceResponse(
+    val sourceName: String,
+    val status: String,
+    val columns: List<SqlConsoleDatabaseObjectColumnResponse> = emptyList(),
+    val errorMessage: String? = null,
+)
+
 data class SqlConsoleObjectSourceSearchResponse(
     val sourceName: String,
     val status: String,

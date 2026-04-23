@@ -4,7 +4,7 @@ import java.sql.Connection
 import java.sql.DriverManager
 import java.sql.ResultSet
 
-class JdbcShardSqlObjectSearcher : ShardSqlObjectSearcher, ShardSqlObjectInspector {
+class JdbcShardSqlObjectSearcher : ShardSqlObjectSearcher, ShardSqlObjectInspector, ShardSqlObjectColumnLoader {
     override fun searchObjects(
         shard: ResolvedSqlConsoleShardConfig,
         rawQuery: String,
@@ -32,6 +32,22 @@ class JdbcShardSqlObjectSearcher : ShardSqlObjectSearcher, ShardSqlObjectInspect
                 inspectPostgres(connection, schemaName, objectName, objectType)
             } else {
                 inspectGeneric(connection, schemaName, objectName, objectType)
+            }
+        }
+    }
+
+    override fun loadObjectColumns(
+        shard: ResolvedSqlConsoleShardConfig,
+        schemaName: String,
+        objectName: String,
+        objectType: SqlConsoleDatabaseObjectType,
+    ): List<SqlConsoleDatabaseObjectColumn> {
+        DriverManager.getConnection(shard.jdbcUrl, shard.username, shard.password).use { connection ->
+            val databaseProductName = connection.metaData.databaseProductName.orEmpty()
+            return if (databaseProductName.contains("postgres", ignoreCase = true)) {
+                loadPostgresObjectColumns(connection, schemaName, objectName, objectType)
+            } else {
+                loadGenericObjectColumns(connection, schemaName, objectName, objectType)
             }
         }
     }
@@ -74,6 +90,20 @@ class JdbcShardSqlObjectSearcher : ShardSqlObjectSearcher, ShardSqlObjectInspect
             SqlConsoleDatabaseObjectType.SEQUENCE -> inspectPostgresSequenceObject(connection, schemaName, objectName)
             SqlConsoleDatabaseObjectType.TRIGGER -> inspectPostgresTriggerObject(connection, schemaName, objectName)
             SqlConsoleDatabaseObjectType.SCHEMA -> inspectPostgresSchemaObject(connection, schemaName)
+        }
+
+    private fun loadPostgresObjectColumns(
+        connection: Connection,
+        schemaName: String,
+        objectName: String,
+        objectType: SqlConsoleDatabaseObjectType,
+    ): List<SqlConsoleDatabaseObjectColumn> =
+        when (objectType) {
+            SqlConsoleDatabaseObjectType.TABLE,
+            SqlConsoleDatabaseObjectType.VIEW,
+            SqlConsoleDatabaseObjectType.MATERIALIZED_VIEW,
+            -> loadPostgresColumns(connection, schemaName, objectName)
+            else -> emptyList()
         }
 
     private fun loadPostgresTableLikeObjects(
@@ -893,6 +923,32 @@ class JdbcShardSqlObjectSearcher : ShardSqlObjectSearcher, ShardSqlObjectInspect
                 objectName = objectName,
                 objectType = objectType,
             )
+        }
+
+    private fun loadGenericObjectColumns(
+        connection: Connection,
+        schemaName: String,
+        objectName: String,
+        objectType: SqlConsoleDatabaseObjectType,
+    ): List<SqlConsoleDatabaseObjectColumn> =
+        when (objectType) {
+            SqlConsoleDatabaseObjectType.TABLE,
+            SqlConsoleDatabaseObjectType.VIEW,
+            SqlConsoleDatabaseObjectType.MATERIALIZED_VIEW,
+            -> connection.metaData.getColumns(null, schemaName, objectName, null).use { columnsResultSet ->
+                buildList {
+                    while (columnsResultSet.next()) {
+                        add(
+                            SqlConsoleDatabaseObjectColumn(
+                                name = columnsResultSet.getString("COLUMN_NAME"),
+                                type = columnsResultSet.getString("TYPE_NAME"),
+                                nullable = columnsResultSet.getInt("NULLABLE") != 0,
+                            ),
+                        )
+                    }
+                }
+            }
+            else -> emptyList()
         }
 
     private fun ResultSet.toIndexMetadata(): SqlConsoleDatabaseObjectIndex =

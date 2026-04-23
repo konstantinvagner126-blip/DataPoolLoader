@@ -73,6 +73,15 @@ fun interface ShardSqlObjectInspector {
     ): SqlConsoleDatabaseObjectInspector
 }
 
+fun interface ShardSqlObjectColumnLoader {
+    fun loadObjectColumns(
+        shard: ResolvedSqlConsoleShardConfig,
+        schemaName: String,
+        objectName: String,
+        objectType: SqlConsoleDatabaseObjectType,
+    ): List<SqlConsoleDatabaseObjectColumn>
+}
+
 data class ShardSqlObjectSearchResult(
     val objects: List<SqlConsoleDatabaseObject>,
     val truncated: Boolean = false,

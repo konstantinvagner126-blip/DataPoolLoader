@@ -40,6 +40,14 @@ interface SqlConsoleOperations {
         objectType: SqlConsoleDatabaseObjectType,
         credentialsPath: Path?,
     ): SqlConsoleDatabaseObjectInspector
+
+    fun loadObjectColumns(
+        schemaName: String,
+        objectName: String,
+        objectType: SqlConsoleDatabaseObjectType,
+        credentialsPath: Path?,
+        selectedSourceNames: List<String> = emptyList(),
+    ): SqlConsoleDatabaseObjectColumnLookupResult
 }
 
 interface SqlConsoleTransactionalOperations {

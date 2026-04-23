@@ -162,6 +162,20 @@ data class SqlConsoleDatabaseObjectColumn(
     val nullable: Boolean,
 )
 
+data class SqlConsoleDatabaseObjectColumnLookupResult(
+    val schemaName: String,
+    val objectName: String,
+    val objectType: SqlConsoleDatabaseObjectType,
+    val sourceResults: List<SqlConsoleDatabaseObjectColumnSourceResult>,
+)
+
+data class SqlConsoleDatabaseObjectColumnSourceResult(
+    val sourceName: String,
+    val status: String,
+    val columns: List<SqlConsoleDatabaseObjectColumn> = emptyList(),
+    val errorMessage: String? = null,
+)
+
 data class SqlConsoleDatabaseObjectInspector(
     val schemaName: String,
     val objectName: String,

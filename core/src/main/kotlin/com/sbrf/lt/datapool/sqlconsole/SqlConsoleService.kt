@@ -9,6 +9,7 @@ class SqlConsoleService(
     private val connectionChecker: ShardConnectionChecker = JdbcShardConnectionChecker(),
     private val objectSearcher: ShardSqlObjectSearcher = JdbcShardSqlObjectSearcher(),
     private val objectInspector: ShardSqlObjectInspector = JdbcShardSqlObjectSearcher(),
+    private val objectColumnLoader: ShardSqlObjectColumnLoader = JdbcShardSqlObjectSearcher(),
 ) : SqlConsoleOperations, SqlConsoleTransactionalOperations {
     private val logger = LoggerFactory.getLogger(javaClass)
     private val configSupport = SqlConsoleConfigSupport()
@@ -23,6 +24,7 @@ class SqlConsoleService(
         configSupport = configSupport,
         objectSearcher = objectSearcher,
         objectInspector = objectInspector,
+        objectColumnLoader = objectColumnLoader,
     )
     @Volatile
     private var currentConfig: SqlConsoleConfig = config
@@ -117,5 +119,21 @@ class SqlConsoleService(
             objectName = objectName,
             objectType = objectType,
             credentialsPath = credentialsPath,
+        )
+
+    override fun loadObjectColumns(
+        schemaName: String,
+        objectName: String,
+        objectType: SqlConsoleDatabaseObjectType,
+        credentialsPath: Path?,
+        selectedSourceNames: List<String>,
+    ): SqlConsoleDatabaseObjectColumnLookupResult =
+        metadataSupport.loadObjectColumns(
+            config = currentConfig,
+            schemaName = schemaName,
+            objectName = objectName,
+            objectType = objectType,
+            credentialsPath = credentialsPath,
+            selectedSourceNames = selectedSourceNames,
         )
 }
