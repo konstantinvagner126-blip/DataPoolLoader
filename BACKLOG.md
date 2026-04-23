@@ -426,6 +426,11 @@
 
 Фаза D. Monaco hints и autocomplete:
 
+- реализовано в первой волне:
+  - добавлен local completion provider для PostgreSQL keywords;
+  - добавлены local function completions и snippets для частых SQL-шаблонов;
+  - добавлен lightweight hover по keywords/functions без backend-зависимости и без вмешательства в execution lifecycle;
+
 - развивать Monaco постепенно, без тяжелого IDE/LSP-стека и без ущерба для архитектуры SQL-консоли;
 - уровень 1:
   - local completion по keywords/functions/snippets;
