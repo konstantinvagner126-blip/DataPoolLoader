@@ -479,7 +479,7 @@
 
 Статус:
 
-- не реализовано
+- реализовано
 
 Цель:
 
@@ -491,7 +491,7 @@
 - ручная проверка показала, что execution history per workspace в текущем виде слишком сильно раздувает главный экран и конкурирует с editor/result panes.
 - ручная проверка также показала runtime-defect в object inspector: inspector сейчас не отображает metadata в части сценариев и требует отдельного hardening-пакета до visual cleanup.
 
-Ближайший пакет:
+Реализованные пакеты:
 
 #### 13.0. Object inspector direct-load hardening
 
