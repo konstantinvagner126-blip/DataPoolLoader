@@ -33,7 +33,7 @@ fun ComposeSqlConsolePage(
     val pendingManualTransaction = currentExecution?.transactionState == "PENDING_COMMIT"
     val runButtonClass = "btn-${runButtonTone(statementAnalysis, state.strictSafetyEnabled)}"
     val runtimeContext = state.runtimeContext
-    val connectionStatusBySource = state.connectionCheck?.sourceResults?.associateBy { it.sourceName }.orEmpty()
+    val connectionStatusBySource = state.sourceStatuses.associateBy { it.sourceName }
     val exportableResult = activeStatementResult?.toStandaloneQueryResult(currentResult)
     val activeExportShard = activeStatementResult
         ?.takeIf { it.statementType == "RESULT_SET" }
@@ -91,7 +91,6 @@ fun ComposeSqlConsolePage(
                 callbacks = callbacks,
                 runtimeContext = runtimeContext,
                 connectionStatusBySource = connectionStatusBySource,
-                scriptOutline = scriptOutline,
                 currentOutlineItem = currentOutlineItem,
                 statementAnalysis = statementAnalysis,
                 runButtonClass = runButtonClass,

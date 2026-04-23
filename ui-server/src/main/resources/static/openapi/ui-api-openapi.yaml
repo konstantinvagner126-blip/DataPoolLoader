@@ -2817,6 +2817,8 @@ components:
           type: [string, "null"]
         errorMessage:
           type: [string, "null"]
+        connectionState:
+          type: [string, "null"]
 
     SqlConsoleQueryResponse:
       type: object

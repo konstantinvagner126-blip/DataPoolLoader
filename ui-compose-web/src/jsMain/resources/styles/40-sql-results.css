@@ -1,5 +1,4 @@
-.sql-shard-summary,
-.sql-shard-card-grid {
+.sql-shard-summary {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 0.9rem;
@@ -108,33 +107,6 @@
   font-size: 0.8rem;
   font-weight: 700;
   letter-spacing: 0.04em;
-}
-
-.sql-shard-card {
-  padding: 0.95rem 1rem;
-  border-radius: 16px;
-  border: 1px solid rgba(19, 34, 56, 0.08);
-  background: rgba(248, 251, 255, 0.9);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
-  font-size: 0.86rem;
-  color: #23364d;
-}
-
-.sql-shard-card .sql-shard-card-title {
-  font-size: 0.86rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  margin-bottom: 0.45rem;
-  color: #132238;
-}
-
-.sql-shard-card-timings {
-  margin-top: 0.8rem;
-  display: grid;
-  gap: 0.25rem;
-  font-size: 0.79rem;
-  color: #5b6f86;
 }
 
 .sql-result-table thead th {

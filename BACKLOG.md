@@ -396,6 +396,11 @@
 
 Фаза C. Основной экран консоли: интерфейс, читаемость и control-flow UX:
 
+- реализовано в первой волне:
+  - source/shard status оставлен в одной primary presentation-форме: таблица без карточного дубля;
+  - внешний page-блок `Script outline` удален; cursor-based flow для `Текущий` statement остался editor-native;
+  - source connection indicators теперь обновляются не только после ручной проверки, но и по факту реального SQL execution на участвовавших source;
+
 - четко развести source/settings, editor, execution state, result output и transaction controls;
 - убрать визуальное смешение между рабочим контекстом и результатами запроса;
 - явно различать `Run`, `Cancel`, `Commit`, `Rollback`;

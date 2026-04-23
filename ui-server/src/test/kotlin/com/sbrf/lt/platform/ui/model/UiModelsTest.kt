@@ -1,6 +1,7 @@
 package com.sbrf.lt.platform.ui.model
 
 import com.sbrf.lt.datapool.sqlconsole.RawShardExecutionResult
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleConnectionState
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleInfo
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleQueryResult
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleStatementType
@@ -43,6 +44,7 @@ class UiModelsTest {
                     rows = listOf(mapOf("id" to "1")),
                     truncated = true,
                     message = "ok",
+                    connectionState = SqlConsoleConnectionState.AVAILABLE,
                     startedAt = Instant.parse("2026-04-19T09:00:00Z"),
                     finishedAt = Instant.parse("2026-04-19T09:00:01Z"),
                     durationMillis = 1000,
@@ -57,6 +59,7 @@ class UiModelsTest {
         assertEquals(1, response.shardResults.single().rowCount)
         assertEquals(true, response.shardResults.single().truncated)
         assertEquals(1000, response.shardResults.single().durationMillis)
+        assertEquals("AVAILABLE", response.shardResults.single().connectionState)
         assertEquals(Instant.parse("2026-04-19T09:00:00Z"), response.shardResults.single().startedAt)
     }
 

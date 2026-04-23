@@ -71,6 +71,7 @@ data class RawShardExecutionResult(
     val affectedRows: Int? = null,
     val message: String? = null,
     val errorMessage: String? = null,
+    val connectionState: SqlConsoleConnectionState? = null,
     val startedAt: Instant? = null,
     val finishedAt: Instant? = null,
     val durationMillis: Long? = null,
@@ -82,6 +83,11 @@ data class RawShardConnectionCheckResult(
     val message: String? = null,
     val errorMessage: String? = null,
 )
+
+enum class SqlConsoleConnectionState {
+    AVAILABLE,
+    UNAVAILABLE,
+}
 
 data class SqlConsoleInfo(
     val configured: Boolean,

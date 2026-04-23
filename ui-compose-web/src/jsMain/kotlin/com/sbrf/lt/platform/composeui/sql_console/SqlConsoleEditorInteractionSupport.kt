@@ -2,21 +2,6 @@ package com.sbrf.lt.platform.composeui.sql_console
 
 import kotlinx.browser.window
 
-internal fun focusEditorLine(
-    editor: dynamic,
-    lineNumber: Int,
-) {
-    if (editor == null) {
-        return
-    }
-    editor.revealLineInCenter(lineNumber)
-    val position = js("{}")
-    position.lineNumber = lineNumber
-    position.column = 1
-    editor.setPosition(position)
-    editor.focus()
-}
-
 internal fun insertSqlText(
     editor: dynamic,
     text: String,

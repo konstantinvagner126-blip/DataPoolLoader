@@ -170,6 +170,7 @@ internal class SqlConsoleExecutionSupport(
                         shardName = shard.name,
                         status = "FAILED",
                         errorMessage = ex.message ?: "Неизвестная ошибка",
+                        connectionState = classifyExecutionConnectionState(ex),
                     )
                 }.let { result ->
                     val finishedAt = Instant.now()

@@ -1,14 +1,12 @@
 package com.sbrf.lt.platform.composeui.sql_console
 
 import androidx.compose.runtime.Composable
-import com.sbrf.lt.platform.composeui.foundation.component.AlertBanner
 import com.sbrf.lt.platform.composeui.foundation.component.EmptyStateCard
 import com.sbrf.lt.platform.composeui.foundation.component.StatusBadge
 import com.sbrf.lt.platform.composeui.foundation.dom.classes
 import com.sbrf.lt.platform.composeui.foundation.format.formatDateTime
 import com.sbrf.lt.platform.composeui.foundation.format.formatDuration
 import org.jetbrains.compose.web.dom.Div
-import org.jetbrains.compose.web.dom.H3
 import org.jetbrains.compose.web.dom.Table
 import org.jetbrains.compose.web.dom.Tbody
 import org.jetbrains.compose.web.dom.Td
@@ -69,33 +67,6 @@ internal fun StatusResultPane(
                         Td { Text(shard.message ?: "-") }
                         Td { Text(shard.errorMessage ?: "-") }
                     }
-                }
-            }
-        }
-    }
-    Div({ classes("sql-shard-card-grid") }) {
-        readyResult.shardResults.forEach { shard ->
-            Div({ classes("sql-shard-card", "status-${sourceStatusSuffix(shard.status)}") }) {
-                Div({ classes("d-flex", "justify-content-between", "align-items-start", "gap-3") }) {
-                    Div {
-                        H3({ classes("h6", "mb-1") }) { Text(shard.shardName) }
-                        Div({ classes("small", "text-secondary") }) {
-                            Text(buildShardStatusSummary(shard))
-                        }
-                    }
-                    ShardStatusBadge(shard.status)
-                }
-                if (!shard.errorMessage.isNullOrBlank()) {
-                    AlertBanner(shard.errorMessage ?: "", "danger")
-                } else if (!shard.message.isNullOrBlank()) {
-                    Div({ classes("alert", "alert-secondary", "mt-3", "mb-0") }) {
-                        Text(shard.message ?: "")
-                    }
-                }
-                Div({ classes("sql-shard-card-timings") }) {
-                    Div { Text("Старт: ${formatDateTime(shard.startedAt)}") }
-                    Div { Text("Финиш: ${formatDateTime(shard.finishedAt)}") }
-                    Div { Text("Длительность: ${buildShardDurationText(shard)}") }
                 }
             }
         }

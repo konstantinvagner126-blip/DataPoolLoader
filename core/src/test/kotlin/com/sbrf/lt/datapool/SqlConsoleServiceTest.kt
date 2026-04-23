@@ -24,8 +24,10 @@ import com.sbrf.lt.datapool.sqlconsole.SqlConsoleStatement
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleExecutionControl
 import com.sbrf.lt.datapool.sqlconsole.PendingShardTransaction
 import com.sbrf.lt.datapool.sqlconsole.TransactionalShardScriptExecution
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleConnectionState
 import kotlin.io.path.createTempDirectory
 import kotlin.io.path.writeText
+import java.sql.SQLException
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -128,6 +130,44 @@ class SqlConsoleServiceTest {
         assertEquals(SqlConsoleStatementType.RESULT_SET, response.statementType)
         assertEquals(1, response.shardResults.first { it.shardName == "shard1" }.rows.size)
         assertTrue(response.shardResults.any { it.shardName == "shard2" && it.status == "FAILED" })
+    }
+
+    @Test
+    fun `marks shard as unavailable on connection-level SQL failure`() {
+        val service = SqlConsoleService(
+            config = SqlConsoleConfig(
+                sources = listOf(SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user1", "pwd1")),
+            ),
+            executor = ShardSqlExecutor { _, _, _, _, _, _ ->
+                throw SQLException("connection refused", "08001")
+            },
+        )
+
+        val response = service.executeQuery("select 1", null)
+
+        assertEquals(
+            SqlConsoleConnectionState.UNAVAILABLE,
+            response.shardResults.single().connectionState,
+        )
+    }
+
+    @Test
+    fun `keeps shard available on SQL-level failure`() {
+        val service = SqlConsoleService(
+            config = SqlConsoleConfig(
+                sources = listOf(SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user1", "pwd1")),
+            ),
+            executor = ShardSqlExecutor { _, _, _, _, _, _ ->
+                throw SQLException("syntax error at or near SELECT", "42601")
+            },
+        )
+
+        val response = service.executeQuery("select from demo", null)
+
+        assertEquals(
+            SqlConsoleConnectionState.AVAILABLE,
+            response.shardResults.single().connectionState,
+        )
     }
 
     @Test

@@ -58,7 +58,7 @@ internal fun SqlConsoleSourceSidebar(
                 Text(buildConnectionCheckStatusText(connectionCheck))
             }
         } ?: Div({ classes("small", "text-secondary", "mt-2") }) {
-            Text("Проверка подключений еще не выполнялась.")
+            Text("Явная проверка подключений еще не выполнялась. Индикаторы ниже обновляются также по факту выполнения SQL.")
         }
         Div({ classes("small", "text-secondary", "mt-3") }) {
             Text("Выбери, по каким источникам выполнять запрос.")

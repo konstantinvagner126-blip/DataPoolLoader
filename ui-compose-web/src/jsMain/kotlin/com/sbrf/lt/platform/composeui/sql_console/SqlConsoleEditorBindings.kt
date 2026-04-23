@@ -15,10 +15,6 @@ internal class SqlConsoleEditorBindings(
         )
     }
 
-    fun jumpToLine(lineNumber: Int) {
-        focusEditorLine(context.currentUiState().editorInstance, lineNumber)
-    }
-
     fun onEditorReady(editor: Any) {
         val monacoEditor = editor.asDynamic()
         context.updateUiState { it.copy(editorInstance = monacoEditor) }

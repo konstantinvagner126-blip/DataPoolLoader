@@ -15,6 +15,14 @@ fun buildConnectionCheckStatusText(result: SqlConsoleConnectionCheckResponse): S
     return "Проверка подключений завершена. Успешно: $success, с ошибкой: $failed."
 }
 
+fun translateConnectionStatus(status: String): String =
+    when {
+        status.equals("SUCCESS", ignoreCase = true) || status.equals("OK", ignoreCase = true) -> "Доступен"
+        status.equals("FAILED", ignoreCase = true) || status.equals("ERROR", ignoreCase = true) -> "Недоступен"
+        status.equals("RUNNING", ignoreCase = true) -> "Проверяется"
+        else -> status
+    }
+
 fun sourceStatusTone(status: SqlConsoleSourceConnectionStatus?): String =
     when {
         status == null -> "unknown"

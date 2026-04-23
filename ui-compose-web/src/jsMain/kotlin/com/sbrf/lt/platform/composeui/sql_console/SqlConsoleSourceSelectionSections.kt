@@ -55,14 +55,14 @@ internal fun SqlConsoleSourceCheckbox(
                     Text(sourceName)
                 }
                 Span({ classes("sql-source-checkbox-status") }) {
-                    Text(sourceStatus?.let { translateSourceStatus(it.status) } ?: "Не проверено")
+                    Text(sourceStatus?.let { translateConnectionStatus(it.status) } ?: "Не проверено")
                 }
             }
             Div({ classes("sql-source-checkbox-message") }) {
                 Text(
                     sourceStatus?.errorMessage
                         ?: sourceStatus?.message
-                        ?: "Подключение еще не проверялось. Выбери source и запусти проверку.",
+                        ?: "Статус появится после проверки подключения или выполнения SQL по этому source.",
                 )
             }
         }

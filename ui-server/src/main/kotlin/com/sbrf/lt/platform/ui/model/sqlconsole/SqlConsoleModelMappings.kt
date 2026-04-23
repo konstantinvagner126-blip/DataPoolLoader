@@ -123,6 +123,7 @@ private fun RawShardExecutionResult.toResponse(): SqlConsoleShardResultResponse 
     affectedRows = affectedRows,
     message = message,
     errorMessage = errorMessage,
+    connectionState = connectionState?.name,
     startedAt = startedAt,
     finishedAt = finishedAt,
     durationMillis = durationMillis,

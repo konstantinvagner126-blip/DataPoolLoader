@@ -85,6 +85,7 @@ class JdbcShardSqlExecutor : ShardSqlExecutor, ShardSqlScriptExecutor, ShardSqlT
                         shardName = shard.name,
                         status = "FAILED",
                         errorMessage = ex.message ?: "Неизвестная ошибка",
+                        connectionState = classifyExecutionConnectionState(ex),
                     )
                     repeat(statements.lastIndex - index) {
                         results += RawShardExecutionResult(
@@ -153,6 +154,7 @@ class JdbcShardSqlExecutor : ShardSqlExecutor, ShardSqlScriptExecutor, ShardSqlT
                             columns = columns,
                             rows = rows,
                             truncated = truncated,
+                            connectionState = SqlConsoleConnectionState.AVAILABLE,
                             message = if (truncated) {
                                 "Результат усечен до $maxRows строк."
                             } else {
@@ -169,6 +171,7 @@ class JdbcShardSqlExecutor : ShardSqlExecutor, ShardSqlScriptExecutor, ShardSqlT
                     shardName = shard.name,
                     status = "SUCCESS",
                     affectedRows = jdbcStatement.updateCount.takeIf { it >= 0 },
+                    connectionState = SqlConsoleConnectionState.AVAILABLE,
                     message = "${statement.leadingKeyword} выполнен успешно.",
                     startedAt = startedAt,
                     finishedAt = finishedAt,

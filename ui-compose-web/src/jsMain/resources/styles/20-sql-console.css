@@ -170,68 +170,6 @@
   min-width: 0;
 }
 
-.sql-script-outline {
-  display: flex;
-  flex-direction: column;
-  gap: 0.65rem;
-}
-
-.sql-script-outline-item {
-  width: 100%;
-  text-align: left;
-  justify-content: flex-start;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.2rem;
-  padding: 0.7rem 0.85rem;
-  border-radius: 12px;
-}
-
-.sql-script-outline-item-main {
-  font-size: 0.82rem;
-  font-weight: 800;
-  color: #132238;
-}
-
-.sql-script-outline-item-preview {
-  font-size: 0.8rem;
-  color: #64748b;
-  white-space: normal;
-  overflow: hidden;
-  max-width: 100%;
-}
-
-.sql-statement-risk-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.3rem 0.55rem;
-  border-radius: 999px;
-  font-size: 0.72rem;
-  font-weight: 800;
-  white-space: nowrap;
-}
-
-.sql-statement-risk-safe {
-  background: rgba(13, 148, 136, 0.12);
-  color: #0f766e;
-}
-
-.sql-statement-risk-warning {
-  background: rgba(249, 115, 22, 0.12);
-  color: #c2410c;
-}
-
-.sql-statement-risk-danger {
-  background: rgba(220, 38, 38, 0.12);
-  color: #b91c1c;
-}
-
-.sql-statement-risk-neutral {
-  background: rgba(15, 23, 42, 0.08);
-  color: #334155;
-}
-
 .sql-recent-query-select {
   min-width: 20rem;
   flex: 1 1 20rem;

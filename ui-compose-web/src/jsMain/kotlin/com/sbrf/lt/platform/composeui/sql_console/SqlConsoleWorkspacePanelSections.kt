@@ -11,8 +11,6 @@ internal fun SqlConsoleWorkspacePanel(
     state: SqlConsolePageState,
     selectedRecentQuery: String,
     selectedFavoriteQuery: String,
-    editorCursorLine: Int,
-    scriptOutline: List<SqlScriptOutlineItem>,
     currentOutlineItem: SqlScriptOutlineItem?,
     statementAnalysis: SqlStatementAnalysis,
     runButtonClass: String,
@@ -39,7 +37,6 @@ internal fun SqlConsoleWorkspacePanel(
     onInsertFavoriteObject: (SqlConsoleFavoriteObject, String) -> Unit,
     onOpenFavoriteMetadata: (SqlConsoleFavoriteObject) -> Unit,
     onRemoveFavoriteObject: (SqlConsoleFavoriteObject) -> Unit,
-    onJumpToLine: (Int) -> Unit,
     onEditorReady: (Any) -> Unit,
     onDraftSqlChange: (String) -> Unit,
     onPageSizeChange: (Int) -> Unit,
@@ -94,12 +91,6 @@ internal fun SqlConsoleWorkspacePanel(
             },
             onOpenMetadata = onOpenFavoriteMetadata,
             onRemove = onRemoveFavoriteObject,
-        )
-
-        SqlEditorIdeBlock(
-            outlineItems = scriptOutline,
-            currentLine = editorCursorLine,
-            onJumpToLine = onJumpToLine,
         )
 
         MonacoEditorPane(
