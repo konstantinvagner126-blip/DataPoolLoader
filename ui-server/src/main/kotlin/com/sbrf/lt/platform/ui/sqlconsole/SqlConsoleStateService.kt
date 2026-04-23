@@ -11,7 +11,9 @@ class SqlConsoleStateService(
     private val preferencesStore: SqlConsolePreferencesStateStore,
 ) {
     private val lock = Any()
-    private var workspaceState: PersistedSqlConsoleWorkspaceState = workspaceStore.load()
+    private val workspaceStates: MutableMap<String, PersistedSqlConsoleWorkspaceState> = linkedMapOf(
+        DEFAULT_SQL_CONSOLE_WORKSPACE_ID to workspaceStore.load(),
+    )
     private var libraryState: PersistedSqlConsoleLibraryState = libraryStore.load()
     private var preferencesState: PersistedSqlConsolePreferencesState = preferencesStore.load()
 
@@ -21,15 +23,21 @@ class SqlConsoleStateService(
         preferencesStore = SqlConsolePreferencesStateStore(storageDir),
     )
 
-    fun currentState(): SqlConsoleStateResponse = synchronized(lock) {
-        toResponse()
+    fun currentState(workspaceId: String? = null): SqlConsoleStateResponse = synchronized(lock) {
+        toResponse(currentWorkspaceState(workspaceId))
     }
 
-    fun updateState(request: SqlConsoleStateUpdateRequest): SqlConsoleStateResponse = synchronized(lock) {
-        workspaceState = PersistedSqlConsoleWorkspaceState(
+    fun updateState(
+        request: SqlConsoleStateUpdateRequest,
+        workspaceId: String? = null,
+    ): SqlConsoleStateResponse = synchronized(lock) {
+        val normalizedWorkspaceId = normalizeSqlConsoleWorkspaceId(workspaceId)
+        val workspaceState = PersistedSqlConsoleWorkspaceState(
             draftSql = request.draftSql,
+            selectedGroupNames = request.selectedGroupNames,
             selectedSourceNames = request.selectedSourceNames,
         ).normalized()
+        workspaceStates[normalizedWorkspaceId] = workspaceState
         libraryState = PersistedSqlConsoleLibraryState(
             recentQueries = request.recentQueries,
             favoriteQueries = request.favoriteQueries,
@@ -48,13 +56,20 @@ class SqlConsoleStateService(
             strictSafetyEnabled = request.strictSafetyEnabled,
             transactionMode = request.transactionMode,
         ).normalized()
-        workspaceStore.save(workspaceState)
+        workspaceStore.save(normalizedWorkspaceId, workspaceState)
         libraryStore.save(libraryState)
         preferencesStore.save(preferencesState)
-        toResponse()
+        toResponse(workspaceState)
     }
 
-    private fun toResponse(): SqlConsoleStateResponse = SqlConsoleStateResponse(
+    private fun currentWorkspaceState(workspaceId: String?): PersistedSqlConsoleWorkspaceState {
+        val normalizedWorkspaceId = normalizeSqlConsoleWorkspaceId(workspaceId)
+        return workspaceStates.getOrPut(normalizedWorkspaceId) {
+            workspaceStore.load(normalizedWorkspaceId)
+        }
+    }
+
+    private fun toResponse(workspaceState: PersistedSqlConsoleWorkspaceState): SqlConsoleStateResponse = SqlConsoleStateResponse(
         draftSql = workspaceState.draftSql,
         recentQueries = libraryState.recentQueries,
         favoriteQueries = libraryState.favoriteQueries,
@@ -67,6 +82,7 @@ class SqlConsoleStateService(
                 tableName = it.tableName,
             )
         },
+        selectedGroupNames = workspaceState.selectedGroupNames,
         selectedSourceNames = workspaceState.selectedSourceNames,
         pageSize = preferencesState.pageSize,
         strictSafetyEnabled = preferencesState.strictSafetyEnabled,

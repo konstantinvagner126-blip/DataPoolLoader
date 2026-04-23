@@ -58,12 +58,14 @@ internal fun SqlConsoleWorkspaceToolbar(
         Div({ classes("sql-toolbar-action-groups") }) {
             SqlToolbarActionGroup("Подготовка") {
                 SqlToolbarActionButton(
+                    title = "Форматировать SQL",
+                    icon = "≣",
                     toneClass = "btn-outline-dark",
                     onClick = onFormatSql,
-                ) {
-                    Text("Форматировать")
-                }
+                )
                 SqlToolbarActionButton(
+                    title = "Выполнить текущий statement",
+                    icon = "↦",
                     toneClass = "btn-outline-dark",
                     buttonDisabled = (
                         state.actionInProgress == "run-current-query" ||
@@ -72,58 +74,56 @@ internal fun SqlConsoleWorkspaceToolbar(
                             currentOutlineItem == null
                         ),
                     onClick = onRunCurrent,
-                ) {
-                    Text("Текущий statement")
-                }
+                )
             }
             SqlToolbarActionGroup("Выполнение") {
                 SqlToolbarActionButton(
+                    title = "Выполнить скрипт",
+                    icon = "▶",
                     toneClass = runButtonClass,
                     buttonDisabled = state.actionInProgress == "run-query" || state.info?.configured != true || pendingManualTransaction,
                     extraClasses = arrayOf("sql-toolbar-primary-action"),
                     onClick = onRunAll,
-                ) {
-                    Text("Выполнить скрипт")
-                }
+                )
                 SqlToolbarActionButton(
+                    title = "Остановить выполнение",
+                    icon = "■",
                     toneClass = "btn-danger",
                     buttonDisabled = !isRunning || state.actionInProgress == "cancel-query",
                     onClick = onStop,
-                ) {
-                    Text("Остановить")
-                }
+                )
             }
             SqlToolbarActionGroup("Транзакция") {
                 SqlToolbarActionButton(
+                    title = "Commit",
+                    icon = "✓",
                     toneClass = "btn-success",
                     buttonDisabled = !pendingManualTransaction || state.actionInProgress == "commit-query",
                     onClick = onCommit,
-                ) {
-                    Text("Commit")
-                }
+                )
                 SqlToolbarActionButton(
+                    title = "Rollback",
+                    icon = "↶",
                     toneClass = "btn-outline-danger",
                     buttonDisabled = !pendingManualTransaction || state.actionInProgress == "rollback-query",
                     onClick = onRollback,
-                ) {
-                    Text("Rollback")
-                }
+                )
             }
             SqlToolbarActionGroup("Экспорт") {
                 SqlToolbarActionButton(
+                    title = "Скачать CSV",
+                    icon = "▦",
                     toneClass = "btn-outline-secondary",
                     buttonDisabled = activeExportShard == null,
                     onClick = onExportCsv,
-                ) {
-                    Text("Скачать CSV")
-                }
+                )
                 SqlToolbarActionButton(
+                    title = "Скачать ZIP",
+                    icon = "⇩",
                     toneClass = "btn-outline-secondary",
                     buttonDisabled = exportableResult?.statementType != "RESULT_SET",
                     onClick = onExportZip,
-                ) {
-                    Text("Скачать ZIP")
-                }
+                )
             }
         }
     }
@@ -144,20 +144,23 @@ private fun SqlToolbarActionGroup(
 
 @Composable
 internal fun SqlToolbarActionButton(
+    title: String,
+    icon: String,
     toneClass: String,
     buttonDisabled: Boolean = false,
     extraClasses: Array<String> = emptyArray(),
     onClick: () -> Unit,
-    content: @Composable () -> Unit,
 ) {
     Button(attrs = {
-        classes("btn", toneClass, *extraClasses)
+        classes("btn", toneClass, "sql-toolbar-icon-button", *extraClasses)
         attr("type", "button")
+        attr("title", title)
+        attr("aria-label", title)
         if (buttonDisabled) {
             disabled()
         }
         onClick { onClick() }
     }) {
-        content()
+        Span({ classes("sql-toolbar-icon") }) { Text(icon) }
     }
 }

@@ -37,6 +37,7 @@ class LegacySqlConsoleStateStoreTest {
         val preferences = SqlConsolePreferencesStateStore(storageDir).load()
 
         assertEquals("select * from demo", workspace.draftSql)
+        assertEquals(null, workspace.selectedGroupNames)
         assertEquals(listOf("db1", "db2"), workspace.selectedSourceNames)
         assertEquals(listOf("select * from demo", "select 1"), library.recentQueries)
         assertEquals(listOf("select * from demo", "select 2"), library.favoriteQueries)
@@ -100,6 +101,7 @@ class LegacySqlConsoleStateStoreTest {
         val preferences = SqlConsolePreferencesStateStore(storageDir).load()
 
         assertEquals("select 1 as check_value", workspace.draftSql)
+        assertEquals(null, workspace.selectedGroupNames)
         assertEquals(emptyList(), workspace.selectedSourceNames)
         assertEquals(emptyList(), library.recentQueries)
         assertEquals(emptyList(), library.favoriteQueries)
@@ -126,6 +128,7 @@ class LegacySqlConsoleStateStoreTest {
                         objectType = "TABLE",
                     ),
                 ),
+                selectedGroupNames = listOf("dev"),
                 selectedSourceNames = listOf("db1"),
                 pageSize = 100,
                 strictSafetyEnabled = true,
@@ -134,6 +137,7 @@ class LegacySqlConsoleStateStoreTest {
         )
 
         assertEquals("select * from offer", updated.draftSql)
+        assertEquals(listOf("dev"), updated.selectedGroupNames)
         assertEquals(listOf("db1"), updated.selectedSourceNames)
         assertEquals(listOf("select * from offer"), updated.recentQueries)
         assertEquals(listOf("select count(*) from offer"), updated.favoriteQueries)
@@ -141,5 +145,49 @@ class LegacySqlConsoleStateStoreTest {
         assertEquals(100, updated.pageSize)
         assertTrue(updated.strictSafetyEnabled)
         assertEquals("TRANSACTION_PER_SHARD", updated.transactionMode)
+    }
+
+    @Test
+    fun `state service keeps workspace state isolated by workspace id while library and preferences stay shared`() {
+        val storageDir = Files.createTempDirectory("sql-console-state-workspaces")
+        val service = SqlConsoleStateService(storageDir)
+
+        service.updateState(
+            request = com.sbrf.lt.platform.ui.model.SqlConsoleStateUpdateRequest(
+                draftSql = "select * from dev_table",
+                recentQueries = listOf("select * from dev_table"),
+                selectedGroupNames = listOf("dev"),
+                selectedSourceNames = listOf("db1", "db2"),
+                pageSize = 100,
+            ),
+            workspaceId = "workspace-a",
+        )
+        val emptyWorkspace = service.currentState("workspace-b")
+        assertEquals("select 1 as check_value", emptyWorkspace.draftSql)
+        assertEquals(null, emptyWorkspace.selectedGroupNames)
+        assertEquals(emptyList(), emptyWorkspace.selectedSourceNames)
+        service.updateState(
+            request = com.sbrf.lt.platform.ui.model.SqlConsoleStateUpdateRequest(
+                draftSql = "select * from ift_table",
+                recentQueries = listOf("select * from ift_table"),
+                selectedGroupNames = listOf("ift"),
+                selectedSourceNames = listOf("db2", "db3"),
+                pageSize = 25,
+            ),
+            workspaceId = "workspace-b",
+        )
+
+        val workspaceA = service.currentState("workspace-a")
+        val workspaceB = service.currentState("workspace-b")
+
+        assertEquals("select * from dev_table", workspaceA.draftSql)
+        assertEquals(listOf("dev"), workspaceA.selectedGroupNames)
+        assertEquals(listOf("db1", "db2"), workspaceA.selectedSourceNames)
+        assertEquals("select * from ift_table", workspaceB.draftSql)
+        assertEquals(listOf("ift"), workspaceB.selectedGroupNames)
+        assertEquals(listOf("db2", "db3"), workspaceB.selectedSourceNames)
+        assertEquals(listOf("select * from ift_table"), workspaceA.recentQueries)
+        assertEquals(25, workspaceA.pageSize)
+        assertEquals(25, workspaceB.pageSize)
     }
 }

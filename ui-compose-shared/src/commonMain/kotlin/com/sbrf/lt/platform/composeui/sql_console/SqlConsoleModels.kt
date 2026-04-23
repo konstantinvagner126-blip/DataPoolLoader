@@ -6,16 +6,22 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class SqlConsoleInfo(
     val configured: Boolean,
-    val sourceNames: List<String>,
-    val sourceGroups: List<SqlConsoleSourceGroup> = emptyList(),
+    val sourceCatalog: List<SqlConsoleSourceCatalogEntry> = emptyList(),
+    val groups: List<SqlConsoleSourceGroup> = emptyList(),
     val maxRowsPerShard: Int,
     val queryTimeoutSec: Int? = null,
 )
 
 @Serializable
+data class SqlConsoleSourceCatalogEntry(
+    val name: String,
+)
+
+@Serializable
 data class SqlConsoleSourceGroup(
     val name: String,
-    val sourceNames: List<String> = emptyList(),
+    val sources: List<String> = emptyList(),
+    val synthetic: Boolean = false,
 )
 
 @Serializable
@@ -24,6 +30,7 @@ data class SqlConsoleStateSnapshot(
     val recentQueries: List<String> = emptyList(),
     val favoriteQueries: List<String> = emptyList(),
     val favoriteObjects: List<SqlConsoleFavoriteObject> = emptyList(),
+    val selectedGroupNames: List<String>? = null,
     val selectedSourceNames: List<String> = emptyList(),
     val pageSize: Int = 50,
     val strictSafetyEnabled: Boolean = false,
@@ -36,6 +43,7 @@ data class SqlConsoleStateUpdate(
     val recentQueries: List<String> = emptyList(),
     val favoriteQueries: List<String> = emptyList(),
     val favoriteObjects: List<SqlConsoleFavoriteObject> = emptyList(),
+    val selectedGroupNames: List<String> = emptyList(),
     val selectedSourceNames: List<String> = emptyList(),
     val pageSize: Int = 50,
     val strictSafetyEnabled: Boolean = false,
@@ -278,6 +286,9 @@ data class SqlConsolePageState(
     val favoriteQueries: List<String> = emptyList(),
     val favoriteObjects: List<SqlConsoleFavoriteObject> = emptyList(),
     val selectedSourceNames: List<String> = emptyList(),
+    val selectedGroupNames: List<String> = emptyList(),
+    val manuallyIncludedSourceNames: List<String> = emptyList(),
+    val manuallyExcludedSourceNames: List<String> = emptyList(),
     val pageSize: Int = 50,
     val strictSafetyEnabled: Boolean = false,
     val transactionMode: String = "AUTO_COMMIT",
@@ -297,6 +308,9 @@ data class SqlConsoleObjectsPageState(
     val persistedState: SqlConsoleStateSnapshot? = null,
     val query: String = "",
     val selectedSourceNames: List<String> = emptyList(),
+    val selectedGroupNames: List<String> = emptyList(),
+    val manuallyIncludedSourceNames: List<String> = emptyList(),
+    val manuallyExcludedSourceNames: List<String> = emptyList(),
     val favoriteObjects: List<SqlConsoleFavoriteObject> = emptyList(),
     val searchResponse: SqlConsoleObjectSearchResponse? = null,
     val inspectorLoading: Boolean = false,

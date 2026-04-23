@@ -58,7 +58,7 @@ class SqlConsoleServiceTest {
             config = SqlConsoleConfig(
                 maxRowsPerShard = 2,
                 queryTimeoutSec = 15,
-                sources = listOf(
+                sourceCatalog = listOf(
                     SqlConsoleSourceConfig("shard1", "\${SHARD1_URL}", "\${SHARD1_USER}", "\${SHARD1_PASSWORD}"),
                     SqlConsoleSourceConfig("shard2", "\${SHARD2_URL}", "\${SHARD2_USER}", "\${SHARD2_PASSWORD}"),
                 ),
@@ -108,7 +108,7 @@ class SqlConsoleServiceTest {
     fun `keeps successful shard rows when one shard fails`() {
         val service = SqlConsoleService(
             config = SqlConsoleConfig(
-                sources = listOf(
+                sourceCatalog = listOf(
                     SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user1", "pwd1"),
                     SqlConsoleSourceConfig("shard2", "jdbc:test:two", "user2", "pwd2"),
                 ),
@@ -137,7 +137,7 @@ class SqlConsoleServiceTest {
     fun `marks shard as unavailable on connection-level SQL failure`() {
         val service = SqlConsoleService(
             config = SqlConsoleConfig(
-                sources = listOf(SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user1", "pwd1")),
+                sourceCatalog = listOf(SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user1", "pwd1")),
             ),
             executor = ShardSqlExecutor { _, _, _, _, _, _ ->
                 throw SQLException("connection refused", "08001")
@@ -156,7 +156,7 @@ class SqlConsoleServiceTest {
     fun `keeps shard available on SQL-level failure`() {
         val service = SqlConsoleService(
             config = SqlConsoleConfig(
-                sources = listOf(SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user1", "pwd1")),
+                sourceCatalog = listOf(SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user1", "pwd1")),
             ),
             executor = ShardSqlExecutor { _, _, _, _, _, _ ->
                 throw SQLException("syntax error at or near SELECT", "42601")
@@ -176,7 +176,7 @@ class SqlConsoleServiceTest {
         val executed = mutableListOf<String>()
         val service = SqlConsoleService(
             config = SqlConsoleConfig(
-                sources = listOf(
+                sourceCatalog = listOf(
                     SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user1", "pwd1"),
                     SqlConsoleSourceConfig("shard2", "jdbc:test:two", "user2", "pwd2"),
                     SqlConsoleSourceConfig("shard3", "jdbc:test:three", "user3", "pwd3"),
@@ -204,7 +204,7 @@ class SqlConsoleServiceTest {
     fun `supports update statements`() {
         val service = SqlConsoleService(
             config = SqlConsoleConfig(
-                sources = listOf(SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user1", "pwd1")),
+                sourceCatalog = listOf(SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user1", "pwd1")),
             ),
             executor = ShardSqlExecutor { shard, statement, _, _, _, _ ->
                 assertEquals("shard1", shard.name)
@@ -229,7 +229,7 @@ class SqlConsoleServiceTest {
     fun `supports arbitrary command statements`() {
         val service = SqlConsoleService(
             config = SqlConsoleConfig(
-                sources = listOf(SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user1", "pwd1")),
+                sourceCatalog = listOf(SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user1", "pwd1")),
             ),
             executor = ShardSqlExecutor { shard, statement, _, _, _, _ ->
                 assertEquals("DELETE", statement.leadingKeyword)
@@ -253,7 +253,7 @@ class SqlConsoleServiceTest {
     fun `executes multiple statements sequentially`() {
         val service = SqlConsoleService(
             config = SqlConsoleConfig(
-                sources = listOf(
+                sourceCatalog = listOf(
                     SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user1", "pwd1"),
                     SqlConsoleSourceConfig("shard2", "jdbc:test:two", "user2", "pwd2"),
                 ),
@@ -293,7 +293,7 @@ class SqlConsoleServiceTest {
     fun `stops next statements for shard after previous failure`() {
         val service = SqlConsoleService(
             config = SqlConsoleConfig(
-                sources = listOf(
+                sourceCatalog = listOf(
                     SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user1", "pwd1"),
                     SqlConsoleSourceConfig("shard2", "jdbc:test:two", "user2", "pwd2"),
                 ),
@@ -333,7 +333,7 @@ class SqlConsoleServiceTest {
         var observedTransactionMode: SqlConsoleTransactionMode? = null
         val service = SqlConsoleService(
             config = SqlConsoleConfig(
-                sources = listOf(
+                sourceCatalog = listOf(
                     SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user1", "pwd1"),
                     SqlConsoleSourceConfig("shard2", "jdbc:test:two", "user2", "pwd2"),
                 ),
@@ -404,7 +404,7 @@ class SqlConsoleServiceTest {
     fun `returns pending transaction when auto commit disabled`() {
         val service = SqlConsoleService(
             config = SqlConsoleConfig(
-                sources = listOf(SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user1", "pwd1")),
+                sourceCatalog = listOf(SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user1", "pwd1")),
             ),
             executor = object : ShardSqlExecutor, ShardSqlTransactionalExecutor {
                 override fun execute(
@@ -461,7 +461,7 @@ class SqlConsoleServiceTest {
         var rollbackCalls = 0
         val service = SqlConsoleService(
             config = SqlConsoleConfig(
-                sources = listOf(SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user1", "pwd1")),
+                sourceCatalog = listOf(SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user1", "pwd1")),
             ),
             executor = object : ShardSqlExecutor, ShardSqlTransactionalExecutor {
                 override fun execute(
@@ -522,7 +522,7 @@ class SqlConsoleServiceTest {
     fun `rejects continue on error in transaction mode`() {
         val service = SqlConsoleService(
             config = SqlConsoleConfig(
-                sources = listOf(SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user1", "pwd1")),
+                sourceCatalog = listOf(SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user1", "pwd1")),
             ),
             executor = object : ShardSqlExecutor, ShardSqlScriptExecutor {
                 override fun execute(
@@ -564,7 +564,7 @@ class SqlConsoleServiceTest {
         val service = SqlConsoleService(
             config = SqlConsoleConfig(
                 queryTimeoutSec = 45,
-                sources = listOf(SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user1", "pwd1")),
+                sourceCatalog = listOf(SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user1", "pwd1")),
             ),
             executor = ShardSqlExecutor { _, _, _, _, _, _ -> error("should not be called") },
         )
@@ -576,11 +576,11 @@ class SqlConsoleServiceTest {
     fun `exposes source groups in info`() {
         val service = SqlConsoleService(
             config = SqlConsoleConfig(
-                sources = listOf(
+                sourceCatalog = listOf(
                     SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user1", "pwd1"),
                     SqlConsoleSourceConfig("shard2", "jdbc:test:two", "user2", "pwd2"),
                 ),
-                sourceGroups = listOf(
+                groups = listOf(
                     SqlConsoleSourceGroupConfig("dev", listOf("shard1", "shard2")),
                     SqlConsoleSourceGroupConfig("ift", listOf("shard2")),
                 ),
@@ -588,18 +588,18 @@ class SqlConsoleServiceTest {
             executor = ShardSqlExecutor { _, _, _, _, _, _ -> error("should not be called") },
         )
 
-        assertEquals(listOf("dev", "ift"), service.info().sourceGroups.map { it.name })
-        assertEquals(listOf("shard1", "shard2"), service.info().sourceGroups.first().sourceNames)
+        assertEquals(listOf("dev", "ift"), service.info().groups.map { it.name })
+        assertEquals(listOf("shard1", "shard2"), service.info().groups.first().sources)
     }
 
     @Test
     fun `fails when source group references unknown source`() {
         val service = SqlConsoleService(
             config = SqlConsoleConfig(
-                sources = listOf(
+                sourceCatalog = listOf(
                     SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user1", "pwd1"),
                 ),
-                sourceGroups = listOf(
+                groups = listOf(
                     SqlConsoleSourceGroupConfig("dev", listOf("shard1", "missing")),
                 ),
             ),
@@ -619,7 +619,7 @@ class SqlConsoleServiceTest {
         val service = SqlConsoleService(
             config = SqlConsoleConfig(
                 maxRowsPerShard = 200,
-                sources = listOf(SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user1", "pwd1")),
+                sourceCatalog = listOf(SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user1", "pwd1")),
             ),
             executor = ShardSqlExecutor { _, _, _, _, _, _ -> error("should not be called") },
         )
@@ -636,7 +636,7 @@ class SqlConsoleServiceTest {
             config = SqlConsoleConfig(
                 maxRowsPerShard = 200,
                 queryTimeoutSec = 45,
-                sources = listOf(SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user1", "pwd1")),
+                sourceCatalog = listOf(SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user1", "pwd1")),
             ),
             executor = ShardSqlExecutor { _, _, _, _, _, _ -> error("should not be called") },
         )
@@ -654,7 +654,7 @@ class SqlConsoleServiceTest {
         val service = SqlConsoleService(
             config = SqlConsoleConfig(
                 queryTimeoutSec = 12,
-                sources = listOf(
+                sourceCatalog = listOf(
                     SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user1", "pwd1"),
                     SqlConsoleSourceConfig("shard2", "jdbc:test:two", "user2", "pwd2"),
                 ),
@@ -685,7 +685,7 @@ class SqlConsoleServiceTest {
     fun `connection check returns failed status when placeholder is not resolved`() {
         val service = SqlConsoleService(
             config = SqlConsoleConfig(
-                sources = listOf(
+                sourceCatalog = listOf(
                     SqlConsoleSourceConfig("shard1", "\${SHARD1_URL}", "user1", "pwd1"),
                     SqlConsoleSourceConfig("shard2", "jdbc:test:two", "user2", "pwd2"),
                 ),
@@ -712,7 +712,7 @@ class SqlConsoleServiceTest {
         val searched = mutableListOf<String>()
         val service = SqlConsoleService(
             config = SqlConsoleConfig(
-                sources = listOf(
+                sourceCatalog = listOf(
                     SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user1", "pwd1"),
                     SqlConsoleSourceConfig("shard2", "jdbc:test:two", "user2", "pwd2"),
                 ),
@@ -751,7 +751,7 @@ class SqlConsoleServiceTest {
         val inspected = mutableListOf<String>()
         val service = SqlConsoleService(
             config = SqlConsoleConfig(
-                sources = listOf(
+                sourceCatalog = listOf(
                     SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user1", "pwd1"),
                     SqlConsoleSourceConfig("shard2", "jdbc:test:two", "user2", "pwd2"),
                 ),

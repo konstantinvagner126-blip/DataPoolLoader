@@ -15,11 +15,16 @@ internal fun Route.registerSqlConsoleStateRoutes(context: UiServerContext) {
     }
 
     get("/api/sql-console/state") {
-        call.respond(context.sqlConsoleStateService.currentState())
+        call.respond(context.sqlConsoleStateService.currentState(call.request.queryParameters["workspaceId"]))
     }
 
     post("/api/sql-console/state") {
-        call.respond(context.sqlConsoleStateService.updateState(call.receive()))
+        call.respond(
+            context.sqlConsoleStateService.updateState(
+                request = call.receive(),
+                workspaceId = call.request.queryParameters["workspaceId"],
+            ),
+        )
     }
 
     post("/api/sql-console/settings") {

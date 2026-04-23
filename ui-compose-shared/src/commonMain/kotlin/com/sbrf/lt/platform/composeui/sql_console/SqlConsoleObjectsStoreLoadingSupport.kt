@@ -24,15 +24,24 @@ internal class SqlConsoleObjectsStoreLoadingSupport(
         }
         val persistedState = runCatching { api.loadState() }
             .getOrDefault(defaultSqlConsoleStateSnapshot())
+        val allSourceNames = info.sourceCatalogNames()
         val selectedSources = persistedState.selectedSourceNames
-            .filter { it in info.sourceNames }
-            .ifEmpty { info.sourceNames }
+            .filter { it in allSourceNames }
+            .ifEmpty { allSourceNames }
+        val sourceSelectionState = restoreSelectedSourceState(
+            groups = info.groups,
+            selectedGroupNames = persistedState.selectedGroupNames,
+            selectedSourceNames = selectedSources,
+        )
         return SqlConsoleObjectsPageState(
             loading = false,
             runtimeContext = runtimeContext,
             info = info,
             persistedState = persistedState,
-            selectedSourceNames = selectedSources,
+            selectedSourceNames = sourceSelectionState.selectedSourceNames,
+            selectedGroupNames = sourceSelectionState.selectedGroupNames,
+            manuallyIncludedSourceNames = sourceSelectionState.manuallyIncludedSourceNames,
+            manuallyExcludedSourceNames = sourceSelectionState.manuallyExcludedSourceNames,
             favoriteObjects = persistedState.favoriteObjects,
         )
     }

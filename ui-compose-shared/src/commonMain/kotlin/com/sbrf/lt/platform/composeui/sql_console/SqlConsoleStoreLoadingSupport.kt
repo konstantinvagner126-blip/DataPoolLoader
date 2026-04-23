@@ -25,9 +25,15 @@ internal class SqlConsoleStoreLoadingSupport(
 
         val persistedStateResult = runCatching { api.loadState() }
         val persistedState = persistedStateResult.getOrDefault(defaultSqlConsoleStateSnapshot())
+        val allSourceNames = info.sourceCatalogNames()
         val selectedSources = persistedState.selectedSourceNames
-            .filter { it in info.sourceNames }
-            .ifEmpty { info.sourceNames }
+            .filter { it in allSourceNames }
+            .ifEmpty { allSourceNames }
+        val sourceSelectionState = restoreSelectedSourceState(
+            groups = info.groups,
+            selectedGroupNames = persistedState.selectedGroupNames,
+            selectedSourceNames = selectedSources,
+        )
         val normalizedTransactionMode = normalizeTransactionMode(persistedState.transactionMode)
         return SqlConsolePageState(
             loading = false,
@@ -37,7 +43,10 @@ internal class SqlConsoleStoreLoadingSupport(
             recentQueries = persistedState.recentQueries,
             favoriteQueries = persistedState.favoriteQueries,
             favoriteObjects = persistedState.favoriteObjects,
-            selectedSourceNames = selectedSources,
+            selectedSourceNames = sourceSelectionState.selectedSourceNames,
+            selectedGroupNames = sourceSelectionState.selectedGroupNames,
+            manuallyIncludedSourceNames = sourceSelectionState.manuallyIncludedSourceNames,
+            manuallyExcludedSourceNames = sourceSelectionState.manuallyExcludedSourceNames,
             pageSize = normalizePageSize(persistedState.pageSize),
             strictSafetyEnabled = persistedState.strictSafetyEnabled,
             transactionMode = normalizedTransactionMode,

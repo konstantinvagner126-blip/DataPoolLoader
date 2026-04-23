@@ -1177,7 +1177,17 @@ paths:
                 $ref: "#/components/schemas/SqlConsoleInfoResponse"
               example:
                 configured: true
-                sourceNames: ["db1", "db2", "db3"]
+                sourceCatalog:
+                  - name: db1
+                  - name: db2
+                  - name: db3
+                groups:
+                  - name: dev
+                    sources: [db1, db2]
+                    synthetic: false
+                  - name: "Без группы"
+                    sources: [db3]
+                    synthetic: true
                 maxRowsPerShard: 200
                 queryTimeoutSec: 60
 
@@ -1186,6 +1196,13 @@ paths:
       tags: [SQL Console]
       summary: Сохраненное состояние SQL-консоли
       operationId: getSqlConsoleState
+      parameters:
+        - in: query
+          name: workspaceId
+          required: false
+          schema:
+            type: string
+          description: Идентификатор browser-tab workspace для tab-scoped состояния SQL-консоли.
       responses:
         "200":
           description: Драфт SQL-консоли
@@ -1196,12 +1213,20 @@ paths:
               example:
                 draftSql: "select 1"
                 recentQueries: ["select 1", "select now()"]
+                selectedGroupNames: ["dev"]
                 selectedSourceNames: ["db1", "db2"]
                 pageSize: 50
     post:
       tags: [SQL Console]
       summary: Сохранение состояния SQL-консоли
       operationId: saveSqlConsoleState
+      parameters:
+        - in: query
+          name: workspaceId
+          required: false
+          schema:
+            type: string
+          description: Идентификатор browser-tab workspace для tab-scoped состояния SQL-консоли.
       requestBody:
         required: true
         content:
@@ -1211,6 +1236,7 @@ paths:
             example:
               draftSql: "select 1"
               recentQueries: ["select 1"]
+              selectedGroupNames: ["dev"]
               selectedSourceNames: ["db1"]
               pageSize: 100
       responses:
@@ -1223,6 +1249,7 @@ paths:
               example:
                 draftSql: "select 1"
                 recentQueries: ["select 1"]
+                selectedGroupNames: ["dev"]
                 selectedSourceNames: ["db1"]
                 pageSize: 100
 
@@ -1249,7 +1276,13 @@ paths:
                 $ref: "#/components/schemas/SqlConsoleInfoResponse"
               example:
                 configured: true
-                sourceNames: ["db1", "db2"]
+                sourceCatalog:
+                  - name: db1
+                  - name: db2
+                groups:
+                  - name: dev
+                    sources: [db1, db2]
+                    synthetic: false
                 maxRowsPerShard: 500
                 queryTimeoutSec: 90
         "400":
@@ -2699,18 +2732,42 @@ components:
 
     SqlConsoleInfoResponse:
       type: object
-      required: [configured, sourceNames, maxRowsPerShard]
+      required: [configured, sourceCatalog, groups, maxRowsPerShard]
       properties:
         configured:
           type: boolean
-        sourceNames:
+        sourceCatalog:
           type: array
           items:
-            type: string
+            $ref: "#/components/schemas/SqlConsoleSourceCatalogEntryResponse"
+        groups:
+          type: array
+          items:
+            $ref: "#/components/schemas/SqlConsoleSourceGroupResponse"
         maxRowsPerShard:
           type: integer
         queryTimeoutSec:
           type: [integer, "null"]
+
+    SqlConsoleSourceCatalogEntryResponse:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+
+    SqlConsoleSourceGroupResponse:
+      type: object
+      required: [name, sources, synthetic]
+      properties:
+        name:
+          type: string
+        sources:
+          type: array
+          items:
+            type: string
+        synthetic:
+          type: boolean
 
     SqlConsoleSourceConnectionStatusResponse:
       type: object
@@ -2746,6 +2803,10 @@ components:
           type: array
           items:
             type: string
+        selectedGroupNames:
+          type: [array, "null"]
+          items:
+            type: string
         selectedSourceNames:
           type: array
           items:
@@ -2761,6 +2822,10 @@ components:
         draftSql:
           type: string
         recentQueries:
+          type: array
+          items:
+            type: string
+        selectedGroupNames:
           type: array
           items:
             type: string

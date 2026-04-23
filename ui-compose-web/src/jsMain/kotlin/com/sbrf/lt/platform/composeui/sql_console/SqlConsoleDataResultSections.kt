@@ -2,6 +2,7 @@ package com.sbrf.lt.platform.composeui.sql_console
 
 import androidx.compose.runtime.Composable
 import com.sbrf.lt.platform.composeui.foundation.dom.classes
+import kotlinx.browser.window
 import org.jetbrains.compose.web.dom.Div
 import org.jetbrains.compose.web.dom.Table
 import org.jetbrains.compose.web.dom.Tbody
@@ -61,8 +62,9 @@ internal fun SelectResultPane(
             totalPages = totalPages,
         ),
     )
+    ResultMutedText("Ячейки можно нажимать: значение копируется в буфер обмена, полный текст доступен по наведению.")
     Div({ classes("table-responsive") }) {
-        Table({ classes("table", "table-sm", "table-striped", "sql-result-table", "mb-0") }) {
+        Table({ classes("table", "table-sm", "sql-result-table", "mb-0") }) {
             Thead {
                 Tr {
                     activeShard.columns.forEach { column ->
@@ -74,11 +76,30 @@ internal fun SelectResultPane(
                 visibleRows.forEach { row ->
                     Tr {
                         activeShard.columns.forEach { column ->
-                            Td { Text(row[column] ?: "") }
+                            val value = row[column] ?: ""
+                            Td(attrs = {
+                                classes("sql-result-table-cell")
+                                attr("title", if (value.isBlank()) "Пустое значение" else "Клик, чтобы скопировать: $value")
+                                attr("tabindex", "0")
+                                onClick { copySqlResultCellValue(value) }
+                            }) {
+                                Div({
+                                    classes(
+                                        "sql-result-cell-value",
+                                        if (value.isBlank()) "sql-result-cell-value-empty" else "sql-result-cell-value-filled",
+                                    )
+                                }) {
+                                    Text(if (value.isBlank()) "∅" else value)
+                                }
+                            }
                         }
                     }
                 }
             }
         }
     }
+}
+
+private fun copySqlResultCellValue(value: String) {
+    window.navigator.asDynamic().clipboard?.writeText(value)
 }

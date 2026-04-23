@@ -128,33 +128,18 @@ internal fun SqlConsoleObjectsPageContent(
                 panelClasses = "panel h-100",
                 useParagraphNote = true,
             ) {
-                val sourceGroups = state.info?.sourceGroups.orEmpty()
-                if (sourceGroups.isNotEmpty()) {
-                    Div({ classes("sql-source-group-selection", "mb-3") }) {
-                        Div({ classes("sql-source-selection-caption") }) {
-                            Text("Группы")
-                        }
-                        sourceGroups.forEach { sourceGroup ->
-                            val selectionState = sourceGroupSelectionState(sourceGroup, state.selectedSourceNames)
-                            SqlConsoleSourceGroupCheckbox(
-                                group = sourceGroup,
-                                selectionState = selectionState,
-                                onToggle = {
-                                    callbacks.onToggleSourceGroup(
-                                        sourceGroup,
-                                        selectionState != SqlConsoleSourceGroupSelectionState.ALL,
-                                    )
-                                },
-                            )
-                        }
-                    }
-                }
-                if (!state.info?.sourceNames.isNullOrEmpty()) {
-                    Div({ classes("sql-source-selection-caption") }) {
-                        Text("Источники")
-                    }
-                }
-                state.info?.sourceNames?.forEach { sourceName ->
+                SqlConsoleSourceGroupTree(
+                    groups = state.info?.groups.orEmpty().ifEmpty {
+                        state.info?.sourceCatalog
+                            .orEmpty()
+                            .map { it.name }
+                            .takeIf { it.isNotEmpty() }
+                            ?.let { listOf(SqlConsoleSourceGroup(name = "Без группы", sources = it, synthetic = true)) }
+                            .orEmpty()
+                    },
+                    selectedSourceNames = state.selectedSourceNames,
+                    onToggleSourceGroup = callbacks.onToggleSourceGroup,
+                ) { sourceName ->
                     val selected = sourceName in state.selectedSourceNames
                     SqlObjectSourceCheckbox(
                         sourceName = sourceName,

@@ -14,6 +14,7 @@ import com.sbrf.lt.datapool.sqlconsole.SqlConsoleExecutionRun
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleInfo
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleOperations
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleQueryResult
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleSourceCatalogEntry
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleService
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleSourceConfig
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleTransactionalOperations
@@ -66,7 +67,7 @@ class SqlConsoleQueryManagerTest {
         val manager = SqlConsoleQueryManager(
             sqlConsoleService = SqlConsoleService(
                 config = SqlConsoleConfig(
-                    sources = listOf(SqlConsoleSourceConfig("db1", "jdbc:test", "user", "pwd")),
+                    sourceCatalog = listOf(SqlConsoleSourceConfig("db1", "jdbc:test", "user", "pwd")),
                 ),
                 executor = ShardSqlExecutor { _, _, _, _, _, control ->
                     repeat(50) {
@@ -98,7 +99,7 @@ class SqlConsoleQueryManagerTest {
         val manager = SqlConsoleQueryManager(
             sqlConsoleService = SqlConsoleService(
                 config = SqlConsoleConfig(
-                    sources = listOf(SqlConsoleSourceConfig("db1", "jdbc:test", "user", "pwd")),
+                    sourceCatalog = listOf(SqlConsoleSourceConfig("db1", "jdbc:test", "user", "pwd")),
                 ),
                 executor = ShardSqlExecutor { _, _, _, _, _, _ ->
                     error("boom")
@@ -122,7 +123,7 @@ class SqlConsoleQueryManagerTest {
             sqlConsoleService = object : SqlConsoleOperations, SqlConsoleTransactionalOperations {
                 override fun info(): SqlConsoleInfo = SqlConsoleInfo(
                     configured = true,
-                    sourceNames = listOf("db1"),
+                    sourceCatalog = listOf(SqlConsoleSourceCatalogEntry(name = "db1")),
                     maxRowsPerShard = 200,
                     queryTimeoutSec = null,
                 )
@@ -223,7 +224,7 @@ class SqlConsoleQueryManagerTest {
         val manager = SqlConsoleQueryManager(
             sqlConsoleService = SqlConsoleService(
                 config = SqlConsoleConfig(
-                    sources = listOf(SqlConsoleSourceConfig("db1", "jdbc:test", "user", "pwd")),
+                    sourceCatalog = listOf(SqlConsoleSourceConfig("db1", "jdbc:test", "user", "pwd")),
                 ),
                 executor = object : ShardSqlExecutor, com.sbrf.lt.datapool.sqlconsole.ShardSqlTransactionalExecutor {
                     override fun execute(
@@ -293,7 +294,7 @@ class SqlConsoleQueryManagerTest {
         val manager = SqlConsoleQueryManager(
             sqlConsoleService = SqlConsoleService(
                 config = SqlConsoleConfig(
-                    sources = listOf(SqlConsoleSourceConfig("db1", "jdbc:test", "user", "pwd")),
+                    sourceCatalog = listOf(SqlConsoleSourceConfig("db1", "jdbc:test", "user", "pwd")),
                 ),
                 executor = object : ShardSqlExecutor, com.sbrf.lt.datapool.sqlconsole.ShardSqlTransactionalExecutor {
                     override fun execute(
@@ -361,7 +362,7 @@ class SqlConsoleQueryManagerTest {
         val manager = SqlConsoleQueryManager(
             sqlConsoleService = SqlConsoleService(
                 config = SqlConsoleConfig(
-                    sources = listOf(SqlConsoleSourceConfig("db1", "jdbc:test", "user", "pwd")),
+                    sourceCatalog = listOf(SqlConsoleSourceConfig("db1", "jdbc:test", "user", "pwd")),
                 ),
                 executor = ShardSqlExecutor { _, _, _, _, _, control ->
                     repeat(20) {
@@ -394,7 +395,7 @@ class SqlConsoleQueryManagerTest {
         val manager = SqlConsoleQueryManager(
             sqlConsoleService = SqlConsoleService(
                 config = SqlConsoleConfig(
-                    sources = listOf(SqlConsoleSourceConfig("db1", "jdbc:test", "user", "pwd")),
+                    sourceCatalog = listOf(SqlConsoleSourceConfig("db1", "jdbc:test", "user", "pwd")),
                 ),
                 executor = ShardSqlExecutor { _, _, _, _, _, _ ->
                     RawShardExecutionResult(
@@ -427,7 +428,7 @@ class SqlConsoleQueryManagerTest {
         val manager = SqlConsoleQueryManager(
             sqlConsoleService = SqlConsoleService(
                 config = SqlConsoleConfig(
-                    sources = listOf(SqlConsoleSourceConfig("db1", "jdbc:test", "user", "pwd")),
+                    sourceCatalog = listOf(SqlConsoleSourceConfig("db1", "jdbc:test", "user", "pwd")),
                 ),
                 executor = ShardSqlExecutor { _, _, _, _, _, _ ->
                     throw IllegalStateException("boom")
@@ -449,7 +450,7 @@ class SqlConsoleQueryManagerTest {
         val cleanupDir = Files.createTempDirectory("sql-console-invalid-config")
         val manager = SqlConsoleQueryManager(
             sqlConsoleService = SqlConsoleService(
-                config = SqlConsoleConfig(sources = emptyList()),
+                config = SqlConsoleConfig(sourceCatalog = emptyList()),
             ),
         )
 
@@ -645,7 +646,7 @@ class SqlConsoleQueryManagerTest {
 
     private fun serviceWithSuccess() = SqlConsoleService(
         config = SqlConsoleConfig(
-            sources = listOf(SqlConsoleSourceConfig("db1", "jdbc:test", "user", "pwd")),
+            sourceCatalog = listOf(SqlConsoleSourceConfig("db1", "jdbc:test", "user", "pwd")),
         ),
         executor = ShardSqlExecutor { shard, statement, _, _, _, _ ->
             assertEquals("SELECT", statement.leadingKeyword)
@@ -660,7 +661,7 @@ class SqlConsoleQueryManagerTest {
 
     private fun manualTransactionService(releaseExecution: CountDownLatch? = null) = SqlConsoleService(
         config = SqlConsoleConfig(
-            sources = listOf(SqlConsoleSourceConfig("db1", "jdbc:test", "user", "pwd")),
+            sourceCatalog = listOf(SqlConsoleSourceConfig("db1", "jdbc:test", "user", "pwd")),
         ),
         executor = object : ShardSqlExecutor, com.sbrf.lt.datapool.sqlconsole.ShardSqlTransactionalExecutor {
             override fun execute(

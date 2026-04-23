@@ -57,6 +57,7 @@ data class LegacySqlConsoleState(
 internal fun LegacySqlConsoleState.toWorkspaceState(): PersistedSqlConsoleWorkspaceState =
     PersistedSqlConsoleWorkspaceState(
         draftSql = draftSql,
+        selectedGroupNames = null,
         selectedSourceNames = selectedSourceNames,
     ).normalized()
 

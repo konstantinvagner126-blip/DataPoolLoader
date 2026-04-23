@@ -69,6 +69,12 @@ internal fun SqlConsoleWorkspacePanel(
             state = state,
             selectedRecentQuery = selectedRecentQuery,
             selectedFavoriteQuery = selectedFavoriteQuery,
+            currentOutlineItem = currentOutlineItem,
+            runButtonClass = runButtonClass,
+            pendingManualTransaction = pendingManualTransaction,
+            isRunning = isRunning,
+            exportableResult = exportableResult,
+            activeExportShard = activeExportShard,
             onRecentSelected = onRecentSelected,
             onFavoriteSelected = onFavoriteSelected,
             onApplyRecent = onApplyRecent,
@@ -78,6 +84,15 @@ internal fun SqlConsoleWorkspacePanel(
             onClearRecent = onClearRecent,
             onStrictSafetyToggle = onStrictSafetyToggle,
             onAutoCommitToggle = onAutoCommitToggle,
+            onPageSizeChange = onPageSizeChange,
+            onFormatSql = onFormatSql,
+            onRunCurrent = onRunCurrent,
+            onRunAll = onRunAll,
+            onStop = onStop,
+            onCommit = onCommit,
+            onRollback = onRollback,
+            onExportCsv = onExportCsv,
+            onExportZip = onExportZip,
         )
 
         SqlFavoriteObjectsBlock(
@@ -104,24 +119,6 @@ internal fun SqlConsoleWorkspacePanel(
             onValueChange = onDraftSqlChange,
         )
 
-        SqlConsoleWorkspaceToolbar(
-            state = state,
-            currentOutlineItem = currentOutlineItem,
-            runButtonClass = runButtonClass,
-            pendingManualTransaction = pendingManualTransaction,
-            isRunning = isRunning,
-            exportableResult = exportableResult,
-            activeExportShard = activeExportShard,
-            onPageSizeChange = onPageSizeChange,
-            onFormatSql = onFormatSql,
-            onRunCurrent = onRunCurrent,
-            onRunAll = onRunAll,
-            onStop = onStop,
-            onCommit = onCommit,
-            onRollback = onRollback,
-            onExportCsv = onExportCsv,
-            onExportZip = onExportZip,
-        )
         SqlConsoleShortcutPanel(
             editorFocused = editorFocused,
             onFocusEditor = onFocusEditor,

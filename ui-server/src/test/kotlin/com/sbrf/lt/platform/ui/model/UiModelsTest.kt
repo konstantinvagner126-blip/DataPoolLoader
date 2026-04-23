@@ -4,6 +4,7 @@ import com.sbrf.lt.datapool.sqlconsole.RawShardExecutionResult
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleConnectionState
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleInfo
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleQueryResult
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleSourceCatalogEntry
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleSourceGroup
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleStatementType
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleExecutionSnapshot
@@ -19,19 +20,22 @@ class UiModelsTest {
     fun `maps sql console info to response`() {
         val response = SqlConsoleInfo(
             configured = true,
-            sourceNames = listOf("db1", "db2"),
-            sourceGroups = listOf(
-                SqlConsoleSourceGroup(name = "dev", sourceNames = listOf("db1")),
-                SqlConsoleSourceGroup(name = "ift", sourceNames = listOf("db1", "db2")),
+            sourceCatalog = listOf(
+                SqlConsoleSourceCatalogEntry(name = "db1"),
+                SqlConsoleSourceCatalogEntry(name = "db2"),
+            ),
+            groups = listOf(
+                SqlConsoleSourceGroup(name = "dev", sources = listOf("db1")),
+                SqlConsoleSourceGroup(name = "ift", sources = listOf("db1", "db2")),
             ),
             maxRowsPerShard = 200,
             queryTimeoutSec = 60,
         ).toResponse()
 
         assertEquals(true, response.configured)
-        assertEquals(listOf("db1", "db2"), response.sourceNames)
-        assertEquals(listOf("dev", "ift"), response.sourceGroups.map { it.name })
-        assertEquals(listOf("db1", "db2"), response.sourceGroups.last().sourceNames)
+        assertEquals(listOf("db1", "db2"), response.sourceCatalog.map { it.name })
+        assertEquals(listOf("dev", "ift"), response.groups.map { it.name })
+        assertEquals(listOf("db1", "db2"), response.groups.last().sources)
         assertEquals(200, response.maxRowsPerShard)
         assertEquals(60, response.queryTimeoutSec)
     }

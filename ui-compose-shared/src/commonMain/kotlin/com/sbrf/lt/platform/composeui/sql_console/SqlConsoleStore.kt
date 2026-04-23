@@ -22,27 +22,45 @@ class SqlConsoleStore(
         current: SqlConsolePageState,
         sourceName: String,
         enabled: Boolean,
-    ): SqlConsolePageState =
-        current.copy(
-            selectedSourceNames = toggleSelectedSourceNames(
-                current.selectedSourceNames,
-                sourceName,
-                enabled,
-            ),
+    ): SqlConsolePageState {
+        val selectionUpdate = toggleSelectedSourceWithGroups(
+            groups = current.info?.groups.orEmpty(),
+            currentSelectedGroupNames = current.selectedGroupNames,
+            currentSelectedSourceNames = current.selectedSourceNames,
+            manuallyIncludedSourceNames = current.manuallyIncludedSourceNames,
+            manuallyExcludedSourceNames = current.manuallyExcludedSourceNames,
+            sourceName = sourceName,
+            enabled = enabled,
         )
+        return current.copy(
+            selectedSourceNames = selectionUpdate.selectedSourceNames,
+            selectedGroupNames = selectionUpdate.selectedGroupNames,
+            manuallyIncludedSourceNames = selectionUpdate.manuallyIncludedSourceNames,
+            manuallyExcludedSourceNames = selectionUpdate.manuallyExcludedSourceNames,
+        )
+    }
 
     fun updateSelectedSourceGroup(
         current: SqlConsolePageState,
         group: SqlConsoleSourceGroup,
         enabled: Boolean,
-    ): SqlConsolePageState =
-        current.copy(
-            selectedSourceNames = toggleSelectedSourceGroupNames(
-                current = current.selectedSourceNames,
-                group = group,
-                enabled = enabled,
-            ),
+    ): SqlConsolePageState {
+        val selectionUpdate = toggleSelectedSourceGroupNames(
+            groups = current.info?.groups.orEmpty(),
+            currentSelectedGroupNames = current.selectedGroupNames,
+            currentSelectedSourceNames = current.selectedSourceNames,
+            manuallyIncludedSourceNames = current.manuallyIncludedSourceNames,
+            manuallyExcludedSourceNames = current.manuallyExcludedSourceNames,
+            group = group,
+            enabled = enabled,
         )
+        return current.copy(
+            selectedSourceNames = selectionUpdate.selectedSourceNames,
+            selectedGroupNames = selectionUpdate.selectedGroupNames,
+            manuallyIncludedSourceNames = selectionUpdate.manuallyIncludedSourceNames,
+            manuallyExcludedSourceNames = selectionUpdate.manuallyExcludedSourceNames,
+        )
+    }
 
     fun updatePageSize(
         current: SqlConsolePageState,

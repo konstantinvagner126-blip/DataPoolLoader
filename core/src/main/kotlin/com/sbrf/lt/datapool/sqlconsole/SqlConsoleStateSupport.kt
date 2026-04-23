@@ -3,14 +3,11 @@ package com.sbrf.lt.datapool.sqlconsole
 internal class SqlConsoleStateSupport {
     fun info(config: SqlConsoleConfig): SqlConsoleInfo =
         SqlConsoleInfo(
-            configured = config.sources.isNotEmpty(),
-            sourceNames = config.sources.map { it.name },
-            sourceGroups = config.sourceGroups.map { group ->
-                SqlConsoleSourceGroup(
-                    name = group.name.trim(),
-                    sourceNames = group.sourceNames.map { it.trim() }.filter { it.isNotEmpty() }.distinct(),
-                )
+            configured = config.sourceCatalog.isNotEmpty(),
+            sourceCatalog = config.sourceCatalog.map { source ->
+                SqlConsoleSourceCatalogEntry(name = source.name.trim())
             },
+            groups = buildRuntimeSourceGroups(config),
             maxRowsPerShard = config.maxRowsPerShard,
             queryTimeoutSec = config.queryTimeoutSec,
         )
@@ -29,4 +26,27 @@ internal class SqlConsoleStateSupport {
             queryTimeoutSec = queryTimeoutSec,
         )
     }
+}
+
+private fun buildRuntimeSourceGroups(config: SqlConsoleConfig): List<SqlConsoleSourceGroup> {
+    val configuredGroups = config.groups.map { group ->
+        SqlConsoleSourceGroup(
+            name = group.name.trim(),
+            sources = group.sources.map { it.trim() }.filter { it.isNotEmpty() }.distinct(),
+        )
+    }
+    val groupedSourceNames = configuredGroups.flatMap { it.sources }.toSet()
+    val ungroupedSourceNames = config.sourceCatalog
+        .map { it.name.trim() }
+        .filter { it.isNotEmpty() }
+        .filter { it !in groupedSourceNames }
+    return configuredGroups + listOfNotNull(
+        ungroupedSourceNames.takeIf { it.isNotEmpty() }?.let { sourceNames ->
+            SqlConsoleSourceGroup(
+                name = "Без группы",
+                sources = sourceNames,
+                synthetic = true,
+            )
+        },
+    )
 }

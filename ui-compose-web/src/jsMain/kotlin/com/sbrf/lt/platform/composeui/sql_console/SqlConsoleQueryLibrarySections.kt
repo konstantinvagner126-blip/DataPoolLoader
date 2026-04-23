@@ -12,6 +12,12 @@ internal fun QueryLibraryBlock(
     state: SqlConsolePageState,
     selectedRecentQuery: String,
     selectedFavoriteQuery: String,
+    currentOutlineItem: SqlScriptOutlineItem?,
+    runButtonClass: String,
+    pendingManualTransaction: Boolean,
+    isRunning: Boolean,
+    exportableResult: SqlConsoleQueryResult?,
+    activeExportShard: String?,
     onRecentSelected: (String) -> Unit,
     onFavoriteSelected: (String) -> Unit,
     onApplyRecent: () -> Unit,
@@ -21,6 +27,15 @@ internal fun QueryLibraryBlock(
     onClearRecent: () -> Unit,
     onStrictSafetyToggle: () -> Unit,
     onAutoCommitToggle: (Boolean) -> Unit,
+    onPageSizeChange: (Int) -> Unit,
+    onFormatSql: () -> Unit,
+    onRunCurrent: () -> Unit,
+    onRunAll: () -> Unit,
+    onStop: () -> Unit,
+    onCommit: () -> Unit,
+    onRollback: () -> Unit,
+    onExportCsv: () -> Unit,
+    onExportZip: () -> Unit,
 ) {
     Div({ classes("sql-query-library", "mb-3") }) {
         SqlConsoleQueryLibrarySummary(
@@ -63,6 +78,24 @@ internal fun QueryLibraryBlock(
             state = state,
             onStrictSafetyToggle = onStrictSafetyToggle,
             onAutoCommitToggle = onAutoCommitToggle,
+        )
+        SqlConsoleWorkspaceToolbar(
+            state = state,
+            currentOutlineItem = currentOutlineItem,
+            runButtonClass = runButtonClass,
+            pendingManualTransaction = pendingManualTransaction,
+            isRunning = isRunning,
+            exportableResult = exportableResult,
+            activeExportShard = activeExportShard,
+            onPageSizeChange = onPageSizeChange,
+            onFormatSql = onFormatSql,
+            onRunCurrent = onRunCurrent,
+            onRunAll = onRunAll,
+            onStop = onStop,
+            onCommit = onCommit,
+            onRollback = onRollback,
+            onExportCsv = onExportCsv,
+            onExportZip = onExportZip,
         )
     }
 }

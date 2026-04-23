@@ -7,9 +7,10 @@ data class SqlConsoleConfig(
     val fetchSize: Int = 1000,
     val maxRowsPerShard: Int = 200,
     val queryTimeoutSec: Int? = null,
-    @param:JsonAlias("shards")
-    val sources: List<SqlConsoleSourceConfig> = emptyList(),
-    val sourceGroups: List<SqlConsoleSourceGroupConfig> = emptyList(),
+    @param:JsonAlias("shards", "sources")
+    val sourceCatalog: List<SqlConsoleSourceConfig> = emptyList(),
+    @param:JsonAlias("sourceGroups")
+    val groups: List<SqlConsoleSourceGroupConfig> = emptyList(),
 )
 
 data class SqlConsoleSourceConfig(
@@ -21,7 +22,8 @@ data class SqlConsoleSourceConfig(
 
 data class SqlConsoleSourceGroupConfig(
     val name: String = "",
-    val sourceNames: List<String> = emptyList(),
+    @param:JsonAlias("sourceNames")
+    val sources: List<String> = emptyList(),
 )
 
 data class ResolvedSqlConsoleShardConfig(
@@ -97,15 +99,20 @@ enum class SqlConsoleConnectionState {
 
 data class SqlConsoleInfo(
     val configured: Boolean,
-    val sourceNames: List<String>,
-    val sourceGroups: List<SqlConsoleSourceGroup> = emptyList(),
+    val sourceCatalog: List<SqlConsoleSourceCatalogEntry> = emptyList(),
+    val groups: List<SqlConsoleSourceGroup> = emptyList(),
     val maxRowsPerShard: Int,
     val queryTimeoutSec: Int?,
 )
 
+data class SqlConsoleSourceCatalogEntry(
+    val name: String,
+)
+
 data class SqlConsoleSourceGroup(
     val name: String,
-    val sourceNames: List<String> = emptyList(),
+    val sources: List<String> = emptyList(),
+    val synthetic: Boolean = false,
 )
 
 data class SqlConsoleQueryResult(

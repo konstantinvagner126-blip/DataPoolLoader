@@ -28,27 +28,45 @@ class SqlConsoleObjectsStore(
         current: SqlConsoleObjectsPageState,
         sourceName: String,
         enabled: Boolean,
-    ): SqlConsoleObjectsPageState =
-        current.copy(
-            selectedSourceNames = toggleSelectedSourceNames(
-                current.selectedSourceNames,
-                sourceName,
-                enabled,
-            ),
+    ): SqlConsoleObjectsPageState {
+        val selectionUpdate = toggleSelectedSourceWithGroups(
+            groups = current.info?.groups.orEmpty(),
+            currentSelectedGroupNames = current.selectedGroupNames,
+            currentSelectedSourceNames = current.selectedSourceNames,
+            manuallyIncludedSourceNames = current.manuallyIncludedSourceNames,
+            manuallyExcludedSourceNames = current.manuallyExcludedSourceNames,
+            sourceName = sourceName,
+            enabled = enabled,
         )
+        return current.copy(
+            selectedSourceNames = selectionUpdate.selectedSourceNames,
+            selectedGroupNames = selectionUpdate.selectedGroupNames,
+            manuallyIncludedSourceNames = selectionUpdate.manuallyIncludedSourceNames,
+            manuallyExcludedSourceNames = selectionUpdate.manuallyExcludedSourceNames,
+        )
+    }
 
     fun updateSelectedSourceGroup(
         current: SqlConsoleObjectsPageState,
         group: SqlConsoleSourceGroup,
         enabled: Boolean,
-    ): SqlConsoleObjectsPageState =
-        current.copy(
-            selectedSourceNames = toggleSelectedSourceGroupNames(
-                current = current.selectedSourceNames,
-                group = group,
-                enabled = enabled,
-            ),
+    ): SqlConsoleObjectsPageState {
+        val selectionUpdate = toggleSelectedSourceGroupNames(
+            groups = current.info?.groups.orEmpty(),
+            currentSelectedGroupNames = current.selectedGroupNames,
+            currentSelectedSourceNames = current.selectedSourceNames,
+            manuallyIncludedSourceNames = current.manuallyIncludedSourceNames,
+            manuallyExcludedSourceNames = current.manuallyExcludedSourceNames,
+            group = group,
+            enabled = enabled,
         )
+        return current.copy(
+            selectedSourceNames = selectionUpdate.selectedSourceNames,
+            selectedGroupNames = selectionUpdate.selectedGroupNames,
+            manuallyIncludedSourceNames = selectionUpdate.manuallyIncludedSourceNames,
+            manuallyExcludedSourceNames = selectionUpdate.manuallyExcludedSourceNames,
+        )
+    }
 
     suspend fun toggleFavoriteObject(
         current: SqlConsoleObjectsPageState,

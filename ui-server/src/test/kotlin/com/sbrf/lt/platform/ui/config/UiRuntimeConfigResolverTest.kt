@@ -33,7 +33,7 @@ class UiRuntimeConfigResolverTest {
                 ),
             ),
             sqlConsole = SqlConsoleConfig(
-                sources = listOf(
+                sourceCatalog = listOf(
                     SqlConsoleSourceConfig(
                         name = "db1",
                         jdbcUrl = "\${LOCAL_MANUAL_DB_JDBC_URL}",
@@ -49,8 +49,8 @@ class UiRuntimeConfigResolverTest {
         assertEquals("jdbc:postgresql://127.0.0.1:5432/postgres", resolved.moduleStore.postgres.jdbcUrl)
         assertEquals("kwdev", resolved.moduleStore.postgres.username)
         assertEquals("dummy", resolved.moduleStore.postgres.password)
-        assertEquals("jdbc:postgresql://127.0.0.1:5432/postgres", resolved.sqlConsole.sources.single().jdbcUrl)
-        assertEquals("kwdev", resolved.sqlConsole.sources.single().username)
-        assertEquals("dummy", resolved.sqlConsole.sources.single().password)
+        assertEquals("jdbc:postgresql://127.0.0.1:5432/postgres", resolved.sqlConsole.sourceCatalog.single().jdbcUrl)
+        assertEquals("kwdev", resolved.sqlConsole.sourceCatalog.single().username)
+        assertEquals("dummy", resolved.sqlConsole.sourceCatalog.single().password)
     }
 }

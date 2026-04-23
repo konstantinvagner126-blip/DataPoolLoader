@@ -8,6 +8,7 @@ data class SqlConsoleStateResponse(
     val recentQueries: List<String> = emptyList(),
     val favoriteQueries: List<String> = emptyList(),
     val favoriteObjects: List<SqlConsoleFavoriteObjectResponse> = emptyList(),
+    val selectedGroupNames: List<String>? = null,
     val selectedSourceNames: List<String> = emptyList(),
     val pageSize: Int = 50,
     val strictSafetyEnabled: Boolean = false,

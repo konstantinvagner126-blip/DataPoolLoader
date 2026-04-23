@@ -8,6 +8,9 @@ import kotlinx.serialization.builtins.serializer
 class SqlConsoleApiClient(
     private val httpClient: ComposeHttpClient = ComposeHttpClient(),
 ) : SqlConsoleApi {
+    private fun sqlConsoleStatePath(): String =
+        "/api/sql-console/state?workspaceId=${urlEncode(resolveSqlConsoleWorkspaceId())}"
+
     override suspend fun loadRuntimeContext(): RuntimeContext =
         httpClient.get("/api/ui/runtime-context", RuntimeContext.serializer())
 
@@ -15,11 +18,11 @@ class SqlConsoleApiClient(
         httpClient.get("/api/sql-console/info", SqlConsoleInfo.serializer())
 
     override suspend fun loadState(): SqlConsoleStateSnapshot =
-        httpClient.get("/api/sql-console/state", SqlConsoleStateSnapshot.serializer())
+        httpClient.get(sqlConsoleStatePath(), SqlConsoleStateSnapshot.serializer())
 
     override suspend fun saveState(request: SqlConsoleStateUpdate): SqlConsoleStateSnapshot =
         httpClient.postJson(
-            path = "/api/sql-console/state",
+            path = sqlConsoleStatePath(),
             payload = request,
             serializer = SqlConsoleStateUpdate.serializer(),
             deserializer = SqlConsoleStateSnapshot.serializer(),

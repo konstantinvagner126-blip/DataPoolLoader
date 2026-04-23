@@ -18,8 +18,17 @@ internal fun SqlConsoleObjectsPageEffects(
         if (initialQuery.isNotBlank()) {
             nextState = store.updateQuery(nextState, initialQuery)
         }
-        if (initialSource.isNotBlank() && initialSource in (nextState.info?.sourceNames ?: emptyList())) {
-            nextState = nextState.copy(selectedSourceNames = listOf(initialSource))
+        if (initialSource.isNotBlank() && initialSource in (nextState.info?.sourceCatalogNames() ?: emptyList())) {
+            val selectionState = initializeSelectedSourceState(
+                groups = nextState.info?.groups.orEmpty(),
+                selectedSourceNames = listOf(initialSource),
+            )
+            nextState = nextState.copy(
+                selectedSourceNames = selectionState.selectedSourceNames,
+                selectedGroupNames = selectionState.selectedGroupNames,
+                manuallyIncludedSourceNames = selectionState.manuallyIncludedSourceNames,
+                manuallyExcludedSourceNames = selectionState.manuallyExcludedSourceNames,
+            )
         }
         setState(nextState)
         if (initialQuery.length >= 2) {

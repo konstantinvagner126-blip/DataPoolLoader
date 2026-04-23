@@ -11,6 +11,12 @@ internal fun SqlConsoleWorkingContextStrip(
     state: SqlConsolePageState,
     uiState: SqlConsolePageUiState,
 ) {
+    val selectionPills = buildSelectedContextPills(
+        info = state.info,
+        selectedGroupNames = state.selectedGroupNames,
+        manuallyIncludedSourceNames = state.manuallyIncludedSourceNames,
+        manuallyExcludedSourceNames = state.manuallyExcludedSourceNames,
+    )
     Div({ classes("sql-context-strip") }) {
         Div({ classes("sql-context-strip-head") }) {
             Div({ classes("sql-context-strip-title") }) { Text("Текущий контекст выполнения") }
@@ -20,7 +26,20 @@ internal fun SqlConsoleWorkingContextStrip(
         }
         Div({ classes("sql-context-chip-row") }) {
             SqlConsoleContextChip(
-                label = "Sources",
+                label = "Группы",
+                value = buildSelectedGroupsSummary(
+                    info = state.info,
+                    selectedGroupNames = state.selectedGroupNames,
+                    selectedSourceNames = state.selectedSourceNames,
+                ),
+                tone = when {
+                    state.selectedSourceNames.isEmpty() -> "warning"
+                    state.selectedGroupNames.isEmpty() -> "neutral"
+                    else -> "primary"
+                },
+            )
+            SqlConsoleContextChip(
+                label = "Источники",
                 value = buildSelectedSourcesSummary(state.selectedSourceNames),
                 tone = if (state.selectedSourceNames.isEmpty()) "warning" else "primary",
             )
@@ -45,6 +64,13 @@ internal fun SqlConsoleWorkingContextStrip(
                 tone = credentialsStatusTone(uiState.credentialsStatus),
             )
         }
+        if (selectionPills.isNotEmpty()) {
+            Div({ classes("sql-context-selection-row") }) {
+                selectionPills.forEach { pill ->
+                    SqlConsoleContextSelectionPillView(pill)
+                }
+            }
+        }
     }
 }
 
@@ -60,16 +86,19 @@ private fun SqlConsoleContextChip(
     }
 }
 
+@Composable
+private fun SqlConsoleContextSelectionPillView(
+    pill: SqlConsoleContextSelectionPill,
+) {
+    Div({ classes("sql-context-selection-pill", "sql-context-selection-pill-${pill.tone}") }) {
+        Span({ classes("sql-context-selection-pill-label") }) { Text(pill.label) }
+        Span({ classes("sql-context-selection-pill-value") }) { Text(pill.value) }
+    }
+}
+
 private fun credentialsStatusTone(status: com.sbrf.lt.platform.composeui.model.CredentialsStatusResponse?): String =
     when {
         status == null -> "neutral"
         status.uploaded || status.fileAvailable -> "success"
         else -> "warning"
-    }
-
-private fun buildSelectedSourcesSummary(selectedSourceNames: List<String>): String =
-    when {
-        selectedSourceNames.isEmpty() -> "не выбраны"
-        selectedSourceNames.size <= 3 -> selectedSourceNames.joinToString(", ")
-        else -> selectedSourceNames.take(2).joinToString(", ") + " +" + (selectedSourceNames.size - 2)
     }

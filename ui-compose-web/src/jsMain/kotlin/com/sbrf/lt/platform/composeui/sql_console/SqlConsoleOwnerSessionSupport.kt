@@ -42,6 +42,9 @@ internal fun resolveSqlConsoleOwnerTabInstanceId(): String {
     }
 }
 
+internal fun resolveSqlConsoleWorkspaceId(): String =
+    resolveSqlConsoleOwnerTabInstanceId().replace("sql-tab-", "sql-workspace-")
+
 internal fun loadSqlConsoleExecutionOwnerState(): SqlConsoleExecutionOwnerState? =
     runCatching { window.sessionStorage.getItem(SQL_CONSOLE_EXECUTION_OWNER_KEY) }
         .getOrNull()

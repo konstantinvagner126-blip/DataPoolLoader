@@ -65,8 +65,8 @@ internal fun SqlConsoleSourceSidebar(
             Text("Выбери, по каким источникам выполнять запрос.")
         }
         SqlConsoleSourceSelectionBlock(
-            sourceGroups = state.info?.sourceGroups.orEmpty(),
-            sourceNames = state.info?.sourceNames.orEmpty(),
+            groups = state.info?.groups.orEmpty(),
+            sourceCatalogNames = state.info?.sourceCatalog.orEmpty().map { it.name },
             selectedSourceNames = state.selectedSourceNames,
             connectionStatusBySource = connectionStatusBySource,
             onToggleSourceGroup = onToggleSourceGroup,

@@ -246,10 +246,10 @@ class ServerTest {
             storageDir = storageDir.toString(),
             sqlConsole = SqlConsoleConfig(
                 queryTimeoutSec = 30,
-                sourceGroups = listOf(
+                groups = listOf(
                     SqlConsoleSourceGroupConfig("dev", listOf("shard1")),
                 ),
-                sources = listOf(SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user", "pwd")),
+                sourceCatalog = listOf(SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user", "pwd")),
             ),
         )
         val runManager = RunManager(moduleRegistry = registry, uiConfig = uiConfig)
@@ -451,22 +451,23 @@ class ServerTest {
         assertTrue(details.contains("\"validationStatus\":\"VALID\""))
 
         val info = client.get("/api/sql-console/info").bodyAsText()
-        assertTrue(info.contains("\"sourceNames\":[\"shard1\"]"))
-        assertTrue(info.contains("\"sourceGroups\":[{\"name\":\"dev\",\"sourceNames\":[\"shard1\"]}]"))
+        assertTrue(info.contains("\"sourceCatalog\":[{\"name\":\"shard1\"}]"))
+        assertTrue(info.contains("\"groups\":[{\"name\":\"dev\",\"sources\":[\"shard1\"],\"synthetic\":false}]"))
         assertTrue(info.contains("\"queryTimeoutSec\":30"))
         assertTrue(info.contains("\"maxRowsPerShard\":200"))
 
-        val state = client.get("/api/sql-console/state").bodyAsText()
+        val state = client.get("/api/sql-console/state?workspaceId=workspace-a").bodyAsText()
         assertTrue(state.contains("\"draftSql\":\"select 1 as check_value\""))
         assertTrue(state.contains("\"pageSize\":50"))
 
-        val savedState = client.post("/api/sql-console/state") {
+        val savedState = client.post("/api/sql-console/state?workspaceId=workspace-a") {
             contentType(ContentType.Application.Json)
             setBody(
                 """
                 {
                   "draftSql":"select * from demo",
                   "recentQueries":["select * from demo"],
+                  "selectedGroupNames":["dev"],
                   "favoriteObjects":[
                     {
                       "sourceName":"shard1",
@@ -484,8 +485,34 @@ class ServerTest {
         assertEquals(HttpStatusCode.OK, savedState.status)
         val savedStateBody = savedState.bodyAsText()
         assertTrue(savedStateBody.contains("\"draftSql\":\"select * from demo\""))
+        assertTrue(savedStateBody.contains("\"selectedGroupNames\":[\"dev\"]"))
         assertTrue(savedStateBody.contains("\"pageSize\":100"))
         assertTrue(savedStateBody.contains("\"favoriteObjects\":[{\"sourceName\":\"shard1\""))
+
+        val secondWorkspaceState = client.get("/api/sql-console/state?workspaceId=workspace-b").bodyAsText()
+        assertTrue(secondWorkspaceState.contains("\"draftSql\":\"select 1 as check_value\""))
+        assertTrue(secondWorkspaceState.contains("\"selectedSourceNames\":[]"))
+
+        val savedSecondWorkspace = client.post("/api/sql-console/state?workspaceId=workspace-b") {
+            contentType(ContentType.Application.Json)
+            setBody(
+                """
+                {
+                  "draftSql":"select * from second_workspace",
+                  "selectedGroupNames":[],
+                  "selectedSourceNames":["shard1"],
+                  "pageSize":25
+                }
+                """.trimIndent()
+            )
+        }
+        assertEquals(HttpStatusCode.OK, savedSecondWorkspace.status)
+
+        val restoredFirstWorkspace = client.get("/api/sql-console/state?workspaceId=workspace-a").bodyAsText()
+        assertTrue(restoredFirstWorkspace.contains("\"draftSql\":\"select * from demo\""))
+        assertTrue(restoredFirstWorkspace.contains("\"selectedGroupNames\":[\"dev\"]"))
+        val restoredSecondWorkspace = client.get("/api/sql-console/state?workspaceId=workspace-b").bodyAsText()
+        assertTrue(restoredSecondWorkspace.contains("\"draftSql\":\"select * from second_workspace\""))
 
         val settings = client.post("/api/sql-console/settings") {
             contentType(ContentType.Application.Json)
@@ -824,7 +851,7 @@ class ServerTest {
             storageDir = storageDir.toString(),
             sqlConsole = SqlConsoleConfig(
                 queryTimeoutSec = 30,
-                sources = listOf(SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user", "pwd")),
+                sourceCatalog = listOf(SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user", "pwd")),
             ),
         )
         val runManager = RunManager(moduleRegistry = registry, uiConfig = uiConfig)

@@ -37,7 +37,7 @@ open class UiRuntimeConfigResolver(
 
     private fun SqlConsoleConfig.resolvePlaceholders(properties: Map<String, String>): SqlConsoleConfig =
         copy(
-            sources = sources.map { it.resolvePlaceholders(properties) },
+            sourceCatalog = sourceCatalog.map { it.resolvePlaceholders(properties) },
         )
 
     private fun SqlConsoleSourceConfig.resolvePlaceholders(properties: Map<String, String>): SqlConsoleSourceConfig =

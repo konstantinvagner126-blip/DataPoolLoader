@@ -75,10 +75,10 @@ internal class SqlConsoleConfigSupport {
         require(config.queryTimeoutSec == null || config.queryTimeoutSec > 0) {
             "Параметр ui.sqlConsole.queryTimeoutSec должен быть больше 0, если задан."
         }
-        require(config.sources.isNotEmpty()) {
-            "В конфиге UI не настроены source-подключения. Заполни ui.sqlConsole.sources."
+        require(config.sourceCatalog.isNotEmpty()) {
+            "В конфиге UI не настроены source-подключения. Заполни ui.sqlConsole.sourceCatalog."
         }
-        val normalizedSourceNames = config.sources.map { it.name.trim() }
+        val normalizedSourceNames = config.sourceCatalog.map { it.name.trim() }
         require(normalizedSourceNames.all { it.isNotEmpty() }) {
             "В SQL-консоли имя source не должно быть пустым."
         }
@@ -90,7 +90,7 @@ internal class SqlConsoleConfigSupport {
         require(duplicateSourceNames.isEmpty()) {
             "В SQL-консоли имена source должны быть уникальны: ${duplicateSourceNames.joinToString(", ")}"
         }
-        validateSourceGroups(config.sourceGroups, normalizedSourceNames.toSet())
+        validateSourceGroups(config.groups, normalizedSourceNames.toSet())
     }
 
     private fun selectSourcesInternal(
@@ -99,14 +99,14 @@ internal class SqlConsoleConfigSupport {
     ): List<SqlConsoleSourceConfig> {
         val normalizedSelectedSourceNames = selectedSourceNames.map { it.trim() }.filter { it.isNotEmpty() }
         val selectedSources = if (normalizedSelectedSourceNames.isEmpty()) {
-            config.sources
+            config.sourceCatalog
         } else {
-            val configuredSourceNames = config.sources.map { it.name }.toSet()
+            val configuredSourceNames = config.sourceCatalog.map { it.name }.toSet()
             val unknown = normalizedSelectedSourceNames.filter { it !in configuredSourceNames }
             require(unknown.isEmpty()) {
                 "В SQL-консоли выбраны неизвестные sources: ${unknown.joinToString(", ")}"
             }
-            config.sources.filter { it.name in normalizedSelectedSourceNames }
+            config.sourceCatalog.filter { it.name in normalizedSelectedSourceNames }
         }
         require(selectedSources.isNotEmpty()) {
             "В SQL-консоли должен быть выбран хотя бы один source."
@@ -239,7 +239,7 @@ private fun validateSourceGroups(
     }
 
     sourceGroups.forEach { group ->
-        val normalizedSourceNames = group.sourceNames
+        val normalizedSourceNames = group.sources
             .map { it.trim() }
             .filter { it.isNotEmpty() }
             .distinct()

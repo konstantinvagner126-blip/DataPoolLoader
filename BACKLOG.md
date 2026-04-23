@@ -390,12 +390,24 @@
 
 Фаза A3. Global source groups и selection model:
 
-- реализован первый пакет этой фазы:
-  - глобальный config contract `sqlConsole.sourceGroups` добавлен в `ui config -> core -> ui-server -> shared UI`;
-  - `sourceGroups` теперь входят в `/api/sql-console/info` и доступны обоим SQL-console экранам как runtime contract;
-  - конфиг валидируется: group names уникальны, пустые группы запрещены, unknown source в группе считается ошибкой конфигурации;
-  - основной экран SQL-консоли и `sql-console-objects` уже поддерживают group-aware selection UI с состояниями `all / partial / none`;
-  - source of truth по-прежнему остается `selectedSourceNames`, а group toggle работает как bulk-select/bulk-unselect layer;
+- текущая волна этой фазы реализована:
+  - старый `flat sources + separate sourceGroups` контракт заменен на `group-first` модель;
+  - YAML contract:
+    - `groups`: список групп с `name` и списком `sources`;
+    - `sourceCatalog`: канонический каталог всех источников с полным connection config;
+  - полный source config нельзя дублировать внутри групп;
+  - один source по-прежнему может входить в несколько групп;
+- UI source selection теперь иерархический:
+  - сначала показываются группы;
+  - группа раскрывается и показывает входящие в нее source;
+  - group checkbox работает как bulk-select/bulk-unselect для своей группы;
+  - source checkbox внутри группы остается явным source-level control;
+- source, не входящие ни в одну группу, отображаются в вычисляемой группе `Без группы`;
+  - `Без группы` не нужно явно описывать в YAML;
+  - это synthetic UI/runtime group для всех source из `sourceCatalog`, которые не упомянуты ни в одной группе;
+- source selection UI не уходит в пустое состояние:
+  - если runtime `groups` по какой-то причине пусты, экран должен хотя бы показать synthetic fallback из `sourceCatalog`;
+  - если не настроен даже `sourceCatalog`, нужно показывать явный empty state, а не пустую панель;
 - группы источников считаются частью глобальной конфигурации приложения, а не локальным persisted state SQL-консоли;
 - конфигурация должна уметь явно описывать:
   - `group name`;
@@ -415,14 +427,17 @@
   - `not selected`;
 - execution, connection status, diff и safety по-прежнему считаются по source, а не по группе;
 - object browser и основной экран SQL-консоли должны использовать один и тот же group-aware source selection contract;
+- tab/workspace-scoped persisted selection для `selectedGroups + selectedSources` уже реализован поверх `workspaceId` и отдельного workspace-state файла;
+- working context strip теперь честно отражает:
+  - выбранные группы;
+  - ручные добавления source;
+  - manual exclusions;
+  - synthetic `Без группы` selection;
 - первая версия этой модели не включает:
   - вложенные группы;
   - group-level permissions/policies;
   - auto-generated группы без явной конфигурации.
-- оставшийся хвост этой фазы:
-  - tab/workspace-scoped persisted selection для `selectedGroups + selectedSources`;
-  - явный UX для group chips/summary в working context strip;
-  - интеграция с multi-tab workspaces из `Фазы A2`, чтобы выбор групп не был общим между вкладками.
+- отдельного внутреннего хвоста у `A3` больше нет; дальнейшее развитие групп теперь идет только в рамках `A2` multi-tab workspaces и execution model.
 
 Фаза B. `sql-console-objects` и object inspector:
 
@@ -519,9 +534,16 @@
   - query library теперь показывает summary по history/favorites/object shortcuts и подсказывает следующий шаг для выбранного query без перехода в editor/sidebar;
   - favorite objects переведены в более явную action hierarchy: primary SQL-действие, затем вспомогательные действия, затем inspector/remove;
   - statement/shard/page navigation собрана в один result navigator вместо разнесенных по экрану блоков и длинного pagination wall;
-  - shortcut contract вокруг Monaco стал явным: экран показывает, какие hotkeys живут editor-local и когда они реально активны;
-  - Monaco получил editor-local hotkeys для result navigation (`statement/source/page`, `data/status`) без глобальных browser handlers;
-  - library-actions `Подставить` теперь возвращают фокус в Monaco, а экран умеет явно показать и восстановить editor focus;
+- shortcut contract вокруг Monaco стал явным: экран показывает, какие hotkeys живут editor-local и когда они реально активны;
+- Monaco получил editor-local hotkeys для result navigation (`statement/source/page`, `data/status`) без глобальных browser handlers;
+- library-actions `Подставить` теперь возвращают фокус в Monaco, а экран умеет явно показать и восстановить editor focus;
+- action-panel под Monaco должен стать компактнее: icon-only кнопки вместо текстовых, с понятными hover tooltips и без лишнего визуального веса;
+- action-panel больше не должен жить отдельным блоком под Monaco: быстрые действия и execution controls нужно держать внутри `Шаблоны и быстрые действия`, чтобы не дублировать точки управления;
+- result table для `SELECT` должна выглядеть как IDE-like data grid: более явная сетка, визуально разделенные поля, hover/focus affordance и полезная cell-level click action вместо обычной bootstrap-таблицы;
+- remaining UX contract для shortcut-help:
+  - блок горячих клавиш должен быть сворачиваемым;
+  - по умолчанию он должен быть свернут;
+  - на первом этапе состояние expand/collapse не нужно делать persisted;
 
 - четко развести source/settings, editor, execution state, result output и transaction controls;
 - убрать визуальное смешение между рабочим контекстом и результатами запроса;

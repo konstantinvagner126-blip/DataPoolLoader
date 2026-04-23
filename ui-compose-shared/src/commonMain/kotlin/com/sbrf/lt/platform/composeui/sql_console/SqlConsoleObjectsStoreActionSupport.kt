@@ -18,6 +18,7 @@ internal class SqlConsoleObjectsStoreActionSupport(
         return runCatching {
             val savedState = api.saveState(
                 persistedState.toStateUpdate(
+                    selectedGroupNames = current.selectedGroupNames,
                     selectedSourceNames = current.selectedSourceNames,
                     favoriteObjects = nextFavorites,
                 ),
@@ -52,6 +53,7 @@ internal class SqlConsoleObjectsStoreActionSupport(
             val savedState = api.saveState(
                 persistedState.toStateUpdate(
                     draftSql = draftSql,
+                    selectedGroupNames = emptyList(),
                     selectedSourceNames = listOf(sourceName),
                     favoriteObjects = current.favoriteObjects,
                 ),

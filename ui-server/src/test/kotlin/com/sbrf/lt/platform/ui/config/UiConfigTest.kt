@@ -23,8 +23,8 @@ class UiConfigTest {
         assertEquals(UiModuleStorePostgresConfig.DEFAULT_SCHEMA, config.moduleStore.postgres.schemaName())
         assertEquals(1000, config.sqlConsole.fetchSize)
         assertEquals(200, config.sqlConsole.maxRowsPerShard)
-        assertEquals(listOf("dev", "ift", "lt"), config.sqlConsole.sourceGroups.map { it.name })
-        assertEquals(listOf("db2", "db3", "db4"), config.sqlConsole.sourceGroups.first { it.name == "ift" }.sourceNames)
+        assertEquals(listOf("dev", "ift", "lt"), config.sqlConsole.groups.map { it.name })
+        assertEquals(listOf("db2", "db3", "db4"), config.sqlConsole.groups.first { it.name == "ift" }.sources)
         assertEquals("\${LOCAL_MANUAL_DB_JDBC_URL}", config.moduleStore.postgres.jdbcUrl)
     }
 
@@ -121,12 +121,12 @@ class UiConfigTest {
                     """
                     ui:
                       sqlConsole:
-                        sourceGroups:
+                        groups:
                           - name: dev
-                            sourceNames: [db1, db2]
+                            sources: [db1, db2]
                           - name: ift
-                            sourceNames: [db2, db3]
-                        sources:
+                            sources: [db2, db3]
+                        sourceCatalog:
                           - name: db1
                             jdbcUrl: jdbc:postgresql://localhost:5432/db1
                             username: db1_user
@@ -147,8 +147,8 @@ class UiConfigTest {
             override fun resolveExternalConfigPath() = configFile
         }.load()
 
-        assertEquals(listOf("dev", "ift"), config.sqlConsole.sourceGroups.map { it.name })
-        assertEquals(listOf("db1", "db2"), config.sqlConsole.sourceGroups.first().sourceNames)
+        assertEquals(listOf("dev", "ift"), config.sqlConsole.groups.map { it.name })
+        assertEquals(listOf("db1", "db2"), config.sqlConsole.groups.first().sources)
     }
 
     @Test

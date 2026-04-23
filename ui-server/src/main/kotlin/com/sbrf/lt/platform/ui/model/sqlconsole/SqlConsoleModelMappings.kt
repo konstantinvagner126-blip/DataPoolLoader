@@ -15,6 +15,7 @@ import com.sbrf.lt.datapool.sqlconsole.SqlConsoleDatabaseObjectSequence
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleDatabaseObjectSourceResult
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleDatabaseObjectTrigger
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleInfo
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleSourceCatalogEntry
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleQueryResult
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleSourceGroup
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleStatementResult
@@ -25,15 +26,20 @@ import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleExecutionSnapshot
  */
 fun SqlConsoleInfo.toResponse(): SqlConsoleInfoResponse = SqlConsoleInfoResponse(
     configured = configured,
-    sourceNames = sourceNames,
-    sourceGroups = sourceGroups.map { it.toResponse() },
+    sourceCatalog = sourceCatalog.map { it.toResponse() },
+    groups = groups.map { it.toResponse() },
     maxRowsPerShard = maxRowsPerShard,
     queryTimeoutSec = queryTimeoutSec,
 )
 
+private fun SqlConsoleSourceCatalogEntry.toResponse(): SqlConsoleSourceCatalogEntryResponse = SqlConsoleSourceCatalogEntryResponse(
+    name = name,
+)
+
 private fun SqlConsoleSourceGroup.toResponse(): SqlConsoleSourceGroupResponse = SqlConsoleSourceGroupResponse(
     name = name,
-    sourceNames = sourceNames,
+    sources = sources,
+    synthetic = synthetic,
 )
 
 /**
