@@ -865,6 +865,13 @@ Review after Phase F:
       - добавлены common tests на create-module validation/request и lifecycle state transitions:
         - [ModuleEditorStoreCreateModuleRequestSupportTest.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonTest/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreCreateModuleRequestSupportTest.kt)
         - [ModuleEditorStoreDatabaseLifecycleStateSupportTest.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonTest/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreDatabaseLifecycleStateSupportTest.kt)
+    - save-action слой больше не смешивает draft->request mapping и refresh boundary:
+      - draft->request mapping вынесен в [ModuleEditorStoreSaveRequestSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreSaveRequestSupport.kt);
+      - refresh selected module после save/discard/publish теперь идет через узкий контракт [ModuleEditorSelectedModuleRefreshStore.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorSelectedModuleRefreshStore.kt), а не через concrete loading support;
+      - [ModuleEditorStoreSaveActionSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreSaveActionSupport.kt) остался orchestration-facade слоем;
+      - добавлены common tests на save request mapping и save action error/refresh wiring:
+        - [ModuleEditorStoreSaveRequestSupportTest.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonTest/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreSaveRequestSupportTest.kt)
+        - [ModuleEditorStoreSaveActionSupportTest.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonTest/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreSaveActionSupportTest.kt)
   - начат cleanup `module_runs` shared-store кластера:
     - [ModuleRunsStoreLoadingSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsStoreLoadingSupport.kt) перестал держать initial load, database runtime fallback и run selection/details policy в одном helper;
     - runtime/fallback branching вынесен в [ModuleRunsStoreRuntimeSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_runs/ModuleRunsStoreRuntimeSupport.kt);
