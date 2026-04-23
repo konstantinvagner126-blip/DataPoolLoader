@@ -2,16 +2,16 @@ package com.sbrf.lt.platform.composeui.module_sync
 
 internal class ModuleSyncStoreLoadingSupport(
     private val api: ModuleSyncApi,
-) {
+) : ModuleSyncLoadStore {
     private val runtimeSupport = ModuleSyncStoreRuntimeSupport(api)
     private val selectionSupport = ModuleSyncStoreSelectionSupport(api)
 
-    suspend fun load(
-        historyLimit: Int = 20,
-        preferredRunId: String? = null,
-        selectiveSyncVisible: Boolean = false,
-        selectedModuleCodes: Set<String> = emptySet(),
-        moduleSearchQuery: String = "",
+    override suspend fun load(
+        historyLimit: Int,
+        preferredRunId: String?,
+        selectiveSyncVisible: Boolean,
+        selectedModuleCodes: Set<String>,
+        moduleSearchQuery: String,
     ): ModuleSyncPageState {
         val runtimeContextResult = runtimeSupport.loadRuntimeContext()
         val runtimeContext = runtimeContextResult.getOrNull()

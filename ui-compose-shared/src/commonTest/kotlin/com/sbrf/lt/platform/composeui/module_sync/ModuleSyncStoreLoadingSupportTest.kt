@@ -44,7 +44,13 @@ class ModuleSyncStoreLoadingSupportTest {
         )
 
         val state = runModuleSyncSuspend {
-            support.load(preferredRunId = "missing")
+            support.load(
+                historyLimit = 20,
+                preferredRunId = "missing",
+                selectiveSyncVisible = false,
+                selectedModuleCodes = emptySet(),
+                moduleSearchQuery = "",
+            )
         }
 
         assertEquals("run-2", state.selectedRunId)

@@ -2,65 +2,44 @@ package com.sbrf.lt.platform.composeui.module_sync
 
 internal class ModuleSyncStoreActionSupport(
     private val api: ModuleSyncApi,
-    private val loadingSupport: ModuleSyncStoreLoadingSupport,
+    loadStore: ModuleSyncLoadStore,
 ) {
+    private val selectionSupport = ModuleSyncStoreActionSelectionSupport()
+    private val stateSupport = ModuleSyncStoreActionStateSupport()
+    private val reloadSupport = ModuleSyncStoreActionReloadSupport(loadStore, stateSupport)
+
     suspend fun syncAll(current: ModuleSyncPageState): ModuleSyncPageState =
         runCatching {
             val result = api.syncAll()
-            loadingSupport.load(
-                historyLimit = current.historyLimit,
-                preferredRunId = result.syncRunId,
-                selectiveSyncVisible = current.selectiveSyncVisible,
-                selectedModuleCodes = current.selectedModuleCodes,
-                moduleSearchQuery = current.moduleSearchQuery,
-            ).copy(
-                successMessage = "Массовая синхронизация запущена.",
-                actionInProgress = null,
-            )
+            reloadSupport.reloadAfterFullSync(current, result.syncRunId)
         }.getOrElse { error ->
-            current.copy(
-                actionInProgress = null,
-                errorMessage = error.message ?: "Не удалось запустить массовый импорт.",
-            )
+            stateSupport.applyFailure(current, error, "Не удалось запустить массовый импорт.")
         }
 
     suspend fun syncOne(current: ModuleSyncPageState): ModuleSyncPageState {
-        val moduleCode = current.selectedModuleCodes.singleOrNull()?.trim().orEmpty()
-        if (moduleCode.isBlank()) {
-            return current.copy(
-                actionInProgress = null,
-                errorMessage = "Выбери один модуль для точечной синхронизации.",
+        val moduleCode = selectionSupport.resolveSingleModuleCode(current.selectedModuleCodes)
+        if (moduleCode == null) {
+            return stateSupport.applyFailure(
+                current,
+                IllegalStateException("Выбери один модуль для точечной синхронизации."),
+                "Выбери один модуль для точечной синхронизации.",
             )
         }
         return runCatching {
             val result = api.syncOne(moduleCode)
-            loadingSupport.load(
-                historyLimit = current.historyLimit,
-                preferredRunId = result.syncRunId,
-                selectiveSyncVisible = false,
-                selectedModuleCodes = setOf(moduleCode),
-                moduleSearchQuery = current.moduleSearchQuery,
-            ).copy(
-                successMessage = "Синхронизация модуля '$moduleCode' запущена.",
-                actionInProgress = null,
-            )
+            reloadSupport.reloadAfterSingleSync(current, result.syncRunId, moduleCode)
         }.getOrElse { error ->
-            current.copy(
-                actionInProgress = null,
-                errorMessage = error.message ?: "Не удалось синхронизировать модуль.",
-            )
+            stateSupport.applyFailure(current, error, "Не удалось синхронизировать модуль.")
         }
     }
 
     suspend fun syncSelected(current: ModuleSyncPageState): ModuleSyncPageState {
-        val moduleCodes = current.selectedModuleCodes
-            .map { it.trim() }
-            .filter { it.isNotBlank() }
-            .distinct()
+        val moduleCodes = selectionSupport.resolveSelectedModuleCodes(current.selectedModuleCodes)
         if (moduleCodes.isEmpty()) {
-            return current.copy(
-                actionInProgress = null,
-                errorMessage = "Отметь хотя бы один модуль для синхронизации.",
+            return stateSupport.applyFailure(
+                current,
+                IllegalStateException("Отметь хотя бы один модуль для синхронизации."),
+                "Отметь хотя бы один модуль для синхронизации.",
             )
         }
         if (moduleCodes.size == 1) {
@@ -68,21 +47,9 @@ internal class ModuleSyncStoreActionSupport(
         }
         return runCatching {
             val result = api.syncSelected(moduleCodes)
-            loadingSupport.load(
-                historyLimit = current.historyLimit,
-                preferredRunId = result.syncRunId,
-                selectiveSyncVisible = false,
-                selectedModuleCodes = moduleCodes.toSet(),
-                moduleSearchQuery = current.moduleSearchQuery,
-            ).copy(
-                successMessage = "Выборочная синхронизация запущена для ${moduleCodes.size} модулей.",
-                actionInProgress = null,
-            )
+            reloadSupport.reloadAfterSelectedSync(current, result.syncRunId, moduleCodes)
         }.getOrElse { error ->
-            current.copy(
-                actionInProgress = null,
-                errorMessage = error.message ?: "Не удалось запустить выборочную синхронизацию.",
-            )
+            stateSupport.applyFailure(current, error, "Не удалось запустить выборочную синхронизацию.")
         }
     }
 }

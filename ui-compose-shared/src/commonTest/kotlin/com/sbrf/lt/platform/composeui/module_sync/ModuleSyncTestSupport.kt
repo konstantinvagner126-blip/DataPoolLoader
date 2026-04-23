@@ -102,6 +102,15 @@ internal class StubModuleSyncApi(
     private val filesModulesCatalogHandler: suspend () -> FilesModulesCatalogResponse = {
         sampleFilesModulesCatalog()
     },
+    private val syncAllHandler: suspend () -> SyncRunResultResponse = {
+        error("syncAll not configured")
+    },
+    private val syncOneHandler: suspend (String) -> SyncRunResultResponse = {
+        error("syncOne not configured")
+    },
+    private val syncSelectedHandler: suspend (List<String>) -> SyncRunResultResponse = {
+        error("syncSelected not configured")
+    },
 ) : ModuleSyncApi {
     var detailsLoads: Int = 0
         private set
@@ -119,12 +128,37 @@ internal class StubModuleSyncApi(
 
     override suspend fun loadFilesModulesCatalog(): FilesModulesCatalogResponse = filesModulesCatalogHandler()
 
-    override suspend fun syncAll(): SyncRunResultResponse = error("syncAll not configured")
+    override suspend fun syncAll(): SyncRunResultResponse = syncAllHandler()
 
-    override suspend fun syncOne(moduleCode: String): SyncRunResultResponse = error("syncOne not configured")
+    override suspend fun syncOne(moduleCode: String): SyncRunResultResponse = syncOneHandler(moduleCode)
 
     override suspend fun syncSelected(moduleCodes: List<String>): SyncRunResultResponse =
-        error("syncSelected not configured")
+        syncSelectedHandler(moduleCodes)
+}
+
+internal class StubModuleSyncLoadStore(
+    private val handler: suspend (
+        historyLimit: Int,
+        preferredRunId: String?,
+        selectiveSyncVisible: Boolean,
+        selectedModuleCodes: Set<String>,
+        moduleSearchQuery: String,
+    ) -> ModuleSyncPageState,
+) : ModuleSyncLoadStore {
+    override suspend fun load(
+        historyLimit: Int,
+        preferredRunId: String?,
+        selectiveSyncVisible: Boolean,
+        selectedModuleCodes: Set<String>,
+        moduleSearchQuery: String,
+    ): ModuleSyncPageState =
+        handler(
+            historyLimit,
+            preferredRunId,
+            selectiveSyncVisible,
+            selectedModuleCodes,
+            moduleSearchQuery,
+        )
 }
 
 internal fun <T> runModuleSyncSuspend(block: suspend () -> T): T {
