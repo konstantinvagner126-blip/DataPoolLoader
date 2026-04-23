@@ -43,13 +43,13 @@ internal fun AboutPageContent() {
             name = "Вагнер Константин",
             alias = "kwdev",
             accentClass = "about-developer-card-primary",
-            motorcycleClass = "about-sportbike-black",
+            motorcycleClassNames = listOf("about-sportbike-black"),
         )
         AboutDeveloperCard(
             name = "Родионов Сергей",
             alias = "darkelf",
             accentClass = "about-developer-card-secondary",
-            motorcycleClass = "about-sportbike-black about-sportbike-delayed",
+            motorcycleClassNames = listOf("about-sportbike-black", "about-sportbike-delayed"),
         )
     }
 }
@@ -66,7 +66,7 @@ private fun AboutDeveloperCard(
     name: String,
     alias: String,
     accentClass: String,
-    motorcycleClass: String,
+    motorcycleClassNames: List<String>,
 ) {
     Div({ classes("panel", "about-card", "about-developer-card", accentClass) }) {
         Div({ classes("home-card-label") }) { Text("Разработчик") }
@@ -86,15 +86,15 @@ private fun AboutDeveloperCard(
         P({ classes("about-card-text", "mb-3") }) {
             Text("Участник команды разработки MLP. На карточке ниже — декоративный черный спортивный мотоцикл, который едет на заднем колесе.")
         }
-        AboutMotorcycleAnimation(motorcycleClass)
+        AboutMotorcycleAnimation(motorcycleClassNames)
     }
 }
 
 @Composable
-private fun AboutMotorcycleAnimation(motorcycleClass: String) {
+private fun AboutMotorcycleAnimation(motorcycleClassNames: List<String>) {
     Div({ classes("about-motorcycle-stage") }) {
         Div({ classes("about-motorcycle-track") })
-        Div({ classes("about-motorcycle", motorcycleClass) }) {
+        Div({ classes("about-motorcycle", *motorcycleClassNames.toTypedArray()) }) {
             Div({ classes("about-motorcycle-rider") })
             Div({ classes("about-motorcycle-tail") })
             Div({ classes("about-motorcycle-seat") })

@@ -554,9 +554,15 @@
 - action-panel под Monaco должен стать компактнее: icon-only кнопки вместо текстовых, с понятными hover tooltips и без лишнего визуального веса;
 - action-panel больше не должен жить отдельным блоком под Monaco: быстрые действия и execution controls нужно держать внутри `Шаблоны и быстрые действия`, чтобы не дублировать точки управления;
 - result table для `SELECT` должна выглядеть как IDE-like data grid: более явная сетка, визуально разделенные поля, hover/focus affordance и полезная cell-level click action вместо обычной bootstrap-таблицы;
+- group expanders в source selection не должны выглядеть как текстовые utility-кнопки `Раскрыть/Свернуть`: нужен compact modern chevron-expander без текста, с hover tooltip и читаемым expanded/collapsed state;
+- compact chevron-expander, введенный в SQL-консоли, нужно распространить на весь интерфейс как единый expandable-control pattern: новые и существующие `Раскрыть/Свернуть` utility-кнопки должны постепенно мигрировать на icon-only chevron с hover tooltip и ясным expanded/collapsed state;
+- page-level success banner сразу под шапкой SQL-консоли не нужен: сообщения вроде `Запрос запущен` считаются рудиментом и не должны рендериться как верхний alert;
+- read-only guardrail с сообщениями вида `Команда SELECT распознана как read-only.` не нужен: для безопасных команд этот отдельный информационный блок считается шумом и не должен рендериться;
+- отдельный visual block `Текущий контекст выполнения` не нужен: он дублирует выбранные параметры из sidebar и должен быть полностью удален, а не замаскирован;
 - remaining UX contract для shortcut-help:
   - блок горячих клавиш должен быть сворачиваемым;
   - по умолчанию он должен быть свернут;
+  - кнопка `Вернуть фокус в Monaco` должна быть idempotent и не должна выбрасывать JS-ошибки при повторных нажатиях;
   - на первом этапе состояние expand/collapse не нужно делать persisted;
 
 - четко развести source/settings, editor, execution state, result output и transaction controls;
@@ -736,6 +742,12 @@
     - favorites вынесены в [SqlConsoleObjectsStoreFavoriteSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectsStoreFavoriteSupport.kt);
     - search и inspector вынесены в [SqlConsoleObjectsStoreSearchSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectsStoreSearchSupport.kt) и [SqlConsoleObjectsStoreInspectorSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectsStoreInspectorSupport.kt).
     - [SqlConsoleObjectsStore.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectsStore.kt) больше не держит inline query/selection/inspector UI-state helpers; они вынесены в [SqlConsoleObjectsStoreStateSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleObjectsStoreStateSupport.kt).
+  - начат cleanup store-support кластера `module_editor`:
+    - [ModuleEditorStoreDraftSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreDraftSupport.kt) перестал держать status mutations, editor field updates и create-dialog draft в одном knowledge-heavy helper;
+    - чистые draft mutations вынесены в [ModuleEditorStoreDraftStatusSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreDraftStatusSupport.kt), [ModuleEditorStoreDraftFieldSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreDraftFieldSupport.kt) и [ModuleEditorStoreCreateModuleDraftSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreCreateModuleDraftSupport.kt);
+    - SQL-resource flow больше не смешивает naming rules и mutation lifecycle: naming вынесен в [ModuleEditorStoreSqlResourceNamingSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreSqlResourceNamingSupport.kt), mutations вынесены в [ModuleEditorStoreSqlResourceMutationSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreSqlResourceMutationSupport.kt);
+    - config-form support больше не держит parsing/apply flow и SQL-resource tracking в одном файле: они разведены в [ModuleEditorStoreConfigFormMutationSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreConfigFormMutationSupport.kt) и [ModuleEditorStoreConfigFormSqlResourceSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreConfigFormSqlResourceSupport.kt);
+    - добавлены первые common tests на чистые naming/resource-tracking правила `module_editor`, чтобы этот cleanup не остался без regression coverage.
 
 ### 12. Финализировать boundary модульного редактора и storage contracts
 

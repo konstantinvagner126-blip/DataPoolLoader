@@ -11,6 +11,9 @@ internal fun CommandGuardrail(
     analysis: SqlStatementAnalysis,
     strictSafetyEnabled: Boolean,
 ) {
+    if (analysis.keyword != "SQL" && analysis.readOnly) {
+        return
+    }
     val cssClass = when {
         analysis.keyword == "SQL" -> "sql-guardrail sql-guardrail-neutral"
         strictSafetyEnabled && !analysis.readOnly -> "sql-guardrail sql-guardrail-danger"

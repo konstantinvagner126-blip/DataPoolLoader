@@ -174,7 +174,12 @@ internal fun formatSqlStatement(sql: String): String {
         "JOIN",
         "ON",
     ).forEachIndexed { index, keyword ->
-        val prefix = if (index == 0) Regex("(?i)\\b$keyword\\b") else Regex("(?i)\\s+\\b$keyword\\b")
+        val escapedKeyword = Regex.escape(keyword)
+        val prefix = if (index == 0) {
+            Regex("\\b$escapedKeyword\\b", RegexOption.IGNORE_CASE)
+        } else {
+            Regex("\\s+\\b$escapedKeyword\\b", RegexOption.IGNORE_CASE)
+        }
         formatted = formatted.replace(prefix, "\n${keyword.uppercase()}")
     }
     formatted = formatted

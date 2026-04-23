@@ -34,6 +34,10 @@ internal class SqlConsolePageBindingContext(
     }
 
     fun focusEditor() {
-        currentUiState().editorInstance?.asDynamic()?.focus?.invoke()
+        val editor = currentUiState().editorInstance?.asDynamic() ?: return
+        val focus = editor.focus
+        if (jsTypeOf(focus) == "function") {
+            focus.call(editor)
+        }
     }
 }

@@ -27,7 +27,6 @@ internal fun SqlConsolePageContent(
     activeExportShard: String?,
 ) {
     state.errorMessage?.let { AlertBanner(it, "warning") }
-    state.successMessage?.let { AlertBanner(it, "success") }
     runtimeContext?.takeIf { it.hasModeFallback() }?.let { fallbackContext ->
         AlertBanner(
             buildRuntimeModeFallbackMessage(
@@ -42,11 +41,6 @@ internal fun SqlConsolePageContent(
         LoadingStateCard(title = "SQL-консоль", text = "Конфигурация SQL-консоли загружается.")
         return
     }
-
-    SqlConsoleWorkingContextStrip(
-        state = state,
-        uiState = uiState,
-    )
 
     Div({ classes("row", "g-4") }) {
         Div({ classes("col-12", "col-xl-3") }) {

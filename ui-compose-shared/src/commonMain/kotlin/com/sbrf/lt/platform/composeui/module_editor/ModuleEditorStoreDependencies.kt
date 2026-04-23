@@ -15,11 +15,21 @@ internal fun createModuleEditorStoreDependencies(
     val runActionSupport = ModuleEditorStoreRunActionSupport(api)
     val databaseLifecycleActionSupport = ModuleEditorStoreDatabaseLifecycleActionSupport(api, loadingSupport)
     val configFormSupport = ModuleEditorStoreConfigFormSupport(api)
+    val sqlResourceNamingSupport = ModuleEditorStoreSqlResourceNamingSupport()
     return ModuleEditorStoreDependencies(
         loadingStore = loadingSupport,
         draftStore = ModuleEditorDraftStoreSupport(
-            draftSupport = ModuleEditorStoreDraftSupport(),
-            sqlResourceSupport = ModuleEditorStoreSqlResourceSupport(configFormSupport),
+            draftSupport = ModuleEditorStoreDraftSupport(
+                statusSupport = ModuleEditorStoreDraftStatusSupport(),
+                fieldSupport = ModuleEditorStoreDraftFieldSupport(),
+                createModuleSupport = ModuleEditorStoreCreateModuleDraftSupport(),
+            ),
+            sqlResourceSupport = ModuleEditorStoreSqlResourceSupport(
+                mutationSupport = ModuleEditorStoreSqlResourceMutationSupport(
+                    configFormSupport = configFormSupport,
+                    namingSupport = sqlResourceNamingSupport,
+                ),
+            ),
         ),
         workflowStore = ModuleEditorWorkflowStoreSupport(
             saveActionSupport = saveActionSupport,

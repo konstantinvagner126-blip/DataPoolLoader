@@ -6,12 +6,10 @@
   const DEFAULT_SQL_OBJECT_COMPLETION_LIMIT = 8;
   const MAX_SQL_OBJECT_SUGGESTIONS = 24;
   const MAX_SQL_COLUMN_SUGGESTIONS = 48;
-  const SQL_IDENTIFIER_PATTERN = '(?:"(?:[^"]|"")*"|[A-Za-z_][A-Za-z0-9_$]*)';
-  const SQL_OBJECT_REFERENCE_PATTERN = `${SQL_IDENTIFIER_PATTERN}(?:\\s*\\.\\s*${SQL_IDENTIFIER_PATTERN})?`;
-  const SQL_ALIAS_DEFINITION_PATTERN = new RegExp(
-    `\\b(?:from|join|update)\\s+(${SQL_OBJECT_REFERENCE_PATTERN})(?:\\s+(?:as\\s+)?)(${SQL_IDENTIFIER_PATTERN})`,
-    "gi"
-  );
+  // Keep alias parsing intentionally bounded and browser-safe.
+  // Quoted identifiers still work for exact `schema.table.` completion,
+  // but alias-aware hints only target simple unquoted FROM/JOIN/UPDATE aliases.
+  const SQL_ALIAS_DEFINITION_PATTERN = /\b(?:from|join|update)\s+([A-Za-z_][A-Za-z0-9_$]*(?:\s*\.\s*[A-Za-z_][A-Za-z0-9_$]*)?)(?:\s+(?:as\s+)?)([A-Za-z_][A-Za-z0-9_$]*)/gi;
   const sqlMetadataSearchCache = new Map();
   const sqlObjectColumnsCache = new Map();
   let sqlMetadataContext = normalizeSqlMetadataContext(global.__composeSqlConsoleMetadataContext);

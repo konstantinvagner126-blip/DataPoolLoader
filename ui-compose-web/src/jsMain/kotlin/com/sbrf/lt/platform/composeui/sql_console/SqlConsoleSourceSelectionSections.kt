@@ -118,15 +118,18 @@ internal fun SqlConsoleSourceGroupCard(
                 }
             }
             Button(attrs = {
-                classes("btn", "btn-outline-secondary", "btn-sm", "sql-source-group-toggle")
+                classes("sql-source-group-toggle")
+                if (expanded) {
+                    classes("sql-source-group-toggle-expanded")
+                }
                 attr("type", "button")
+                attr("title", if (expanded) "Свернуть группу" else "Раскрыть группу")
+                attr("aria-label", if (expanded) "Свернуть группу" else "Раскрыть группу")
                 if (group.sources.isEmpty()) {
                     disabled()
                 }
                 onClick { expanded = !expanded }
-            }) {
-                Text(if (expanded) "Свернуть" else "Раскрыть")
-            }
+            }) { }
         }
         if (expanded && group.sources.isNotEmpty()) {
             Div({ classes("sql-source-group-sources") }) {
