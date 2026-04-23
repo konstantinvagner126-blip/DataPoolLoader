@@ -27,6 +27,12 @@ internal fun SqlConsolePageEffects(
         setUiState(transform(currentUiState()))
     }
 
+    DisposableEffect(Unit) {
+        onDispose {
+            clearSqlConsoleMonacoMetadataContext()
+        }
+    }
+
     val trackingExecution = isRunning || currentExecution?.transactionState == "PENDING_COMMIT"
     val heartbeatEnabled = trackingExecution && !currentExecution?.ownerToken.isNullOrBlank()
 
@@ -172,6 +178,15 @@ internal fun SqlConsolePageEffects(
         }
         delay(500)
         setState(store.persistState(state))
+    }
+
+    LaunchedEffect(
+        currentState().selectedSourceNames.joinToString("\u0001"),
+        currentState().favoriteObjects.joinToString("\u0001") { favorite ->
+            favorite.sourceName + "|" + favorite.schemaName + "|" + favorite.objectName + "|" + favorite.objectType + "|" + (favorite.tableName ?: "")
+        },
+    ) {
+        updateSqlConsoleMonacoMetadataContext(currentState())
     }
 
     PollingEffect(

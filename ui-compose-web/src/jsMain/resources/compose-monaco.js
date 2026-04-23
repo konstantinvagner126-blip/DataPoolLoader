@@ -3,6 +3,10 @@
   let monacoConfigured = false;
   let sqlSupportRegistered = false;
   const monacoVsPath = "/static/compose-app/vendor/monaco-editor/min/vs";
+  const DEFAULT_SQL_OBJECT_COMPLETION_LIMIT = 8;
+  const MAX_SQL_OBJECT_SUGGESTIONS = 24;
+  const sqlMetadataSearchCache = new Map();
+  let sqlMetadataContext = normalizeSqlMetadataContext(global.__composeSqlConsoleMetadataContext);
 
   const SQL_KEYWORDS = [
     {
@@ -211,6 +215,337 @@
     return map;
   }
 
+  function normalizeSqlMetadataContext(context) {
+    const selectedSourceNames = Array.isArray(context?.selectedSourceNames)
+      ? [...new Set(
+          context.selectedSourceNames
+            .map(value => `${value ?? ""}`.trim())
+            .filter(Boolean)
+        )]
+      : [];
+    const favoriteObjects = Array.isArray(context?.favoriteObjects)
+      ? deduplicateFavoriteObjects(context.favoriteObjects.map(normalizeFavoriteObject).filter(Boolean))
+      : [];
+    const requestedLimit = Number(context?.maxObjectsPerSource);
+    const maxObjectsPerSource = Number.isFinite(requestedLimit)
+      ? Math.max(1, Math.min(20, Math.trunc(requestedLimit)))
+      : DEFAULT_SQL_OBJECT_COMPLETION_LIMIT;
+    return {
+      selectedSourceNames,
+      favoriteObjects,
+      maxObjectsPerSource
+    };
+  }
+
+  function normalizeFavoriteObject(value) {
+    const sourceName = `${value?.sourceName ?? ""}`.trim();
+    const schemaName = `${value?.schemaName ?? ""}`.trim();
+    const objectName = `${value?.objectName ?? ""}`.trim();
+    const objectType = `${value?.objectType ?? ""}`.trim().toUpperCase();
+    const tableName = `${value?.tableName ?? ""}`.trim() || null;
+    if (!sourceName || !schemaName || !objectName || !objectType) {
+      return null;
+    }
+    return {
+      sourceName,
+      schemaName,
+      objectName,
+      objectType,
+      tableName
+    };
+  }
+
+  function deduplicateFavoriteObjects(values) {
+    const uniqueValues = new Map();
+    values.forEach(value => {
+      const key = [
+        value.sourceName,
+        value.schemaName,
+        value.objectName,
+        value.objectType,
+        value.tableName || ""
+      ].join("|");
+      if (!uniqueValues.has(key)) {
+        uniqueValues.set(key, value);
+      }
+    });
+    return Array.from(uniqueValues.values());
+  }
+
+  function setSqlMetadataContext(context) {
+    sqlMetadataContext = normalizeSqlMetadataContext(context);
+    global.__composeSqlConsoleMetadataContext = sqlMetadataContext;
+    sqlMetadataSearchCache.clear();
+  }
+
+  function buildCompletionContext(model, position) {
+    const range = keywordRange(global.monaco, model, position);
+    const linePrefix = model.getLineContent(position.lineNumber).slice(0, position.column - 1);
+    const chainMatch = linePrefix.match(/((?:[A-Za-z_][A-Za-z0-9_$]*\.)*)([A-Za-z_][A-Za-z0-9_$]*)?$/);
+    const qualifiers = chainMatch?.[1]
+      ? chainMatch[1].split(".").filter(Boolean)
+      : [];
+    const token = (chainMatch?.[2] || "").toLowerCase();
+    if (qualifiers.length === 0) {
+      return {
+        range,
+        mode: "global",
+        token,
+        schemaName: null,
+        remoteQuery: token.length >= 2 ? token : null
+      };
+    }
+    if (qualifiers.length === 1) {
+      const schemaName = qualifiers[0].toLowerCase();
+      return {
+        range,
+        mode: "schema",
+        token,
+        schemaName,
+        remoteQuery: token.length >= 2 ? token : (schemaName.length >= 2 ? schemaName : null)
+      };
+    }
+    return {
+      range,
+      mode: "unsupported",
+      token,
+      schemaName: qualifiers[0].toLowerCase(),
+      remoteQuery: null
+    };
+  }
+
+  function buildObjectSearchCacheKey(request) {
+    return JSON.stringify({
+      query: request.query.toLowerCase(),
+      selectedSourceNames: request.selectedSourceNames,
+      maxObjectsPerSource: request.maxObjectsPerSource
+    });
+  }
+
+  async function loadSqlMetadataSearchEntries(request) {
+    const cacheKey = buildObjectSearchCacheKey(request);
+    if (sqlMetadataSearchCache.has(cacheKey)) {
+      return sqlMetadataSearchCache.get(cacheKey);
+    }
+    const promise = fetch("/api/sql-console/objects/search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(request)
+    })
+      .then(async response => {
+        if (!response.ok) {
+          return [];
+        }
+        const payload = await response.json();
+        return flattenSqlMetadataSearchEntries(payload?.sourceResults);
+      })
+      .catch(() => []);
+    sqlMetadataSearchCache.set(cacheKey, promise);
+    return promise;
+  }
+
+  function flattenSqlMetadataSearchEntries(sourceResults) {
+    if (!Array.isArray(sourceResults)) {
+      return [];
+    }
+    return sourceResults.flatMap(sourceResult => {
+      if (sourceResult?.status !== "SUCCESS" || !Array.isArray(sourceResult.objects)) {
+        return [];
+      }
+      return sourceResult.objects.map(dbObject => ({
+        sourceName: `${sourceResult.sourceName ?? ""}`.trim(),
+        dbObject: {
+          schemaName: `${dbObject?.schemaName ?? ""}`.trim(),
+          objectName: `${dbObject?.objectName ?? ""}`.trim(),
+          objectType: `${dbObject?.objectType ?? ""}`.trim().toUpperCase(),
+          tableName: `${dbObject?.tableName ?? ""}`.trim() || null
+        }
+      })).filter(entry => entry.sourceName && entry.dbObject.schemaName && entry.dbObject.objectName && entry.dbObject.objectType);
+    });
+  }
+
+  function filterFavoriteObjectEntries(completionContext) {
+    const selectedSourceNames = sqlMetadataContext.selectedSourceNames;
+    const hasSelectedSources = selectedSourceNames.length > 0;
+    return sqlMetadataContext.favoriteObjects
+      .filter(value => !hasSelectedSources || selectedSourceNames.includes(value.sourceName))
+      .map(value => ({
+        sourceName: value.sourceName,
+        dbObject: {
+          schemaName: value.schemaName,
+          objectName: value.objectName,
+          objectType: value.objectType,
+          tableName: value.tableName
+        }
+      }))
+      .filter(entry => matchesObjectEntryCompletionContext(entry, completionContext));
+  }
+
+  function matchesObjectEntryCompletionContext(entry, completionContext) {
+    const dbObject = entry.dbObject;
+    const token = completionContext.token;
+    if (completionContext.mode === "schema") {
+      if (dbObject.objectType === "SCHEMA") {
+        return false;
+      }
+      if (dbObject.schemaName.toLowerCase() !== completionContext.schemaName) {
+        return false;
+      }
+      return token === "" || dbObject.objectName.toLowerCase().startsWith(token);
+    }
+    if (completionContext.mode !== "global") {
+      return false;
+    }
+    if (token === "") {
+      return false;
+    }
+    const schemaName = dbObject.schemaName.toLowerCase();
+    const objectName = dbObject.objectName.toLowerCase();
+    const qualifiedName = `${schemaName}.${objectName}`;
+    return schemaName.startsWith(token) || objectName.startsWith(token) || qualifiedName.startsWith(token);
+  }
+
+  function mergeUniqueObjectEntries(localEntries, remoteEntries) {
+    const uniqueEntries = new Map();
+    [...localEntries, ...remoteEntries].forEach(entry => {
+      const dbObject = entry.dbObject;
+      const key = [
+        entry.sourceName,
+        dbObject.schemaName,
+        dbObject.objectName,
+        dbObject.objectType,
+        dbObject.tableName || ""
+      ].join("|");
+      if (!uniqueEntries.has(key)) {
+        uniqueEntries.set(key, entry);
+      }
+    });
+    return Array.from(uniqueEntries.values());
+  }
+
+  function buildSqlObjectSuggestions(monaco, entries, completionContext) {
+    return entries.map((entry, index) =>
+      buildSqlObjectSuggestion(monaco, entry, completionContext, index)
+    );
+  }
+
+  function buildSqlObjectSuggestion(monaco, entry, completionContext, index) {
+    const dbObject = entry.dbObject;
+    const label = dbObject.objectType === "SCHEMA"
+      ? dbObject.schemaName
+      : `${dbObject.schemaName}.${dbObject.objectName}`;
+    const insertText = buildSqlObjectInsertText(dbObject, completionContext.mode);
+    return {
+      label,
+      kind: completionKindForObjectType(monaco, dbObject.objectType),
+      insertText,
+      detail: buildSqlObjectDetail(entry),
+      documentation: buildSqlObjectDocumentation(entry),
+      range: completionContext.range,
+      sortText: `${index.toString().padStart(4, "0")}-${label.toLowerCase()}`
+    };
+  }
+
+  function buildSqlObjectInsertText(dbObject, completionMode) {
+    if (completionMode === "schema") {
+      return quoteSqlIdentifierIfNeeded(dbObject.objectName);
+    }
+    if (dbObject.objectType === "SCHEMA") {
+      return quoteSqlIdentifierIfNeeded(dbObject.schemaName);
+    }
+    return `${quoteSqlIdentifierIfNeeded(dbObject.schemaName)}.${quoteSqlIdentifierIfNeeded(dbObject.objectName)}`;
+  }
+
+  function buildSqlObjectDetail(entry) {
+    const dbObject = entry.dbObject;
+    return [
+      entry.sourceName,
+      dbObject.objectType,
+      dbObject.tableName ? `table ${dbObject.tableName}` : null
+    ].filter(Boolean).join(" · ");
+  }
+
+  function buildSqlObjectDocumentation(entry) {
+    const dbObject = entry.dbObject;
+    const details = [
+      `**${dbObject.objectType}**`,
+      `Source: ${entry.sourceName}`,
+      `Schema: ${dbObject.schemaName}`
+    ];
+    if (dbObject.objectType !== "SCHEMA") {
+      details.push(`Object: ${dbObject.objectName}`);
+    }
+    if (dbObject.tableName) {
+      details.push(`Table: ${dbObject.tableName}`);
+    }
+    return details.join("\n\n");
+  }
+
+  function completionKindForObjectType(monaco, objectType) {
+    switch (objectType) {
+      case "SCHEMA":
+        return monaco.languages.CompletionItemKind.Module;
+      case "INDEX":
+        return monaco.languages.CompletionItemKind.Reference;
+      case "SEQUENCE":
+        return monaco.languages.CompletionItemKind.Value;
+      case "TRIGGER":
+        return monaco.languages.CompletionItemKind.Event;
+      case "VIEW":
+      case "MATERIALIZED_VIEW":
+        return monaco.languages.CompletionItemKind.Interface;
+      case "TABLE":
+      default:
+        return monaco.languages.CompletionItemKind.Struct;
+    }
+  }
+
+  function quoteSqlIdentifierIfNeeded(value) {
+    if (/^[a-z_][a-z0-9_$]*$/.test(value)) {
+      return value;
+    }
+    return `"${`${value}`.replace(/"/g, "\"\"")}"`;
+  }
+
+  async function buildSqlMetadataSuggestions(monaco, model, position) {
+    const completionContext = buildCompletionContext(model, position);
+    if (completionContext.mode === "unsupported") {
+      return [];
+    }
+
+    const localEntries = filterFavoriteObjectEntries(completionContext);
+    const remoteEntries = completionContext.remoteQuery
+      ? (await loadSqlMetadataSearchEntries({
+          query: completionContext.remoteQuery,
+          selectedSourceNames: sqlMetadataContext.selectedSourceNames,
+          maxObjectsPerSource: sqlMetadataContext.maxObjectsPerSource
+        })).filter(entry => matchesObjectEntryCompletionContext(entry, completionContext))
+      : [];
+
+    return buildSqlObjectSuggestions(
+      monaco,
+      mergeUniqueObjectEntries(localEntries, remoteEntries).slice(0, MAX_SQL_OBJECT_SUGGESTIONS),
+      completionContext
+    );
+  }
+
+  function buildLocalSuggestions(monaco, model, position) {
+    const range = keywordRange(monaco, model, position);
+    const currentWord = model.getWordUntilPosition(position).word.toLowerCase();
+    const startsWithToken = label => currentWord === "" || label.toLowerCase().startsWith(currentWord);
+    return [
+      ...SQL_KEYWORDS.filter(item => startsWithToken(item.label)).map(item =>
+        buildSuggestion(monaco, item, monaco.languages.CompletionItemKind.Keyword, range, false)
+      ),
+      ...SQL_FUNCTIONS.filter(item => startsWithToken(item.label)).map(item =>
+        buildSuggestion(monaco, item, monaco.languages.CompletionItemKind.Function, range, true)
+      ),
+      ...SQL_SNIPPETS.filter(item => currentWord === "" || item.label.toLowerCase().includes(currentWord)).map(item =>
+        buildSuggestion(monaco, item, monaco.languages.CompletionItemKind.Snippet, range, true)
+      )
+    ];
+  }
+
   function ensureSqlSupport() {
     if (sqlSupportRegistered) {
       return;
@@ -223,28 +558,18 @@
     const hoverMap = buildHoverMap();
 
     monaco.languages.registerCompletionItemProvider("sql", {
-      provideCompletionItems(model, position) {
-        const range = keywordRange(monaco, model, position);
-        const currentWord = model.getWordUntilPosition(position).word.toLowerCase();
-        const startsWithToken = (label) => currentWord === "" || label.toLowerCase().startsWith(currentWord);
-        const suggestions = [
-          ...SQL_KEYWORDS.filter(item => startsWithToken(item.label)).map(item =>
-            buildSuggestion(monaco, item, monaco.languages.CompletionItemKind.Keyword, range, false)
-          ),
-          ...SQL_FUNCTIONS.filter(item => startsWithToken(item.label)).map(item =>
-            buildSuggestion(monaco, item, monaco.languages.CompletionItemKind.Function, range, true)
-          ),
-          ...SQL_SNIPPETS.filter(item => currentWord === "" || item.label.toLowerCase().includes(currentWord)).map(item =>
-            buildSuggestion(monaco, item, monaco.languages.CompletionItemKind.Snippet, range, true)
-          )
-        ];
-        return { suggestions };
+      triggerCharacters: ["."],
+      async provideCompletionItems(model, position) {
+        const localSuggestions = buildLocalSuggestions(monaco, model, position);
+        const metadataSuggestions = await buildSqlMetadataSuggestions(monaco, model, position);
+        return { suggestions: [...localSuggestions, ...metadataSuggestions] };
       }
     });
 
     monaco.languages.registerHoverProvider("sql", {
       provideHover(model, position) {
-        const word = model.getWordAtPosition(position)?.word?.toLowerCase();
+        const wordAtPosition = model.getWordAtPosition(position);
+        const word = wordAtPosition?.word?.toLowerCase();
         if (!word) {
           return null;
         }
@@ -255,9 +580,9 @@
         return {
           range: new monaco.Range(
             position.lineNumber,
-            model.getWordAtPosition(position).startColumn,
+            wordAtPosition.startColumn,
             position.lineNumber,
-            model.getWordAtPosition(position).endColumn
+            wordAtPosition.endColumn
           ),
           contents: [
             { value: `**${item.label}**` },
@@ -307,4 +632,5 @@
   namespace.withMonacoReady = withMonacoReady;
   namespace.createMonacoEditor = createMonacoEditor;
   namespace.ensureSqlSupport = ensureSqlSupport;
+  namespace.setSqlMetadataContext = setSqlMetadataContext;
 })(window);

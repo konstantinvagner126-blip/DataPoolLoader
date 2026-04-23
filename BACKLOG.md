@@ -430,6 +430,9 @@
   - добавлен local completion provider для PostgreSQL keywords;
   - добавлены local function completions и snippets для частых SQL-шаблонов;
   - добавлен lightweight hover по keywords/functions без backend-зависимости и без вмешательства в execution lifecycle;
+  - добавлен metadata-aware autocomplete по объектам БД через текущий search-first backend, без нового stateful completion-session слоя;
+  - autocomplete учитывает выбранные source, использует избранные объекты как zero-latency local source и держит только session-local bounded cache;
+  - сценарий `schema.` теперь умеет подсказывать объекты схемы editor-native способом, без возврата внешнего `Script outline` или catalog preload;
 
 - развивать Monaco постепенно, без тяжелого IDE/LSP-стека и без ущерба для архитектуры SQL-консоли;
 - уровень 1:
