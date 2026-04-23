@@ -4,54 +4,26 @@ internal class ModuleEditorStoreDatabaseLifecycleActionSupport(
     private val api: ModuleEditorApi,
     private val loadingSupport: ModuleEditorStoreLoadingSupport,
 ) {
+    private val requestSupport = ModuleEditorStoreCreateModuleRequestSupport()
+    private val stateSupport = ModuleEditorStoreDatabaseLifecycleStateSupport()
+
     suspend fun createDatabaseModule(
         current: ModuleEditorPageState,
         route: ModuleEditorRouteState,
     ): ModuleEditorPageState {
         val draft = current.createModuleDraft
-        if (draft.moduleCode.isBlank()) {
+        val validationError = requestSupport.validateDraft(draft)
+        if (validationError != null) {
             return current.copy(
                 actionInProgress = null,
-                errorMessage = "Укажи код модуля.",
-            )
-        }
-        if (draft.title.isBlank()) {
-            return current.copy(
-                actionInProgress = null,
-                errorMessage = "Укажи название модуля.",
-            )
-        }
-        if (draft.configText.isBlank()) {
-            return current.copy(
-                actionInProgress = null,
-                errorMessage = "Стартовый application.yml не должен быть пустым.",
+                errorMessage = validationError,
             )
         }
         return runCatching {
-            val response = api.createDatabaseModule(
-                CreateDbModuleRequestDto(
-                    moduleCode = draft.moduleCode.trim(),
-                    title = draft.title.trim(),
-                    description = draft.description.trim().ifBlank { null },
-                    tags = parseTags(draft.tagsText),
-                    configText = draft.configText,
-                    hiddenFromUi = draft.hiddenFromUi,
-                ),
-            )
-            val nextRoute = route.copy(
-                moduleId = response.moduleCode,
-                includeHidden = route.includeHidden || draft.hiddenFromUi,
-            )
+            val response = api.createDatabaseModule(requestSupport.buildRequest(draft))
+            val nextRoute = stateSupport.nextRouteAfterCreate(route, draft, response)
             val loaded = loadingSupport.load(nextRoute)
-            loaded.copy(
-                loading = false,
-                actionInProgress = null,
-                errorMessage = null,
-                successMessage = response.message,
-                activeTab = ModuleEditorTab.SETTINGS,
-                createModuleDialogOpen = false,
-                createModuleDraft = CreateModuleDraft(),
-            )
+            stateSupport.applyCreatedModuleLoadedState(loaded, response)
         }.getOrElse { error ->
             current.copy(
                 actionInProgress = null,
@@ -67,15 +39,8 @@ internal class ModuleEditorStoreDatabaseLifecycleActionSupport(
         val moduleId = current.selectedModuleId ?: return current
         return runCatching {
             val response = api.deleteDatabaseModule(moduleId)
-            val loaded = loadingSupport.load(route.copy(moduleId = null))
-            loaded.copy(
-                loading = false,
-                errorMessage = null,
-                successMessage = response.message,
-                actionInProgress = null,
-                createModuleDialogOpen = false,
-                createModuleDraft = CreateModuleDraft(),
-            )
+            val loaded = loadingSupport.load(stateSupport.nextRouteAfterDelete(route))
+            stateSupport.applyDeletedModuleLoadedState(loaded, response)
         }.getOrElse { error ->
             current.copy(
                 actionInProgress = null,
@@ -83,10 +48,4 @@ internal class ModuleEditorStoreDatabaseLifecycleActionSupport(
             )
         }
     }
-
-    private fun parseTags(rawValue: String): List<String> =
-        rawValue.split(',')
-            .map { it.trim() }
-            .filter { it.isNotEmpty() }
-            .distinct()
 }
