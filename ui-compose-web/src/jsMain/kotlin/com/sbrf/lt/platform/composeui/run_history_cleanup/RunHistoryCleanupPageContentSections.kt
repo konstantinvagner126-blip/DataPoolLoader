@@ -25,18 +25,20 @@ internal fun RunHistoryCleanupPageContent(
         state.errorMessage?.let { AlertBanner(it, "warning") }
         state.successMessage?.let { AlertBanner(it, "success") }
 
-        CleanupSection(
-            state = state,
-            onToggleDisableSafeguard = callbacks.onToggleCleanupSafeguard,
-            onRefreshPreview = callbacks.onRefreshCleanupPreview,
-            onExecuteCleanup = callbacks.onExecuteCleanup,
-        )
+        Div({ classes("run-history-cleanup-panels-shell") }) {
+            CleanupSection(
+                state = state,
+                onToggleDisableSafeguard = callbacks.onToggleCleanupSafeguard,
+                onRefreshPreview = callbacks.onRefreshCleanupPreview,
+                onExecuteCleanup = callbacks.onExecuteCleanup,
+            )
 
-        OutputRetentionSection(
-            state = state,
-            onToggleDisableSafeguard = callbacks.onToggleOutputSafeguard,
-            onRefreshPreview = callbacks.onRefreshOutputPreview,
-            onExecuteCleanup = callbacks.onExecuteOutputCleanup,
-        )
+            OutputRetentionSection(
+                state = state,
+                onToggleDisableSafeguard = callbacks.onToggleOutputSafeguard,
+                onRefreshPreview = callbacks.onRefreshOutputPreview,
+                onExecuteCleanup = callbacks.onExecuteOutputCleanup,
+            )
+        }
     }
 }

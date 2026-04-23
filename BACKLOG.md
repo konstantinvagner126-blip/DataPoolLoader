@@ -1234,6 +1234,87 @@
 - visual spec получил отдельный workspace-scoped empty-state baseline для нового `workspaceId`;
 - committed snapshot `sql-console-history-empty-shell` добавлен в regression suite.
 
+#### 16.9. Visual baseline для SQL object inspector error-state
+
+Статус:
+
+- реализовано
+
+Проблема:
+
+- visual suite уже страхует normal shell inspector scenario, но не держит его error-ветку;
+- если direct inspector metadata path сломается, layout warning/empty-state может деградировать незаметно, хотя это важный operational сценарий для SQL-console object flow.
+
+Целевой контракт:
+
+- visual suite получает screenshot-baseline для `sql object inspector` в error-state;
+- baseline должен воспроизводиться детерминированно через browser intercept, а не через случайный backend-failure;
+- regression guard должен ловить:
+  - поломку error banner / empty-state inspector path;
+  - потерю search+inspector split layout;
+  - деградацию `sql-object-content-shell` при failed metadata load.
+
+Что сделано:
+
+- visual spec расширен browser-level сценарием `sql object inspector error-state`;
+- error-state воспроизводится детерминированно через Playwright intercept/abort inspector metadata request;
+- committed snapshot `sql-object-inspector-error-shell` добавлен в regression suite;
+- заодно стабилизированы соседние visual baselines `module runs empty-state` и `module sync shell`, чтобы suite не дрейфовал из-за page scrollbar-зависимости.
+
+#### 16.10. Visual baseline для module sync runtime-fallback state
+
+Статус:
+
+- реализовано
+
+Проблема:
+
+- visual suite уже держит normal shell `module sync`, но не страхует его деградированный operational режим;
+- если `runtimeContext` падает в `FILES`/fallback, экран меняет banner, доступность кнопок и поведение secondary-panels, и эти регрессии сейчас можно пропустить незаметно.
+
+Целевой контракт:
+
+- visual suite получает screenshot-baseline для `module sync` в `runtime-fallback` state;
+- fallback-state воспроизводится детерминированно через browser intercept, а не через случайную конфигурацию локальной БД;
+- regression guard должен ловить:
+  - поломку warning banner о недоступности database mode;
+  - потерю disabled-state у primary sync actions;
+  - деградацию `module-sync-content-shell` в non-database operational режиме.
+
+Что сделано:
+
+- visual spec расширен browser-level сценарием `module sync runtime-fallback`;
+- fallback-state воспроизводится детерминированно через Playwright intercept для `runtime-context` и neutral `sync-state`;
+- committed snapshot `module-sync-runtime-fallback-shell` добавлен в regression suite;
+- заодно normal `module sync shell` и `sql console shell` переведены на фиксированные payload-ы, чтобы suite не зависел от живого user/runtime state.
+
+#### 16.11. Visual baseline для run history cleanup runtime-fallback state
+
+Статус:
+
+- реализовано
+
+Проблема:
+
+- visual suite уже держит normal shell `run history cleanup`, но не страхует его деградированный runtime-fallback режим;
+- если maintenance screen работает вне ожидаемого database-mode/fallback context, warning banner и preview-panels меняют подачу, и эти регрессии сейчас можно пропустить.
+
+Целевой контракт:
+
+- visual suite получает screenshot-baseline для `run history cleanup` в runtime-fallback state;
+- fallback-state воспроизводится детерминированно через browser intercept для `runtime-context` и preview payload-ов;
+- regression guard должен ловить:
+  - поломку warning banner о runtime fallback;
+  - деградацию `run-history-cleanup-content-shell` в non-primary operational режиме;
+  - потерю предсказуемой panel hierarchy при fallback-state.
+
+Что сделано:
+
+- visual spec расширен browser-level сценарием `run history cleanup runtime-fallback`;
+- fallback-state воспроизводится детерминированно через Playwright intercept для `runtime-context`, cleanup preview и output preview;
+- committed snapshot `run-history-cleanup-runtime-fallback-shell` добавлен в regression suite;
+- для visual-suite введен стабильный inner target `run-history-cleanup-panels-shell`, чтобы banner и panel hierarchy проверялись раздельно и не зависели от outer shell drift.
+
 2. `Comprehensive visual regression coverage`
    - расширить существующий browser smoke harness до visual regression уровня;
    - покрыть как минимум:
