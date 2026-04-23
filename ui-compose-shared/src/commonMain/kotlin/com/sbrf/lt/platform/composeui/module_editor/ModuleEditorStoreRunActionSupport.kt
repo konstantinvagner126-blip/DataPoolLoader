@@ -1,28 +1,29 @@
 package com.sbrf.lt.platform.composeui.module_editor
 
 internal class ModuleEditorStoreRunActionSupport(
-    private val api: ModuleEditorApi,
+    private val runStore: ModuleEditorStorageRunStore,
 ) {
-    private val requestSupport = ModuleEditorStoreRunRequestSupport()
     private val stateSupport = ModuleEditorStoreRunStateSupport()
 
     suspend fun runFilesModule(current: ModuleEditorPageState): ModuleEditorPageState {
-        val moduleId = current.selectedModuleId ?: return current
-        return runCatching {
-            api.startFilesRun(requestSupport.buildFilesRunRequest(moduleId, current))
-            stateSupport.runStarted(current)
-        }.getOrElse { error ->
-            stateSupport.runFailed(current, error, "Не удалось запустить модуль.")
-        }
+        return runModule(current, "files", "Не удалось запустить модуль.")
     }
 
     suspend fun runDatabaseModule(current: ModuleEditorPageState): ModuleEditorPageState {
+        return runModule(current, "database", "Не удалось запустить модуль из базы данных.")
+    }
+
+    private suspend fun runModule(
+        current: ModuleEditorPageState,
+        storage: String,
+        fallbackMessage: String,
+    ): ModuleEditorPageState {
         val moduleId = current.selectedModuleId ?: return current
         return runCatching {
-            api.startDatabaseRun(moduleId)
+            runStore.run(storage, moduleId, current)
             stateSupport.runStarted(current)
         }.getOrElse { error ->
-            stateSupport.runFailed(current, error, "Не удалось запустить модуль из базы данных.")
+            stateSupport.runFailed(current, error, fallbackMessage)
         }
     }
 }

@@ -6,21 +6,20 @@ import kotlin.test.assertEquals
 class ModuleEditorStoreRunActionSupportTest {
 
     @Test
-    fun `runFilesModule sends current draft request and clears transient status`() {
-        var capturedRequest: StartRunRequestDto? = null
+    fun `runFilesModule delegates to storage run store and clears transient status`() {
+        var capturedStorage: String? = null
+        var capturedModuleId: String? = null
         val support = ModuleEditorStoreRunActionSupport(
-            api = StubModuleEditorApi(
-                startFilesRunHandler = { request ->
-                    capturedRequest = request
-                    UiRunSnapshotDto(
-                        id = "run-1",
-                        moduleId = request.moduleId,
-                        moduleTitle = "Demo",
-                        status = "RUNNING",
-                        startedAt = "2026-04-23T10:00:00Z",
-                    )
-                },
-            ),
+            runStore = object : ModuleEditorStorageRunStore {
+                override suspend fun run(
+                    storage: String,
+                    moduleId: String,
+                    current: ModuleEditorPageState,
+                ) {
+                    capturedStorage = storage
+                    capturedModuleId = moduleId
+                }
+            },
         )
 
         val state = runModuleEditorSuspend {
@@ -36,8 +35,8 @@ class ModuleEditorStoreRunActionSupportTest {
             )
         }
 
-        assertEquals("module-a", capturedRequest?.moduleId)
-        assertEquals("app: {}", capturedRequest?.configText)
+        assertEquals("files", capturedStorage)
+        assertEquals("module-a", capturedModuleId)
         assertEquals(null, state.actionInProgress)
         assertEquals(null, state.errorMessage)
         assertEquals(null, state.successMessage)
@@ -46,11 +45,15 @@ class ModuleEditorStoreRunActionSupportTest {
     @Test
     fun `runDatabaseModule uses fallback error message when API throws without message`() {
         val support = ModuleEditorStoreRunActionSupport(
-            api = StubModuleEditorApi(
-                startDatabaseRunHandler = {
+            runStore = object : ModuleEditorStorageRunStore {
+                override suspend fun run(
+                    storage: String,
+                    moduleId: String,
+                    current: ModuleEditorPageState,
+                ) {
                     throw IllegalStateException()
-                },
-            ),
+                }
+            },
         )
 
         val state = runModuleEditorSuspend {

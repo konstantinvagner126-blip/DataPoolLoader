@@ -6,30 +6,44 @@ import kotlin.test.assertEquals
 class ModuleEditorStoreSaveActionSupportTest {
 
     @Test
-    fun `saveFilesModule delegates to refresh store with API response message`() {
+    fun `saveModule delegates to refresh store with storage save response message`() {
+        var capturedRoute: String? = null
         var capturedModuleId: String? = null
         var capturedRequest: SaveModuleRequestDto? = null
         var refreshMessage: String? = null
         val support = ModuleEditorStoreSaveActionSupport(
-            api = StubModuleEditorApi(
-                saveFilesModuleHandler = { moduleId, request ->
+            saveStore = object : ModuleEditorStorageSaveStore {
+                override suspend fun save(
+                    route: ModuleEditorRouteState,
+                    moduleId: String,
+                    request: SaveModuleRequestDto,
+                ): SaveResultResponseDto {
+                    capturedRoute = route.storage
                     capturedModuleId = moduleId
                     capturedRequest = request
-                    SaveResultResponseDto(message = "saved")
+                    return SaveResultResponseDto(message = "saved")
+                }
+
+                override suspend fun discardWorkingCopy(moduleId: String): SaveResultResponseDto =
+                    error("not used")
+
+                override suspend fun publishWorkingCopy(moduleId: String): SaveResultResponseDto =
+                    error("not used")
+            },
+            refreshStore = StubModuleEditorSelectedModuleRefreshStore(
+                handler = { current, _, successMessage ->
+                    refreshMessage = successMessage
+                    current.copy(
+                        actionInProgress = null,
+                        successMessage = successMessage,
+                        errorMessage = null,
+                    )
                 },
             ),
-            refreshStore = StubModuleEditorSelectedModuleRefreshStore { current, _, successMessage ->
-                refreshMessage = successMessage
-                current.copy(
-                    actionInProgress = null,
-                    successMessage = successMessage,
-                    errorMessage = null,
-                )
-            },
         )
 
         val state = runModuleEditorSuspend {
-            support.saveFilesModule(
+            support.saveModule(
                 current = ModuleEditorPageState(
                     selectedModuleId = "module-a",
                     actionInProgress = "saveFilesModule",
@@ -40,6 +54,7 @@ class ModuleEditorStoreSaveActionSupportTest {
             )
         }
 
+        assertEquals("files", capturedRoute)
         assertEquals("module-a", capturedModuleId)
         assertEquals("app: {}", capturedRequest?.configText)
         assertEquals("Demo", capturedRequest?.title)
@@ -52,14 +67,25 @@ class ModuleEditorStoreSaveActionSupportTest {
     @Test
     fun `publishDatabaseWorkingCopy returns fallback error message on failure`() {
         val support = ModuleEditorStoreSaveActionSupport(
-            api = StubModuleEditorApi(
-                publishDatabaseWorkingCopyHandler = {
+            saveStore = object : ModuleEditorStorageSaveStore {
+                override suspend fun save(
+                    route: ModuleEditorRouteState,
+                    moduleId: String,
+                    request: SaveModuleRequestDto,
+                ): SaveResultResponseDto = error("not used")
+
+                override suspend fun discardWorkingCopy(moduleId: String): SaveResultResponseDto =
+                    error("not used")
+
+                override suspend fun publishWorkingCopy(moduleId: String): SaveResultResponseDto {
                     throw IllegalStateException()
+                }
+            },
+            refreshStore = StubModuleEditorSelectedModuleRefreshStore(
+                handler = { current, _, successMessage ->
+                    current.copy(successMessage = successMessage)
                 },
             ),
-            refreshStore = StubModuleEditorSelectedModuleRefreshStore { current, _, successMessage ->
-                current.copy(successMessage = successMessage)
-            },
         )
 
         val state = runModuleEditorSuspend {

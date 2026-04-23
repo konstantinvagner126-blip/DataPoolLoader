@@ -10,13 +10,13 @@ internal class ModuleEditorWorkflowStoreSupport(
         current: ModuleEditorPageState,
         route: ModuleEditorRouteState,
     ): ModuleEditorPageState =
-        saveActionSupport.saveFilesModule(current, route)
+        saveActionSupport.saveModule(current, route)
 
     override suspend fun saveDatabaseWorkingCopy(
         current: ModuleEditorPageState,
         route: ModuleEditorRouteState,
     ): ModuleEditorPageState =
-        saveActionSupport.saveDatabaseWorkingCopy(current, route)
+        saveActionSupport.saveModule(current, route)
 
     override suspend fun discardDatabaseWorkingCopy(
         current: ModuleEditorPageState,

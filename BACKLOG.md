@@ -975,6 +975,16 @@ Review after Phase F:
   - [ModuleEditorStoreCatalogLoadingSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreCatalogLoadingSupport.kt) и [ModuleEditorStoreSessionLoadingSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreSessionLoadingSupport.kt) перестали напрямую вызывать `loadFiles* / loadDatabase*`;
   - unified storage snapshots заведены внутри loading boundary, а [ModuleEditorStoreStateFactory.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreStateFactory.kt) переведен на них;
   - добавлен targeted regression test на storage-aware read path: [ModuleEditorStorageReadSupportTest.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonTest/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStorageReadSupportTest.kt).
+- storage-aware save boundary вынесен из workflow/save path:
+  - [ModuleEditorStorageSaveStore.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStorageSaveStore.kt) теперь инкапсулирует `files/database` branching для save path;
+  - [ModuleEditorStoreSaveActionSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreSaveActionSupport.kt) перестал напрямую вызывать `saveFilesModule / saveDatabaseWorkingCopy`;
+  - [ModuleEditorWorkflowStoreSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorWorkflowStoreSupport.kt) переведен на unified save path внутри workflow boundary;
+  - добавлен targeted regression test на storage-aware save path: [ModuleEditorStorageSaveSupportTest.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonTest/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStorageSaveSupportTest.kt).
+- storage-aware run boundary вынесен из workflow/run path:
+  - [ModuleEditorStorageRunStore.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStorageRunStore.kt) теперь инкапсулирует `files/database` branching для run path;
+  - [ModuleEditorStoreRunActionSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreRunActionSupport.kt) перестал напрямую вызывать `startFilesRun / startDatabaseRun`;
+  - [ModuleEditorWorkflowStoreSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorWorkflowStoreSupport.kt) сохраняет прежний facade-контракт, но run storage branching теперь живет внутри отдельного boundary;
+  - добавлен targeted regression test на storage-aware run path: [ModuleEditorStorageRunSupportTest.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonTest/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStorageRunSupportTest.kt).
 
 Критерий завершения:
 

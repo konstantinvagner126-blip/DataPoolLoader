@@ -1,39 +1,27 @@
 package com.sbrf.lt.platform.composeui.module_editor
 
 internal class ModuleEditorStoreSaveActionSupport(
-    private val api: ModuleEditorApi,
+    private val saveStore: ModuleEditorStorageSaveStore,
     private val refreshStore: ModuleEditorSelectedModuleRefreshStore,
 ) {
     private val requestSupport = ModuleEditorStoreSaveRequestSupport()
 
-    suspend fun saveFilesModule(
+    suspend fun saveModule(
         current: ModuleEditorPageState,
         route: ModuleEditorRouteState,
     ): ModuleEditorPageState {
         val moduleId = current.selectedModuleId ?: return current
         return runCatching {
-            val response = api.saveFilesModule(moduleId, requestSupport.buildSaveRequest(current))
+            val response = saveStore.save(route, moduleId, requestSupport.buildSaveRequest(current))
             refreshStore.refreshSelectedModule(current, route, response.message)
         }.getOrElse { error ->
             current.copy(
                 actionInProgress = null,
-                errorMessage = error.message ?: "Не удалось сохранить модуль.",
-            )
-        }
-    }
-
-    suspend fun saveDatabaseWorkingCopy(
-        current: ModuleEditorPageState,
-        route: ModuleEditorRouteState,
-    ): ModuleEditorPageState {
-        val moduleId = current.selectedModuleId ?: return current
-        return runCatching {
-            val response = api.saveDatabaseWorkingCopy(moduleId, requestSupport.buildSaveRequest(current))
-            refreshStore.refreshSelectedModule(current, route, response.message)
-        }.getOrElse { error ->
-            current.copy(
-                actionInProgress = null,
-                errorMessage = error.message ?: "Не удалось сохранить черновик.",
+                errorMessage = if (route.storage == "database") {
+                    error.message ?: "Не удалось сохранить черновик."
+                } else {
+                    error.message ?: "Не удалось сохранить модуль."
+                },
             )
         }
     }
@@ -44,7 +32,7 @@ internal class ModuleEditorStoreSaveActionSupport(
     ): ModuleEditorPageState {
         val moduleId = current.selectedModuleId ?: return current
         return runCatching {
-            val response = api.discardDatabaseWorkingCopy(moduleId)
+            val response = saveStore.discardWorkingCopy(moduleId)
             refreshStore.refreshSelectedModule(current, route, response.message)
         }.getOrElse { error ->
             current.copy(
@@ -60,7 +48,7 @@ internal class ModuleEditorStoreSaveActionSupport(
     ): ModuleEditorPageState {
         val moduleId = current.selectedModuleId ?: return current
         return runCatching {
-            val response = api.publishDatabaseWorkingCopy(moduleId)
+            val response = saveStore.publishWorkingCopy(moduleId)
             refreshStore.refreshSelectedModule(current, route, response.message)
         }.getOrElse { error ->
             current.copy(
