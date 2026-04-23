@@ -23,6 +23,11 @@ internal fun QueryLibraryBlock(
     onAutoCommitToggle: (Boolean) -> Unit,
 ) {
     Div({ classes("sql-query-library", "mb-3") }) {
+        SqlConsoleQueryLibrarySummary(
+            state = state,
+            selectedRecentQuery = selectedRecentQuery,
+            selectedFavoriteQuery = selectedFavoriteQuery,
+        )
         Div({ classes("sql-query-library-row") }) {
             SqlConsoleQueryPickerBlock(
                 fieldId = "composeRecentQueries",
@@ -61,6 +66,58 @@ internal fun QueryLibraryBlock(
         )
     }
 }
+
+@Composable
+private fun SqlConsoleQueryLibrarySummary(
+    state: SqlConsolePageState,
+    selectedRecentQuery: String,
+    selectedFavoriteQuery: String,
+) {
+    Div({ classes("sql-query-library-summary") }) {
+        Div({ classes("d-flex", "flex-wrap", "align-items-start", "justify-content-between", "gap-3") }) {
+            Div {
+                Div({ classes("panel-title", "mb-1") }) { Text("Шаблоны и быстрые действия") }
+                Div({ classes("small", "text-secondary") }) {
+                    Text("Выбери готовый запрос, подставь его в редактор или закрепи текущий SQL без переключения контекста.")
+                }
+            }
+            Div({ classes("sql-query-library-summary-chips") }) {
+                SqlQueryLibrarySummaryChip("История", state.recentQueries.size.toString())
+                SqlQueryLibrarySummaryChip("Избранное", state.favoriteQueries.size.toString())
+                SqlQueryLibrarySummaryChip("Объекты", state.favoriteObjects.size.toString())
+            }
+        }
+        buildSelectedQuerySummary(
+            selectedRecentQuery = selectedRecentQuery,
+            selectedFavoriteQuery = selectedFavoriteQuery,
+        )?.let { summary ->
+            Div({ classes("sql-query-library-selection-note") }) {
+                Text(summary)
+            }
+        }
+    }
+}
+
+@Composable
+private fun SqlQueryLibrarySummaryChip(
+    label: String,
+    value: String,
+) {
+    Div({ classes("sql-query-library-summary-chip") }) {
+        Div({ classes("sql-query-library-summary-chip-label") }) { Text(label) }
+        Div({ classes("sql-query-library-summary-chip-value") }) { Text(value) }
+    }
+}
+
+private fun buildSelectedQuerySummary(
+    selectedRecentQuery: String,
+    selectedFavoriteQuery: String,
+): String? =
+    when {
+        selectedFavoriteQuery.isNotBlank() -> "Выбран избранный запрос. Следующий шаг: подставить его в редактор или убрать из списка."
+        selectedRecentQuery.isNotBlank() -> "Выбран запрос из истории. Следующий шаг: подставить его в редактор и при необходимости сохранить в избранное."
+        else -> null
+    }
 
 @Composable
 internal fun SqlLibraryActionButton(

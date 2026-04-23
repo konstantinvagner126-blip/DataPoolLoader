@@ -79,8 +79,6 @@ internal fun QueryOutputPanel(
     selectedShard: String?,
     currentPage: Int,
     onSelectTab: (String) -> Unit,
-    onSelectShard: (String) -> Unit,
-    onSelectPage: (Int) -> Unit,
 ) {
     Div({ classes("sql-output-tabs") }) {
         OutputTabButton(
@@ -104,8 +102,6 @@ internal fun QueryOutputPanel(
                 pageSize = pageSize,
                 selectedShard = selectedShard,
                 currentPage = currentPage,
-                onSelectShard = onSelectShard,
-                onSelectPage = onSelectPage,
             )
         }
     }

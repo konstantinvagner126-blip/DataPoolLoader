@@ -125,10 +125,17 @@ internal fun SqlConsoleWorkspacePanel(
         ExecutionStatusStrip(currentExecution, runningClockTick)
 
         Div({ classes("sql-output-panel") }) {
-            StatementSelectionBlock(
+            SqlConsoleResultNavigator(
                 statementResults = statementResults,
                 selectedStatementIndex = selectedStatementIndex,
+                result = exportableResult,
+                activeTab = activeOutputTab,
+                selectedShard = selectedResultShard,
+                currentPage = currentDataPage,
+                pageSize = state.pageSize,
                 onSelectStatement = onSelectStatement,
+                onSelectShard = onSelectShard,
+                onSelectPage = onSelectPage,
             )
             QueryOutputPanel(
                 execution = currentExecution,
@@ -138,8 +145,6 @@ internal fun SqlConsoleWorkspacePanel(
                 selectedShard = selectedResultShard,
                 currentPage = currentDataPage,
                 onSelectTab = onSelectOutputTab,
-                onSelectShard = onSelectShard,
-                onSelectPage = onSelectPage,
             )
         }
     }

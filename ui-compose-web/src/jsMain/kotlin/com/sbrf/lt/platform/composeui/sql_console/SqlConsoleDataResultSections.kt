@@ -2,9 +2,7 @@ package com.sbrf.lt.platform.composeui.sql_console
 
 import androidx.compose.runtime.Composable
 import com.sbrf.lt.platform.composeui.foundation.dom.classes
-import org.jetbrains.compose.web.dom.Button
 import org.jetbrains.compose.web.dom.Div
-import org.jetbrains.compose.web.dom.Li
 import org.jetbrains.compose.web.dom.Table
 import org.jetbrains.compose.web.dom.Tbody
 import org.jetbrains.compose.web.dom.Td
@@ -12,7 +10,6 @@ import org.jetbrains.compose.web.dom.Text
 import org.jetbrains.compose.web.dom.Th
 import org.jetbrains.compose.web.dom.Thead
 import org.jetbrains.compose.web.dom.Tr
-import org.jetbrains.compose.web.dom.Ul
 
 @Composable
 internal fun SelectResultPane(
@@ -21,8 +18,6 @@ internal fun SelectResultPane(
     pageSize: Int,
     selectedShard: String?,
     currentPage: Int,
-    onSelectShard: (String) -> Unit,
-    onSelectPage: (Int) -> Unit,
 ) {
     if (
         RenderExecutionResultPlaceholder(
@@ -56,22 +51,6 @@ internal fun SelectResultPane(
     val visibleRows = activeShard.rows.drop(startIndex).take(pageSize)
 
     ResultMutedText("Данные показываются отдельно по каждому source. Лимит на source: ${readyResult.maxRowsPerShard}.")
-    Ul({ classes("nav", "nav-tabs", "sql-result-tabs", "mb-3") }) {
-        successfulShards.forEach { shard ->
-            Li({ classes("nav-item") }) {
-                Button(attrs = {
-                    classes("nav-link")
-                    if (shard.shardName == activeShard.shardName) {
-                        classes("active")
-                    }
-                    attr("type", "button")
-                    onClick { onSelectShard(shard.shardName) }
-                }) {
-                    Text("${shard.shardName} (${shard.rowCount})")
-                }
-            }
-        }
-    }
     ResultMutedText(
         buildResultPageSummary(
             shard = activeShard,
@@ -97,28 +76,6 @@ internal fun SelectResultPane(
                         activeShard.columns.forEach { column ->
                             Td { Text(row[column] ?: "") }
                         }
-                    }
-                }
-            }
-        }
-    }
-    if (totalPages > 1) {
-        Div({ classes("sql-pagination-footer") }) {
-            Div({ classes("small", "text-secondary") }) {
-                Text("Страница $normalizedPage из $totalPages")
-            }
-            Div({ classes("d-flex", "flex-wrap", "gap-2") }) {
-                (1..totalPages).forEach { page ->
-                    Button(attrs = {
-                        classes(
-                            "btn",
-                            "btn-sm",
-                            if (page == normalizedPage) "btn-dark" else "btn-outline-secondary",
-                        )
-                        attr("type", "button")
-                        onClick { onSelectPage(page) }
-                    }) {
-                        Text(page.toString())
                     }
                 }
             }

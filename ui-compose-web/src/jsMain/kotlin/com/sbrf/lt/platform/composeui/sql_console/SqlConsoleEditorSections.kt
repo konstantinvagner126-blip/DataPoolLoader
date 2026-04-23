@@ -3,9 +3,7 @@ package com.sbrf.lt.platform.composeui.sql_console
 import androidx.compose.runtime.Composable
 import com.sbrf.lt.platform.composeui.foundation.dom.classes
 import com.sbrf.lt.platform.composeui.foundation.dom.classesFromString
-import org.jetbrains.compose.web.dom.Button
 import org.jetbrains.compose.web.dom.Div
-import org.jetbrains.compose.web.dom.Span
 import org.jetbrains.compose.web.dom.Text
 
 @Composable
@@ -29,64 +27,5 @@ internal fun CommandGuardrail(
     }
     Div({ classesFromString(cssClass) }) {
         Text(text)
-    }
-}
-
-@Composable
-internal fun StatementSelectionBlock(
-    statementResults: List<SqlConsoleStatementResult>,
-    selectedStatementIndex: Int,
-    onSelectStatement: (Int) -> Unit,
-) {
-    if (statementResults.size <= 1) {
-        return
-    }
-
-    Div({ classes("sql-query-library", "mb-3") }) {
-        SqlEditorMutedText("Скрипт содержит ${statementResults.size} statement-ов. Выбери statement, для которого показывать данные, статусы и экспорт.", "mb-2")
-        Div({ classes("d-flex", "flex-wrap", "gap-2") }) {
-            statementResults.forEachIndexed { index, statement ->
-                SqlEditorStatementButton(
-                    active = index == selectedStatementIndex,
-                    onClick = { onSelectStatement(index) },
-                ) {
-                    Text("#${index + 1} ${statement.statementKeyword}")
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun SqlEditorMutedText(
-    text: String,
-    marginClass: String = "",
-) {
-    Div({
-        classes("small", "text-secondary")
-        if (marginClass.isNotBlank()) {
-            classes(marginClass)
-        }
-    }) {
-        Text(text)
-    }
-}
-
-@Composable
-private fun SqlEditorStatementButton(
-    active: Boolean,
-    onClick: () -> Unit,
-    content: @Composable () -> Unit,
-) {
-    Button(attrs = {
-        classes(
-            "btn",
-            "btn-sm",
-            if (active) "btn-dark" else "btn-outline-secondary",
-        )
-        attr("type", "button")
-        onClick { onClick() }
-    }) {
-        content()
     }
 }

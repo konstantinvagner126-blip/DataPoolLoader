@@ -136,25 +136,72 @@
   width: 90px;
 }
 
-.sql-result-tabs .nav-link {
-  border-radius: 12px 12px 0 0;
-  color: #30465f;
+.sql-result-navigator {
+  padding: 0.9rem 1rem 0.8rem;
+  border-bottom: 1px solid rgba(19, 34, 56, 0.08);
+  background: rgba(248, 251, 255, 0.72);
+}
+
+.sql-result-navigator-head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.18rem;
+  margin-bottom: 0.8rem;
+}
+
+.sql-result-navigator-title {
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: #132238;
+}
+
+.sql-result-navigator-note {
+  font-size: 0.82rem;
+  color: #64748b;
+}
+
+.sql-result-navigator-groups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+}
+
+.sql-result-navigator-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.7rem 0.8rem;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid rgba(19, 34, 56, 0.08);
+}
+
+.sql-result-navigator-group-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.sql-result-navigator-group-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.sql-result-navigator-button {
   font-weight: 600;
 }
 
-.sql-result-tabs .nav-link.active {
-  background: #132238;
-  color: #eff6ff;
-  border-color: #132238;
-}
-
-.sql-pagination-footer {
-  display: flex;
-  justify-content: space-between;
+.sql-result-navigator-ellipsis {
+  display: inline-flex;
   align-items: center;
-  gap: 1rem;
-  margin-top: 1rem;
-  flex-wrap: wrap;
+  color: #64748b;
+  font-size: 0.95rem;
+  font-weight: 700;
+  padding: 0 0.15rem;
 }
 
 .footer-note {
@@ -631,8 +678,7 @@
 
 .sql-favorite-object-card {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+  flex-direction: column;
   gap: 12px;
   padding: 14px 16px;
   border: 1px solid rgba(15, 23, 42, 0.08);
@@ -655,6 +701,12 @@
   margin-top: 4px;
   font-size: 0.82rem;
   color: #64748b;
+}
+
+.sql-favorite-object-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
 .sql-object-name {

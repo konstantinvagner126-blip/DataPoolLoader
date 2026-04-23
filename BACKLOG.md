@@ -403,6 +403,9 @@
   - добавлен `working context strip`: source selection, transaction mode, strict safety, page size и credentials state читаются с одного взгляда, без возврата в sidebar;
   - toolbar переведен в явную action hierarchy `подготовка / выполнение / транзакция / экспорт`; `Run / Cancel / Commit / Rollback` больше не прячутся в визуально равноправном icon-only наборе;
   - execution status strip усилен для `pending commit`, `auto rollback by timeout/owner loss` и `cancel requested`, чтобы safety-состояния читались как operational state, а не как абстрактный summary;
+  - query library теперь показывает summary по history/favorites/object shortcuts и подсказывает следующий шаг для выбранного query без перехода в editor/sidebar;
+  - favorite objects переведены в более явную action hierarchy: primary SQL-действие, затем вспомогательные действия, затем inspector/remove;
+  - statement/shard/page navigation собрана в один result navigator вместо разнесенных по экрану блоков и длинного pagination wall;
 
 - четко развести source/settings, editor, execution state, result output и transaction controls;
 - убрать визуальное смешение между рабочим контекстом и результатами запроса;

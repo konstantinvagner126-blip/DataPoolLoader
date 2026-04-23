@@ -21,11 +21,12 @@ internal fun SqlFavoriteObjectsBlock(
         Div({ classes("d-flex", "align-items-center", "justify-content-between", "gap-3", "mb-2") }) {
             Div({ classes("panel-title", "mb-0") }) { Text("Избранные объекты") }
             Div({ classes("small", "text-secondary") }) {
-                Text("Быстрая вставка имен и готовых SQL-шаблонов в редактор.")
+                Text("Сначала выбери SQL-действие, затем при необходимости открой инспектор или выполни вспомогательные действия.")
             }
         }
         Div({ classes("sql-favorite-objects-grid") }) {
             favorites.forEach { favorite ->
+                val supportsPreview = supportsFavoriteRowPreview(favorite)
                 Div({ classes("sql-favorite-object-card") }) {
                     Div({ classes("sql-favorite-object-meta") }) {
                         Div({ classes("sql-favorite-object-name") }) {
@@ -35,22 +36,34 @@ internal fun SqlFavoriteObjectsBlock(
                             Text(favorite.contextLabel())
                         }
                     }
-                    Div({ classes("d-flex", "flex-wrap", "gap-2") }) {
-                        SqlLibraryActionButton("Вставить", "btn-outline-dark") { onInsert(favorite) }
+                    Div({ classes("sql-favorite-object-actions") }) {
                         SqlLibraryActionButton(
-                            if (supportsFavoriteRowPreview(favorite)) "SELECT *" else "В SQL",
+                            primaryFavoriteActionLabel(supportsPreview),
                             "btn-dark",
                         ) {
                             onInsertSelect(favorite)
                         }
-                        if (supportsFavoriteRowPreview(favorite)) {
-                            SqlLibraryActionButton("COUNT(*)", "btn-outline-dark") { onInsertCount(favorite) }
+                        Div({ classes("d-flex", "flex-wrap", "gap-2") }) {
+                            SqlLibraryActionButton(secondaryFavoriteActionLabel(supportsPreview), "btn-outline-dark") {
+                                onInsert(favorite)
+                            }
+                            if (supportsPreview) {
+                                SqlLibraryActionButton("COUNT(*)", "btn-outline-secondary") { onInsertCount(favorite) }
+                            }
                         }
-                        SqlLibraryActionButton("Метаданные", "btn-outline-secondary") { onOpenMetadata(favorite) }
-                        SqlLibraryActionButton("Убрать", "btn-outline-danger") { onRemove(favorite) }
+                        Div({ classes("d-flex", "flex-wrap", "gap-2") }) {
+                            SqlLibraryActionButton("Инспектор", "btn-outline-secondary") { onOpenMetadata(favorite) }
+                            SqlLibraryActionButton("Убрать", "btn-outline-danger") { onRemove(favorite) }
+                        }
                     }
                 }
             }
         }
     }
 }
+
+private fun primaryFavoriteActionLabel(supportsPreview: Boolean): String =
+    if (supportsPreview) "Открыть SELECT" else "Открыть SQL"
+
+private fun secondaryFavoriteActionLabel(supportsPreview: Boolean): String =
+    if (supportsPreview) "Вставить имя" else "Вставить объект"
