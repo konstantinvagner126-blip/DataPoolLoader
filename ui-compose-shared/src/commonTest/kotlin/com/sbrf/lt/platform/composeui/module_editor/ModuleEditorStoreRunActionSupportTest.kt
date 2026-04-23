@@ -6,7 +6,7 @@ import kotlin.test.assertEquals
 class ModuleEditorStoreRunActionSupportTest {
 
     @Test
-    fun `runFilesModule delegates to storage run store and clears transient status`() {
+    fun `runModule delegates to storage run store and clears transient status for files route`() {
         var capturedStorage: String? = null
         var capturedModuleId: String? = null
         val support = ModuleEditorStoreRunActionSupport(
@@ -23,15 +23,16 @@ class ModuleEditorStoreRunActionSupportTest {
         )
 
         val state = runModuleEditorSuspend {
-            support.runFilesModule(
-                ModuleEditorPageState(
+            support.runModule(
+                current = ModuleEditorPageState(
                     selectedModuleId = "module-a",
-                    actionInProgress = "runFilesModule",
+                    actionInProgress = "run",
                     errorMessage = "old",
                     successMessage = "old",
                     configTextDraft = "app: {}",
                     sqlContentsDraft = linkedMapOf("classpath:sql/main.sql" to "select 1"),
                 ),
+                route = ModuleEditorRouteState(storage = "files", moduleId = "module-a"),
             )
         }
 
@@ -43,7 +44,7 @@ class ModuleEditorStoreRunActionSupportTest {
     }
 
     @Test
-    fun `runDatabaseModule uses fallback error message when API throws without message`() {
+    fun `runModule uses fallback error message when database route fails without message`() {
         val support = ModuleEditorStoreRunActionSupport(
             runStore = object : ModuleEditorStorageRunStore {
                 override suspend fun run(
@@ -57,11 +58,12 @@ class ModuleEditorStoreRunActionSupportTest {
         )
 
         val state = runModuleEditorSuspend {
-            support.runDatabaseModule(
-                ModuleEditorPageState(
+            support.runModule(
+                current = ModuleEditorPageState(
                     selectedModuleId = "module-a",
-                    actionInProgress = "runDatabaseModule",
+                    actionInProgress = "run",
                 ),
+                route = ModuleEditorRouteState(storage = "database", moduleId = "module-a"),
             )
         }
 

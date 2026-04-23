@@ -5,25 +5,24 @@ internal class ModuleEditorStoreRunActionSupport(
 ) {
     private val stateSupport = ModuleEditorStoreRunStateSupport()
 
-    suspend fun runFilesModule(current: ModuleEditorPageState): ModuleEditorPageState {
-        return runModule(current, "files", "Не удалось запустить модуль.")
-    }
-
-    suspend fun runDatabaseModule(current: ModuleEditorPageState): ModuleEditorPageState {
-        return runModule(current, "database", "Не удалось запустить модуль из базы данных.")
-    }
-
-    private suspend fun runModule(
+    suspend fun runModule(
         current: ModuleEditorPageState,
-        storage: String,
-        fallbackMessage: String,
+        route: ModuleEditorRouteState,
     ): ModuleEditorPageState {
         val moduleId = current.selectedModuleId ?: return current
         return runCatching {
-            runStore.run(storage, moduleId, current)
+            runStore.run(route.storage, moduleId, current)
             stateSupport.runStarted(current)
         }.getOrElse { error ->
-            stateSupport.runFailed(current, error, fallbackMessage)
+            stateSupport.runFailed(
+                current = current,
+                error = error,
+                fallbackMessage = if (route.storage == "database") {
+                    "Не удалось запустить модуль из базы данных."
+                } else {
+                    "Не удалось запустить модуль."
+                },
+            )
         }
     }
 }

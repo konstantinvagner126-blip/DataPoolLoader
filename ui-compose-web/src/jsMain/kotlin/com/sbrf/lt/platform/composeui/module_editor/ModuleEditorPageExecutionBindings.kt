@@ -9,11 +9,7 @@ internal class ModuleEditorPageExecutionBindings(
     fun runModule() {
         context.scope.launch {
             val runningState = context.store.beginAction(context.currentState(), "run")
-            val nextState = if (context.currentRoute().storage == "database") {
-                context.store.runDatabaseModule(runningState)
-            } else {
-                context.store.runFilesModule(runningState)
-            }
+            val nextState = context.store.runModule(runningState, context.currentRoute())
             context.setState(nextState)
             context.refreshModuleCatalog()
             nextState.selectedModuleId?.let { moduleId ->
@@ -25,11 +21,7 @@ internal class ModuleEditorPageExecutionBindings(
     fun saveModule() {
         context.scope.launch {
             val savingState = context.store.beginAction(context.currentState(), "save")
-            val nextState = if (context.currentRoute().storage == "database") {
-                context.store.saveDatabaseWorkingCopy(savingState, context.currentRoute())
-            } else {
-                context.store.saveFilesModule(savingState, context.currentRoute())
-            }
+            val nextState = context.store.saveModule(savingState, context.currentRoute())
             context.setState(nextState)
         }
     }

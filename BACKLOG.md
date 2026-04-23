@@ -76,7 +76,7 @@
 
 Статус:
 
-- частично реализовано
+- реализовано
 
 Цель:
 
@@ -1000,6 +1000,14 @@ Review after Phase F:
   - добавлены targeted tests:
     - [ModuleEditorWorkingCopyLifecycleSupportTest.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonTest/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorWorkingCopyLifecycleSupportTest.kt)
     - расширен [ModuleEditorStoreSaveActionSupportTest.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonTest/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreSaveActionSupportTest.kt) на `publish/discard` orchestration.
+- workflow facade для обычных `save/run` больше не течет storage-ветвлением в page execution layer:
+  - [ModuleEditorWorkflowStore.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorWorkflowStore.kt) переведен на unified `saveModule / runModule` contract для текущего route;
+  - [ModuleEditorWorkflowStoreSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorWorkflowStoreSupport.kt) больше не дублирует `files/database` методы для базовых write/run сценариев;
+  - [ModuleEditorPageExecutionBindings.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorPageExecutionBindings.kt) перестал сам выбирать `files` или `database` workflow path для `save/run`;
+  - обновлен targeted regression test [ModuleEditorStoreRunActionSupportTest.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonTest/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreRunActionSupportTest.kt) под route-aware run contract.
+- closure review секции:
+  - оставшиеся `route.storage` проверки в `ui-compose-web` теперь относятся в основном к UI-capabilities, labels и presentation, а не к knowledge-heavy workflow branching;
+  - DB-only actions `create/delete/publish/discard` оставлены явными, потому что это не случайный leakage, а реальная разница lifecycle capabilities между storage adapters.
 
 Критерий завершения:
 

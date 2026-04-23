@@ -1,11 +1,7 @@
 package com.sbrf.lt.platform.composeui.module_editor
 
 internal interface ModuleEditorWorkflowStore {
-    suspend fun saveFilesModule(
-        current: ModuleEditorPageState,
-        route: ModuleEditorRouteState,
-    ): ModuleEditorPageState
-    suspend fun saveDatabaseWorkingCopy(
+    suspend fun saveModule(
         current: ModuleEditorPageState,
         route: ModuleEditorRouteState,
     ): ModuleEditorPageState
@@ -17,8 +13,10 @@ internal interface ModuleEditorWorkflowStore {
         current: ModuleEditorPageState,
         route: ModuleEditorRouteState,
     ): ModuleEditorPageState
-    suspend fun runFilesModule(current: ModuleEditorPageState): ModuleEditorPageState
-    suspend fun runDatabaseModule(current: ModuleEditorPageState): ModuleEditorPageState
+    suspend fun runModule(
+        current: ModuleEditorPageState,
+        route: ModuleEditorRouteState,
+    ): ModuleEditorPageState
     suspend fun createDatabaseModule(
         current: ModuleEditorPageState,
         route: ModuleEditorRouteState,

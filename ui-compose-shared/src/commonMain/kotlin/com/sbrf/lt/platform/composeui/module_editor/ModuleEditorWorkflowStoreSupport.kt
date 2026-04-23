@@ -6,13 +6,7 @@ internal class ModuleEditorWorkflowStoreSupport(
     private val databaseLifecycleActionSupport: ModuleEditorStoreDatabaseLifecycleActionSupport,
     private val configFormSupport: ModuleEditorStoreConfigFormSupport,
 ) : ModuleEditorWorkflowStore {
-    override suspend fun saveFilesModule(
-        current: ModuleEditorPageState,
-        route: ModuleEditorRouteState,
-    ): ModuleEditorPageState =
-        saveActionSupport.saveModule(current, route)
-
-    override suspend fun saveDatabaseWorkingCopy(
+    override suspend fun saveModule(
         current: ModuleEditorPageState,
         route: ModuleEditorRouteState,
     ): ModuleEditorPageState =
@@ -30,11 +24,11 @@ internal class ModuleEditorWorkflowStoreSupport(
     ): ModuleEditorPageState =
         saveActionSupport.publishDatabaseWorkingCopy(current, route)
 
-    override suspend fun runFilesModule(current: ModuleEditorPageState): ModuleEditorPageState =
-        runActionSupport.runFilesModule(current)
-
-    override suspend fun runDatabaseModule(current: ModuleEditorPageState): ModuleEditorPageState =
-        runActionSupport.runDatabaseModule(current)
+    override suspend fun runModule(
+        current: ModuleEditorPageState,
+        route: ModuleEditorRouteState,
+    ): ModuleEditorPageState =
+        runActionSupport.runModule(current, route)
 
     override suspend fun createDatabaseModule(
         current: ModuleEditorPageState,
