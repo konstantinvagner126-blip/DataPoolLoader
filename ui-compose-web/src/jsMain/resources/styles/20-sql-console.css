@@ -1,8 +1,9 @@
 .editor-frame {
   height: 460px;
-  border: 1px solid rgba(19, 34, 56, 0.12);
-  border-radius: 16px;
+  border: 1px solid rgba(19, 34, 56, 0.14);
+  border-radius: 12px;
   overflow: hidden;
+  background: #ffffff;
 }
 
 .sql-editor-frame .monaco-editor .compose-sql-statement-block {
@@ -210,6 +211,34 @@
 
 .sql-editor-frame {
   height: 360px;
+}
+
+.sql-console-shell-row {
+  align-items: stretch;
+}
+
+.sql-console-shell-column {
+  min-width: 0;
+}
+
+.sql-shell-pane {
+  padding: 1rem 1.05rem;
+  border: 1px solid rgba(19, 34, 56, 0.08);
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(251, 252, 254, 0.98), rgba(247, 249, 252, 0.98));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.88);
+}
+
+.sql-shell-pane-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.7rem 1rem;
+}
+
+.sql-shell-pane-note {
+  line-height: 1.35;
 }
 
 .sql-sidebar-panel,
@@ -490,11 +519,11 @@
   margin-top: 0.85rem;
   display: flex;
   flex-direction: column;
-  gap: 0.8rem;
-  padding: 0.8rem 0.9rem;
-  border-radius: 14px;
+  gap: 0.65rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 10px;
   border: 1px solid rgba(19, 34, 56, 0.08);
-  background: rgba(19, 34, 56, 0.04);
+  background: rgba(255, 255, 255, 0.84);
 }
 
 .sql-toolbar-meta {
@@ -507,17 +536,17 @@
 .sql-toolbar-action-groups {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.6rem;
+  gap: 0.5rem;
 }
 
 .sql-toolbar-action-group {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
-  padding: 0.6rem 0.7rem;
-  border-radius: 12px;
-  border: 1px solid rgba(19, 34, 56, 0.08);
-  background: rgba(255, 255, 255, 0.82);
+  gap: 0.3rem;
+  padding: 0.5rem 0.55rem;
+  border-radius: 9px;
+  border: 1px solid rgba(19, 34, 56, 0.07);
+  background: rgba(248, 250, 252, 0.92);
 }
 
 .sql-toolbar-action-group-head {
@@ -535,9 +564,9 @@
 }
 
 .sql-toolbar-action-group-note {
-  font-size: 0.78rem;
+  font-size: 0.74rem;
   color: #52657e;
-  line-height: 1.4;
+  line-height: 1.25;
 }
 
 .sql-toolbar-action-group-buttons {
@@ -556,10 +585,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.35rem;
-  height: 2.35rem;
+  width: 2.15rem;
+  height: 2.15rem;
   padding: 0;
-  border-radius: 12px;
+  border-radius: 10px;
 }
 
 .sql-toolbar-icon {
@@ -569,10 +598,10 @@
 
 .sql-shortcut-panel {
   margin-top: 0.9rem;
-  padding: 0.9rem 1rem;
-  border-radius: 16px;
+  padding: 0.75rem 0.85rem;
+  border-radius: 11px;
   border: 1px solid rgba(19, 34, 56, 0.08);
-  background: rgba(248, 251, 255, 0.78);
+  background: rgba(248, 250, 252, 0.82);
 }
 
 .sql-shortcut-panel-head {
@@ -580,8 +609,8 @@
   flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 0.85rem;
-  margin-bottom: 0.85rem;
+  gap: 0.65rem;
+  margin-bottom: 0.65rem;
 }
 
 .sql-shortcut-panel-title {
@@ -607,14 +636,14 @@
 .sql-shortcut-groups {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 0.75rem;
+  gap: 0.55rem;
 }
 
 .sql-shortcut-group {
-  padding: 0.75rem 0.85rem;
-  border-radius: 14px;
-  border: 1px solid rgba(19, 34, 56, 0.08);
-  background: rgba(255, 255, 255, 0.88);
+  padding: 0.6rem 0.7rem;
+  border-radius: 10px;
+  border: 1px solid rgba(19, 34, 56, 0.07);
+  background: rgba(255, 255, 255, 0.9);
 }
 
 .sql-shortcut-group-title {
@@ -645,10 +674,10 @@
 
 .sql-guardrail {
   margin-top: 1rem;
-  border-radius: 14px;
-  padding: 0.85rem 1rem;
+  border-radius: 10px;
+  padding: 0.7rem 0.85rem;
   border: 1px solid transparent;
-  font-size: 0.91rem;
+  font-size: 0.86rem;
   font-weight: 600;
 }
 
@@ -678,11 +707,11 @@
 
 .sql-status-strip {
   margin-top: 1rem;
-  border-radius: 14px;
-  padding: 0.85rem 1rem;
+  border-radius: 10px;
+  padding: 0.7rem 0.85rem;
   background: rgba(100, 116, 139, 0.12);
   color: #475569;
-  font-size: 0.92rem;
+  font-size: 0.86rem;
   font-weight: 600;
 }
 
@@ -738,28 +767,28 @@
 
 .sql-output-panel {
   margin-top: 1rem;
-  border: 1px solid rgba(19, 34, 56, 0.08);
-  border-radius: 18px;
+  border: 1px solid rgba(19, 34, 56, 0.1);
+  border-radius: 12px;
   overflow: hidden;
-  background: rgba(248, 251, 255, 0.65);
+  background: rgba(247, 249, 252, 0.96);
 }
 
 .sql-output-tabs {
   display: flex;
   gap: 0.35rem;
-  padding: 0.75rem 0.75rem 0;
+  padding: 0.6rem 0.6rem 0;
   border-bottom: 1px solid rgba(19, 34, 56, 0.08);
-  background: rgba(255, 255, 255, 0.72);
+  background: rgba(251, 252, 254, 0.96);
 }
 
 .sql-output-tab {
   border: 0;
   background: transparent;
   color: #52657e;
-  font-size: 0.88rem;
+  font-size: 0.84rem;
   font-weight: 700;
-  padding: 0.7rem 1rem;
-  border-radius: 12px 12px 0 0;
+  padding: 0.58rem 0.82rem;
+  border-radius: 10px 10px 0 0;
 }
 
 .sql-output-tab.active {
@@ -769,36 +798,112 @@
 
 .sql-output-pane {
   display: none;
-  padding: 1rem;
+  padding: 0.85rem;
 }
 
 .sql-output-pane.active {
   display: block;
 }
 
+.sql-working-status-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.72rem;
+  padding-top: 0.72rem;
+  border-top: 1px solid rgba(19, 34, 56, 0.08);
+}
+
+.sql-working-status-item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  min-height: 1.95rem;
+  padding: 0.36rem 0.54rem;
+  border: 1px solid rgba(19, 34, 56, 0.08);
+  border-radius: 8px;
+  background: rgba(248, 250, 252, 0.94);
+}
+
+.sql-working-status-item-label {
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.sql-working-status-item-value {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #132238;
+  line-height: 1.25;
+}
+
+.sql-working-status-item-info {
+  border-color: rgba(29, 111, 216, 0.16);
+  background: rgba(29, 111, 216, 0.08);
+}
+
+.sql-working-status-item-info .sql-working-status-item-label,
+.sql-working-status-item-info .sql-working-status-item-value {
+  color: #1d4ed8;
+}
+
+.sql-working-status-item-success {
+  border-color: rgba(13, 148, 136, 0.18);
+  background: rgba(13, 148, 136, 0.08);
+}
+
+.sql-working-status-item-success .sql-working-status-item-label,
+.sql-working-status-item-success .sql-working-status-item-value {
+  color: #0f766e;
+}
+
+.sql-working-status-item-warning {
+  border-color: rgba(245, 158, 11, 0.22);
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.sql-working-status-item-warning .sql-working-status-item-label,
+.sql-working-status-item-warning .sql-working-status-item-value {
+  color: #b45309;
+}
+
+.sql-working-status-item-danger {
+  border-color: rgba(220, 38, 38, 0.2);
+  background: rgba(220, 38, 38, 0.1);
+}
+
+.sql-working-status-item-danger .sql-working-status-item-label,
+.sql-working-status-item-danger .sql-working-status-item-value {
+  color: #b91c1c;
+}
+
 .event-log,
 .summary-box {
   background: #0f172a;
   color: #d7e2f1;
-  border-radius: 16px;
-  padding: 1rem;
-  min-height: 220px;
-  max-height: 420px;
+  border-radius: 10px;
+  padding: 0.78rem 0.88rem;
+  min-height: 180px;
+  max-height: 360px;
   overflow: auto;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
+  line-height: 1.42;
   margin: 0;
   white-space: pre-wrap;
 }
 
 .human-log {
-  background: #f8fbff;
+  background: #ffffff;
   color: #132238;
-  border: 1px solid rgba(19, 34, 56, 0.08);
+  border: 1px solid rgba(19, 34, 56, 0.1);
 }
 
 .technical-log {
-  min-height: 180px;
-  max-height: 360px;
+  min-height: 160px;
+  max-height: 320px;
 }
 
 @media (max-width: 992px) {

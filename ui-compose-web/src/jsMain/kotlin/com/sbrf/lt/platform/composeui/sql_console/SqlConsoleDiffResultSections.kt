@@ -25,28 +25,30 @@ internal fun SqlConsoleDiffResultPane(
         SqlResultPlaceholder("Diff-режим доступен только для табличных результатов.")
         return
     }
-    ResultMutedText("Сравнение строится относительно baseline source ${diffView.baselineSourceName} и использует только уже загруженные строки результата.")
-    if (diffView.truncated) {
-        ResultMutedText("Хотя бы один source вернул усеченный результат. Diff отражает только видимую часть набора данных.")
+    ResultMetaStack {
+        ResultMutedText("Сравнение строится относительно baseline source ${diffView.baselineSourceName} и использует только уже загруженные строки результата.")
+        if (diffView.truncated) {
+            ResultMutedText("Хотя бы один source вернул усеченный результат. Diff отражает только видимую часть набора данных.")
+        }
+        ResultMutedText(
+            when {
+                diffView.totalMismatchCount == 0 -> "Различий по source не найдено."
+                diffView.mismatchLimitReached ->
+                    "Показаны первые ${diffView.entries.size} различий из ${diffView.totalMismatchCount}. Полный compare не рисуется, чтобы не раздувать экран."
+                else -> "Найдено различий: ${diffView.totalMismatchCount}."
+            },
+        )
     }
     Div({ classes("sql-diff-summary-grid") }) {
         diffView.sourceSummaries.forEach { summary ->
             SqlConsoleDiffSummaryCard(summary = summary, baselineSourceName = diffView.baselineSourceName)
         }
     }
-    ResultMutedText(
-        when {
-            diffView.totalMismatchCount == 0 -> "Различий по source не найдено."
-            diffView.mismatchLimitReached ->
-                "Показаны первые ${diffView.entries.size} различий из ${diffView.totalMismatchCount}. Полный compare не рисуется, чтобы не раздувать экран."
-            else -> "Найдено различий: ${diffView.totalMismatchCount}."
-        },
-    )
     if (diffView.entries.isEmpty()) {
         SqlResultPlaceholder("Для текущего statement расхождений между source не найдено.")
         return
     }
-    Div({ classes("table-responsive") }) {
+    Div({ classes("table-responsive", "sql-diff-table-wrap") }) {
         Table({ classes("table", "table-sm", "sql-diff-table", "mb-0") }) {
             Thead {
                 Tr {

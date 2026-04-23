@@ -185,8 +185,17 @@ internal fun OutputPane(
 internal fun ResultMutedText(
     text: String,
 ) {
-    Div({ classes("small", "text-secondary", "mb-3") }) {
+    Div({ classes("sql-result-meta-line") }) {
         Text(text)
+    }
+}
+
+@Composable
+internal fun ResultMetaStack(
+    content: @Composable () -> Unit,
+) {
+    Div({ classes("sql-result-meta-stack") }) {
+        content()
     }
 }
 

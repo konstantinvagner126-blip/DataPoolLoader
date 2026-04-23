@@ -743,6 +743,132 @@
 - query picker blocks получили более строгую section-подачу внутри tool window;
 - `Избранные объекты` переведены из более тяжелой card-grid подачи в более плотный stacked secondary list.
 
+#### 13.5. Shell densification
+
+Статус:
+
+- реализовано
+
+Проблема:
+
+- основной shell SQL-консоли все еще местами слишком мягкий и card-like:
+  - крупные радиусы;
+  - мягкие подложки;
+  - избыточный внутренний воздух;
+- из-за этого editor/result panes все еще не забирают достаточно визуального приоритета.
+
+Текущая зона:
+
+- [SqlConsolePageContentSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsolePageContentSections.kt)
+- [SqlConsoleSourceSidebarSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleSourceSidebarSections.kt)
+- [SqlConsoleWorkspacePanelSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleWorkspacePanelSections.kt)
+- [SqlConsoleWorkspaceToolbarSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleWorkspaceToolbarSections.kt)
+- [SqlConsoleResultNavigatorSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleResultNavigatorSections.kt)
+- [20-sql-console.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/20-sql-console.css)
+
+Целевой контракт:
+
+- shell SQL-консоли становится плотнее и строже;
+- sidebar/workspace/output panes читаются как связанные части одной рабочей среды;
+- editor frame и result pane получают больший визуальный приоритет;
+- toolbar и navigator выглядят как pane chrome, а не как набор отдельных мягких карточек.
+
+Что сделано:
+
+- для sidebar и workspace pane введен более строгий shell chrome с явными pane-head секциями;
+- editor frame, output shell и result navigator уплотнены:
+  - меньше радиусы;
+  - меньше мягкие подложки;
+  - плотнее внутренние отступы;
+- toolbar action groups и shortcut panel переведены на более плотную pane-chrome подачу;
+- визуальный приоритет editor/output panes усилен без изменения execution behavior и safety affordance.
+
+#### 13.6. Result pane densification
+
+Статус:
+
+- реализовано
+
+Проблема:
+
+- нижняя зона результатов все еще местами выглядит как набор мягких panel/card блоков:
+  - grid toolbar слишком похож на отдельный widget;
+  - diff summary и diff table держат лишнюю card-like подачу;
+  - status pane использует слишком общий bootstrap-like table вид;
+  - placeholder/meta-copy не собираются в строгий result-pane chrome;
+- из-за этого result area читается слабее, чем editor pane, хотя именно она должна быть второй главной рабочей зоной.
+
+Текущая зона:
+
+- [SqlConsoleResultSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleResultSections.kt)
+- [SqlConsoleDataResultSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleDataResultSections.kt)
+- [SqlConsoleDiffResultSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleDiffResultSections.kt)
+- [SqlConsoleStatusResultSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleStatusResultSections.kt)
+- [20-sql-console.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/20-sql-console.css)
+- [40-sql-results.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/40-sql-results.css)
+
+Целевой контракт:
+
+- result area читается как единый рабочий pane;
+- result-meta, toolbar, grid/diff/status tables и placeholders подаются плотнее и строже;
+- data/diff/status tabs сохраняют текущую функциональность, но перестают выглядеть как набор разрозненных widgets;
+- IDE-like приоритет result pane усиливается без нового banner/noise слоя.
+
+Что сделано:
+
+- result-meta summary собран в компактный pane-style block вместо набора разрозненных muted lines;
+- data grid toolbar, table chrome и placeholders уплотнены и стали ближе к строгому IDE/data-grid виду;
+- diff summary cards и diff table переведены на более плотную, менее декоративную подачу;
+- status pane получил собственный строгий table chrome вместо общего bootstrap-like вида;
+- status/event log boxes уплотнены, чтобы output зона читалась как связанная часть одного result pane.
+
+#### 13.7. Status bar / working status line
+
+Статус:
+
+- реализовано
+
+Проблема:
+
+- после cleanup shell/result-pane внизу workspace все еще не хватает одного компактного operational слоя, который быстро отвечает на вопрос:
+  - по скольким source сейчас идет работа;
+  - какой transaction mode активен;
+  - включена ли strict safety;
+  - в каком result context пользователь сейчас находится;
+  - что происходит с текущим execution;
+- при этом возвращать старый дублирующий context block нельзя.
+
+Текущая зона:
+
+- [SqlConsoleWorkspacePanelSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleWorkspacePanelSections.kt)
+- [SqlConsoleModels.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleModels.kt)
+- [SqlConsoleLabels.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleLabels.kt)
+- [20-sql-console.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/20-sql-console.css)
+
+Целевой контракт:
+
+- внизу workspace есть компактная status line;
+- она не дублирует sidebar и не превращается в второй summary-block;
+- status line показывает только полезные operational сигналы:
+  - selected sources;
+  - transaction mode;
+  - strict safety;
+  - result context;
+  - execution state;
+- `pending commit` и failure states остаются визуально заметными.
+
+Что сделано:
+
+- внизу SQL workspace добавлена компактная working status line;
+- она показывает только operational summary:
+  - количество выбранных source;
+  - transaction mode;
+  - strict safety;
+  - текущий result/view context;
+  - execution state;
+- line использует компактные tone-coded items и не возвращает старый дублирующий context block;
+- `pending commit`, `running`, `failed`, `rolled back` и `success` состояния execution остаются читаемыми в нижнем chrome.
+
 Порядок реализации:
 
 1. `Object inspector direct-load hardening`:

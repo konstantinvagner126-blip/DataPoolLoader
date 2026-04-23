@@ -42,8 +42,8 @@ internal fun SqlConsolePageContent(
         return
     }
 
-    Div({ classes("row", "g-4") }) {
-        Div({ classes("col-12", "col-xl-3") }) {
+    Div({ classes("row", "g-3", "sql-console-shell-row") }) {
+        Div({ classes("col-12", "col-xl-3", "sql-console-shell-column") }) {
             SqlConsoleSourceSidebar(
                 state = state,
                 connectionStatusBySource = connectionStatusBySource,
@@ -63,7 +63,7 @@ internal fun SqlConsolePageContent(
             )
         }
 
-        Div({ classes("col-12", "col-xl-9") }) {
+        Div({ classes("col-12", "col-xl-9", "sql-console-shell-column") }) {
             SqlConsoleWorkspacePanel(
                 state = state,
                 editorFocused = uiState.editorFocused,

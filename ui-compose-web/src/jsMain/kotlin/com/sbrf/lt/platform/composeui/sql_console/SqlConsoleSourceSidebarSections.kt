@@ -31,9 +31,12 @@ internal fun SqlConsoleSourceSidebar(
     onCredentialsFileSelected: (File?) -> Unit,
     onUploadCredentials: () -> Unit,
 ) {
-    Div({ classes("panel", "sql-sidebar-panel", "h-100") }) {
-        Div({ classes("d-flex", "align-items-center", "justify-content-between", "gap-2", "mb-2") }) {
-            Div({ classes("panel-title", "mb-0") }) { Text("Sources") }
+    Div({ classes("panel", "sql-shell-pane", "sql-sidebar-panel", "h-100") }) {
+        Div({ classes("sql-shell-pane-head", "sql-sidebar-pane-head") }) {
+            Div {
+                Div({ classes("eyebrow", "mb-1") }) { Text("Navigator") }
+                Div({ classes("panel-title", "mb-0") }) { Text("Sources") }
+            }
             Button(attrs = {
                 classes("btn", "btn-outline-dark", "btn-sm")
                 attr("type", "button")
@@ -45,7 +48,7 @@ internal fun SqlConsoleSourceSidebar(
                 Text("Проверить подключение")
             }
         }
-        Div({ classes("small", "text-secondary", "mb-3") }) {
+        Div({ classes("small", "text-secondary", "sql-shell-pane-note", "mb-3") }) {
             Text(buildConsoleInfoText(state.info))
         }
         SqlConsoleSourceSettingsBlock(

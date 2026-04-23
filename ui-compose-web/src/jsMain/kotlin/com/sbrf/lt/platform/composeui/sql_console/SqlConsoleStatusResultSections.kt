@@ -33,7 +33,9 @@ internal fun StatusResultPane(
     val readyExecution = requireNotNull(execution)
     val readyResult = requireNotNull(result)
 
-    ResultMutedText(buildResultStatusSummary(readyExecution, readyResult))
+    ResultMetaStack {
+        ResultMutedText(buildResultStatusSummary(readyExecution, readyResult))
+    }
     if (readyResult.shardResults.isEmpty()) {
         EmptyStateCard(
             title = "Результаты",
@@ -41,8 +43,8 @@ internal fun StatusResultPane(
         )
         return
     }
-    Div({ classes("table-responsive", "mb-3") }) {
-        Table({ classes("table", "table-striped", "table-hover", "align-middle", "mb-0") }) {
+    Div({ classes("table-responsive", "sql-status-result-table-wrap", "mb-0") }) {
+        Table({ classes("table", "table-sm", "align-middle", "mb-0", "sql-status-result-table") }) {
             Thead {
                 Tr {
                     Th { Text("Source") }

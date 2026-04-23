@@ -66,11 +66,12 @@ internal fun SqlConsoleWorkspacePanel(
     onSelectShard: (String?) -> Unit,
     onSelectPage: (Int) -> Unit,
 ) {
-    Div({ classes("panel", "sql-workspace-panel") }) {
-        Div({ classes("d-flex", "flex-wrap", "align-items-start", "justify-content-between", "gap-3", "mb-3") }) {
+    Div({ classes("panel", "sql-shell-pane", "sql-workspace-panel") }) {
+        Div({ classes("sql-shell-pane-head", "sql-workspace-pane-head", "mb-3") }) {
             Div {
+                Div({ classes("eyebrow", "mb-1") }) { Text("Workspace") }
                 Div({ classes("panel-title", "mb-1") }) { Text("SQL-редактор") }
-                Div({ classes("text-secondary", "small") }) {
+                Div({ classes("text-secondary", "small", "sql-shell-pane-note") }) {
                     Text("Поддерживается один SQL или SQL-скрипт из нескольких statement-ов. Результат показывается отдельно по каждому statement и source.")
                 }
             }
@@ -176,5 +177,16 @@ internal fun SqlConsoleWorkspacePanel(
                 onSelectTab = onSelectOutputTab,
             )
         }
+
+        SqlConsoleWorkingStatusBar(
+            state = state,
+            execution = currentExecution,
+            activeOutputTab = activeOutputTab,
+            activeDataView = activeDataView,
+            selectedStatementIndex = selectedStatementIndex,
+            statementResults = statementResults,
+            selectedShard = selectedResultShard,
+            currentPage = currentDataPage,
+        )
     }
 }

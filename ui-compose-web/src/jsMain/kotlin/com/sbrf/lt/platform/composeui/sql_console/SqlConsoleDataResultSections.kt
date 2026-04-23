@@ -85,18 +85,20 @@ internal fun SelectResultPane(
         ?.let { visibleRows.getOrNull(it.absoluteRowIndex - startIndex) }
     val selectedCellOnCurrentPage = selectedCell != null && selectedRow != null && selectedColumnName != null
 
-    ResultMutedText("Данные показываются отдельно по каждому source. Лимит на source: ${readyResult.maxRowsPerShard}.")
-    ResultMutedText(
-        buildResultPageSummary(
-            shard = activeShard,
-            result = readyResult,
-            startIndex = startIndex,
-            endIndexExclusive = endIndexExclusive,
-            normalizedPage = normalizedPage,
-            totalPages = totalPages,
-        ),
-    )
-    ResultMutedText("Grid поддерживает wrap/nowrap, resize/autosize колонок и copy по ячейке, строке и колонке.")
+    ResultMetaStack {
+        ResultMutedText("Данные показываются отдельно по каждому source. Лимит на source: ${readyResult.maxRowsPerShard}.")
+        ResultMutedText(
+            buildResultPageSummary(
+                shard = activeShard,
+                result = readyResult,
+                startIndex = startIndex,
+                endIndexExclusive = endIndexExclusive,
+                normalizedPage = normalizedPage,
+                totalPages = totalPages,
+            ),
+        )
+        ResultMutedText("Grid поддерживает wrap/nowrap, resize/autosize колонок и copy по ячейке, строке и колонке.")
+    }
     Div({ classes("sql-result-grid-toolbar") }) {
         Div({ classes("sql-result-grid-toolbar-actions") }) {
             SqlResultGridToolbarButton(
@@ -152,7 +154,7 @@ internal fun SelectResultPane(
             )
         }
     }
-    Div({ classes("table-responsive") }) {
+    Div({ classes("table-responsive", "sql-result-table-wrap") }) {
         Table({
             classes("table", "table-sm", "sql-result-table", "sql-result-grid-table", "mb-0")
             if (wrapCellContent) {
