@@ -1,10 +1,9 @@
 package com.sbrf.lt.platform.composeui.module_editor
 
 internal class ModuleEditorStoreSessionLoadingSupport(
-    private val api: ModuleEditorApi,
+    private val storageReadSupport: ModuleEditorStorageReadSupport,
     private val syncRoute: (storage: String, moduleId: String?, includeHidden: Boolean) -> Unit,
     private val stateFactory: ModuleEditorStoreStateFactory,
-    private val configFormSnapshotStore: ModuleEditorConfigFormSnapshotStore,
     private val fallbackSupport: ModuleEditorStoreFallbackSupport,
 ) {
     suspend fun selectModule(
@@ -13,14 +12,9 @@ internal class ModuleEditorStoreSessionLoadingSupport(
         moduleId: String,
     ): ModuleEditorPageState {
         return runCatching {
-            val session = if (route.storage == "database") {
-                api.loadDatabaseSession(moduleId)
-            } else {
-                api.loadFilesSession(moduleId)
-            }
-            val configForm = configFormSnapshotStore.loadSnapshot(session.module.configText)
+            val snapshot = storageReadSupport.loadSessionSnapshot(route, moduleId)
             syncRoute(route.storage, moduleId, route.includeHidden)
-            stateFactory.applySelectedSession(current, moduleId, session, configForm)
+            stateFactory.applySelectedSession(current, snapshot)
         }.getOrElse { error ->
             current.copy(
                 loading = false,

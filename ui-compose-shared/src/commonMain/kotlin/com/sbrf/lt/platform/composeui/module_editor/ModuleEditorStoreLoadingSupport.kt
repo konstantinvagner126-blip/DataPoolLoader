@@ -8,19 +8,21 @@ internal class ModuleEditorStoreLoadingSupport(
     private val fallbackSupport = ModuleEditorStoreFallbackSupport(api)
     private val selectionSupport = ModuleEditorStoreCatalogSelectionSupport()
     private val configFormSnapshotStore = ModuleEditorStoreConfigFormSnapshotSupport(api)
-    private val catalogLoadingSupport = ModuleEditorStoreCatalogLoadingSupport(
+    private val storageReadSupport = ModuleEditorStorageReadSupport(
         api = api,
-        syncRoute = syncRoute,
-        stateFactory = stateFactory,
         selectionSupport = selectionSupport,
         configFormSnapshotStore = configFormSnapshotStore,
+    )
+    private val catalogLoadingSupport = ModuleEditorStoreCatalogLoadingSupport(
+        storageReadSupport = storageReadSupport,
+        syncRoute = syncRoute,
+        stateFactory = stateFactory,
         fallbackSupport = fallbackSupport,
     )
     private val sessionLoadingSupport = ModuleEditorStoreSessionLoadingSupport(
-        api = api,
+        storageReadSupport = storageReadSupport,
         syncRoute = syncRoute,
         stateFactory = stateFactory,
-        configFormSnapshotStore = configFormSnapshotStore,
         fallbackSupport = fallbackSupport,
     )
 

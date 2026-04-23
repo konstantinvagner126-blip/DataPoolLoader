@@ -1,11 +1,120 @@
 package com.sbrf.lt.platform.composeui.module_editor
 
 import com.sbrf.lt.platform.composeui.model.DatabaseModulesCatalogResponse
+import com.sbrf.lt.platform.composeui.model.DatabaseConnectionStatus
 import com.sbrf.lt.platform.composeui.model.FilesModulesCatalogResponse
+import com.sbrf.lt.platform.composeui.model.ModuleCatalogDiagnostics
+import com.sbrf.lt.platform.composeui.model.ModuleCatalogItem
+import com.sbrf.lt.platform.composeui.model.ModuleMetadataDescriptor
+import com.sbrf.lt.platform.composeui.model.ModuleStoreMode
+import com.sbrf.lt.platform.composeui.model.RuntimeActorState
 import com.sbrf.lt.platform.composeui.model.RuntimeContext
+import com.sbrf.lt.platform.composeui.model.AppsRootStatus
+import com.sbrf.lt.platform.composeui.model.CredentialsStatusResponse
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.coroutines.startCoroutine
+
+internal fun sampleModuleEditorRuntimeContext(
+    effectiveMode: ModuleStoreMode = ModuleStoreMode.FILES,
+): RuntimeContext =
+    RuntimeContext(
+        requestedMode = effectiveMode,
+        effectiveMode = effectiveMode,
+        actor = RuntimeActorState(
+            resolved = true,
+            message = "ok",
+        ),
+        database = DatabaseConnectionStatus(
+            configured = true,
+            available = true,
+            schema = "public",
+            message = "ok",
+        ),
+    )
+
+internal fun sampleModuleEditorCatalogItem(id: String): ModuleCatalogItem =
+    ModuleCatalogItem(
+        id = id,
+        descriptor = ModuleMetadataDescriptor(
+            title = id,
+        ),
+    )
+
+internal fun sampleModuleEditorFilesCatalog(
+    moduleIds: List<String> = listOf("module-a", "module-b"),
+): FilesModulesCatalogResponse =
+    FilesModulesCatalogResponse(
+        appsRootStatus = AppsRootStatus(
+            mode = "ok",
+            message = "ok",
+        ),
+        diagnostics = ModuleCatalogDiagnostics(),
+        modules = moduleIds.map(::sampleModuleEditorCatalogItem),
+    )
+
+internal fun sampleModuleEditorDatabaseCatalog(
+    moduleIds: List<String> = listOf("module-a", "module-b"),
+): DatabaseModulesCatalogResponse =
+    DatabaseModulesCatalogResponse(
+        runtimeContext = sampleModuleEditorRuntimeContext(ModuleStoreMode.DATABASE),
+        diagnostics = ModuleCatalogDiagnostics(),
+        modules = moduleIds.map(::sampleModuleEditorCatalogItem),
+    )
+
+internal fun sampleModuleEditorConfigFormState(): ConfigFormStateDto =
+    ConfigFormStateDto(
+        outputDir = "/tmp/out",
+        fileFormat = "csv",
+        mergeMode = "APPEND",
+        errorMode = "FAIL_FAST",
+        parallelism = 2,
+        fetchSize = 100,
+        queryTimeoutSec = 30,
+        progressLogEveryRows = 500,
+        maxMergedRows = 1_000,
+        deleteOutputFilesAfterCompletion = false,
+        commonSql = "select 1",
+        targetEnabled = false,
+        targetJdbcUrl = "",
+        targetUsername = "",
+        targetPassword = "",
+        targetTable = "",
+        targetTruncateBeforeLoad = false,
+    )
+
+internal fun sampleModuleEditorSession(
+    moduleId: String = "module-a",
+    storageMode: String = "files",
+    configText: String = "demo-config",
+): ModuleEditorSessionResponse =
+    ModuleEditorSessionResponse(
+        storageMode = storageMode,
+        module = ModuleDetailsResponse(
+            id = moduleId,
+            descriptor = ModuleMetadataDescriptor(
+                title = moduleId,
+            ),
+            configPath = "application.yml",
+            configText = configText,
+            sqlFiles = listOf(
+                ModuleFileContent(
+                    label = "sql",
+                    path = "sql/main.sql",
+                    content = "select 1",
+                    exists = true,
+                ),
+            ),
+            requiresCredentials = false,
+            credentialsStatus = CredentialsStatusResponse(
+                mode = "none",
+                displayName = "none",
+                fileAvailable = false,
+                uploaded = false,
+            ),
+        ),
+        capabilities = ModuleLifecycleCapabilities(),
+    )
 
 internal class StubModuleEditorApi(
     private val loadFilesCatalogHandler: suspend () -> FilesModulesCatalogResponse = {

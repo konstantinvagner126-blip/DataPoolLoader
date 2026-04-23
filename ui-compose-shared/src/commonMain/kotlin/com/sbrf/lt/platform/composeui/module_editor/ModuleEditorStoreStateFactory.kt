@@ -1,75 +1,56 @@
 package com.sbrf.lt.platform.composeui.module_editor
 
-import com.sbrf.lt.platform.composeui.model.DatabaseModulesCatalogResponse
-import com.sbrf.lt.platform.composeui.model.FilesModulesCatalogResponse
-
 internal class ModuleEditorStoreStateFactory {
-    fun createDatabaseLoadedState(
-        catalog: DatabaseModulesCatalogResponse,
-        selectedModuleId: String?,
-        session: ModuleEditorSessionResponse?,
-        configForm: ConfigFormSnapshot?,
+    fun createLoadedState(
+        snapshot: ModuleEditorCatalogSnapshot,
     ): ModuleEditorPageState =
         ModuleEditorPageState(
             loading = false,
             errorMessage = null,
             successMessage = null,
             actionInProgress = null,
-            databaseCatalog = catalog,
-            selectedModuleId = selectedModuleId,
-            session = session,
-            selectedSqlPath = session?.module?.sqlFiles?.firstOrNull()?.path,
-            configTextDraft = session?.module?.configText.orEmpty(),
-            sqlContentsDraft = session?.module?.sqlFiles?.associate { it.path to it.content }.orEmpty(),
-            metadataDraft = session?.module?.let(::toModuleMetadataDraft) ?: ModuleMetadataDraft(),
-            configFormState = configForm?.state,
-            configFormError = configForm?.errorMessage,
-            configFormSourceText = if (configForm?.state != null) session?.module?.configText.orEmpty() else "",
-        )
-
-    fun createFilesLoadedState(
-        catalog: FilesModulesCatalogResponse,
-        selectedModuleId: String?,
-        session: ModuleEditorSessionResponse?,
-        configForm: ConfigFormSnapshot?,
-    ): ModuleEditorPageState =
-        ModuleEditorPageState(
-            loading = false,
-            errorMessage = null,
-            successMessage = null,
-            actionInProgress = null,
-            filesCatalog = catalog,
-            selectedModuleId = selectedModuleId,
-            session = session,
-            selectedSqlPath = session?.module?.sqlFiles?.firstOrNull()?.path,
-            configTextDraft = session?.module?.configText.orEmpty(),
-            sqlContentsDraft = session?.module?.sqlFiles?.associate { it.path to it.content }.orEmpty(),
-            metadataDraft = session?.module?.let(::toModuleMetadataDraft) ?: ModuleMetadataDraft(),
-            configFormState = configForm?.state,
-            configFormError = configForm?.errorMessage,
-            configFormSourceText = if (configForm?.state != null) session?.module?.configText.orEmpty() else "",
+            databaseCatalog = snapshot.databaseCatalog,
+            filesCatalog = snapshot.filesCatalog,
+            selectedModuleId = snapshot.selectedModuleId,
+            session = snapshot.session,
+            selectedSqlPath = snapshot.session?.module?.sqlFiles?.firstOrNull()?.path,
+            configTextDraft = snapshot.session?.module?.configText.orEmpty(),
+            sqlContentsDraft = snapshot.session?.module?.sqlFiles?.associate { it.path to it.content }.orEmpty(),
+            metadataDraft = snapshot.session?.module?.let(::toModuleMetadataDraft) ?: ModuleMetadataDraft(),
+            configFormState = snapshot.configForm?.state,
+            configFormError = snapshot.configForm?.errorMessage,
+            configFormSourceText = if (snapshot.configForm?.state != null) snapshot.session?.module?.configText.orEmpty() else "",
         )
 
     fun applySelectedSession(
         current: ModuleEditorPageState,
-        moduleId: String,
-        session: ModuleEditorSessionResponse,
-        configForm: ConfigFormSnapshot,
+        snapshot: ModuleEditorSessionSnapshot,
     ): ModuleEditorPageState =
         current.copy(
             loading = false,
             errorMessage = null,
             successMessage = null,
             actionInProgress = null,
-            selectedModuleId = moduleId,
-            session = session,
-            selectedSqlPath = session.module.sqlFiles.firstOrNull()?.path,
-            configTextDraft = session.module.configText,
-            sqlContentsDraft = session.module.sqlFiles.associate { it.path to it.content },
-            metadataDraft = toModuleMetadataDraft(session.module),
-            configFormState = configForm.state,
-            configFormError = configForm.errorMessage,
-            configFormSourceText = if (configForm.state != null) session.module.configText else "",
+            selectedModuleId = snapshot.moduleId,
+            session = snapshot.session,
+            selectedSqlPath = snapshot.session.module.sqlFiles.firstOrNull()?.path,
+            configTextDraft = snapshot.session.module.configText,
+            sqlContentsDraft = snapshot.session.module.sqlFiles.associate { it.path to it.content },
+            metadataDraft = toModuleMetadataDraft(snapshot.session.module),
+            configFormState = snapshot.configForm.state,
+            configFormError = snapshot.configForm.errorMessage,
+            configFormSourceText = if (snapshot.configForm.state != null) snapshot.session.module.configText else "",
+        )
+
+    fun applyCatalogRefresh(
+        current: ModuleEditorPageState,
+        snapshot: ModuleEditorCatalogRefreshSnapshot,
+    ): ModuleEditorPageState =
+        current.copy(
+            loading = false,
+            filesCatalog = snapshot.filesCatalog ?: current.filesCatalog,
+            databaseCatalog = snapshot.databaseCatalog ?: current.databaseCatalog,
+            selectedModuleId = snapshot.selectedModuleId,
         )
 
 }

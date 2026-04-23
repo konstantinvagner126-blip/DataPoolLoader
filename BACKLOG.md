@@ -950,7 +950,7 @@ Review after Phase F:
 
 Статус:
 
-- не реализовано
+- частично реализовано
 
 Цель:
 
@@ -967,6 +967,14 @@ Review after Phase F:
   - metadata / lifecycle / publish / working copy semantics;
 - убедиться, что `Module Editor` действительно остается единым экраном с разными storage adapters, а не двумя логиками в одном файле;
 - убрать устаревшие переходные решения, если они остались после реализации DB/files режима.
+
+Что уже сделано:
+
+- storage-aware read boundary для loading/session path вынесен из loading support:
+  - [ModuleEditorStorageReadSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStorageReadSupport.kt) теперь инкапсулирует `files/database` branching для `catalog/session` loading;
+  - [ModuleEditorStoreCatalogLoadingSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreCatalogLoadingSupport.kt) и [ModuleEditorStoreSessionLoadingSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreSessionLoadingSupport.kt) перестали напрямую вызывать `loadFiles* / loadDatabase*`;
+  - unified storage snapshots заведены внутри loading boundary, а [ModuleEditorStoreStateFactory.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStoreStateFactory.kt) переведен на них;
+  - добавлен targeted regression test на storage-aware read path: [ModuleEditorStorageReadSupportTest.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonTest/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStorageReadSupportTest.kt).
 
 Критерий завершения:
 

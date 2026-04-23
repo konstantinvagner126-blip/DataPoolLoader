@@ -1,36 +1,16 @@
 package com.sbrf.lt.platform.composeui.module_editor
 
 internal class ModuleEditorStoreCatalogLoadingSupport(
-    private val api: ModuleEditorApi,
+    private val storageReadSupport: ModuleEditorStorageReadSupport,
     private val syncRoute: (storage: String, moduleId: String?, includeHidden: Boolean) -> Unit,
     private val stateFactory: ModuleEditorStoreStateFactory,
-    private val selectionSupport: ModuleEditorStoreCatalogSelectionSupport,
-    private val configFormSnapshotStore: ModuleEditorConfigFormSnapshotStore,
     private val fallbackSupport: ModuleEditorStoreFallbackSupport,
 ) {
     suspend fun load(route: ModuleEditorRouteState): ModuleEditorPageState {
         return runCatching {
-            if (route.storage == "database") {
-                val catalog = api.loadDatabaseCatalog(route.includeHidden)
-                val selectedModuleId = selectionSupport.resolveInitialSelectedModuleId(
-                    route.moduleId,
-                    catalog.modules.map { it.id },
-                )
-                val session = selectedModuleId?.let { moduleId -> api.loadDatabaseSession(moduleId) }
-                val configForm = session?.let { configFormSnapshotStore.loadSnapshot(it.module.configText) }
-                syncRoute(route.storage, selectedModuleId, route.includeHidden)
-                stateFactory.createDatabaseLoadedState(catalog, selectedModuleId, session, configForm)
-            } else {
-                val catalog = api.loadFilesCatalog()
-                val selectedModuleId = selectionSupport.resolveInitialSelectedModuleId(
-                    route.moduleId,
-                    catalog.modules.map { it.id },
-                )
-                val session = selectedModuleId?.let { moduleId -> api.loadFilesSession(moduleId) }
-                val configForm = session?.let { configFormSnapshotStore.loadSnapshot(it.module.configText) }
-                syncRoute(route.storage, selectedModuleId, route.includeHidden)
-                stateFactory.createFilesLoadedState(catalog, selectedModuleId, session, configForm)
-            }
+            val snapshot = storageReadSupport.loadCatalogSnapshot(route)
+            syncRoute(route.storage, snapshot.selectedModuleId, route.includeHidden)
+            stateFactory.createLoadedState(snapshot)
         }.recoverCatching { error ->
             fallbackSupport.loadDatabaseFallbackState()
                 ?: throw error
@@ -47,29 +27,8 @@ internal class ModuleEditorStoreCatalogLoadingSupport(
         route: ModuleEditorRouteState,
     ): ModuleEditorPageState =
         runCatching {
-            if (route.storage == "database") {
-                val catalog = api.loadDatabaseCatalog(route.includeHidden)
-                val selectedModuleId = selectionSupport.resolveRefreshedSelectedModuleId(
-                    current.selectedModuleId,
-                    catalog.modules.map { it.id },
-                )
-                current.copy(
-                    loading = false,
-                    databaseCatalog = catalog,
-                    selectedModuleId = selectedModuleId,
-                )
-            } else {
-                val catalog = api.loadFilesCatalog()
-                val selectedModuleId = selectionSupport.resolveRefreshedSelectedModuleId(
-                    current.selectedModuleId,
-                    catalog.modules.map { it.id },
-                )
-                current.copy(
-                    loading = false,
-                    filesCatalog = catalog,
-                    selectedModuleId = selectedModuleId,
-                )
-            }
+            val snapshot = storageReadSupport.refreshCatalogSnapshot(route, current.selectedModuleId)
+            stateFactory.applyCatalogRefresh(current, snapshot)
         }.getOrElse {
             if (route.storage == "database") {
                 fallbackSupport.loadDatabaseFallbackState(current) ?: current
