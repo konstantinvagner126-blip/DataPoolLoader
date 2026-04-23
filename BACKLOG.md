@@ -686,6 +686,33 @@
     - история заполняется server-side из async execution lifecycle, поэтому фиксирует не только обычный finish, но и `PENDING_COMMIT`, manual `commit/rollback`, owner-loss и timeout rollback;
     - UI показывает короткий bounded список последних execution session рядом с `Шаблоны и быстрые действия`, с действиями `Подставить` и `Повторить`, без превращения экрана в тяжелый audit log.
 
+Review after Phase F:
+
+- по итогам review первая продуктовая волна SQL-консоли считается реализованной:
+  - safety/recovery, multi-tab, group-first selection, object inspector, main UX, Monaco, IDE-like enhancements и execution history уже собраны в рабочую подсистему;
+  - backlog `6` больше не должен расширяться новыми product-идеями до отдельного нового решения;
+- блок `6` пока не закрывается формально, потому что остались три closure-task, уже относящиеся не к новым фичам, а к закреплению и cleanup:
+  1. browser-level smoke coverage для ключевых SQL-console сценариев:
+     - multi-tab workspace restore;
+     - pending-commit / rollback UX;
+     - object inspector -> `Открыть SELECT в консоли`;
+     - result `Grid / Diff` navigation;
+  2. structural cleanup `core` metadata-introspection слоя:
+     - [SqlConsoleMetadataJdbcSupport.kt](/Users/kwdev/DataPoolLoader/core/src/main/kotlin/com/sbrf/lt/datapool/sqlconsole/SqlConsoleMetadataJdbcSupport.kt) стал giant support-file и должен быть разрезан на более узкие postgres/generic search/inspect/details responsibilities;
+  3. structural cleanup SQL-console test layer:
+     - [SqlConsoleServiceTest.kt](/Users/kwdev/DataPoolLoader/core/src/test/kotlin/com/sbrf/lt/datapool/SqlConsoleServiceTest.kt),
+       [SqlConsoleQueryManagerTest.kt](/Users/kwdev/DataPoolLoader/ui-server/src/test/kotlin/com/sbrf/lt/platform/ui/sqlconsole/SqlConsoleQueryManagerTest.kt)
+       и SQL-console slice внутри [ServerTest.kt](/Users/kwdev/DataPoolLoader/ui-server/src/test/kotlin/com/sbrf/lt/platform/ui/server/ServerTest.kt)
+       нужно довести до более reviewable test-support/spec структуры;
+- следующий рабочий шаг после этого review: сначала добить пункт `2`, затем `3`, и только потом решать, нужен ли отдельный пакет smoke coverage или блок `6` можно закрывать с текущим уровнем косвенной страховки.
+- update after review:
+  - giant metadata-introspection слой в `core` уже приведен к более узкой структуре:
+    - postgres search вынесен отдельно;
+    - postgres table-like inspect/columns вынесен отдельно;
+    - postgres secondary object inspect (`index / sequence / trigger / schema`) вынесен отдельно;
+    - generic JDBC metadata path и shared SQL/result-set helper-ы вынесены отдельно;
+  - ближайший remaining closure-task теперь не metadata, а SQL-console test layer cleanup.
+
 Критерий завершения:
 
 - SQL-консоль рассматривается и поддерживается как самостоятельная подсистема, а не как “еще один экран”.
