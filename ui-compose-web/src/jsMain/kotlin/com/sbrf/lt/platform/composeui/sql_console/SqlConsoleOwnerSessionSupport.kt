@@ -57,7 +57,15 @@ internal fun openSqlConsoleWorkspaceInNewTab(workspaceId: String): Boolean =
 
 internal fun openHrefInNewTab(href: String): Boolean =
     runCatching {
-        window.open(href, "_blank", "noopener,noreferrer") != null
+        val openedWindow = window.open("", "_blank") ?: return@runCatching false
+        runCatching {
+            val dynamicWindow = openedWindow.asDynamic()
+            dynamicWindow.opener = null
+            dynamicWindow.location.replace(href)
+        }.getOrElse {
+            openedWindow.location.href = href
+        }
+        true
     }.getOrDefault(false)
 
 internal fun loadSqlConsoleExecutionOwnerState(): SqlConsoleExecutionOwnerState? =

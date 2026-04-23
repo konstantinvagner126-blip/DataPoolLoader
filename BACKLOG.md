@@ -393,6 +393,7 @@
 - action `Открыть новую вкладку консоли` уже добавлена:
   - она открывает новый SQL-console tab/workspace, а не просто дублирует текущий URL;
   - текущий implementation contract: `clone current context` в новую browser-вкладку;
+  - warning `Браузер заблокировал открытие новой вкладки SQL-консоли.` допустим только при реальном blocked/null результате открытия; успешное открытие новой вкладки не должно оставлять ложный banner в исходной вкладке;
 - закрепить multi-tab сценарии отдельными tests:
   - different tabs with different drafts;
   - parallel auto-commit execution;
@@ -711,7 +712,10 @@ Review after Phase F:
     - postgres table-like inspect/columns вынесен отдельно;
     - postgres secondary object inspect (`index / sequence / trigger / schema`) вынесен отдельно;
     - generic JDBC metadata path и shared SQL/result-set helper-ы вынесены отдельно;
-  - ближайший remaining closure-task теперь не metadata, а SQL-console test layer cleanup.
+  - SQL-console test-layer cleanup уже начат:
+    - server-side SQL-console route/lifecycle/export slice вынесен из giant [ServerTest.kt](/Users/kwdev/DataPoolLoader/ui-server/src/test/kotlin/com/sbrf/lt/platform/ui/server/ServerTest.kt) в отдельный [SqlConsoleServerTest.kt](/Users/kwdev/DataPoolLoader/ui-server/src/test/kotlin/com/sbrf/lt/platform/ui/server/SqlConsoleServerTest.kt);
+    - общие server test helper-ы вынесены в [ServerTestSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/test/kotlin/com/sbrf/lt/platform/ui/server/ServerTestSupport.kt);
+  - ближайший remaining closure-task теперь не metadata и не server route slice, а cleanup [SqlConsoleServiceTest.kt](/Users/kwdev/DataPoolLoader/core/src/test/kotlin/com/sbrf/lt/datapool/SqlConsoleServiceTest.kt) и [SqlConsoleQueryManagerTest.kt](/Users/kwdev/DataPoolLoader/ui-server/src/test/kotlin/com/sbrf/lt/platform/ui/sqlconsole/SqlConsoleQueryManagerTest.kt).
 
 Критерий завершения:
 
