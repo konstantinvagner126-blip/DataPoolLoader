@@ -23,6 +23,7 @@ internal fun SqlConsoleWorkspaceToolbar(
     activeExportShard: String?,
     onPageSizeChange: (Int) -> Unit,
     onFormatSql: () -> Unit,
+    onOpenNewTab: () -> Unit,
     onRunCurrent: () -> Unit,
     onRunAll: () -> Unit,
     onStop: () -> Unit,
@@ -62,6 +63,12 @@ internal fun SqlConsoleWorkspaceToolbar(
                     icon = "≣",
                     toneClass = "btn-outline-dark",
                     onClick = onFormatSql,
+                )
+                SqlToolbarActionButton(
+                    title = "Открыть новую вкладку консоли",
+                    icon = "⊞",
+                    toneClass = "btn-outline-dark",
+                    onClick = onOpenNewTab,
                 )
                 SqlToolbarActionButton(
                     title = "Выполнить текущий statement",

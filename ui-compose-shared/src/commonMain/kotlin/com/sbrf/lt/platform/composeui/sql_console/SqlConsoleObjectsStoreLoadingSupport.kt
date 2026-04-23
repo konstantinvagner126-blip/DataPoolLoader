@@ -3,7 +3,7 @@ package com.sbrf.lt.platform.composeui.sql_console
 internal class SqlConsoleObjectsStoreLoadingSupport(
     private val api: SqlConsoleApi,
 ) {
-    suspend fun load(): SqlConsoleObjectsPageState {
+    suspend fun load(workspaceId: String? = null): SqlConsoleObjectsPageState {
         val runtimeContextResult = runCatching { api.loadRuntimeContext() }
         val runtimeContext = runtimeContextResult.getOrNull()
         if (runtimeContext == null) {
@@ -22,7 +22,7 @@ internal class SqlConsoleObjectsStoreLoadingSupport(
                 errorMessage = infoResult.exceptionOrNull()?.message ?: "Не удалось загрузить конфигурацию SQL-консоли.",
             )
         }
-        val persistedState = runCatching { api.loadState() }
+        val persistedState = runCatching { api.loadState(workspaceId) }
             .getOrDefault(defaultSqlConsoleStateSnapshot())
         val allSourceNames = info.sourceCatalogNames()
         val selectedSources = persistedState.selectedSourceNames

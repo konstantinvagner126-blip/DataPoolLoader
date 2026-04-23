@@ -16,6 +16,8 @@ fun ComposeSqlConsoleObjectsPage(
     initialParams: Map<String, String> = emptyMap(),
     api: SqlConsoleApi = remember { SqlConsoleApiClient() },
 ) {
+    val workspaceId = initialParams["workspaceId"]?.trim().orEmpty()
+        .ifBlank { resolveSqlConsoleWorkspaceId() }
     val store = remember(api) { SqlConsoleObjectsStore(api) }
     var state by remember { mutableStateOf(SqlConsoleObjectsPageState()) }
     val initialQuery = initialParams["query"]?.trim().orEmpty()
@@ -35,6 +37,7 @@ fun ComposeSqlConsoleObjectsPage(
     }
     val callbacks = sqlConsoleObjectsPageCallbacks(
         store = store,
+        workspaceId = workspaceId,
         scope = rememberCoroutineScope(),
         currentState = { state },
         setState = { state = it },
@@ -42,6 +45,7 @@ fun ComposeSqlConsoleObjectsPage(
 
     SqlConsoleObjectsPageEffects(
         store = store,
+        workspaceId = workspaceId,
         initialQuery = initialQuery,
         initialSource = initialSource,
         navigationTarget = navigationTarget,
@@ -58,7 +62,7 @@ fun ComposeSqlConsoleObjectsPage(
         heroHeader = {
             Div({ classes("hero-actions", "mb-3") }) {
                 ObjectsNavActionButton("На главную", hrefValue = "/")
-                ObjectsNavActionButton("SQL-консоль", hrefValue = "/sql-console")
+                ObjectsNavActionButton("SQL-консоль", hrefValue = buildSqlConsoleWorkspaceHref(workspaceId))
                 ObjectsNavActionButton("Объекты БД", active = true)
             }
         },

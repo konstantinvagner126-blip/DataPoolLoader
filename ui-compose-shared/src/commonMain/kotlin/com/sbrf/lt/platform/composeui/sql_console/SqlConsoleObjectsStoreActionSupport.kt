@@ -3,8 +3,29 @@ package com.sbrf.lt.platform.composeui.sql_console
 internal class SqlConsoleObjectsStoreActionSupport(
     private val api: SqlConsoleApi,
 ) {
+    suspend fun persistState(
+        current: SqlConsoleObjectsPageState,
+        workspaceId: String,
+    ): SqlConsoleObjectsPageState {
+        val persistedState = current.persistedState ?: defaultSqlConsoleStateSnapshot()
+        return runCatching {
+            val savedState = api.saveState(
+                persistedState.toStateUpdate(
+                    selectedGroupNames = current.selectedGroupNames,
+                    selectedSourceNames = current.selectedSourceNames,
+                    favoriteObjects = current.favoriteObjects,
+                ),
+                workspaceId = workspaceId,
+            )
+            current.copy(persistedState = savedState)
+        }.getOrElse {
+            current
+        }
+    }
+
     suspend fun toggleFavoriteObject(
         current: SqlConsoleObjectsPageState,
+        workspaceId: String,
         sourceName: String,
         value: SqlConsoleDatabaseObject,
     ): SqlConsoleObjectsPageState {
@@ -22,6 +43,7 @@ internal class SqlConsoleObjectsStoreActionSupport(
                     selectedSourceNames = current.selectedSourceNames,
                     favoriteObjects = nextFavorites,
                 ),
+                workspaceId = workspaceId,
             )
             current.copy(
                 actionInProgress = null,
@@ -45,6 +67,7 @@ internal class SqlConsoleObjectsStoreActionSupport(
 
     suspend fun openObjectInConsole(
         current: SqlConsoleObjectsPageState,
+        workspaceId: String,
         sourceName: String,
         draftSql: String,
     ): SqlConsoleObjectsPageState {
@@ -57,6 +80,7 @@ internal class SqlConsoleObjectsStoreActionSupport(
                     selectedSourceNames = listOf(sourceName),
                     favoriteObjects = current.favoriteObjects,
                 ),
+                workspaceId = workspaceId,
             )
             current.copy(
                 actionInProgress = null,

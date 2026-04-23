@@ -106,6 +106,7 @@ internal fun SqlConsolePageContent(
                 onDraftSqlChange = callbacks.onDraftSqlChange,
                 onPageSizeChange = callbacks.onPageSizeChange,
                 onFormatSql = callbacks.onFormatSql,
+                onOpenNewTab = callbacks.onOpenNewTab,
                 onRunCurrent = callbacks.onRunCurrent,
                 onRunAll = callbacks.onRunAll,
                 onStop = callbacks.onStop,

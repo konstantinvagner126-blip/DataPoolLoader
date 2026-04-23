@@ -60,6 +60,7 @@ data class SqlConsoleSettingsUpdate(
 data class SqlConsoleQueryStartRequest(
     val sql: String,
     val selectedSourceNames: List<String> = emptyList(),
+    val workspaceId: String? = null,
     val ownerSessionId: String,
     val transactionMode: String = "AUTO_COMMIT",
 )

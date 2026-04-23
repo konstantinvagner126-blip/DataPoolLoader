@@ -347,6 +347,15 @@
 
 - текущий single-execution/single-workspace режим нужно заменить на явную multi-tab модель без размывания safety-инвариантов;
 - первой целевой формой multi-tab режима считаются именно отдельные browser tabs, а не внутренний tab-strip внутри одного page-shell;
+- реализован первый пакет этой фазы:
+  - `workspaceId` уже стал явной частью browser-tab workspace model;
+  - action `Открыть новую вкладку консоли` клонирует текущий persisted context в новый `workspaceId` и открывает новую browser-вкладку;
+  - `/sql-console` и `/sql-console-objects` теперь сохраняют и восстанавливают один и тот же tab-scoped workspace context по `workspaceId`, без потери состояния при переходе между экраном консоли и object browser;
+  - selected groups / selected sources уже persistятся per workspace и не перетираются между browser-вкладками;
+  - server-side execution model больше не singleton: `AUTO_COMMIT` execution могут идти параллельно;
+  - для manual transaction на первом этапе введен safe single-flight policy:
+    - нельзя запускать вторую manual transaction, пока другая manual transaction еще `RUNNING`;
+    - нельзя запускать новую manual transaction, пока другая вкладка держит `PENDING_COMMIT`;
 - ввести отдельное понятие `console workspace` / `tab workspace` для SQL-консоли:
   - draft SQL;
   - selected groups;
@@ -378,9 +387,9 @@
     `В другой вкладке SQL-консоли есть незавершенная транзакция. Сначала выполните Commit или Rollback в той вкладке. Пока транзакция не завершена, запуск новой ручной транзакции недоступен.`
   - расширение до нескольких параллельных `PENDING_COMMIT` возможно только отдельным safety-review и отдельным backlog-пакетом;
 - в web/shared слоях перейти от single current execution view к явному tab/workspace-scoped current execution contract;
-- добавить в UI явную action-кнопку `Открыть новую вкладку консоли`:
-  - action должна открывать новый SQL-console tab/workspace, а не просто дублировать URL без model-level semantics;
-  - первый implementation contract: `clone current context` в новую browser-вкладку;
+- action `Открыть новую вкладку консоли` уже добавлена:
+  - она открывает новый SQL-console tab/workspace, а не просто дублирует текущий URL;
+  - текущий implementation contract: `clone current context` в новую browser-вкладку;
 - закрепить multi-tab сценарии отдельными tests:
   - different tabs with different drafts;
   - parallel auto-commit execution;

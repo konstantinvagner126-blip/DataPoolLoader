@@ -1373,6 +1373,9 @@ paths:
             example:
               sql: "select pg_sleep(10)"
               selectedSourceNames: ["db1"]
+              workspaceId: "sql-workspace-dev"
+              ownerSessionId: "sql-owner-tab-1"
+              transactionMode: "AUTO_COMMIT"
       responses:
         "200":
           description: Асинхронный запрос принят в работу
@@ -2847,7 +2850,7 @@ components:
 
     SqlConsoleQueryRequest:
       type: object
-      required: [sql]
+      required: [sql, ownerSessionId]
       properties:
         sql:
           type: string
@@ -2855,6 +2858,12 @@ components:
           type: array
           items:
             type: string
+        workspaceId:
+          type: [string, "null"]
+        ownerSessionId:
+          type: string
+        transactionMode:
+          type: string
 
     SqlConsoleShardResultResponse:
       type: object

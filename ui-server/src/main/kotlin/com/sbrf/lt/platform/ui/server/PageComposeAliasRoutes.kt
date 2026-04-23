@@ -15,10 +15,14 @@ internal fun Route.registerPageComposeAliasRoutes() {
     )
     registerComposeRedirect("/compose-sync", "screen" to "module-sync")
     registerComposeRedirect("/compose-run-history-cleanup", "screen" to "run-history-cleanup")
-    registerComposeRedirect("/compose-sql-console", "screen" to "sql-console")
+    registerComposeRedirect(
+        "/compose-sql-console",
+        "screen" to "sql-console",
+        forwardedParams = listOf("workspaceId"),
+    )
     registerComposeRedirect(
         "/compose-sql-console-objects",
         "screen" to "sql-console-objects",
-        forwardedParams = listOf("query", "source", "schema", "object", "type"),
+        forwardedParams = listOf("workspaceId", "query", "source", "schema", "object", "type"),
     )
 }

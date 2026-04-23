@@ -6,8 +6,8 @@ class SqlConsoleStore(
     private val loadingSupport = SqlConsoleStoreLoadingSupport(api)
     private val executionSupport = SqlConsoleStoreExecutionSupport(api)
 
-    suspend fun load(): SqlConsolePageState =
-        loadingSupport.load()
+    suspend fun load(workspaceId: String? = null): SqlConsolePageState =
+        loadingSupport.load(workspaceId)
 
     fun startLoading(current: SqlConsolePageState): SqlConsolePageState =
         current.copy(loading = true, errorMessage = null, successMessage = null)
@@ -148,6 +148,12 @@ class SqlConsoleStore(
     suspend fun persistState(current: SqlConsolePageState): SqlConsolePageState =
         loadingSupport.persistState(current)
 
+    suspend fun persistState(
+        current: SqlConsolePageState,
+        workspaceId: String,
+    ): SqlConsolePageState =
+        loadingSupport.persistState(current, workspaceId)
+
     suspend fun saveSettings(current: SqlConsolePageState): SqlConsolePageState =
         executionSupport.saveSettings(current)
 
@@ -156,11 +162,12 @@ class SqlConsoleStore(
 
     suspend fun startQuery(
         current: SqlConsolePageState,
+        workspaceId: String,
         ownerSessionId: String,
         sqlOverride: String? = null,
         successMessage: String = "Запрос запущен.",
     ): SqlConsolePageState =
-        executionSupport.startQuery(current, ownerSessionId, sqlOverride, successMessage)
+        executionSupport.startQuery(current, workspaceId, ownerSessionId, sqlOverride, successMessage)
 
     suspend fun refreshExecution(current: SqlConsolePageState): SqlConsolePageState =
         executionSupport.refreshExecution(current)

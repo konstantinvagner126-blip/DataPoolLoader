@@ -38,7 +38,7 @@ internal fun SqlConsolePageEffects(
 
     LaunchedEffect(store) {
         setState(store.startLoading(currentState()))
-        val loadedState = store.load()
+        val loadedState = store.load(currentUiState().workspaceId)
         val restoredState = loadSqlConsoleExecutionOwnerState()
             ?.takeIf {
                 canRestoreSqlConsoleExecutionOwnership(
@@ -163,6 +163,7 @@ internal fun SqlConsolePageEffects(
 
     LaunchedEffect(
         currentState().draftSql,
+        currentState().selectedGroupNames.joinToString("\u0001"),
         currentState().selectedSourceNames.joinToString("\u0001"),
         currentState().pageSize,
         currentState().strictSafetyEnabled,
@@ -177,7 +178,7 @@ internal fun SqlConsolePageEffects(
             return@LaunchedEffect
         }
         delay(500)
-        setState(store.persistState(state))
+        setState(store.persistState(state, currentUiState().workspaceId))
     }
 
     LaunchedEffect(

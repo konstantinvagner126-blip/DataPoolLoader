@@ -43,7 +43,19 @@ internal fun resolveSqlConsoleOwnerTabInstanceId(): String {
 }
 
 internal fun resolveSqlConsoleWorkspaceId(): String =
-    resolveSqlConsoleOwnerTabInstanceId().replace("sql-tab-", "sql-workspace-")
+    resolveSqlConsoleWorkspaceIdFromLocation()
+        ?: resolveSqlConsoleOwnerTabInstanceId().replace("sql-tab-", "sql-workspace-")
+
+internal fun generateSqlConsoleWorkspaceId(): String =
+    "sql-workspace-${Date.now().toLong().toString(36)}-${Random.nextLong().toString(36)}"
+
+internal fun buildSqlConsoleWorkspaceHref(workspaceId: String): String =
+    "/sql-console?workspaceId=${urlEncode(workspaceId)}"
+
+internal fun openSqlConsoleWorkspaceInNewTab(workspaceId: String): Boolean =
+    runCatching {
+        window.open(buildSqlConsoleWorkspaceHref(workspaceId), "_blank", "noopener,noreferrer") != null
+    }.getOrDefault(false)
 
 internal fun loadSqlConsoleExecutionOwnerState(): SqlConsoleExecutionOwnerState? =
     runCatching { window.sessionStorage.getItem(SQL_CONSOLE_EXECUTION_OWNER_KEY) }
@@ -101,3 +113,8 @@ private fun generateSqlConsoleOwnerSessionId(): String =
 
 private fun generateSqlConsoleOwnerTabInstanceId(): String =
     "sql-tab-${Date.now().toLong().toString(36)}-${Random.nextLong().toString(36)}"
+
+private fun resolveSqlConsoleWorkspaceIdFromLocation(): String? =
+    runCatching {
+        js("new URLSearchParams(window.location.search).get('workspaceId')") as String?
+    }.getOrNull()?.trim()?.takeIf { it.isNotEmpty() }

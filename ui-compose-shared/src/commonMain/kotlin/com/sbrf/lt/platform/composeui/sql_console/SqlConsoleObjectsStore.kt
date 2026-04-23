@@ -6,8 +6,8 @@ class SqlConsoleObjectsStore(
     private val loadingSupport = SqlConsoleObjectsStoreLoadingSupport(api)
     private val actionSupport = SqlConsoleObjectsStoreActionSupport(api)
 
-    suspend fun load(): SqlConsoleObjectsPageState =
-        loadingSupport.load()
+    suspend fun load(workspaceId: String? = null): SqlConsoleObjectsPageState =
+        loadingSupport.load(workspaceId)
 
     fun startLoading(current: SqlConsoleObjectsPageState): SqlConsoleObjectsPageState =
         current.copy(loading = true, errorMessage = null, successMessage = null)
@@ -70,17 +70,25 @@ class SqlConsoleObjectsStore(
 
     suspend fun toggleFavoriteObject(
         current: SqlConsoleObjectsPageState,
+        workspaceId: String,
         sourceName: String,
         value: SqlConsoleDatabaseObject,
     ): SqlConsoleObjectsPageState =
-        actionSupport.toggleFavoriteObject(current, sourceName, value)
+        actionSupport.toggleFavoriteObject(current, workspaceId, sourceName, value)
+
+    suspend fun persistState(
+        current: SqlConsoleObjectsPageState,
+        workspaceId: String,
+    ): SqlConsoleObjectsPageState =
+        actionSupport.persistState(current, workspaceId)
 
     suspend fun openObjectInConsole(
         current: SqlConsoleObjectsPageState,
+        workspaceId: String,
         sourceName: String,
         draftSql: String,
     ): SqlConsoleObjectsPageState =
-        actionSupport.openObjectInConsole(current, sourceName, draftSql)
+        actionSupport.openObjectInConsole(current, workspaceId, sourceName, draftSql)
 
     suspend fun search(current: SqlConsoleObjectsPageState): SqlConsoleObjectsPageState =
         actionSupport.search(current)

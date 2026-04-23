@@ -17,6 +17,7 @@ internal fun UiServerContext.startSqlConsoleQuery(
             sql = request.sql,
             credentialsPath = executionPaths.credentialsPath,
             selectedSourceNames = request.selectedSourceNames,
+            workspaceId = request.workspaceId,
             ownerSessionId = request.ownerSessionId,
             executionPolicy = SqlConsoleExecutionPolicy.STOP_ON_FIRST_ERROR,
             transactionMode = request.toTransactionMode(),

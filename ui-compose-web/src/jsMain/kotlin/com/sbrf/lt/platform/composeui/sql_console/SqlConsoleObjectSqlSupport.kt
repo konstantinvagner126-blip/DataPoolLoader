@@ -60,14 +60,32 @@ internal fun buildCountSql(dbObject: SqlConsoleDatabaseObject): String =
         objectName = dbObject.objectName,
     )
 
-internal fun buildFavoriteMetadataHref(favorite: SqlConsoleFavoriteObject): String =
-    "/sql-console-objects?query=${urlEncode(favorite.objectName)}&source=${urlEncode(favorite.sourceName)}&schema=${urlEncode(favorite.schemaName)}&object=${urlEncode(favorite.objectName)}&type=${urlEncode(favorite.objectType)}"
+internal fun buildFavoriteMetadataHref(
+    favorite: SqlConsoleFavoriteObject,
+    workspaceId: String = resolveSqlConsoleWorkspaceId(),
+): String =
+    buildSqlConsoleObjectsHref(
+        workspaceId = workspaceId,
+        query = favorite.objectName,
+        sourceName = favorite.sourceName,
+        schemaName = favorite.schemaName,
+        objectName = favorite.objectName,
+        objectType = favorite.objectType,
+    )
 
 internal fun buildObjectInspectorHref(
     sourceName: String,
     dbObject: SqlConsoleDatabaseObject,
+    workspaceId: String = resolveSqlConsoleWorkspaceId(),
 ): String =
-    "/sql-console-objects?query=${urlEncode(dbObject.objectName)}&source=${urlEncode(sourceName)}&schema=${urlEncode(dbObject.schemaName)}&object=${urlEncode(dbObject.objectName)}&type=${urlEncode(dbObject.objectType)}"
+    buildSqlConsoleObjectsHref(
+        workspaceId = workspaceId,
+        query = dbObject.objectName,
+        sourceName = sourceName,
+        schemaName = dbObject.schemaName,
+        objectName = dbObject.objectName,
+        objectType = dbObject.objectType,
+    )
 
 internal fun translateSqlObjectType(type: String): String =
     when (type.uppercase()) {
@@ -91,6 +109,9 @@ internal fun sqlIdentifier(value: String): String = "\"${value.replace("\"", "\"
 internal fun sqlLiteral(value: String): String = "'${value.replace("'", "''")}'"
 
 internal fun urlEncode(value: String): String = js("encodeURIComponent(value)") as String
+
+internal fun buildSqlConsoleObjectsWorkspaceHref(workspaceId: String): String =
+    buildSqlConsoleObjectsHref(workspaceId = workspaceId)
 
 internal fun buildSqlObjectQualifiedName(
     schemaName: String,
@@ -177,4 +198,23 @@ private fun buildCountSql(
         select count(*) as total_rows
         from $qualifiedName;
     """.trimIndent()
+}
+
+private fun buildSqlConsoleObjectsHref(
+    workspaceId: String,
+    query: String? = null,
+    sourceName: String? = null,
+    schemaName: String? = null,
+    objectName: String? = null,
+    objectType: String? = null,
+): String {
+    val queryParams = buildList {
+        add("workspaceId=${urlEncode(workspaceId)}")
+        query?.takeIf { it.isNotBlank() }?.let { add("query=${urlEncode(it)}") }
+        sourceName?.takeIf { it.isNotBlank() }?.let { add("source=${urlEncode(it)}") }
+        schemaName?.takeIf { it.isNotBlank() }?.let { add("schema=${urlEncode(it)}") }
+        objectName?.takeIf { it.isNotBlank() }?.let { add("object=${urlEncode(it)}") }
+        objectType?.takeIf { it.isNotBlank() }?.let { add("type=${urlEncode(it)}") }
+    }
+    return "/sql-console-objects?${queryParams.joinToString("&")}"
 }

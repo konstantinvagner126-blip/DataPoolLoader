@@ -63,6 +63,7 @@ internal class SqlConsoleStoreExecutionSupport(
 
     suspend fun startQuery(
         current: SqlConsolePageState,
+        workspaceId: String,
         ownerSessionId: String,
         sqlOverride: String? = null,
         successMessage: String = "Запрос запущен.",
@@ -88,6 +89,7 @@ internal class SqlConsoleStoreExecutionSupport(
                 SqlConsoleQueryStartRequest(
                     sql = sql,
                     selectedSourceNames = current.selectedSourceNames,
+                    workspaceId = workspaceId,
                     ownerSessionId = ownerSessionId,
                     transactionMode = current.transactionMode,
                 ),

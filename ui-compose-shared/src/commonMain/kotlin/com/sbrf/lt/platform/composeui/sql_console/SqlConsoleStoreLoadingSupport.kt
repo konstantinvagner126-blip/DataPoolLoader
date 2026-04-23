@@ -3,7 +3,7 @@ package com.sbrf.lt.platform.composeui.sql_console
 internal class SqlConsoleStoreLoadingSupport(
     private val api: SqlConsoleApi,
 ) {
-    suspend fun load(): SqlConsolePageState {
+    suspend fun load(workspaceId: String? = null): SqlConsolePageState {
         val runtimeContextResult = runCatching { api.loadRuntimeContext() }
         val runtimeContext = runtimeContextResult.getOrNull()
         if (runtimeContext == null) {
@@ -23,7 +23,7 @@ internal class SqlConsoleStoreLoadingSupport(
             )
         }
 
-        val persistedStateResult = runCatching { api.loadState() }
+        val persistedStateResult = runCatching { api.loadState(workspaceId) }
         val persistedState = persistedStateResult.getOrDefault(defaultSqlConsoleStateSnapshot())
         val allSourceNames = info.sourceCatalogNames()
         val selectedSources = persistedState.selectedSourceNames
@@ -59,6 +59,17 @@ internal class SqlConsoleStoreLoadingSupport(
     suspend fun persistState(current: SqlConsolePageState): SqlConsolePageState =
         runCatching {
             api.saveState(current.toPersistedState())
+            current
+        }.getOrElse {
+            current
+        }
+
+    suspend fun persistState(
+        current: SqlConsolePageState,
+        workspaceId: String,
+    ): SqlConsolePageState =
+        runCatching {
+            api.saveState(current.toPersistedState(), workspaceId = workspaceId)
             current
         }.getOrElse {
             current

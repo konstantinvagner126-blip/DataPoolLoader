@@ -357,19 +357,21 @@ class SqlConsoleQueryManagerTest {
     }
 
     @Test
-    fun `rejects concurrent start and cleans up directory`() {
-        val cleanupDir = Files.createTempDirectory("sql-console-cleanup")
+    fun `allows parallel auto commit starts and cleans up both directories`() {
+        val firstCleanupDir = Files.createTempDirectory("sql-console-cleanup-a")
+        val secondCleanupDir = Files.createTempDirectory("sql-console-cleanup-b")
+        val releaseExecution = CountDownLatch(1)
+        val startedExecutions = CountDownLatch(2)
         val manager = SqlConsoleQueryManager(
             sqlConsoleService = SqlConsoleService(
                 config = SqlConsoleConfig(
                     sourceCatalog = listOf(SqlConsoleSourceConfig("db1", "jdbc:test", "user", "pwd")),
                 ),
                 executor = ShardSqlExecutor { _, _, _, _, _, control ->
-                    repeat(20) {
-                        if (control.isCancelled()) {
-                            throw SqlConsoleExecutionCancelledException("cancelled")
-                        }
-                        Thread.sleep(10)
+                    startedExecutions.countDown()
+                    releaseExecution.await()
+                    if (control.isCancelled()) {
+                        throw SqlConsoleExecutionCancelledException("cancelled")
                     }
                     RawShardExecutionResult(
                         shardName = "db1",
@@ -381,13 +383,81 @@ class SqlConsoleQueryManagerTest {
             ),
         )
 
-        val started = manager.startQuery("select 1", null, ownerSessionId = ownerSessionId, cleanupDir = cleanupDir)
+        val firstStarted = manager.startQuery(
+            "select 1",
+            null,
+            ownerSessionId = ownerSessionId,
+            cleanupDir = firstCleanupDir,
+        )
+        val secondStarted = manager.startQuery(
+            "select 2",
+            null,
+            ownerSessionId = "owner-session-2",
+            cleanupDir = secondCleanupDir,
+        )
+
+        startedExecutions.await()
+        assertEquals(SqlConsoleExecutionStatus.RUNNING, manager.snapshot(firstStarted.id).status)
+        assertEquals(SqlConsoleExecutionStatus.RUNNING, manager.snapshot(secondStarted.id).status)
+
+        releaseExecution.countDown()
+        assertEquals(SqlConsoleExecutionStatus.SUCCESS, waitForCompletion(manager, firstStarted.id).status)
+        assertEquals(SqlConsoleExecutionStatus.SUCCESS, waitForCompletion(manager, secondStarted.id).status)
+        assertTrue(!Files.exists(firstCleanupDir))
+        assertTrue(!Files.exists(secondCleanupDir))
+    }
+
+    @Test
+    fun `rejects second manual transaction while another manual transaction is running`() {
+        val releaseExecution = CountDownLatch(1)
+        val manager = SqlConsoleQueryManager(sqlConsoleService = manualTransactionService(releaseExecution))
+
+        manager.startQuery(
+            sql = "update demo set flag = true",
+            credentialsPath = null,
+            ownerSessionId = ownerSessionId,
+            transactionMode = SqlConsoleTransactionMode.TRANSACTION_PER_SHARD,
+        )
+
         val error = assertFailsWith<UiStateConflictException> {
-            manager.startQuery("select 2", null, ownerSessionId = "owner-session-2")
+            manager.startQuery(
+                sql = "update demo set flag = false",
+                credentialsPath = null,
+                ownerSessionId = "owner-session-2",
+                transactionMode = SqlConsoleTransactionMode.TRANSACTION_PER_SHARD,
+            )
         }
-        assertTrue(error.message!!.contains("уже выполняется запрос"))
-        waitForCompletion(manager, started.id)
-        assertTrue(!Files.exists(cleanupDir))
+
+        releaseExecution.countDown()
+        assertTrue(error.message!!.contains("ручная транзакция"))
+    }
+
+    @Test
+    fun `rejects second manual transaction when another tab already has pending commit`() {
+        val manager = SqlConsoleQueryManager(sqlConsoleService = manualTransactionService())
+
+        val firstStarted = manager.startQuery(
+            sql = "update demo set flag = true",
+            credentialsPath = null,
+            ownerSessionId = ownerSessionId,
+            transactionMode = SqlConsoleTransactionMode.TRANSACTION_PER_SHARD,
+        )
+        val pending = waitForCompletion(manager, firstStarted.id)
+        assertEquals(SqlConsoleExecutionTransactionState.PENDING_COMMIT, pending.transactionState)
+
+        val error = assertFailsWith<UiStateConflictException> {
+            manager.startQuery(
+                sql = "update demo set flag = false",
+                credentialsPath = null,
+                ownerSessionId = "owner-session-2",
+                transactionMode = SqlConsoleTransactionMode.TRANSACTION_PER_SHARD,
+            )
+        }
+
+        assertEquals(
+            "В другой вкладке SQL-консоли есть незавершенная транзакция. Сначала выполните Commit или Rollback в той вкладке. Пока транзакция не завершена, запуск новой ручной транзакции недоступен.",
+            error.message,
+        )
     }
 
     @Test

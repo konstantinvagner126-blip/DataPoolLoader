@@ -77,7 +77,10 @@ fun ComposeSqlConsolePage(
         heroHeader = {
             Div({ classes("hero-actions", "mb-3") }) {
                 SqlConsoleNavActionButton("На главную", hrefValue = "/")
-                SqlConsoleNavActionButton("Объекты БД", hrefValue = "/sql-console-objects")
+                SqlConsoleNavActionButton(
+                    "Объекты БД",
+                    hrefValue = buildSqlConsoleObjectsWorkspaceHref(resolveSqlConsoleWorkspaceId()),
+                )
                 SqlConsoleNavActionButton("SQL-консоль", active = true)
             }
         },

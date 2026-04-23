@@ -387,10 +387,12 @@ class ServerTest {
             composeSqlConsoleRedirect.headers[HttpHeaders.Location]
         )
 
-        val composeSqlConsoleObjectsRedirect = noRedirectClient.get("/compose-sql-console-objects")
+        val composeSqlConsoleObjectsRedirect = noRedirectClient.get(
+            "/compose-sql-console-objects?workspaceId=workspace-a&query=offer"
+        )
         assertEquals(HttpStatusCode.Found, composeSqlConsoleObjectsRedirect.status)
         assertEquals(
-            "/static/compose-app/index.html?screen=sql-console-objects",
+            "/static/compose-app/index.html?screen=sql-console-objects&workspaceId=workspace-a&query=offer",
             composeSqlConsoleObjectsRedirect.headers[HttpHeaders.Location]
         )
 
@@ -421,10 +423,10 @@ class ServerTest {
             sqlConsoleRedirect.headers[HttpHeaders.Location],
         )
 
-        val sqlConsoleObjectsRedirect = noRedirectClient.get("/sql-console-objects")
+        val sqlConsoleObjectsRedirect = noRedirectClient.get("/sql-console-objects?workspaceId=workspace-a&type=TABLE")
         assertEquals(HttpStatusCode.Found, sqlConsoleObjectsRedirect.status)
         assertEquals(
-            "/static/compose-app/index.html?screen=sql-console-objects",
+            "/static/compose-app/index.html?screen=sql-console-objects&workspaceId=workspace-a&type=TABLE",
             sqlConsoleObjectsRedirect.headers[HttpHeaders.Location],
         )
 
@@ -891,7 +893,7 @@ class ServerTest {
 
         val started = client.post("/api/sql-console/query/start") {
             contentType(ContentType.Application.Json)
-            setBody("""{"sql":"delete from demo","selectedSourceNames":["shard1"],"ownerSessionId":"tab-1"}""")
+            setBody("""{"sql":"delete from demo","selectedSourceNames":["shard1"],"workspaceId":"workspace-a","ownerSessionId":"tab-1"}""")
         }
         assertEquals(HttpStatusCode.OK, started.status)
         val startedBody = started.bodyAsText()
@@ -906,10 +908,14 @@ class ServerTest {
 
         val duplicateStart = client.post("/api/sql-console/query/start") {
             contentType(ContentType.Application.Json)
-            setBody("""{"sql":"delete from demo_again","selectedSourceNames":["shard1"],"ownerSessionId":"tab-2"}""")
+            setBody("""{"sql":"delete from demo_again","selectedSourceNames":["shard1"],"workspaceId":"workspace-b","ownerSessionId":"tab-2"}""")
         }
-        assertEquals(HttpStatusCode.Conflict, duplicateStart.status)
-        assertTrue(duplicateStart.bodyAsText().contains("уже выполняется запрос"))
+        assertEquals(HttpStatusCode.OK, duplicateStart.status)
+        val duplicateStartBody = duplicateStart.bodyAsText()
+        val duplicateExecutionId = Regex(""""id":"([^"]+)"""").find(duplicateStartBody)?.groupValues?.get(1)
+        assertNotNull(duplicateExecutionId)
+        val duplicateRunning = client.get("/api/sql-console/query/$duplicateExecutionId")
+        assertEquals(HttpStatusCode.OK, duplicateRunning.status)
 
         val heartbeat = client.post("/api/sql-console/query/$executionId/heartbeat") {
             contentType(ContentType.Application.Json)

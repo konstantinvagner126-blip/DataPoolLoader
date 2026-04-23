@@ -115,6 +115,22 @@ internal class SqlConsoleLibraryBindings(
         context.updateState { context.store.updateAutoCommitEnabled(it, enabled) }
     }
 
+    fun openNewConsoleTab() {
+        context.scope.launch {
+            val targetWorkspaceId = generateSqlConsoleWorkspaceId()
+            context.store.persistState(context.currentState(), targetWorkspaceId)
+            val opened = openSqlConsoleWorkspaceInNewTab(targetWorkspaceId)
+            if (!opened) {
+                context.setState(
+                    context.currentState().copy(
+                        errorMessage = "Браузер заблокировал открытие новой вкладки SQL-консоли.",
+                        successMessage = null,
+                    ),
+                )
+            }
+        }
+    }
+
     fun openFavoriteMetadata(favorite: SqlConsoleFavoriteObject) {
         window.location.href = buildFavoriteMetadataHref(favorite)
     }

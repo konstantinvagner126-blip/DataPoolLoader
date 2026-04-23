@@ -8,6 +8,7 @@ import org.w3c.files.File
 internal data class SqlConsolePageUiState(
     val ownerSessionId: String = resolveSqlConsoleOwnerSessionId(),
     val ownerTabInstanceId: String = resolveSqlConsoleOwnerTabInstanceId(),
+    val workspaceId: String = resolveSqlConsoleWorkspaceId(),
     val editorInstance: Any? = null,
     val editorFocused: Boolean = false,
     val editorCursorLine: Int = 1,
@@ -51,6 +52,7 @@ internal data class SqlConsolePageCallbacks(
     val onDraftSqlChange: (String) -> Unit,
     val onPageSizeChange: (Int) -> Unit,
     val onFormatSql: () -> Unit,
+    val onOpenNewTab: () -> Unit,
     val onRunCurrent: () -> Unit,
     val onRunAll: () -> Unit,
     val onStop: () -> Unit,
@@ -122,6 +124,7 @@ internal fun sqlConsolePageCallbacks(
         onDraftSqlChange = editorBindings::updateDraftSql,
         onPageSizeChange = editorBindings::updatePageSize,
         onFormatSql = executionBindings::formatSql,
+        onOpenNewTab = libraryBindings::openNewConsoleTab,
         onRunCurrent = executionBindings::runCurrent,
         onRunAll = executionBindings::runAll,
         onStop = executionBindings::stop,

@@ -23,7 +23,7 @@ class SqlConsoleQueryManager(
     private val sqlConsoleService: SqlConsoleOperations,
     private val transactionalOperations: SqlConsoleTransactionalOperations = sqlConsoleService as? SqlConsoleTransactionalOperations
         ?: error("SQL-консоль не поддерживает транзакционные execution session."),
-    private val executor: ExecutorService = Executors.newSingleThreadExecutor(),
+    private val executor: ExecutorService = Executors.newCachedThreadPool(),
     private val scheduler: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor(),
     private val clock: () -> Instant = Instant::now,
     ownerLeaseDuration: Duration = Duration.ofSeconds(15),
@@ -51,6 +51,7 @@ class SqlConsoleQueryManager(
         sql: String,
         credentialsPath: Path?,
         selectedSourceNames: List<String>,
+        workspaceId: String?,
         ownerSessionId: String,
         executionPolicy: SqlConsoleExecutionPolicy,
         transactionMode: SqlConsoleTransactionMode,
@@ -59,6 +60,7 @@ class SqlConsoleQueryManager(
         enforceSafetyTimeouts()
         val execution = stateSupport.prepareStart(
             autoCommitEnabled = transactionMode == SqlConsoleTransactionMode.AUTO_COMMIT,
+            workspaceId = workspaceId,
             ownerSessionId = ownerSessionId,
             now = clock(),
         )
@@ -79,9 +81,9 @@ class SqlConsoleQueryManager(
         return execution.snapshot
     }
 
-    override fun currentSnapshot(): SqlConsoleExecutionSnapshot? {
+    override fun currentSnapshot(workspaceId: String?): SqlConsoleExecutionSnapshot? {
         enforceSafetyTimeouts()
-        return stateSupport.currentSnapshot()
+        return stateSupport.currentSnapshot(workspaceId)
     }
 
     override fun snapshot(executionId: String): SqlConsoleExecutionSnapshot {

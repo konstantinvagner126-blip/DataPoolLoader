@@ -7,9 +7,12 @@ interface SqlConsoleApi {
 
     suspend fun loadInfo(): SqlConsoleInfo
 
-    suspend fun loadState(): SqlConsoleStateSnapshot
+    suspend fun loadState(workspaceId: String? = null): SqlConsoleStateSnapshot
 
-    suspend fun saveState(request: SqlConsoleStateUpdate): SqlConsoleStateSnapshot
+    suspend fun saveState(
+        request: SqlConsoleStateUpdate,
+        workspaceId: String? = null,
+    ): SqlConsoleStateSnapshot
 
     suspend fun saveSettings(request: SqlConsoleSettingsUpdate): SqlConsoleInfo
 

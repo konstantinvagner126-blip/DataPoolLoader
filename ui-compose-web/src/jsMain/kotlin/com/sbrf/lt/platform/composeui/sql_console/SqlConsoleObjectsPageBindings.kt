@@ -17,6 +17,7 @@ internal data class SqlConsoleObjectsPageCallbacks(
 
 internal fun sqlConsoleObjectsPageCallbacks(
     store: SqlConsoleObjectsStore,
+    workspaceId: String,
     scope: CoroutineScope,
     currentState: () -> SqlConsoleObjectsPageState,
     setState: (SqlConsoleObjectsPageState) -> Unit,
@@ -38,12 +39,12 @@ internal fun sqlConsoleObjectsPageCallbacks(
             }
         },
         onOpenInspector = { sourceName, dbObject ->
-            window.location.href = buildObjectInspectorHref(sourceName, dbObject)
+            window.location.href = buildObjectInspectorHref(sourceName, dbObject, workspaceId)
         },
         onToggleFavorite = { sourceName, dbObject ->
             scope.launch {
                 setState(store.beginAction(currentState(), "toggle-favorite-object"))
-                setState(store.toggleFavoriteObject(currentState(), sourceName, dbObject))
+                setState(store.toggleFavoriteObject(currentState(), workspaceId, sourceName, dbObject))
             }
         },
         onOpenSelect = { sourceName, dbObject ->
@@ -52,12 +53,13 @@ internal fun sqlConsoleObjectsPageCallbacks(
                 setState(
                     store.openObjectInConsole(
                         current = currentState(),
+                        workspaceId = workspaceId,
                         sourceName = sourceName,
                         draftSql = buildPreviewSql(dbObject),
                     ),
                 )
                 if (currentState().errorMessage == null) {
-                    window.location.href = "/sql-console"
+                    window.location.href = buildSqlConsoleWorkspaceHref(workspaceId)
                 }
             }
         },
@@ -67,12 +69,13 @@ internal fun sqlConsoleObjectsPageCallbacks(
                 setState(
                     store.openObjectInConsole(
                         current = currentState(),
+                        workspaceId = workspaceId,
                         sourceName = sourceName,
                         draftSql = buildCountSql(dbObject),
                     ),
                 )
                 if (currentState().errorMessage == null) {
-                    window.location.href = "/sql-console"
+                    window.location.href = buildSqlConsoleWorkspaceHref(workspaceId)
                 }
             }
         },

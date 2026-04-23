@@ -9,13 +9,14 @@ interface SqlConsoleAsyncQueryOperations {
         sql: String,
         credentialsPath: Path?,
         selectedSourceNames: List<String> = emptyList(),
+        workspaceId: String? = null,
         ownerSessionId: String,
         executionPolicy: SqlConsoleExecutionPolicy = SqlConsoleExecutionPolicy.STOP_ON_FIRST_ERROR,
         transactionMode: SqlConsoleTransactionMode = SqlConsoleTransactionMode.AUTO_COMMIT,
         cleanupDir: Path? = null,
     ): SqlConsoleExecutionSnapshot
 
-    fun currentSnapshot(): SqlConsoleExecutionSnapshot?
+    fun currentSnapshot(workspaceId: String? = null): SqlConsoleExecutionSnapshot?
 
     fun snapshot(executionId: String): SqlConsoleExecutionSnapshot
 

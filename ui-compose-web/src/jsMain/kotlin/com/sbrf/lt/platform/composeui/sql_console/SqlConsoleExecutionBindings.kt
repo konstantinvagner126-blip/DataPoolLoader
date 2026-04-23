@@ -13,6 +13,7 @@ internal class SqlConsoleExecutionBindings(
                 context.setState(
                     context.store.startQuery(
                         current = runningState,
+                        workspaceId = context.currentUiState().workspaceId,
                         ownerSessionId = context.currentUiState().ownerSessionId,
                     ),
                 )
@@ -34,6 +35,7 @@ internal class SqlConsoleExecutionBindings(
                 context.setState(
                     context.store.startQuery(
                         current = runningState,
+                        workspaceId = context.currentUiState().workspaceId,
                         ownerSessionId = context.currentUiState().ownerSessionId,
                         sqlOverride = statementSql,
                         successMessage = "Текущий statement запущен.",
