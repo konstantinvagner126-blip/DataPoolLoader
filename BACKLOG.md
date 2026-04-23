@@ -940,6 +940,11 @@ Review after Phase F:
     - добавлены common tests на loading-state rules и load orchestration:
       - [RunHistoryCleanupStoreLoadingStateSupportTest.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonTest/kotlin/com/sbrf/lt/platform/composeui/run_history_cleanup/RunHistoryCleanupStoreLoadingStateSupportTest.kt)
       - [RunHistoryCleanupStoreLoadingSupportTest.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonTest/kotlin/com/sbrf/lt/platform/composeui/run_history_cleanup/RunHistoryCleanupStoreLoadingSupportTest.kt)
+  - следующий bounded split в `module_sync` идет по loading-state, а не по уже выделенным runtime/selection/action boundary:
+    - [ModuleSyncStoreLoadingSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncStoreLoadingSupport.kt) перестал держать database-loaded state и select-run error policy прямо в orchestration слое;
+    - pure loading state transitions вынесены в [ModuleSyncStoreLoadingStateSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncStoreLoadingStateSupport.kt);
+    - добавлены common tests на loading-state rules:
+      - [ModuleSyncStoreLoadingStateSupportTest.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonTest/kotlin/com/sbrf/lt/platform/composeui/module_sync/ModuleSyncStoreLoadingStateSupportTest.kt)
 
 ### 12. Финализировать boundary модульного редактора и storage contracts
 

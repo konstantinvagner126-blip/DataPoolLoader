@@ -5,6 +5,7 @@ internal class ModuleSyncStoreLoadingSupport(
 ) : ModuleSyncLoadStore {
     private val runtimeSupport = ModuleSyncStoreRuntimeSupport(api)
     private val selectionSupport = ModuleSyncStoreSelectionSupport(api)
+    private val stateSupport = ModuleSyncStoreLoadingStateSupport()
 
     override suspend fun load(
         historyLimit: Int,
@@ -61,8 +62,7 @@ internal class ModuleSyncStoreLoadingSupport(
             runsResult.exceptionOrNull()?.message,
             detailsResult.exceptionOrNull()?.message,
         ).firstOrNull()
-        return ModuleSyncPageState(
-            loading = false,
+        return stateSupport.createDatabaseLoadedState(
             runtimeContext = runtimeContext,
             syncState = syncState,
             availableFileModules = availableFileModules,
@@ -92,16 +92,8 @@ internal class ModuleSyncStoreLoadingSupport(
     ): ModuleSyncPageState =
         runCatching {
             val details = api.loadSyncRunDetails(syncRunId)
-            current.copy(
-                loading = false,
-                errorMessage = null,
-                selectedRunId = syncRunId,
-                selectedRunDetails = details,
-            )
+            stateSupport.applySelectedRun(current, syncRunId, details)
         }.getOrElse { error ->
-            current.copy(
-                loading = false,
-                errorMessage = error.message ?: "Не удалось загрузить детали импорта.",
-            )
+            stateSupport.applySelectRunFailure(current, error)
         }
 }
