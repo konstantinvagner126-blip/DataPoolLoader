@@ -697,7 +697,7 @@
 
 Статус:
 
-- не реализовано
+- частично реализовано
 
 Цель:
 
@@ -718,6 +718,14 @@
   - runtime branching;
   - UX-политику;
   - error normalization.
+
+Что уже сделано:
+
+- начат cleanup store-слоев SQL-консоли:
+  - [SqlConsoleStoreExecutionSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleStoreExecutionSupport.kt) перестал держать весь execution lifecycle как один knowledge-heavy файл;
+  - settings/connection flow вынесен в [SqlConsoleStoreSettingsSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleStoreSettingsSupport.kt);
+  - query lifecycle вынесен в [SqlConsoleStoreQueryLifecycleSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleStoreQueryLifecycleSupport.kt);
+  - owner actions и execution state helpers вынесены в [SqlConsoleStoreOwnerActionSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleStoreOwnerActionSupport.kt) и [SqlConsoleStoreExecutionStateSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/sql_console/SqlConsoleStoreExecutionStateSupport.kt).
 
 ### 12. Финализировать boundary модульного редактора и storage contracts
 
