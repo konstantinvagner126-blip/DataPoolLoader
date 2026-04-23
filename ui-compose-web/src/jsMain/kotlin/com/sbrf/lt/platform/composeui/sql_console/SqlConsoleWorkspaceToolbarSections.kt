@@ -32,7 +32,7 @@ internal fun SqlConsoleWorkspaceToolbar(
     onExportZip: () -> Unit,
 ) {
     Div({ classes("sql-toolbar") }) {
-        Div({ classes("d-flex", "flex-wrap", "align-items-center", "gap-2") }) {
+        Div({ classes("sql-toolbar-meta") }) {
             Label(attrs = {
                 classes("small", "text-secondary", "mb-0")
                 attr("for", "composeSqlPageSize")
@@ -55,69 +55,89 @@ internal fun SqlConsoleWorkspaceToolbar(
                 }
             }
         }
-        Div({ classes("d-flex", "flex-wrap", "align-items-center", "gap-2") }) {
-            SqlToolbarActionButton(
-                toneClass = "btn-outline-dark",
-                onClick = onFormatSql,
-            ) {
-                Text("Форматировать")
+        Div({ classes("sql-toolbar-action-groups") }) {
+            SqlToolbarActionGroup("Подготовка") {
+                SqlToolbarActionButton(
+                    toneClass = "btn-outline-dark",
+                    onClick = onFormatSql,
+                ) {
+                    Text("Форматировать")
+                }
+                SqlToolbarActionButton(
+                    toneClass = "btn-outline-dark",
+                    buttonDisabled = (
+                        state.actionInProgress == "run-current-query" ||
+                            state.info?.configured != true ||
+                            pendingManualTransaction ||
+                            currentOutlineItem == null
+                        ),
+                    onClick = onRunCurrent,
+                ) {
+                    Text("Текущий statement")
+                }
             }
-            SqlToolbarActionButton(
-                toneClass = "btn-outline-dark",
-                buttonDisabled = (
-                    state.actionInProgress == "run-current-query" ||
-                        state.info?.configured != true ||
-                        pendingManualTransaction ||
-                        currentOutlineItem == null
-                    ),
-                onClick = onRunCurrent,
-            ) {
-                Text("Текущий")
+            SqlToolbarActionGroup("Выполнение") {
+                SqlToolbarActionButton(
+                    toneClass = runButtonClass,
+                    buttonDisabled = state.actionInProgress == "run-query" || state.info?.configured != true || pendingManualTransaction,
+                    extraClasses = arrayOf("sql-toolbar-primary-action"),
+                    onClick = onRunAll,
+                ) {
+                    Text("Выполнить скрипт")
+                }
+                SqlToolbarActionButton(
+                    toneClass = "btn-danger",
+                    buttonDisabled = !isRunning || state.actionInProgress == "cancel-query",
+                    onClick = onStop,
+                ) {
+                    Text("Остановить")
+                }
             }
-            SqlToolbarActionButton(
-                toneClass = runButtonClass,
-                buttonDisabled = state.actionInProgress == "run-query" || state.info?.configured != true || pendingManualTransaction,
-                extraClasses = arrayOf("sql-action-button", "sql-action-button-run"),
-                onClick = onRunAll,
-            ) {
-                Span({ classes("sql-action-icon", "sql-action-icon-play") })
+            SqlToolbarActionGroup("Транзакция") {
+                SqlToolbarActionButton(
+                    toneClass = "btn-success",
+                    buttonDisabled = !pendingManualTransaction || state.actionInProgress == "commit-query",
+                    onClick = onCommit,
+                ) {
+                    Text("Commit")
+                }
+                SqlToolbarActionButton(
+                    toneClass = "btn-outline-danger",
+                    buttonDisabled = !pendingManualTransaction || state.actionInProgress == "rollback-query",
+                    onClick = onRollback,
+                ) {
+                    Text("Rollback")
+                }
             }
-            SqlToolbarActionButton(
-                toneClass = "btn-danger",
-                buttonDisabled = !isRunning || state.actionInProgress == "cancel-query",
-                extraClasses = arrayOf("sql-action-button", "sql-action-button-stop"),
-                onClick = onStop,
-            ) {
-                Span({ classes("sql-action-icon", "sql-action-icon-stop") })
+            SqlToolbarActionGroup("Экспорт") {
+                SqlToolbarActionButton(
+                    toneClass = "btn-outline-secondary",
+                    buttonDisabled = activeExportShard == null,
+                    onClick = onExportCsv,
+                ) {
+                    Text("Скачать CSV")
+                }
+                SqlToolbarActionButton(
+                    toneClass = "btn-outline-secondary",
+                    buttonDisabled = exportableResult?.statementType != "RESULT_SET",
+                    onClick = onExportZip,
+                ) {
+                    Text("Скачать ZIP")
+                }
             }
-            SqlToolbarActionButton(
-                toneClass = "btn-success",
-                buttonDisabled = !pendingManualTransaction || state.actionInProgress == "commit-query",
-                onClick = onCommit,
-            ) {
-                Text("Commit")
-            }
-            SqlToolbarActionButton(
-                toneClass = "btn-outline-danger",
-                buttonDisabled = !pendingManualTransaction || state.actionInProgress == "rollback-query",
-                onClick = onRollback,
-            ) {
-                Text("Rollback")
-            }
-            SqlToolbarActionButton(
-                toneClass = "btn-outline-secondary",
-                buttonDisabled = activeExportShard == null,
-                onClick = onExportCsv,
-            ) {
-                Text("Скачать CSV")
-            }
-            SqlToolbarActionButton(
-                toneClass = "btn-outline-secondary",
-                buttonDisabled = exportableResult?.statementType != "RESULT_SET",
-                onClick = onExportZip,
-            ) {
-                Text("Скачать ZIP")
-            }
+        }
+    }
+}
+
+@Composable
+private fun SqlToolbarActionGroup(
+    title: String,
+    content: @Composable () -> Unit,
+) {
+    Div({ classes("sql-toolbar-action-group") }) {
+        Span({ classes("sql-toolbar-action-group-title") }) { Text(title) }
+        Div({ classes("sql-toolbar-action-group-buttons") }) {
+            content()
         }
     }
 }

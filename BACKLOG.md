@@ -400,15 +400,16 @@
   - source/shard status оставлен в одной primary presentation-форме: таблица без карточного дубля;
   - внешний page-блок `Script outline` удален; cursor-based flow для `Текущий` statement остался editor-native;
   - source connection indicators теперь обновляются не только после ручной проверки, но и по факту реального SQL execution на участвовавших source;
+  - добавлен `working context strip`: source selection, transaction mode, strict safety, page size и credentials state читаются с одного взгляда, без возврата в sidebar;
+  - toolbar переведен в явную action hierarchy `подготовка / выполнение / транзакция / экспорт`; `Run / Cancel / Commit / Rollback` больше не прячутся в визуально равноправном icon-only наборе;
+  - execution status strip усилен для `pending commit`, `auto rollback by timeout/owner loss` и `cancel requested`, чтобы safety-состояния читались как operational state, а не как абстрактный summary;
 
 - четко развести source/settings, editor, execution state, result output и transaction controls;
 - убрать визуальное смешение между рабочим контекстом и результатами запроса;
-- явно различать `Run`, `Cancel`, `Commit`, `Rollback`;
 - сделать опасные и необратимые состояния очевидными без banner-spam и лишнего дублирования;
 - улучшить presentation для pending/empty/error/success состояний;
 - упростить навигацию по statement/shard/page/result views;
 - для source/shard execution status не держать параллельно таблицу и карточки с одинаковыми данными: primary view должна оставаться таблица, карточный дубль нужно убрать;
-- сделать source selection, transaction mode, strict safety mode, page size и credentials state считываемыми с одного взгляда;
 - не прятать критические execution-инварианты в второстепенные блоки;
 - индикатор подключения по source должен обновляться не только после явного `Проверить подключение`, но и по факту реального SQL execution на выбранных source: успешный run обновляет статус в `available/ok`, connection-level failure обновляет статус в `failed/unavailable`, неучаствовавшие source не должны менять состояние;
 - сократить переключения контекста между recent queries, favorites, object browser и SQL editor;

@@ -23,12 +23,18 @@ internal fun ExecutionStatusStrip(
     val showLiveDuration = isRunning && runningClockTick >= 0
     val cssClass = when {
         execution == null -> "sql-status-strip"
+        execution.transactionState == "PENDING_COMMIT" -> "sql-status-strip sql-status-strip-warning"
+        execution.transactionState == "ROLLED_BACK_BY_TIMEOUT" -> "sql-status-strip sql-status-strip-failed"
+        execution.transactionState == "ROLLED_BACK_BY_OWNER_LOSS" -> "sql-status-strip sql-status-strip-failed"
+        execution.transactionState == "ROLLED_BACK" -> "sql-status-strip sql-status-strip-warning"
+        execution.transactionState == "COMMITTED" -> "sql-status-strip sql-status-strip-success"
         execution.status.equals("FAILED", ignoreCase = true) -> "sql-status-strip sql-status-strip-failed"
         execution.status.equals("SUCCESS", ignoreCase = true) -> "sql-status-strip sql-status-strip-success"
         execution.status.equals("CANCELLED", ignoreCase = true) -> "sql-status-strip sql-status-strip-warning"
         else -> "sql-status-strip sql-status-strip-running"
     }
     val text = buildExecutionStatusText(execution)
+    val hint = buildExecutionStatusHint(execution)
     Div({ classesFromString(cssClass) }) {
         Div({ classes("sql-status-strip-content") }) {
             if (isRunning && execution != null) {
@@ -42,6 +48,9 @@ internal fun ExecutionStatusStrip(
                         Div({ classes("sql-status-strip-meta") }) {
                             Text(buildExecutionStatusMeta(execution, showLiveDuration))
                         }
+                        hint?.let {
+                            Div({ classes("sql-status-strip-hint") }) { Text(it) }
+                        }
                     }
                 }
             } else {
@@ -51,6 +60,9 @@ internal fun ExecutionStatusStrip(
                         Div({ classes("sql-status-strip-meta") }) {
                             Text(buildExecutionStatusMeta(execution, showLiveDuration = false))
                         }
+                    }
+                    hint?.let {
+                        Div({ classes("sql-status-strip-hint") }) { Text(it) }
                     }
                 }
             }

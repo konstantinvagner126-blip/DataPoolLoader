@@ -79,3 +79,18 @@ fun buildCredentialsStatusText(status: CredentialsStatusResponse): String {
     val availability = if (status.fileAvailable) "доступен" else "не найден"
     return "$sourceLabel: ${status.displayName} ($availability)"
 }
+
+fun buildCredentialsStatusBadgeText(status: CredentialsStatusResponse): String =
+    when {
+        status.uploaded -> "загружен через UI"
+        status.mode.equals("FILE", ignoreCase = true) && status.fileAvailable -> "файл по умолчанию"
+        status.mode.equals("FILE", ignoreCase = true) -> "файл не найден"
+        else -> "не задан"
+    }
+
+fun translateTransactionMode(mode: String): String =
+    when {
+        mode.equals("AUTO_COMMIT", ignoreCase = true) -> "Autocommit"
+        mode.equals("TRANSACTION_PER_SHARD", ignoreCase = true) -> "Транзакция по source"
+        else -> mode
+    }

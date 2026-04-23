@@ -8,15 +8,19 @@ internal fun buildExecutionStatusText(execution: SqlConsoleExecutionResponse?): 
     when {
         execution == null -> "Запрос пока не выполнялся."
         execution.status.equals("RUNNING", ignoreCase = true) && execution.cancelRequested ->
-            "Запрос выполняется, отправлена команда на остановку."
+            "Остановка запроса запрошена."
         execution.status.equals("RUNNING", ignoreCase = true) ->
-            "Сценарий выполняется."
+            "Запрос выполняется."
         execution.transactionState == "PENDING_COMMIT" ->
-            "Сценарий выполнен и ждет команды Коммит или Роллбек."
+            "Транзакция ждет решения: Commit или Rollback."
         execution.transactionState == "COMMITTED" ->
-            "Транзакция зафиксирована."
+            "Commit выполнен."
+        execution.transactionState == "ROLLED_BACK_BY_TIMEOUT" ->
+            "Транзакция откатана автоматически по таймауту ожидания решения."
+        execution.transactionState == "ROLLED_BACK_BY_OWNER_LOSS" ->
+            "Транзакция откатана автоматически после потери владельца."
         execution.transactionState == "ROLLED_BACK" ->
-            "Транзакция откатана."
+            "Rollback выполнен."
         execution.status.equals("SUCCESS", ignoreCase = true) ->
             "Запрос завершен успешно."
         execution.status.equals("FAILED", ignoreCase = true) ->
@@ -38,8 +42,22 @@ internal fun buildExecutionStatusMeta(
             append(formatDuration(execution.startedAt, execution.finishedAt, running = true))
         } else {
             if (execution.transactionState == "PENDING_COMMIT" && execution.transactionShardNames.isNotEmpty()) {
-                append(" • Открытых транзакций: ")
+                append(" • Открытые транзакции: ")
                 append(execution.transactionShardNames.joinToString(", "))
+            }
+            if (execution.transactionState == "PENDING_COMMIT" && !execution.pendingCommitExpiresAt.isNullOrBlank()) {
+                append(" • Автооткат: ")
+                append(formatDateTime(execution.pendingCommitExpiresAt))
+            }
+            if (execution.transactionState == "PENDING_COMMIT" && !execution.ownerLeaseExpiresAt.isNullOrBlank()) {
+                append(" • Lease владельца: ")
+                append(formatDateTime(execution.ownerLeaseExpiresAt))
+            }
+            if (execution.transactionState == "ROLLED_BACK_BY_TIMEOUT") {
+                append(" • Причина: истек TTL ожидания commit")
+            }
+            if (execution.transactionState == "ROLLED_BACK_BY_OWNER_LOSS") {
+                append(" • Причина: потерян владелец выполнения")
             }
             if (!execution.finishedAt.isNullOrBlank()) {
                 append(" • Завершение: ")
@@ -48,6 +66,18 @@ internal fun buildExecutionStatusMeta(
                 append(formatDuration(execution.startedAt, execution.finishedAt))
             }
         }
+    }
+
+internal fun buildExecutionStatusHint(execution: SqlConsoleExecutionResponse?): String? =
+    when {
+        execution == null -> null
+        execution.transactionState == "PENDING_COMMIT" ->
+            "Следующий шаг: выбери Commit для фиксации или Rollback для безопасного отката."
+        execution.transactionState == "ROLLED_BACK_BY_TIMEOUT" || execution.transactionState == "ROLLED_BACK_BY_OWNER_LOSS" ->
+            "Система защиты уже выполнила rollback. Дополнительные действия по транзакции не требуются."
+        execution.status.equals("RUNNING", ignoreCase = true) && execution.cancelRequested ->
+            "Ожидается завершение активных source. Новые управляющие действия сейчас не нужны."
+        else -> null
     }
 
 internal fun buildResultPageSummary(

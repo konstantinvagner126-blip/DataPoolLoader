@@ -43,6 +43,11 @@ internal fun SqlConsolePageContent(
         return
     }
 
+    SqlConsoleWorkingContextStrip(
+        state = state,
+        uiState = uiState,
+    )
+
     Div({ classes("row", "g-4") }) {
         Div({ classes("col-12", "col-xl-3") }) {
             SqlConsoleSourceSidebar(
