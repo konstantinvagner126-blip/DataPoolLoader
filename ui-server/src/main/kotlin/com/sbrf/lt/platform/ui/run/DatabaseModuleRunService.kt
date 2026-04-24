@@ -28,11 +28,17 @@ open class DatabaseModuleRunService(
         .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS),
 ) : DatabaseModuleRunOperations {
     private val logger = LoggerFactory.getLogger(javaClass)
+    private val recoverySupport = DatabaseModuleRunRecoverySupport(
+        runExecutionStore = runExecutionStore,
+        runQueryStore = runQueryStore,
+        activeRunRegistry = activeRunRegistry,
+    )
     private val startSupport = DatabaseModuleRunStartSupport(
         databaseModuleStore = databaseModuleStore,
         executionSource = executionSource,
         runExecutionStore = runExecutionStore,
         credentialsProvider = credentialsProvider,
+        recoverySupport = recoverySupport,
     )
     private val eventSupport = DatabaseModuleRunEventSupport(
         runExecutionStore = runExecutionStore,
@@ -55,6 +61,10 @@ open class DatabaseModuleRunService(
         executor = executor,
     )
 
+    init {
+        recoverySupport.recoverAllOrphanRuns()
+    }
+
     override fun startRun(
         moduleCode: String,
         actorId: String,
@@ -66,7 +76,6 @@ open class DatabaseModuleRunService(
             actorId = actorId,
             actorSource = actorSource,
             actorDisplayName = actorDisplayName,
-            localActiveRunId = activeRunRegistry.currentRunId(moduleCode),
         )
         submissionSupport.submitRun(moduleCode, context)
 

@@ -68,6 +68,65 @@
 3. закрепить rollback / cleanup / recovery policy;
 4. усилить scenario-level и server-side проверки именно на long-running контрактах.
 
+#### 9.1. Write-through recovery interrupted FILES runs after restart
+
+Статус:
+
+- реализовано
+
+Контекст:
+
+- для FILES-run history уже есть recovery path `RUNNING -> FAILED` на старте UI;
+- сейчас этот recovery выполняется только в памяти через `RunStateStore.load()`;
+- `run-state.json` при этом может оставаться stale и продолжать хранить `RUNNING`, хотя текущий runtime уже показывает `FAILED`.
+
+Что нужно сделать:
+
+1. нормализовать `run-state.json` write-through после recovery interrupted runs;
+2. не оставлять stale persisted `RUNNING` snapshots как hidden second state;
+3. добавить regression coverage на сценарий `restart -> recovered FAILED -> run-state.json rewritten`;
+4. синхронизировать state-model contract.
+
+#### 9.2. Eager recovery orphan DB runs after restart
+
+Статус:
+
+- реализовано
+
+Контекст:
+
+- для DB-run history orphan recovery сейчас выполняется только лениво при следующем `startRun()` того же модуля;
+- после рестарта `ui-server` stale `RUNNING` записи в registry могут висеть бесконечно, если пользователь больше не стартует этот модуль;
+- это оставляет hidden second lifecycle state:
+  process-local active registry уже очищен, а persisted DB history все еще выглядит как живой run.
+
+Что нужно сделать:
+
+1. вынести orphan DB run recovery в отдельный reusable support вместо дублирования ad-hoc логики;
+2. выполнять eager recovery всех stale DB `RUNNING` runs на инициализации `DatabaseModuleRunService`;
+3. сохранить текущий bounded recovery при `startRun()` для stale runs того же модуля, но перевести его на тот же shared support;
+4. добавить regression coverage на сценарий `restart -> orphan DB run rewritten to FAILED before first manual action`;
+5. синхронизировать state-model contract для active DB run registry и DB run history.
+
+#### 9.3. Failure-side normalization DB run summary counters
+
+Статус:
+
+- реализовано
+
+Контекст:
+
+- в DB run-history failure path `module_run_source_result` уже нормализуется из `PENDING/RUNNING` в `FAILED`;
+- при этом aggregate counters в `module_run` (`successful_source_count`, `failed_source_count`, `skipped_source_count`) не пересчитываются;
+- из-за этого history list может показывать stale `0/0/0` или другие устаревшие значения для уже проваленного DB-run, хотя details/source results уже отражают фактический failure outcome.
+
+Что нужно сделать:
+
+1. нормализовать aggregate source counters в `module_run` внутри DB failure mutation path;
+2. не оставлять расхождение между DB history list и detailed source results после `markRunFailed`;
+3. добавить regression coverage на сценарий `markRunFailed -> sourceResults FAILED -> failedSourceCount updated`;
+4. при необходимости синхронизировать state-model contract для DB run history summary.
+
 ### 11. Зафиксировать и поддерживать repo-level архитектурную дисциплину
 
 Статус:

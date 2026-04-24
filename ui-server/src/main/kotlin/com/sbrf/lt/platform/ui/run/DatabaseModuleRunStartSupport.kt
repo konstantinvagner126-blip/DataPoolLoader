@@ -9,15 +9,15 @@ internal class DatabaseModuleRunStartSupport(
     private val executionSource: DatabaseModuleExecutionSource,
     private val runExecutionStore: DatabaseRunExecutionStore,
     private val credentialsProvider: UiCredentialsProvider,
+    private val recoverySupport: DatabaseModuleRunRecoverySupport,
 ) {
     fun prepareStartContext(
         moduleCode: String,
         actorId: String,
         actorSource: String,
         actorDisplayName: String?,
-        localActiveRunId: String?,
     ): DatabaseModuleRunContext {
-        recoverOrphanRuns(moduleCode, localActiveRunId)
+        recoverySupport.recoverModuleOrphanRuns(moduleCode)
         require(!runExecutionStore.hasActiveRun(moduleCode)) {
             "Для модуля '$moduleCode' уже выполняется DB-запуск. Дождитесь его завершения."
         }
@@ -57,17 +57,5 @@ internal class DatabaseModuleRunStartSupport(
                 credentialsStatus = status,
             )
         }
-    }
-
-    private fun recoverOrphanRuns(moduleCode: String, localActiveRunId: String?) {
-        runExecutionStore.activeRunIds(moduleCode)
-            .filter { it != localActiveRunId }
-            .forEach { runId ->
-                runExecutionStore.markRunFailed(
-                    runId = runId,
-                    finishedAt = Instant.now(),
-                    errorMessage = "DB-запуск был прерван до завершения и восстановлен как FAILED при следующем старте UI.",
-                )
-            }
     }
 }

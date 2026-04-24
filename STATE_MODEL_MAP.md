@@ -95,7 +95,7 @@
 - тип: `operational history`
 - source of truth: persisted `UiRunSnapshot` history в `run-state.json`
 - recovery:
-  на загрузке `RUNNING` snapshots переводятся в `FAILED` через `withRecoveredInterruptedRuns()`
+  на загрузке `RUNNING` snapshots переводятся в `FAILED` через `withRecoveredInterruptedRuns()`, и нормализованный state сразу write-through переписывает `run-state.json`
 - cleanup:
   история сокращается и переписывается через maintenance/retention сценарии, а не через ad-hoc mutation в UI
 
@@ -258,7 +258,7 @@
 - тип: `transient runtime state`
 - source of truth: process-local concurrent map `moduleCode -> runId`
 - recovery:
-  отсутствует; на рестарте реестр очищается
+  сам реестр на рестарте очищается; stale DB `RUNNING` rows в registry не восстанавливают этот map, а eagerly нормализуются в `FAILED` startup-recovery path внутри `DatabaseModuleRunService`
 - cleanup:
   `clear(moduleCode, runId)` или завершение процесса
 

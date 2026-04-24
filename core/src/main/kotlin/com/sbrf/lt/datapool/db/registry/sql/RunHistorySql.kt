@@ -296,6 +296,24 @@ object RunHistorySql {
         update $schema.module_run
         set finished_at = ?::timestamptz,
             status = 'FAILED',
+            successful_source_count = (
+                select count(*)
+                from $schema.module_run_source_result rs
+                where rs.run_id = $schema.module_run.run_id
+                  and rs.status = 'SUCCESS'
+            ),
+            failed_source_count = (
+                select count(*)
+                from $schema.module_run_source_result rs
+                where rs.run_id = $schema.module_run.run_id
+                  and rs.status = 'FAILED'
+            ),
+            skipped_source_count = (
+                select count(*)
+                from $schema.module_run_source_result rs
+                where rs.run_id = $schema.module_run.run_id
+                  and rs.status = 'SKIPPED'
+            ),
             target_status = case
                 when target_status = 'NOT_ENABLED' then 'NOT_ENABLED'
                 else 'FAILED'

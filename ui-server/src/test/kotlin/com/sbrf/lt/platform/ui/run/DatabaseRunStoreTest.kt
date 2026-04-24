@@ -19,9 +19,10 @@ class DatabaseRunStoreTest {
     @Test
     fun `database run store writes instants as sql timestamps`() {
         val timestampCalls = mutableListOf<Timestamp>()
+        val preparedSqls = mutableListOf<String>()
         val store = DatabaseRunStore(
             connectionProvider = DatabaseConnectionProvider {
-                fakeConnection(timestampCalls)
+                fakeConnection(timestampCalls, preparedSqls)
             },
         )
         val requestedAt = Instant.parse("2026-04-17T10:00:00Z")
@@ -75,13 +76,45 @@ class DatabaseRunStoreTest {
         assertTrue(timestampCalls.any { it.time == finishedAt.toEpochMilli() })
     }
 
-    private fun fakeConnection(timestampCalls: MutableList<Timestamp>): Connection =
+    @Test
+    fun `mark run failed SQL recomputes aggregate source counters`() {
+        val preparedSqls = mutableListOf<String>()
+        val store = DatabaseRunStore(
+            connectionProvider = DatabaseConnectionProvider {
+                fakeConnection(mutableListOf(), preparedSqls)
+            },
+        )
+
+        store.markRunFailed(
+            runId = "11111111-1111-1111-1111-111111111111",
+            finishedAt = Instant.parse("2026-04-24T10:00:00Z"),
+            errorMessage = "boom",
+        )
+
+        val failureSql = preparedSqls.first {
+            it.contains("module_run") &&
+                it.contains("successful_source_count = (") &&
+                it.contains("failed_source_count = (") &&
+                it.contains("skipped_source_count = (")
+        }
+        assertTrue(failureSql.contains("successful_source_count = ("))
+        assertTrue(failureSql.contains("failed_source_count = ("))
+        assertTrue(failureSql.contains("skipped_source_count = ("))
+    }
+
+    private fun fakeConnection(
+        timestampCalls: MutableList<Timestamp>,
+        preparedSqls: MutableList<String> = mutableListOf(),
+    ): Connection =
         Proxy.newProxyInstance(
             Connection::class.java.classLoader,
             arrayOf(Connection::class.java),
         ) { _, method, args ->
             when (method.name) {
-                "prepareStatement" -> fakePreparedStatement(timestampCalls)
+                "prepareStatement" -> {
+                    preparedSqls += args?.firstOrNull() as? String ?: ""
+                    fakePreparedStatement(timestampCalls)
+                }
                 "setAutoCommit", "commit", "rollback", "close" -> null
                 "getAutoCommit" -> false
                 else -> defaultReturnValue(method.returnType)

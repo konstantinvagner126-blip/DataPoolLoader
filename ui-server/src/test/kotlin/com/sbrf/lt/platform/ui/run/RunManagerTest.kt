@@ -137,7 +137,8 @@ class RunManagerTest {
     @Test
     fun `restored running run is marked as failed after restart`() {
         val storageDir = createTempDirectory("datapool-ui-storage-")
-        RunStateStore(storageDir).save(
+        val stateStore = RunStateStore(storageDir)
+        stateStore.save(
             PersistedRunState(
                 history = listOf(
                     com.sbrf.lt.platform.ui.model.UiRunSnapshot(
@@ -150,6 +151,7 @@ class RunManagerTest {
                 ),
             ),
         )
+        val initialPersistedState = storageDir.resolve("run-state.json").readText()
 
         val runManager = RunManager(
             uiConfig = UiAppConfig(storageDir = storageDir.toString()),
@@ -159,6 +161,11 @@ class RunManagerTest {
         assertEquals(ExecutionStatus.FAILED, restored.status)
         assertFalse(restored.errorMessage.isNullOrBlank())
         assertNotNull(restored.finishedAt)
+        val rewrittenPersistedState = storageDir.resolve("run-state.json").readText()
+        assertTrue(rewrittenPersistedState != initialPersistedState)
+        val persisted = ConfigLoader().objectMapper()
+            .readValue(rewrittenPersistedState, PersistedRunState::class.java)
+        assertEquals(ExecutionStatus.FAILED, persisted.history.first().status)
     }
 
     @Test

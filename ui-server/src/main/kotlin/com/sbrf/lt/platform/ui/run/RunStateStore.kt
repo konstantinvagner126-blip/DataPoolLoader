@@ -10,9 +10,13 @@ class RunStateStore(
     private val stateFile: Path = storageDir.resolve("run-state.json")
 
     fun load(): PersistedRunState {
-        return readOptionalRunStateFile(stateFile, configLoader, PersistedRunState::class.java)
-            ?.withRecoveredInterruptedRuns()
-            ?: PersistedRunState()
+        val persistedState = readOptionalRunStateFile(stateFile, configLoader, PersistedRunState::class.java)
+            ?: return PersistedRunState()
+        val recoveredState = persistedState.withRecoveredInterruptedRuns()
+        if (recoveredState != persistedState) {
+            saveRunStateFile(storageDir, stateFile, configLoader, recoveredState)
+        }
+        return recoveredState
     }
 
     fun save(state: PersistedRunState) {
