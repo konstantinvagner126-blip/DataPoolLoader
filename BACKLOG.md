@@ -381,6 +381,106 @@
 3. результаты остаются видимыми до explicit read action;
 4. topic-level reload по-прежнему очищает stale results только там, где это реально нужно.
 
+#### 17.10. Clarify Kafka TLS settings UI semantics for certificate files and unspecified type
+
+Статус:
+
+- реализовано
+
+Контекст:
+
+- Kafka settings UI уже поддерживает certificate/key file picking для JKS и PEM-backed fields;
+- технически certificate picker уже принимает `.crt`, `.cer` и `.pem`, но UI скрывает это за подписью `Выбрать PEM`;
+- пустое значение `ssl.truststore.type` / `ssl.keystore.type` рендерится как `default`, хотя по смыслу это не отдельный режим Kafka, а просто `type` не задан.
+
+Что нужно сделать:
+
+1. зафиксировать follow-up в backlog;
+2. убрать misleading label `default` из Kafka TLS settings UI и заменить его на явное `Не задано`;
+3. переименовать certificate/key picker buttons так, чтобы они отражали роль файла, а не внутренний формат placeholder;
+4. добавить helper text с допустимыми расширениями:
+   - сертификат: `.crt / .cer / .pem`;
+   - private key: `.key / .pem`;
+   - keystore: `.jks / .p12 / .pfx`;
+5. не менять backend `properties`-first contract и `${file:/...}` semantics без необходимости.
+
+Что сделано:
+
+1. follow-up зафиксирован как отдельный bounded package;
+2. blank TLS type больше не рендерится как `default`, в UI используется `Не задано`;
+3. browse actions переименованы в role-based labels:
+   - `Выбрать truststore`;
+   - `Выбрать keystore`;
+   - `Выбрать CA сертификат`;
+   - `Выбрать client certificate`;
+   - `Выбрать private key`;
+4. для TLS path fields добавлены helper texts с допустимыми расширениями;
+5. backend contract не менялся:
+   - certificate fields по-прежнему сохраняются как `${file:/...}`;
+   - `.crt/.cer/.pem` для certificates и `.key/.pem` для private key остаются допустимыми.
+
+#### 17.11. Keep Kafka settings usable when cluster catalog is empty and refresh shell after save
+
+Статус:
+
+- реализовано
+
+Контекст:
+
+- Kafka settings UI уже умеет добавлять и сохранять cluster drafts, но shell lifecycle остается неполным;
+- при пустом `info.clusters` page-level empty-state перекрывает settings flow и мешает нормальному first-cluster onboarding;
+- после сохранения нового cluster текущий shell может оставаться на stale `info.clusters`, из-за чего новый cluster не появляется в navigation до полного page reload.
+
+Что нужно сделать:
+
+1. зафиксировать bugfix в backlog;
+2. не блокировать Kafka settings screen global empty-state, если пользователь открывает `cluster-settings`;
+3. дать явный path в settings при `0` configured clusters;
+4. после save settings refresh-ить shell-level cluster catalog и selected cluster state;
+5. добавить regression coverage на first-cluster onboarding flow и post-save shell refresh.
+
+Что сделано:
+
+1. bugfix зафиксирован как отдельный bounded package;
+2. `cluster-settings` screen больше не перекрывается global Kafka empty-state;
+3. при отсутствии configured clusters page показывает явный переход в settings;
+4. после save settings shell refresh-ит `info` и `selectedClusterId`, поэтому новый cluster появляется без full page reload;
+5. regression coverage добавлена на settings save/update flow.
+
+#### 17.12. Add JSON syntax highlighting in Kafka message details
+
+Статус:
+
+- реализовано
+
+Контекст:
+
+- после перехода messages на table-first layout details-pane все еще показывает JSON как plain text в темном `pre` block;
+- payload уже приходит как pretty-printed JSON, но без визуального разделения ключей, строк, чисел и literal values его тяжело читать на больших сообщениях;
+- это чисто web-level ergonomics follow-up и не требует изменения Kafka contracts, store semantics или server response shape.
+
+Что нужно сделать:
+
+1. зафиксировать follow-up в backlog;
+2. добавить локальный JSON syntax highlighting для Kafka message details pane;
+3. выделять хотя бы:
+   - object/array punctuation;
+   - property names;
+   - string values;
+   - numbers;
+   - booleans;
+   - `null`;
+4. сохранить plain-text fallback для non-JSON payload;
+5. не менять message browser server/store contract.
+
+Что сделано:
+
+1. follow-up зафиксирован как отдельный bounded package;
+2. для Kafka message details добавлен локальный JSON tokenizer и span-based syntax highlighting в web renderer;
+3. colored token rendering покрывает punctuation, keys, strings, numbers, booleans и `null`;
+4. non-JSON payload по-прежнему отображается как plain text;
+5. server/store contracts не менялись.
+
 ### 9. Операционная надежность long-running операций
 
 Статус:

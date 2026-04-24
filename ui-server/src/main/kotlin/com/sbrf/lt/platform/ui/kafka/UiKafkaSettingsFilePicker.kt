@@ -82,11 +82,11 @@ internal fun supportedKafkaSettingsFileTargets(): Set<String> = setOf(
 
 private fun kafkaSettingsFileDialogTitle(targetProperty: String): String =
     when (targetProperty) {
-        "ssl.truststore.location" -> "Выбери truststore файл"
-        "ssl.truststore.certificates" -> "Выбери trust certificates файл"
-        "ssl.keystore.location" -> "Выбери keystore файл"
-        "ssl.keystore.certificate.chain" -> "Выбери certificate chain файл"
-        "ssl.keystore.key" -> "Выбери private key файл"
+        "ssl.truststore.location" -> "Выбери truststore"
+        "ssl.truststore.certificates" -> "Выбери CA сертификат"
+        "ssl.keystore.location" -> "Выбери keystore"
+        "ssl.keystore.certificate.chain" -> "Выбери client certificate"
+        "ssl.keystore.key" -> "Выбери private key"
         else -> "Выбери Kafka settings файл"
     }
 
@@ -94,14 +94,14 @@ private fun kafkaSettingsFileExtensions(targetProperty: String): Pair<String, Li
     when (targetProperty) {
         "ssl.truststore.location",
         "ssl.keystore.location",
-            -> "Keystore files" to listOf("jks", "p12", "pfx")
+            -> "Keystore files (.jks, .p12, .pfx)" to listOf("jks", "p12", "pfx")
 
         "ssl.truststore.certificates",
         "ssl.keystore.certificate.chain",
-            -> "Certificate files" to listOf("pem", "crt", "cer")
+            -> "Certificate files (.crt, .cer, .pem)" to listOf("pem", "crt", "cer")
 
         "ssl.keystore.key",
-            -> "Private key files" to listOf("pem", "key")
+            -> "Private key files (.key, .pem)" to listOf("pem", "key")
 
         else -> null
     }

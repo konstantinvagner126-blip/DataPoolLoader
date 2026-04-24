@@ -59,6 +59,7 @@ Kafka credentials и TLS material не должны жить в:
 
 - `JKS` fields сохраняются как filesystem path;
 - `PEM` fields сохраняются как `${file:/abs/path}` placeholder;
+- certificate targets в settings UI допускают `.crt`, `.cer` и `.pem`, private key target допускает `.key` и `.pem`;
 - browser upload не становится вторым source of truth для TLS material.
 
 ## 3. Supported transport/security model
@@ -249,6 +250,17 @@ Create-topic path не должен прятать admin failures за generic U
 - runtime-edited values переживали рестарт без явного сохранения в config.
 
 Если settings UI меняет cluster catalog, единственный source of truth остается `ui-application.yml`.
+
+Blank `ssl.truststore.type` / `ssl.keystore.type` не является отдельным Kafka mode:
+
+- это только отсутствие явно заданного `type`;
+- settings UI должен показывать это как `Не задано`, а не как `default`.
+
+Settings UI также не должен становиться недоступным только из-за того, что текущий cluster catalog пуст:
+
+- first-cluster onboarding обязан оставаться доступным;
+- global empty-state не должен перекрывать `cluster-settings` screen;
+- после успешного save shell-level cluster catalog должен обновляться без обязательного full page reload.
 
 ## 6. Architecture boundaries
 

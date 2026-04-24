@@ -174,8 +174,23 @@ internal class KafkaStoreSettingsSupport(
                 clusters = settings.clusters.map { it.toRequestPayload() },
             ),
         )
+        val refreshedInfo = api.loadInfo()
+        val refreshedSelectedClusterId = resolveSettingsSelectedClusterId(
+            currentSelectedClusterId = current.selectedClusterId,
+            refreshedInfo = refreshedInfo,
+        )
+        val clusterSelectionChanged = refreshedSelectedClusterId != current.selectedClusterId
         return current.copy(
             settingsLoading = false,
+            info = refreshedInfo,
+            selectedClusterId = refreshedSelectedClusterId,
+            topics = if (clusterSelectionChanged) null else current.topics,
+            consumerGroups = if (clusterSelectionChanged) null else current.consumerGroups,
+            brokers = if (clusterSelectionChanged) null else current.brokers,
+            selectedTopicName = if (clusterSelectionChanged) null else current.selectedTopicName,
+            topicOverview = if (clusterSelectionChanged) null else current.topicOverview,
+            messages = if (clusterSelectionChanged) null else current.messages,
+            produceResult = if (clusterSelectionChanged) null else current.produceResult,
             settings = saved,
             settingsStatusMessage = "Настройки Kafka сохранены.",
             settingsConnectionTestClusterIndex = null,
@@ -184,6 +199,13 @@ internal class KafkaStoreSettingsSupport(
             settingsFilePickTargetProperty = null,
         )
     }
+
+    private fun resolveSettingsSelectedClusterId(
+        currentSelectedClusterId: String?,
+        refreshedInfo: KafkaToolInfoResponse,
+    ): String? =
+        refreshedInfo.clusters.firstOrNull { it.id == currentSelectedClusterId }?.id
+            ?: refreshedInfo.clusters.firstOrNull()?.id
 
     private fun KafkaEditableClusterResponse.propertyValue(targetProperty: String): String =
         when (targetProperty) {

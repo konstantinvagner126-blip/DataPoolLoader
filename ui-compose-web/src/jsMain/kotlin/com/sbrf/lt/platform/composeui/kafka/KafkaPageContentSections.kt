@@ -61,10 +61,44 @@ internal fun KafkaPageContent(
 
     val info = state.info
     if (info == null || !info.configured || info.clusters.isEmpty()) {
-        EmptyStateCard(
-            title = "Kafka clusters не настроены",
-            text = "Добавь catalog кластеров в ui.kafka.clusters, чтобы открыть Kafka-инструмент.",
-        )
+        Div({ classes("kafka-main") }) {
+            if (state.activePane == "cluster-settings") {
+                SectionCard(
+                    title = "Настройки Kafka",
+                    subtitle = "Редактирование cluster catalog в управляемом ui-конфиге.",
+                ) {
+                    KafkaSettingsSection(
+                        state = state,
+                        onReloadSettings = onReloadSettings,
+                        onAddSettingsCluster = onAddSettingsCluster,
+                        onRemoveSettingsCluster = onRemoveSettingsCluster,
+                        onSettingsClusterChange = onSettingsClusterChange,
+                        onPickSettingsFile = onPickSettingsFile,
+                        onTestSettingsConnection = onTestSettingsConnection,
+                        onSaveSettings = onSaveSettings,
+                    )
+                }
+            } else {
+                EmptyStateCard(
+                    title = "Kafka clusters не настроены",
+                    text = "Добавь catalog кластеров в ui.kafka.clusters, чтобы открыть Kafka-инструмент.",
+                )
+                Div({ classes("mt-3") }) {
+                    SectionCard(
+                        title = "Первый cluster",
+                        subtitle = "Открой настройки и добавь первый Kafka cluster без ручного page reload.",
+                    ) {
+                        org.jetbrains.compose.web.dom.Button(attrs = {
+                            classes("btn", "btn-dark")
+                            attr("type", "button")
+                            onClick { onPaneChange("cluster-settings") }
+                        }) {
+                            org.jetbrains.compose.web.dom.Text("Открыть настройки Kafka")
+                        }
+                    }
+                }
+            }
+        }
         return
     }
 

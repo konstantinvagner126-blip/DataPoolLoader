@@ -69,4 +69,82 @@ class KafkaStoreSettingsSupportTest {
         assertNull(updated.settingsFilePickClusterIndex)
         assertNull(updated.settingsFilePickTargetProperty)
     }
+
+    @Test
+    fun `saveSettings refreshes shell info and selects first configured cluster when adding first cluster`() {
+        val support = KafkaStoreSettingsSupport(
+            api = StubKafkaApi(
+                saveSettingsHandler = { request ->
+                    KafkaSettingsResponse(
+                        editableConfigPath = "/tmp/ui-application.yml",
+                        clusters = request.clusters.map {
+                            KafkaEditableClusterResponse(
+                                id = it.id,
+                                name = it.name,
+                                readOnly = it.readOnly,
+                                bootstrapServers = it.bootstrapServers,
+                                clientId = it.clientId,
+                                securityProtocol = it.securityProtocol,
+                                truststoreType = it.truststoreType,
+                                truststoreLocation = it.truststoreLocation,
+                                truststoreCertificates = it.truststoreCertificates,
+                                keystoreType = it.keystoreType,
+                                keystoreLocation = it.keystoreLocation,
+                                keystoreCertificateChain = it.keystoreCertificateChain,
+                                keystoreKey = it.keystoreKey,
+                                keyPassword = it.keyPassword,
+                                additionalProperties = it.additionalProperties,
+                            )
+                        },
+                    )
+                },
+                infoHandler = {
+                    KafkaToolInfoResponse(
+                        configured = true,
+                        maxRecordsPerRead = 100,
+                        maxPayloadBytes = 1_048_576,
+                        clusters = listOf(
+                            KafkaClusterCatalogEntryResponse(
+                                id = "stage",
+                                name = "Stage Kafka",
+                                readOnly = true,
+                                bootstrapServers = "stage-1:9092,stage-2:9092",
+                                securityProtocol = "SSL",
+                            ),
+                        ),
+                    )
+                },
+            ),
+        )
+        val current = KafkaPageState(
+            info = KafkaToolInfoResponse(
+                configured = false,
+                maxRecordsPerRead = 100,
+                maxPayloadBytes = 1_048_576,
+                clusters = emptyList(),
+            ),
+            settings = KafkaSettingsResponse(
+                clusters = listOf(
+                    KafkaEditableClusterResponse(
+                        id = "stage",
+                        name = "Stage Kafka",
+                        readOnly = true,
+                        bootstrapServers = "stage-1:9092,stage-2:9092",
+                        securityProtocol = "SSL",
+                    ),
+                ),
+            ),
+        )
+
+        val updated = runKafkaSuspend {
+            support.saveSettings(support.startSettingsSave(current))
+        }
+
+        assertEquals("stage", updated.selectedClusterId)
+        assertEquals(listOf("stage"), updated.info?.clusters?.map { it.id })
+        assertEquals("Настройки Kafka сохранены.", updated.settingsStatusMessage)
+        assertNull(updated.selectedTopicName)
+        assertNull(updated.topicOverview)
+        assertNull(updated.messages)
+    }
 }

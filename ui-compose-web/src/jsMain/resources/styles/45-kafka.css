@@ -780,6 +780,39 @@
   font-size: 0.88rem;
 }
 
+.kafka-message-header-json {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.kafka-json-token {
+  font-family: "SFMono-Regular", "JetBrains Mono", "Fira Code", monospace;
+}
+
+.kafka-json-token-punctuation {
+  color: #8fa3b8;
+}
+
+.kafka-json-token-key {
+  color: #7dd3fc;
+}
+
+.kafka-json-token-string {
+  color: #bef264;
+}
+
+.kafka-json-token-number {
+  color: #fbbf24;
+}
+
+.kafka-json-token-boolean {
+  color: #c4b5fd;
+}
+
+.kafka-json-token-null {
+  color: #fda4af;
+}
+
 .kafka-message-header-value {
   color: #41556e;
   word-break: break-word;
