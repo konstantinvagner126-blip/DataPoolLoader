@@ -3,8 +3,10 @@
 @import url("./styles/06-about.css?v=20260424a");
 @import url("./styles/07-help-api.css?v=20260424a");
 @import url("./styles/10-config-editor.css?v=20260424b");
-@import url("./styles/20-sql-console.css?v=20260424b");
-@import url("./styles/30-run-history.css?v=20260424b");
+@import url("./styles/20-sql-console.css?v=20260424c");
+@import url("./styles/21-sql-catalog.css?v=20260424c");
+@import url("./styles/22-sql-tool-windows.css?v=20260424c");
+@import url("./styles/30-run-history.css?v=20260424c");
 @import url("./styles/35-sync-maintenance.css?v=20260419a");
 @import url("./styles/40-sql-sources.css?v=20260424b");
 @import url("./styles/41-sql-result-pane.css?v=20260424b");

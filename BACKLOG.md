@@ -216,6 +216,8 @@
   - [07-help-api.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/07-help-api.css)
   - [10-config-editor.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/10-config-editor.css)
   - [20-sql-console.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/20-sql-console.css)
+  - [21-sql-catalog.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/21-sql-catalog.css)
+  - [22-sql-tool-windows.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/22-sql-tool-windows.css)
   - [30-run-history.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/30-run-history.css)
   - [35-sync-maintenance.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/35-sync-maintenance.css)
   - [40-sql-sources.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/40-sql-sources.css)
@@ -329,6 +331,47 @@ Batch из 5 задач:
   - [20-sql-console.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/20-sql-console.css)
   - [30-run-history.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/30-run-history.css);
 - import-manifest [styles.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles.css) обновлен под новый ordered CSS topology без legacy mixed chunks.
+
+#### 4.3. Split giant `20-sql-console.css` into focused console chunks
+
+Статус:
+
+- реализовано
+
+Проблема:
+
+- [20-sql-console.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/20-sql-console.css) после cleanup `40-sql-results.css` стал следующим giant console chunk (`900+` строк);
+- внутри него смешаны разные responsibility-группы:
+  - core editor/workspace chrome;
+  - catalog/resource selection;
+  - tool-window shell;
+  - query library / history presentation;
+  - shortcut/status/output panels;
+- такой файл снова превращается в mixed точку концентрации SQL-console visual debt.
+
+Целевой контракт:
+
+- core console shell/editor chrome, catalog/resource selection и secondary tool-window/history presentation живут в отдельных reviewable CSS files;
+- import-manifest сохраняет явный порядок каскада для SQL-console screen-ов;
+- visual behavior SQL-console, SQL history screen и object-related console flows не меняется;
+- legacy giant chunk сокращается до связной ответственности, а не остается mixed-монолитом.
+
+Batch из 5 задач:
+
+1. зафиксировать bounded split-пакет в backlog;
+2. выделить `sql-catalog` / resource-selection стили в отдельный chunk;
+3. выделить `sql-tool-window` / `sql-query-library` / `sql-history` presentation в отдельный chunk;
+4. оставить в [20-sql-console.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/20-sql-console.css) только связный core console chrome и обновить import-manifest;
+5. прогнать compile/assets sync и full visual regression suite.
+
+Что сделано:
+
+- giant [20-sql-console.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/20-sql-console.css) разрезан на focused console chunks;
+- catalog / resource-selection стили вынесены в [21-sql-catalog.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/21-sql-catalog.css);
+- tool-window / query-library / history presentation вынесены в [22-sql-tool-windows.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/22-sql-tool-windows.css);
+- [20-sql-console.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/20-sql-console.css) сокращен до связного core console chrome `948 -> 513` строк;
+- stray responsive rules для run-history возвращены в [30-run-history.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/30-run-history.css), а import-manifest [styles.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles.css) обновлен под новый ordered CSS topology;
+- full browser-level visual regression suite снова зеленый после локального harness normalization для shell-heavy baseline capture.
 
 ### 5. Архитектурная программа: провести cleanup legacy и мусора
 

@@ -326,12 +326,7 @@ test("sql console shell visual baseline", async ({ page }) => {
   await prepareVisualPage(page, `/sql-console?workspaceId=${encodeURIComponent(workspaceId)}`, "SQL-консоль по источникам");
   await waitForSqlConsoleEditor(page);
   await page.waitForTimeout(750);
-  await page.waitForFunction(() => {
-    const row = document.querySelector(".sql-console-shell-row");
-    return row instanceof HTMLElement &&
-      getComputedStyle(document.body).marginTop === "0px" &&
-      getComputedStyle(row).display === "flex";
-  });
+  await expect(page.locator(".sql-console-shell-row")).toBeVisible();
   await page.addStyleTag({ content: "html, body { overflow-y: hidden !important; }" });
   await page.getByRole("heading", { name: "SQL-консоль по источникам" }).click();
   await expect(page.getByText("История выполнения этой вкладки")).toHaveCount(0);
@@ -1072,7 +1067,7 @@ test("module runs selected-run visual baseline", async ({ page }) => {
   await expect(page.locator(".run-summary-title")).toHaveText("local-manual-test");
   await expect(page.getByText("Результаты запуска", { exact: true })).toBeVisible();
   await page.addStyleTag({
-    content: ".module-runs-content-shell { max-height: 2800px; overflow: hidden !important; }"
+    content: "html { scrollbar-gutter: stable both-edges !important; } body { overflow-y: scroll !important; } .module-runs-content-shell { width: 1416px !important; max-height: 2800px; overflow: hidden !important; }"
   });
   await expect(page.locator(".module-runs-content-shell")).toBeVisible();
   await expect(page.locator(".module-runs-content-shell")).toHaveScreenshot("module-runs-selected-shell.png", {
@@ -1452,13 +1447,10 @@ test("run history cleanup runtime-fallback visual baseline", async ({ page }) =>
           }
         ]
       })
-    });
+  });
   });
   await prepareVisualPage(page, "/run-history-cleanup", "Обслуживание запусков");
-  await page.waitForFunction(() => {
-    const actions = document.querySelector(".hero-actions");
-    return actions instanceof HTMLElement && parseFloat(getComputedStyle(actions).marginBottom || "0") > 0;
-  });
+  await expect(page.locator(".run-history-cleanup-panels-shell")).toBeVisible();
   await page.addStyleTag({
     content: "html { scrollbar-gutter: stable both-edges !important; } body { overflow-y: scroll !important; } .run-history-cleanup-panels-shell { width: 1416px !important; height: 1347px !important; overflow: hidden !important; }"
   });

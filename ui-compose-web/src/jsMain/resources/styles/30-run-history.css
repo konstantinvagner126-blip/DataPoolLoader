@@ -802,6 +802,17 @@
   color: #475569;
 }
 
+@media (max-width: 992px) {
+  .run-progress-widget-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .run-progress-stage-track {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 767px) {
   .run-summary-metrics {
     grid-template-columns: 1fr;
