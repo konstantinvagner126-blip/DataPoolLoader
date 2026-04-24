@@ -2,7 +2,6 @@ package com.sbrf.lt.platform.composeui.kafka
 
 import androidx.compose.runtime.Composable
 import com.sbrf.lt.platform.composeui.foundation.component.AlertBanner
-import com.sbrf.lt.platform.composeui.foundation.component.SectionCard
 import com.sbrf.lt.platform.composeui.foundation.dom.classes
 import kotlinx.browser.window
 import org.jetbrains.compose.web.attributes.InputType
@@ -45,21 +44,40 @@ internal fun KafkaTopicsCatalogSection(
     onCreateTopic: () -> Unit,
 ) {
     val filteredTopics = topicsResponse?.topics.orEmpty()
+    val internalTopicCount = filteredTopics.count { it.internal }
+    val userTopicCount = filteredTopics.size - internalTopicCount
     val topicCountLabel = when {
         state.topicsLoading && topicsResponse == null -> "Загрузка"
         filteredTopics.isEmpty() -> "0 topics"
         else -> "${filteredTopics.size} topics"
     }
-    SectionCard(
-        title = "Топики",
-        subtitle = "Кластер: ${selectedCluster.name}",
-        actions = {
-            Div({ classes("kafka-topic-header-actions") }) {
-                Span({ classes("badge", "text-bg-light", "kafka-topic-count-badge") }) {
-                    Text(topicCountLabel)
+    Div({ classes("kafka-topics-panel") }) {
+        Div({ classes("kafka-topics-head") }) {
+            Div({ classes("kafka-topics-title-block") }) {
+                P({ classes("kafka-section-caption", "mb-0") }) { Text("Topic catalog") }
+                Div({ classes("kafka-topics-title-row") }) {
+                    Div({ classes("kafka-topics-title") }) { Text("Topics") }
+                    Span({ classes("kafka-tool-chip", "accent") }) { Text(topicCountLabel) }
+                    Span({ classes("kafka-tool-chip") }) { Text("${userTopicCount} user") }
+                    if (internalTopicCount > 0) {
+                        Span({ classes("kafka-tool-chip", "warn") }) { Text("${internalTopicCount} internal") }
+                    }
                 }
+                P({ classes("kafka-topics-subtitle") }) {
+                    Text("${selectedCluster.name} · ${selectedCluster.bootstrapServers}")
+                }
+            }
+
+            Div({ classes("kafka-topic-header-actions") }) {
                 Button(attrs = {
                     classes("btn", "btn-outline-secondary", "btn-sm")
+                    attr("type", "button")
+                    onClick { onApplyTopicQuery() }
+                }) {
+                    Text(if (state.topicsLoading) "Обновляю..." else "Обновить")
+                }
+                Button(attrs = {
+                    classes("btn", "btn-dark", "btn-sm")
                     attr("type", "button")
                     if (selectedCluster.readOnly) disabled()
                     onClick { onToggleCreateTopicForm() }
@@ -67,8 +85,8 @@ internal fun KafkaTopicsCatalogSection(
                     Text(if (state.createTopicFormVisible) "Скрыть форму" else "Создать топик")
                 }
             }
-        },
-    ) {
+        }
+
         state.createTopicResult?.takeIf { it.cluster.id == selectedCluster.id }?.let { result ->
             AlertBanner(
                 "Топик ${result.topicName} создан: partitions ${result.partitionCount}, replication ${result.replicationFactor}.",
@@ -79,44 +97,26 @@ internal fun KafkaTopicsCatalogSection(
             AlertBanner(message, "warning")
         }
 
-        Div({ classes("kafka-topic-screen-header") }) {
-            Div({ classes("kafka-topic-filter-row") }) {
+        Div({ classes("kafka-topic-filter-bar") }) {
+            Div({ classes("kafka-topic-filter-control") }) {
+                P({ classes("kafka-message-control-label") }) { Text("Topic filter") }
                 Input(type = InputType.Search, attrs = {
-                    classes("form-control")
-                    placeholder("topic name, prefix, internal...")
+                    classes("form-control", "kafka-topic-filter-input")
+                    placeholder("orders, audit, __consumer_offsets")
                     value(state.topicQuery)
                     onInput { onTopicQueryChange(it.value) }
                 })
-                Button(attrs = {
-                    classes("btn", "btn-outline-secondary")
-                    attr("type", "button")
-                    onClick { onApplyTopicQuery() }
-                }) {
-                    Text("Обновить")
-                }
             }
 
-            Div({ classes("kafka-topic-filter-meta") }) {
-                Span({ classes("kafka-section-caption", "mb-0") }) {
-                    Text("Topic catalog")
+            Div({ classes("kafka-topic-filter-chips") }) {
+                Span({ classes("kafka-tool-chip") }) {
+                    Text(if (state.topicQuery.isBlank()) "all topics" else "query: ${state.topicQuery}")
                 }
-                if (state.topicQuery.isNotBlank()) {
-                    Span({ classes("kafka-topic-filter-query") }) {
-                        Text("Фильтр: ${state.topicQuery}")
-                    }
-                } else {
-                    Span({ classes("kafka-topic-filter-query") }) {
-                        Text("Показаны все topic'и кластера")
-                    }
+                Span({ classes("kafka-tool-chip") }) {
+                    Text("internal shown")
                 }
                 if (state.topicsLoading && topicsResponse != null) {
-                    Span({ classes("kafka-topic-filter-status") }) {
-                        Text("Обновляю каталог")
-                    }
-                } else {
-                    Span({ classes("kafka-topic-filter-status") }) {
-                        Text("Нажми на строку, чтобы открыть topic details")
-                    }
+                    Span({ classes("kafka-tool-chip", "warn") }) { Text("refreshing") }
                 }
             }
         }
@@ -340,10 +340,14 @@ private fun KafkaCreateTopicForm(
 internal fun KafkaOverviewMetric(
     title: String,
     value: String,
+    note: String? = null,
 ) {
     Div({ classes("kafka-topic-summary-item") }) {
         Div({ classes("kafka-topic-summary-label") }) { Text(title) }
         Div({ classes("kafka-topic-summary-value") }) { Text(value) }
+        note?.let {
+            Div({ classes("kafka-topic-summary-note") }) { Text(it) }
+        }
     }
 }
 

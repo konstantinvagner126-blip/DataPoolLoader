@@ -41,60 +41,73 @@ internal fun KafkaTopicDetailsPageSection(
     onProduceMessage: () -> Unit,
 ) {
     Div({ classes("kafka-topic-details-shell") }) {
-        Div({ classes("kafka-topic-details-header") }) {
-            Div({ classes("kafka-topic-details-identity") }) {
-                Div({ classes("kafka-topic-details-breadcrumbs") }) {
-                    A(attrs = {
-                        classes("kafka-topic-details-back-link")
-                        href(
-                            buildKafkaPageHref(
-                                clusterId = selectedCluster.id,
-                                clusterSection = "topics",
-                                topicQuery = state.topicQuery,
-                                activePane = "overview",
-                                messageReadScope = state.messageReadScope,
-                                messageReadMode = state.messageReadMode,
-                                selectedMessagePartition = state.selectedMessagePartition,
-                            ),
+        Div({ classes("kafka-topic-header-panel") }) {
+            Div({ classes("kafka-topic-details-header") }) {
+                Div({ classes("kafka-topic-details-identity") }) {
+                    Div({ classes("kafka-topic-details-breadcrumbs") }) {
+                        A(attrs = {
+                            classes("kafka-topic-details-back-link")
+                            href(
+                                buildKafkaPageHref(
+                                    clusterId = selectedCluster.id,
+                                    clusterSection = "topics",
+                                    topicQuery = state.topicQuery,
+                                    activePane = "overview",
+                                    messageReadScope = state.messageReadScope,
+                                    messageReadMode = state.messageReadMode,
+                                    selectedMessagePartition = state.selectedMessagePartition,
+                                ),
+                            )
+                        }) {
+                            Text("Back to topics")
+                        }
+                        Span({ classes("kafka-topic-details-breadcrumb-separator") }) { Text("/") }
+                        Span({ classes("kafka-topic-details-breadcrumb-current") }) {
+                            Text(selectedTopic.topic.name)
+                        }
+                    }
+
+                    Div({ classes("kafka-topic-details-title-row") }) {
+                        Div({ classes("kafka-topic-details-title") }) { Text(selectedTopic.topic.name) }
+                        if (selectedTopic.topic.internal) {
+                            Span({ classes("kafka-topic-flag") }) { Text("internal") }
+                        }
+                    }
+
+                    P({ classes("kafka-topic-details-subtitle") }) {
+                        Text(
+                            "${selectedTopic.cluster.name} · ${selectedTopic.cluster.securityProtocol} · ${selectedTopic.cluster.bootstrapServers}",
                         )
+                    }
+                    Div({ classes("kafka-topic-details-meta") }) {
+                        Span({ classes("kafka-tool-chip", "accent") }) {
+                            Text("${selectedTopic.topic.partitionCount} partitions")
+                        }
+                        Span({ classes("kafka-tool-chip") }) {
+                            Text("replication ${selectedTopic.topic.replicationFactor}")
+                        }
+                        Span({ classes("kafka-tool-chip") }) {
+                            Text(selectedTopic.topic.cleanupPolicy ?: "default cleanup")
+                        }
+                    }
+                }
+
+                Div({ classes("kafka-topic-details-actions") }) {
+                    Button(attrs = {
+                        classes("btn", "btn-outline-secondary", "btn-sm")
+                        attr("type", "button")
+                        onClick { onReloadTopicOverview(selectedTopic.topic.name) }
                     }) {
-                        Text("Topics")
+                        Text("Refresh topic")
                     }
-                    Span({ classes("kafka-topic-details-breadcrumb-separator") }) { Text("/") }
-                    Span({ classes("kafka-topic-details-breadcrumb-current") }) {
-                        Text(selectedTopic.topic.name)
-                    }
-                }
-
-                Div({ classes("kafka-topic-details-title-row") }) {
-                    Div({ classes("kafka-topic-details-title") }) { Text(selectedTopic.topic.name) }
-                    if (selectedTopic.topic.internal) {
-                        Span({ classes("kafka-topic-flag") }) { Text("internal") }
-                    }
-                }
-
-                P({ classes("kafka-topic-details-subtitle") }) {
-                    Text(
-                        "${selectedTopic.cluster.name} · ${selectedTopic.cluster.securityProtocol} · ${selectedTopic.cluster.bootstrapServers}",
-                    )
                 }
             }
 
-            Div({ classes("kafka-topic-details-actions") }) {
-                Button(attrs = {
-                    classes("btn", "btn-outline-secondary", "btn-sm")
-                    attr("type", "button")
-                    onClick { onReloadTopicOverview(selectedTopic.topic.name) }
-                }) {
-                    Text("Обновить")
-                }
-            }
+            KafkaTopicTabStrip(
+                activePane = state.activePane,
+                onPaneChange = onPaneChange,
+            )
         }
-
-        KafkaTopicTabStrip(
-            activePane = state.activePane,
-            onPaneChange = onPaneChange,
-        )
 
         when (state.activePane) {
             "messages" -> {
@@ -167,9 +180,8 @@ private fun KafkaTopicTabButton(
 ) {
     Button(attrs = {
         classes(
-            "btn",
-            "btn-sm",
-            if (pane == activePane) "btn-dark" else "btn-outline-secondary",
+            "kafka-topic-tab-button",
+            if (pane == activePane) "kafka-topic-tab-button-active" else "kafka-topic-tab-button-idle",
         )
         attr("type", "button")
         onClick { onPaneChange(pane) }
@@ -182,42 +194,111 @@ private fun KafkaTopicTabButton(
 private fun KafkaTopicOverviewTabSection(
     selectedTopic: KafkaTopicOverviewResponse,
 ) {
-    SectionCard(
-        title = "Overview",
-        subtitle = "Базовая metadata по topic и его partition layout.",
-    ) {
-        Div({ classes("kafka-topic-summary-grid") }) {
-            KafkaOverviewMetric("Partitions", selectedTopic.topic.partitionCount.toString())
-            KafkaOverviewMetric("Replication", selectedTopic.topic.replicationFactor.toString())
-            KafkaOverviewMetric("Cleanup policy", selectedTopic.topic.cleanupPolicy ?: "default")
-            KafkaOverviewMetric("Retention", formatKafkaRetention(selectedTopic.topic.retentionMs, selectedTopic.topic.retentionBytes))
-        }
+    val isrTotal = selectedTopic.partitions.fold(0) { sum, partition -> sum + partition.inSyncReplicaCount }
+    val replicaTotal = selectedTopic.partitions.fold(0) { sum, partition -> sum + partition.replicaCount }
+    val latestTotal = selectedTopic.partitions.fold(0L) { sum, partition -> sum + (partition.latestOffset ?: 0L) }
 
-        Div({ classes("table-responsive", "mt-3") }) {
-            Table({ classes("table", "table-sm", "align-middle", "mb-0", "kafka-partition-table") }) {
-                Thead {
-                    Tr {
-                        Th { Text("Partition") }
-                        Th { Text("Leader") }
-                        Th { Text("Replicas") }
-                        Th { Text("ISR") }
-                        Th { Text("Earliest") }
-                        Th { Text("Latest") }
+    Div({ classes("kafka-topic-overview-layout") }) {
+        Div({ classes("kafka-topic-overview-panel") }) {
+            Div({ classes("kafka-topic-overview-head") }) {
+                Div {
+                    Div({ classes("kafka-topic-overview-title") }) { Text("Topic overview") }
+                    P({ classes("kafka-topic-overview-subtitle") }) {
+                        Text("Read-only metadata and partition offsets.")
                     }
                 }
-                Tbody {
-                    selectedTopic.partitions.forEach { partition ->
+                Span({
+                    classes(
+                        "kafka-tool-chip",
+                        when (selectedTopic.consumerGroups.status.uppercase()) {
+                            "ERROR" -> "warn"
+                            "AVAILABLE" -> "ok"
+                            else -> "neutral"
+                        },
+                    )
+                }) {
+                    Text("consumer metadata ${selectedTopic.consumerGroups.status.lowercase()}")
+                }
+            }
+
+            Div({ classes("kafka-topic-summary-grid") }) {
+                KafkaOverviewMetric("Partitions", selectedTopic.topic.partitionCount.toString(), "topic layout")
+                KafkaOverviewMetric("Replication", selectedTopic.topic.replicationFactor.toString(), "ISR $isrTotal/$replicaTotal")
+                KafkaOverviewMetric("Cleanup", selectedTopic.topic.cleanupPolicy ?: "default", "topic config")
+                KafkaOverviewMetric("Latest offset", formatKafkaCompactNumber(latestTotal), "across partitions")
+                KafkaOverviewMetric(
+                    "Retention",
+                    formatKafkaRetention(selectedTopic.topic.retentionMs, selectedTopic.topic.retentionBytes),
+                    "time / size",
+                )
+            }
+
+            Div({ classes("table-responsive", "kafka-partition-table-wrap") }) {
+                Table({ classes("table", "table-sm", "align-middle", "mb-0", "kafka-partition-table") }) {
+                    Thead {
                         Tr {
-                            Td { Text(partition.partition.toString()) }
-                            Td { Text(partition.leaderId?.toString() ?: "n/a") }
-                            Td { Text(partition.replicaCount.toString()) }
-                            Td { Text(partition.inSyncReplicaCount.toString()) }
-                            Td { Text(partition.earliestOffset?.toString() ?: "n/a") }
-                            Td { Text(partition.latestOffset?.toString() ?: "n/a") }
+                            Th { Text("Partition") }
+                            Th { Text("Leader") }
+                            Th { Text("Replicas") }
+                            Th { Text("ISR") }
+                            Th { Text("Earliest") }
+                            Th { Text("Latest") }
+                        }
+                    }
+                    Tbody {
+                        selectedTopic.partitions.forEach { partition ->
+                            Tr {
+                                Td({ classes("kafka-topic-value-cell") }) { Text(partition.partition.toString()) }
+                                Td({ classes("kafka-topic-value-cell") }) { Text(partition.leaderId?.toString() ?: "n/a") }
+                                Td({ classes("kafka-topic-value-cell") }) { Text(partition.replicaCount.toString()) }
+                                Td({ classes("kafka-topic-value-cell") }) { Text(partition.inSyncReplicaCount.toString()) }
+                                Td({ classes("kafka-topic-value-cell") }) { Text(partition.earliestOffset?.toString() ?: "n/a") }
+                                Td({ classes("kafka-topic-value-cell") }) { Text(partition.latestOffset?.toString() ?: "n/a") }
+                            }
                         }
                     }
                 }
             }
+        }
+
+        KafkaPartitionLoadPanel(selectedTopic)
+    }
+}
+
+@Composable
+private fun KafkaPartitionLoadPanel(
+    selectedTopic: KafkaTopicOverviewResponse,
+) {
+    val maxLatestOffset = selectedTopic.partitions.fold(0L) { maxOffset, partition ->
+        maxOf(maxOffset, partition.latestOffset ?: 0L)
+    }
+    Div({ classes("kafka-partition-load-panel") }) {
+        Div({ classes("kafka-topic-overview-head") }) {
+            Div {
+                Div({ classes("kafka-topic-overview-title") }) { Text("Partition load") }
+                P({ classes("kafka-topic-overview-subtitle") }) {
+                    Text("Latest offsets by partition")
+                }
+            }
+        }
+        Div({ classes("kafka-partition-bars") }) {
+            selectedTopic.partitions.forEach { partition ->
+                val latestOffset = partition.latestOffset ?: 0L
+                val fillPercent = partitionLatestOffsetPercent(latestOffset, maxLatestOffset)
+                Div({ classes("kafka-partition-bar-row") }) {
+                    Span({ classes("kafka-partition-bar-label") }) { Text("p${partition.partition}") }
+                    Div({ classes("kafka-partition-bar-track") }) {
+                        Div({
+                            classes("kafka-partition-bar-fill")
+                            attr("style", "width: $fillPercent%;")
+                        })
+                    }
+                    Span({ classes("kafka-partition-bar-value") }) { Text(latestOffset.toString()) }
+                }
+            }
+        }
+        selectedTopic.consumerGroups.message?.let { message ->
+            P({ classes("kafka-partition-load-note") }) { Text(message) }
         }
     }
 }
@@ -241,4 +322,22 @@ private fun KafkaTopicSettingsSection(
             Text("Изменение topic settings, delete topic и другие destructive admin actions остаются вне текущего redesign scope.")
         }
     }
+}
+
+private fun formatKafkaCompactNumber(value: Long): String =
+    when {
+        value >= 1_000_000_000 -> "${value / 1_000_000_000}B"
+        value >= 1_000_000 -> "${value / 1_000_000}M"
+        value >= 1_000 -> "${value / 1_000}K"
+        else -> value.toString()
+    }
+
+private fun partitionLatestOffsetPercent(
+    latestOffset: Long,
+    maxLatestOffset: Long,
+): Int {
+    if (latestOffset <= 0L || maxLatestOffset <= 0L) {
+        return 0
+    }
+    return ((latestOffset * 100) / maxLatestOffset).toInt().coerceIn(4, 100)
 }

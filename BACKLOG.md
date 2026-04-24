@@ -555,7 +555,7 @@ Non-goals первой дизайн-волны:
 
 Статус:
 
-- запланировано
+- реализовано
 
 Контекст:
 
@@ -574,11 +574,29 @@ Non-goals первой дизайн-волны:
 3. create-topic action оставить на topics screen, но не смешивать с settings;
 4. не менять topic catalog API без отдельной причины.
 
+Что сделано:
+
+1. Topics screen вынесен из общего card-heavy shell в собственную compact table-first panel;
+2. добавлены toolbar/status chips:
+   - total topics;
+   - user topics;
+   - internal topics;
+   - refreshing state;
+3. сохранены topic filter draft и explicit `Обновить`;
+4. сохранены create-topic action и inline create-topic form на topics screen;
+5. таблица сохранила row/link navigation и колонки:
+   - topic;
+   - partitions;
+   - replication;
+   - cleanup;
+   - retention;
+6. server/store/API contracts не менялись.
+
 #### 19.4. Kafka topic details and tabs redesign
 
 Статус:
 
-- запланировано
+- реализовано
 
 Контекст:
 
@@ -604,11 +622,27 @@ Non-goals первой дизайн-волны:
    - partition load/offset side panel;
 4. не маскировать partial consumer metadata errors как topic failure.
 
+Что сделано:
+
+1. topic header перепакован в compact panel:
+   - breadcrumbs `Back to topics`;
+   - topic name;
+   - cluster/protocol/bootstrap meta;
+   - partition/replication/cleanup chips;
+   - `Refresh topic` action;
+2. tabs `Overview / Messages / Consumers / Settings / Produce` сохранены и переведены на новый compact tab style;
+3. overview заменен на плотный layout:
+   - summary metrics;
+   - partition table;
+   - side panel `Partition load` с latest offsets by partition;
+4. consumer metadata status показывается section-level chip и не блокирует topic overview;
+5. server/store/API contracts не менялись.
+
 #### 19.5. Kafka messages browser redesign
 
 Статус:
 
-- макет согласован, запланировано к реализации
+- реализовано
 
 Контекст:
 
@@ -653,6 +687,40 @@ Non-goals первой дизайн-волны:
 7. не возвращаться к карточному отображению списка сообщений;
 8. JSON highlighting применять только при valid JSON;
 9. non-JSON и invalid JSON показывать plain text без runtime error.
+
+Что сделано:
+
+1. message browser переведен на отдельный compact panel без общего card-heavy shell;
+2. controls сохранены как draft-only:
+   - scope;
+   - partition;
+   - mode;
+   - limit;
+   - offset;
+   - timestamp;
+   - explicit `Читать сообщения`;
+3. result summary оформлен как Kafka UI-like строка:
+   - `DONE`;
+   - elapsed time;
+   - consumed bytes;
+   - messages consumed;
+   - контекст последнего successful read;
+4. messages table получила expander-колонку и preview-колонки:
+   - offset;
+   - partition;
+   - timestamp;
+   - key preview;
+   - value preview;
+   - headers count;
+5. selected message раскрывается inline внутри таблицы;
+6. inspector получил tabs:
+   - `Value`;
+   - `Key`;
+   - `Headers`;
+   - `Metadata`;
+7. для payload сохранены `Pretty / Raw / Copy` actions;
+8. valid JSON продолжает подсвечиваться, plain text и invalid JSON остаются plain text fallback;
+9. server/store/API contracts не менялись.
 
 #### 19.6. Kafka produce and create-topic tool forms
 
