@@ -427,6 +427,65 @@
 - если нового реального thick cluster уже нет, закрыть эту волну как завершенную и не продолжать инерционный split уже reviewable façade-файлов;
 - если thick cluster еще есть, назвать его явно и завести следующий bounded пакет с конкретной причиной, а не “дробить дальше все подряд”.
 
+#### 10.1. Kafka store/page cleanup после baseline
+
+Статус:
+
+- реализовано
+
+Проблема:
+
+- после закрытия Kafka baseline появился новый локальный thick cluster:
+  - [KafkaStore.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/kafka/KafkaStore.kt) снова смешивает initial load, topic reload, message browser, produce flow и settings mutation lifecycle;
+  - [KafkaPageContentSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/kafka/KafkaPageContentSections.kt) держит в одном giant page-файле cluster strip, topic catalog, overview, consumer groups, messages, produce и settings UI;
+- это уже не reviewable façade, а свежий regression после feature-wave.
+
+Целевой контракт:
+
+- `KafkaStore` остается façade-слоем и делегирует:
+  - initial/topic loading;
+  - message browser mutation + request mapping;
+  - produce mutation + request mapping;
+  - settings loading/mutation/test/save
+  в отдельные support-boundary файлы;
+- giant Kafka page разбивается минимум на reviewable section files:
+  - shell/catalog/overview;
+  - messages;
+  - produce;
+  - settings;
+  - consumer groups/support helpers;
+- route/state и UI behavior не меняются;
+- cleanup подтверждается common/browser regression coverage, а не только compile.
+
+Batch из 5 задач:
+
+1. зафиксировать bounded cleanup-пакет в backlog и не продолжать Kafka UI/store код вне него;
+2. разрезать `KafkaStore` на узкие support-boundary слои;
+3. разрезать `KafkaPageContentSections.kt` на reviewable page section files;
+4. обновить store tests под новые boundaries;
+5. прогнать compile/tests и синхронизировать backlog/память проекта.
+
+Что сделано:
+
+- [KafkaStore.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/kafka/KafkaStore.kt) переведен в façade поверх отдельных support-boundary слоев:
+  - [KafkaStoreLoadingSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/kafka/KafkaStoreLoadingSupport.kt)
+  - [KafkaStoreMessageSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/kafka/KafkaStoreMessageSupport.kt)
+  - [KafkaStoreProduceSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/kafka/KafkaStoreProduceSupport.kt)
+  - [KafkaStoreSettingsSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/kafka/KafkaStoreSettingsSupport.kt)
+  - [KafkaStoreStateSupport.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/kafka/KafkaStoreStateSupport.kt)
+- giant page-layer Kafka screen разрезан на reviewable section files:
+  - [KafkaPageContentSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/kafka/KafkaPageContentSections.kt)
+  - [KafkaOverviewSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/kafka/KafkaOverviewSections.kt)
+  - [KafkaMessageSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/kafka/KafkaMessageSections.kt)
+  - [KafkaProduceSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/kafka/KafkaProduceSections.kt)
+  - [KafkaSettingsSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/kafka/KafkaSettingsSections.kt)
+  - [KafkaConsumerGroupSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/kafka/KafkaConsumerGroupSections.kt)
+- regression coverage добавлена не только на façade, но и на новые support-boundary слои:
+  - [KafkaStoreStateSupportTest.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonTest/kotlin/com/sbrf/lt/platform/composeui/kafka/KafkaStoreStateSupportTest.kt)
+  - [KafkaStoreMessageSupportTest.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonTest/kotlin/com/sbrf/lt/platform/composeui/kafka/KafkaStoreMessageSupportTest.kt)
+  - [KafkaStoreSettingsSupportTest.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonTest/kotlin/com/sbrf/lt/platform/composeui/kafka/KafkaStoreSettingsSupportTest.kt)
+- Kafka route/state и UI behavior не менялись; пакет ограничен structural cleanup и regression coverage.
+
 ### 11. Зафиксировать и поддерживать repo-level архитектурную дисциплину
 
 Статус:
