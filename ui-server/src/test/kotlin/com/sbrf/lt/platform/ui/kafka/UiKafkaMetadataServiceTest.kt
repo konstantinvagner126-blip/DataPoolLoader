@@ -3,9 +3,12 @@ package com.sbrf.lt.platform.ui.kafka
 import com.sbrf.lt.datapool.kafka.KafkaClusterNotFoundException
 import com.sbrf.lt.platform.ui.config.UiKafkaClusterConfig
 import com.sbrf.lt.platform.ui.config.UiKafkaConfig
+import org.apache.kafka.common.errors.AuthorizationException
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class UiKafkaMetadataServiceTest {
 
@@ -78,6 +81,26 @@ class UiKafkaMetadataServiceTest {
                         1 to UiKafkaPartitionOffsets(earliestOffset = 4, latestOffset = 27),
                     ),
                 ),
+                consumerGroups = listOf(
+                    UiKafkaConsumerGroupListing("datapool-test-group"),
+                    UiKafkaConsumerGroupListing("other-group"),
+                ),
+                consumerGroupDetails = mapOf(
+                    "datapool-test-group" to UiKafkaConsumerGroupDetails(
+                        groupId = "datapool-test-group",
+                        state = "STABLE",
+                        memberCount = 2,
+                    ),
+                ),
+                consumerGroupOffsets = mapOf(
+                    "datapool-test-group" to listOf(
+                        UiKafkaCommittedOffset(topicName = "datapool-test", partition = 0, committedOffset = 10),
+                        UiKafkaCommittedOffset(topicName = "datapool-test", partition = 1, committedOffset = 20),
+                    ),
+                    "other-group" to listOf(
+                        UiKafkaCommittedOffset(topicName = "another-topic", partition = 0, committedOffset = 3),
+                    ),
+                ),
             ),
         )
 
@@ -88,6 +111,11 @@ class UiKafkaMetadataServiceTest {
         assertEquals(2, overview.partitions.size)
         assertEquals(27L, overview.partitions.last().latestOffset)
         assertEquals(1_048_576L, overview.topic.retentionBytes)
+        assertEquals("AVAILABLE", overview.consumerGroups.status.name)
+        assertEquals(1, overview.consumerGroups.groups.size)
+        assertEquals("datapool-test-group", overview.consumerGroups.groups.single().groupId)
+        assertEquals(2, overview.consumerGroups.groups.single().memberCount)
+        assertEquals(9L, overview.consumerGroups.groups.single().totalLag)
     }
 
     @Test
@@ -100,6 +128,79 @@ class UiKafkaMetadataServiceTest {
         assertFailsWith<KafkaClusterNotFoundException> {
             service.listTopics(clusterId = "missing")
         }
+    }
+
+    @Test
+    fun `keeps topic overview when consumer group metadata is unavailable`() {
+        val service = ConfigBackedKafkaMetadataService(
+            kafkaConfig = testKafkaConfig(),
+            adminFacadeFactory = FakeUiKafkaAdminFacadeFactory(
+                topicDetails = listOf(
+                    UiKafkaTopicDetails(
+                        name = "datapool-test",
+                        internal = false,
+                        partitions = listOf(
+                            UiKafkaPartitionDetails(partition = 0, leaderId = 1, replicaCount = 1, inSyncReplicaCount = 1),
+                        ),
+                    ),
+                ),
+                partitionOffsets = mapOf(
+                    "datapool-test" to mapOf(
+                        0 to UiKafkaPartitionOffsets(earliestOffset = 0, latestOffset = 15),
+                    ),
+                ),
+                consumerGroups = listOf(
+                    UiKafkaConsumerGroupListing("datapool-test-group"),
+                ),
+                consumerGroupOffsets = mapOf(
+                    "datapool-test-group" to listOf(
+                        UiKafkaCommittedOffset(topicName = "datapool-test", partition = 0, committedOffset = 11),
+                    ),
+                ),
+                consumerGroupDescribeFailures = mapOf(
+                    "datapool-test-group" to AuthorizationException("denied"),
+                ),
+            ),
+        )
+
+        val overview = service.loadTopicOverview(clusterId = "local", topicName = "datapool-test")
+
+        assertEquals("AVAILABLE", overview.consumerGroups.status.name)
+        assertEquals(1, overview.consumerGroups.groups.size)
+        val group = overview.consumerGroups.groups.single()
+        assertFalse(group.metadataAvailable)
+        assertEquals(4L, group.totalLag)
+        assertTrue(group.note.orEmpty().contains("не хватает прав"))
+    }
+
+    @Test
+    fun `keeps topic overview when consumer groups are unauthorized`() {
+        val service = ConfigBackedKafkaMetadataService(
+            kafkaConfig = testKafkaConfig(),
+            adminFacadeFactory = FakeUiKafkaAdminFacadeFactory(
+                topicDetails = listOf(
+                    UiKafkaTopicDetails(
+                        name = "datapool-test",
+                        internal = false,
+                        partitions = listOf(
+                            UiKafkaPartitionDetails(partition = 0, leaderId = 1, replicaCount = 1, inSyncReplicaCount = 1),
+                        ),
+                    ),
+                ),
+                partitionOffsets = mapOf(
+                    "datapool-test" to mapOf(
+                        0 to UiKafkaPartitionOffsets(earliestOffset = 0, latestOffset = 15),
+                    ),
+                ),
+                consumerGroupListFailure = AuthorizationException("denied"),
+            ),
+        )
+
+        val overview = service.loadTopicOverview(clusterId = "local", topicName = "datapool-test")
+
+        assertEquals("ERROR", overview.consumerGroups.status.name)
+        assertTrue(overview.consumerGroups.message.orEmpty().contains("не хватает прав"))
+        assertEquals(15L, overview.partitions.single().latestOffset)
     }
 }
 
@@ -123,9 +224,17 @@ private class FakeUiKafkaAdminFacadeFactory(
     private val topicDetails: List<UiKafkaTopicDetails> = emptyList(),
     private val topicConfigs: Map<String, Map<String, String>> = emptyMap(),
     private val partitionOffsets: Map<String, Map<Int, UiKafkaPartitionOffsets>> = emptyMap(),
+    private val consumerGroups: List<UiKafkaConsumerGroupListing> = emptyList(),
+    private val consumerGroupDetails: Map<String, UiKafkaConsumerGroupDetails> = emptyMap(),
+    private val consumerGroupOffsets: Map<String, List<UiKafkaCommittedOffset>> = emptyMap(),
+    private val consumerGroupListFailure: Throwable? = null,
+    private val consumerGroupDescribeFailures: Map<String, Throwable> = emptyMap(),
+    private val consumerGroupOffsetsFailures: Map<String, Throwable> = emptyMap(),
 ) : UiKafkaAdminFacadeFactory {
     override fun open(cluster: UiKafkaClusterConfig): UiKafkaAdminFacade =
         object : UiKafkaAdminFacade {
+            override fun loadBrokerNodeCount(): Int = 1
+
             override fun listTopics(): List<UiKafkaTopicListing> = topics
 
             override fun describeTopics(topicNames: List<String>): List<UiKafkaTopicDetails> =
@@ -133,6 +242,25 @@ private class FakeUiKafkaAdminFacadeFactory(
 
             override fun describeTopicConfigs(topicNames: List<String>): Map<String, Map<String, String>> =
                 topicNames.associateWith { topicName -> topicConfigs[topicName].orEmpty() }
+
+            override fun listConsumerGroups(): List<UiKafkaConsumerGroupListing> {
+                consumerGroupListFailure?.let { throw it }
+                return consumerGroups
+            }
+
+            override fun describeConsumerGroups(groupIds: List<String>): Map<String, UiKafkaConsumerGroupDetails> {
+                groupIds.firstOrNull { consumerGroupDescribeFailures.containsKey(it) }?.let { failingGroupId ->
+                    throw consumerGroupDescribeFailures.getValue(failingGroupId)
+                }
+                return groupIds.mapNotNull { groupId ->
+                    consumerGroupDetails[groupId]?.let { groupId to it }
+                }.toMap()
+            }
+
+            override fun loadConsumerGroupOffsets(groupId: String): List<UiKafkaCommittedOffset> {
+                consumerGroupOffsetsFailures[groupId]?.let { throw it }
+                return consumerGroupOffsets[groupId].orEmpty()
+            }
 
             override fun loadOffsets(
                 topicName: String,

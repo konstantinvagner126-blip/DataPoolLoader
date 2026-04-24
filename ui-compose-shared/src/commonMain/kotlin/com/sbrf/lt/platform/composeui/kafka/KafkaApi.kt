@@ -16,4 +16,22 @@ interface KafkaApi {
         clusterId: String,
         topicName: String,
     ): KafkaTopicOverviewResponse
+
+    suspend fun readMessages(
+        request: KafkaTopicMessageReadRequestPayload,
+    ): KafkaTopicMessageReadResponse
+
+    suspend fun produceMessage(
+        request: KafkaTopicProduceRequestPayload,
+    ): KafkaTopicProduceResponse
+
+    suspend fun loadSettings(): KafkaSettingsResponse
+
+    suspend fun saveSettings(
+        request: KafkaSettingsUpdateRequestPayload,
+    ): KafkaSettingsResponse
+
+    suspend fun testSettingsConnection(
+        request: KafkaSettingsConnectionTestRequestPayload,
+    ): KafkaSettingsConnectionTestResponse
 }

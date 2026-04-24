@@ -26,6 +26,165 @@ async function setEditorValue(page, value) {
   expect(success).toBe(true);
 }
 
+async function mockKafkaRuntimeContext(page) {
+  await page.route("**/api/ui/runtime-context", async route => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        requestedMode: "files",
+        effectiveMode: "files",
+        fallbackReason: null,
+        actor: {
+          resolved: true,
+          actorId: "local-user",
+          actorSource: "local",
+          actorDisplayName: "Local User",
+          requiresManualInput: false,
+          message: "Локальный пользователь определен."
+        },
+        database: {
+          configured: true,
+          available: true,
+          schema: "datapool_manual",
+          message: "Подключение активно.",
+          errorMessage: null
+        }
+      })
+    });
+  });
+}
+
+async function mockKafkaExplorerApi(page, { messageReadResult, settingsResponse } = {}) {
+  await page.route("**/api/kafka/info", async route => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        configured: true,
+        maxRecordsPerRead: 100,
+        maxPayloadBytes: 1048576,
+        clusters: [
+          {
+            id: "local",
+            name: "Local Kafka Docker",
+            readOnly: false,
+            bootstrapServers: "localhost:19092",
+            securityProtocol: "PLAINTEXT"
+          }
+        ]
+      })
+    });
+  });
+  await page.route("**/api/kafka/topics*", async route => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        clusterId: "local",
+        query: "",
+        topics: [
+          {
+            name: "datapool-test",
+            internal: false,
+            partitionCount: 2,
+            replicationFactor: 1,
+            cleanupPolicy: "delete",
+            retentionMs: 60000,
+            retentionBytes: null
+          },
+          {
+            name: "datapool-events",
+            internal: false,
+            partitionCount: 3,
+            replicationFactor: 1,
+            cleanupPolicy: "delete",
+            retentionMs: 3600000,
+            retentionBytes: null
+          }
+        ]
+      })
+    });
+  });
+  await page.route("**/api/kafka/topic-overview*", async route => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        cluster: {
+          id: "local",
+          name: "Local Kafka Docker",
+          readOnly: false,
+          bootstrapServers: "localhost:19092",
+          securityProtocol: "PLAINTEXT"
+        },
+        topic: {
+          name: "datapool-test",
+          internal: false,
+          partitionCount: 2,
+          replicationFactor: 1,
+          cleanupPolicy: "delete",
+          retentionMs: 60000,
+          retentionBytes: null
+        },
+        partitions: [
+          {
+            partition: 0,
+            leaderId: 1,
+            replicaCount: 1,
+            inSyncReplicaCount: 1,
+            earliestOffset: 0,
+            latestOffset: 12
+          },
+          {
+            partition: 1,
+            leaderId: 1,
+            replicaCount: 1,
+            inSyncReplicaCount: 1,
+            earliestOffset: 4,
+            latestOffset: 27
+          }
+        ],
+        consumerGroups: {
+          status: "AVAILABLE",
+          message: null,
+          groups: [
+            {
+              groupId: "datapool-test-group",
+              state: "STABLE",
+              memberCount: 1,
+              metadataAvailable: true,
+              totalLag: 5,
+              lagStatus: "OK",
+              note: null,
+              partitions: [
+                {
+                  partition: 0,
+                  committedOffset: 7,
+                  latestOffset: 12,
+                  lag: 5
+                }
+              ]
+            }
+          ]
+        }
+      })
+    });
+  });
+  if (messageReadResult) {
+    await page.route("**/api/kafka/messages/read", async route => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify(messageReadResult)
+      });
+    });
+  }
+  if (settingsResponse) {
+    await page.route("**/api/kafka/settings", async route => {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify(settingsResponse)
+      });
+    });
+  }
+}
+
 test("home page visual baseline", async ({ page }) => {
   await page.route("**/api/ui/runtime-context", async route => {
     await route.fulfill({
@@ -1502,6 +1661,167 @@ test("sql console history populated-state visual baseline", async ({ page }) => 
   await expect(page.getByRole("button", { name: "Повторить" })).toHaveCount(2);
   await expect(page.locator(".sql-history-content-shell")).toBeVisible();
   await expect(page.locator(".sql-history-content-shell")).toHaveScreenshot("sql-console-history-populated-shell.png", {
+    animations: "disabled",
+    caret: "hide",
+    maxDiffPixels: 1024
+  });
+});
+
+test("kafka messages visual baseline", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 2200 });
+  await mockKafkaRuntimeContext(page);
+  await mockKafkaExplorerApi(page, {
+    messageReadResult: {
+      cluster: {
+        id: "local",
+        name: "Local Kafka Docker",
+        readOnly: false,
+        bootstrapServers: "localhost:19092",
+        securityProtocol: "PLAINTEXT"
+      },
+      topicName: "datapool-test",
+      scope: "ALL_PARTITIONS",
+      partition: null,
+      mode: "LATEST",
+      requestedLimit: 2,
+      effectiveLimit: 2,
+      requestedOffset: null,
+      requestedTimestampMs: null,
+      effectiveStartOffset: null,
+      note: "Merged bounded read across all partitions.",
+      records: [
+        {
+          partition: 1,
+          offset: 17,
+          timestamp: 1700000000100,
+          key: null,
+          value: {
+            sizeBytes: 10,
+            truncated: false,
+            text: "{\"id\":17}",
+            jsonPrettyText: null
+          },
+          headers: []
+        },
+        {
+          partition: 0,
+          offset: 12,
+          timestamp: 1700000000012,
+          key: {
+            sizeBytes: 7,
+            truncated: false,
+            text: "key-12",
+            jsonPrettyText: null
+          },
+          value: {
+            sizeBytes: 9,
+            truncated: false,
+            text: "{\"id\":12}",
+            jsonPrettyText: "{\n  \"id\" : 12\n}"
+          },
+          headers: [
+            {
+              name: "source",
+              value: {
+                sizeBytes: 4,
+                truncated: false,
+                text: "test",
+                jsonPrettyText: null
+              }
+            }
+          ]
+        }
+      ]
+    }
+  });
+  await prepareVisualPage(page, "/kafka?clusterId=local&topic=datapool-test&pane=messages&scope=ALL_PARTITIONS", "Kafka cluster explorer");
+  await page.getByRole("button", { name: "Читать сообщения" }).click();
+  await expect(page.getByText("Merged bounded read across all partitions.")).toBeVisible();
+  await expect(page.getByText("partition 1 · offset 17", { exact: false })).toBeVisible();
+  await page.addStyleTag({
+    content: "html { scrollbar-gutter: stable both-edges !important; } body { overflow-y: scroll !important; } .kafka-content-shell { width: 1416px !important; max-height: 1490px !important; overflow: hidden !important; }"
+  });
+  await expect(page.locator(".kafka-content-shell")).toBeVisible();
+  await expect(page.locator(".kafka-content-shell")).toHaveScreenshot("kafka-messages-shell.png", {
+    animations: "disabled",
+    caret: "hide",
+    maxDiffPixels: 1024
+  });
+});
+
+test("kafka produce visual baseline", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 2100 });
+  await mockKafkaRuntimeContext(page);
+  await mockKafkaExplorerApi(page);
+  await prepareVisualPage(page, "/kafka?clusterId=local&topic=datapool-test&pane=produce", "Kafka cluster explorer");
+  await page.locator(".kafka-produce-grid input").nth(0).fill("1");
+  await page.locator(".kafka-produce-grid input").nth(1).fill("order-key");
+  await page.locator(".kafka-produce-headers").fill("source=test\ntrace-id=abc");
+  await page.locator(".kafka-produce-payload").fill("{\"id\":42}");
+  await expect(page.getByText("Single-message produce", { exact: false })).toBeVisible();
+  await page.addStyleTag({
+    content: "html { scrollbar-gutter: stable both-edges !important; } body { overflow-y: scroll !important; } .kafka-content-shell { width: 1416px !important; max-height: 1450px !important; overflow: hidden !important; }"
+  });
+  await expect(page.locator(".kafka-content-shell")).toHaveScreenshot("kafka-produce-shell.png", {
+    animations: "disabled",
+    caret: "hide",
+    maxDiffPixels: 1024
+  });
+});
+
+test("kafka settings visual baseline", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 2100 });
+  await mockKafkaRuntimeContext(page);
+  await mockKafkaExplorerApi(page, {
+    settingsResponse: {
+      editableConfigPath: "/tmp/ui-application.yml",
+      clusters: [
+        {
+          id: "local",
+          name: "Local Kafka Docker",
+          readOnly: false,
+          bootstrapServers: "localhost:19092",
+          clientId: "datapool-loader",
+          securityProtocol: "PLAINTEXT",
+          truststoreType: "",
+          truststoreLocation: "",
+          truststoreCertificates: "",
+          keystoreType: "",
+          keystoreLocation: "",
+          keystoreCertificateChain: "",
+          keystoreKey: "",
+          keyPassword: "",
+          additionalProperties: {
+            "client.dns.lookup": "use_all_dns_ips"
+          }
+        },
+        {
+          id: "stage-mtls",
+          name: "Stage Kafka mTLS",
+          readOnly: true,
+          bootstrapServers: "stage-1:9092,stage-2:9092",
+          clientId: "datapool-loader",
+          securityProtocol: "SSL",
+          truststoreType: "PEM",
+          truststoreLocation: "",
+          truststoreCertificates: "${file:/tmp/ca.crt}",
+          keystoreType: "PEM",
+          keystoreLocation: "",
+          keystoreCertificateChain: "${file:/tmp/client.crt}",
+          keystoreKey: "${file:/tmp/client.key}",
+          keyPassword: "${KAFKA_CLIENT_KEY_PASSWORD}",
+          additionalProperties: {}
+        }
+      ]
+    }
+  });
+  await prepareVisualPage(page, "/kafka?clusterId=local&pane=settings", "Kafka cluster explorer");
+  await expect(page.getByText("/tmp/ui-application.yml")).toBeVisible();
+  await expect(page.getByText("Stage Kafka mTLS")).toBeVisible();
+  await page.addStyleTag({
+    content: "html { scrollbar-gutter: stable both-edges !important; } body { overflow-y: scroll !important; } .kafka-content-shell { width: 1416px !important; max-height: 1500px !important; overflow: hidden !important; }"
+  });
+  await expect(page.locator(".kafka-content-shell")).toHaveScreenshot("kafka-settings-shell.png", {
     animations: "disabled",
     caret: "hide",
     maxDiffPixels: 1024

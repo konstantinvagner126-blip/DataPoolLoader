@@ -112,9 +112,242 @@
   color: #132238;
 }
 
+.kafka-consumer-groups-section {
+  margin-top: 1rem;
+}
+
+.kafka-section-caption {
+  margin-bottom: 0.65rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #607289;
+}
+
+.kafka-consumer-group-list {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.kafka-consumer-group-card {
+  border: 1px solid rgba(19, 34, 56, 0.08);
+  border-radius: 14px;
+  padding: 0.85rem 0.95rem;
+  background: rgba(248, 250, 252, 0.92);
+}
+
+.kafka-consumer-group-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.85rem;
+}
+
+.kafka-consumer-group-name {
+  font-weight: 700;
+  color: #132238;
+  word-break: break-word;
+}
+
+.kafka-consumer-group-meta,
+.kafka-consumer-group-note {
+  margin: 0.25rem 0 0;
+  font-size: 0.9rem;
+  color: #41556e;
+}
+
+.kafka-consumer-group-table th,
+.kafka-consumer-group-table td {
+  vertical-align: middle;
+}
+
+.kafka-message-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.85rem;
+  margin-bottom: 1rem;
+}
+
+.kafka-pane-tabs,
+.kafka-settings-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 1rem;
+}
+
+.kafka-settings-path {
+  margin: 0.85rem 0 0;
+  color: #41556e;
+  font-size: 0.92rem;
+  word-break: break-word;
+}
+
+.kafka-settings-list {
+  display: grid;
+  gap: 0.95rem;
+  margin-top: 1rem;
+}
+
+.kafka-settings-cluster-card {
+  border: 1px solid rgba(19, 34, 56, 0.08);
+  border-radius: 14px;
+  padding: 0.95rem;
+  background: rgba(248, 250, 252, 0.92);
+}
+
+.kafka-settings-cluster-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.85rem;
+  margin-bottom: 0.85rem;
+}
+
+.kafka-settings-cluster-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.kafka-settings-grid,
+.kafka-settings-ssl-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.85rem;
+}
+
+.kafka-settings-ssl-grid {
+  margin-top: 0.85rem;
+}
+
+.kafka-settings-field {
+  min-width: 0;
+}
+
+.kafka-settings-boolean-field {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.kafka-settings-additional {
+  margin-top: 0.85rem;
+}
+
+.kafka-settings-additional-row {
+  display: grid;
+  grid-template-columns: minmax(200px, 280px) 1fr;
+  gap: 0.7rem;
+  padding: 0.22rem 0;
+  font-size: 0.9rem;
+}
+
+.kafka-settings-additional-key {
+  font-weight: 600;
+  color: #132238;
+  word-break: break-word;
+}
+
+.kafka-settings-additional-value {
+  color: #41556e;
+  word-break: break-word;
+}
+
+.kafka-message-control-label,
+.kafka-message-section-title {
+  margin: 0 0 0.35rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #607289;
+}
+
+.kafka-message-action {
+  display: flex;
+  align-items: end;
+}
+
+.kafka-message-note {
+  margin: 0 0 0.85rem;
+  color: #41556e;
+  font-size: 0.92rem;
+}
+
+.kafka-message-list {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.kafka-message-card {
+  border: 1px solid rgba(19, 34, 56, 0.08);
+  border-radius: 14px;
+  padding: 0.85rem 0.95rem;
+  background: rgba(248, 250, 252, 0.92);
+}
+
+.kafka-message-card-meta {
+  margin-bottom: 0.65rem;
+  font-size: 0.88rem;
+  color: #41556e;
+}
+
+.kafka-message-payload + .kafka-message-payload,
+.kafka-message-payload + .kafka-message-headers,
+.kafka-message-headers + .kafka-message-payload {
+  margin-top: 0.8rem;
+}
+
+.kafka-message-payload-body {
+  margin: 0;
+  padding: 0.8rem 0.9rem;
+  border-radius: 12px;
+  background: #132238;
+  color: #eef4fa;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.88rem;
+}
+
+.kafka-message-header-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 180px) 1fr;
+  gap: 0.7rem;
+  padding: 0.2rem 0;
+  font-size: 0.9rem;
+}
+
+.kafka-message-header-name {
+  color: #132238;
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.kafka-message-header-value {
+  color: #41556e;
+  word-break: break-word;
+}
+
 @media (max-width: 768px) {
   .kafka-topic-filter-row {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .kafka-consumer-group-card-top {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .kafka-settings-cluster-header {
+    flex-direction: column;
+  }
+
+  .kafka-settings-additional-row {
+    grid-template-columns: 1fr;
+  }
+
+  .kafka-message-header-row {
+    grid-template-columns: 1fr;
   }
 }

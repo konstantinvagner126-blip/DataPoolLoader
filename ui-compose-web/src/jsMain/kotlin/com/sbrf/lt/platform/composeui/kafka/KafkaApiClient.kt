@@ -29,4 +29,47 @@ class KafkaApiClient(
             "/api/kafka/topic-overview?clusterId=${urlEncode(clusterId)}&topic=${urlEncode(topicName)}",
             KafkaTopicOverviewResponse.serializer(),
         )
+
+    override suspend fun readMessages(
+        request: KafkaTopicMessageReadRequestPayload,
+    ): KafkaTopicMessageReadResponse =
+        httpClient.postJson(
+            path = "/api/kafka/messages/read",
+            payload = request,
+            serializer = KafkaTopicMessageReadRequestPayload.serializer(),
+            deserializer = KafkaTopicMessageReadResponse.serializer(),
+        )
+
+    override suspend fun produceMessage(
+        request: KafkaTopicProduceRequestPayload,
+    ): KafkaTopicProduceResponse =
+        httpClient.postJson(
+            path = "/api/kafka/messages/produce",
+            payload = request,
+            serializer = KafkaTopicProduceRequestPayload.serializer(),
+            deserializer = KafkaTopicProduceResponse.serializer(),
+        )
+
+    override suspend fun loadSettings(): KafkaSettingsResponse =
+        httpClient.get("/api/kafka/settings", KafkaSettingsResponse.serializer())
+
+    override suspend fun saveSettings(
+        request: KafkaSettingsUpdateRequestPayload,
+    ): KafkaSettingsResponse =
+        httpClient.postJson(
+            path = "/api/kafka/settings",
+            payload = request,
+            serializer = KafkaSettingsUpdateRequestPayload.serializer(),
+            deserializer = KafkaSettingsResponse.serializer(),
+        )
+
+    override suspend fun testSettingsConnection(
+        request: KafkaSettingsConnectionTestRequestPayload,
+    ): KafkaSettingsConnectionTestResponse =
+        httpClient.postJson(
+            path = "/api/kafka/settings/test-connection",
+            payload = request,
+            serializer = KafkaSettingsConnectionTestRequestPayload.serializer(),
+            deserializer = KafkaSettingsConnectionTestResponse.serializer(),
+        )
 }

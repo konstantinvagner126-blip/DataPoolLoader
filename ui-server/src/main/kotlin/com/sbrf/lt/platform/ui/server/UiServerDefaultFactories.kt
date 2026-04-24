@@ -1,13 +1,21 @@
 package com.sbrf.lt.platform.ui.server
 
 import com.sbrf.lt.datapool.kafka.KafkaMetadataOperations
+import com.sbrf.lt.datapool.kafka.KafkaMessageOperations
+import com.sbrf.lt.datapool.kafka.KafkaProduceOperations
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleOperations
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleService
 import com.sbrf.lt.platform.ui.config.UiAppConfig
 import com.sbrf.lt.platform.ui.config.UiConfigLoader
+import com.sbrf.lt.platform.ui.config.UiConfigPersistenceService
+import com.sbrf.lt.platform.ui.config.UiRuntimeConfigResolver
 import com.sbrf.lt.platform.ui.config.appsRootPath
 import com.sbrf.lt.platform.ui.config.storageDirPath
 import com.sbrf.lt.platform.ui.kafka.ConfigBackedKafkaMetadataService
+import com.sbrf.lt.platform.ui.kafka.ConfigBackedKafkaMessageService
+import com.sbrf.lt.platform.ui.kafka.ConfigBackedKafkaProduceService
+import com.sbrf.lt.platform.ui.kafka.UiKafkaSettingsOperations
+import com.sbrf.lt.platform.ui.kafka.UiKafkaSettingsService
 import com.sbrf.lt.platform.ui.module.ModuleRegistry
 import com.sbrf.lt.platform.ui.module.backend.FilesModuleBackend
 import com.sbrf.lt.platform.ui.run.RunManager
@@ -84,6 +92,21 @@ internal fun defaultSqlConsoleStateService(
 
 internal fun defaultKafkaMetadataService(runtimeUiConfig: UiAppConfig): KafkaMetadataOperations =
     ConfigBackedKafkaMetadataService(runtimeUiConfig.kafka)
+
+internal fun defaultKafkaMessageService(runtimeUiConfig: UiAppConfig): KafkaMessageOperations =
+    ConfigBackedKafkaMessageService(runtimeUiConfig.kafka)
+
+internal fun defaultKafkaProduceService(runtimeUiConfig: UiAppConfig): KafkaProduceOperations =
+    ConfigBackedKafkaProduceService(runtimeUiConfig.kafka)
+
+internal fun defaultKafkaSettingsService(
+    uiConfigPersistenceService: UiConfigPersistenceService,
+    runtimeConfigResolver: UiRuntimeConfigResolver,
+): UiKafkaSettingsOperations =
+    UiKafkaSettingsService(
+        uiConfigPersistenceService = uiConfigPersistenceService,
+        runtimeConfigResolver = runtimeConfigResolver,
+    )
 
 internal fun defaultFilesRunHistoryService(
     moduleRegistry: ModuleRegistry,

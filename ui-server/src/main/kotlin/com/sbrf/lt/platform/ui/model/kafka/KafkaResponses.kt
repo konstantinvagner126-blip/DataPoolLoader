@@ -35,6 +35,7 @@ data class KafkaTopicOverviewResponse(
     val cluster: KafkaClusterCatalogEntryResponse,
     val topic: KafkaTopicSummaryResponse,
     val partitions: List<KafkaTopicPartitionSummaryResponse> = emptyList(),
+    val consumerGroups: KafkaTopicConsumerGroupsSummaryResponse = KafkaTopicConsumerGroupsSummaryResponse(),
 )
 
 data class KafkaTopicPartitionSummaryResponse(
@@ -44,4 +45,152 @@ data class KafkaTopicPartitionSummaryResponse(
     val inSyncReplicaCount: Int,
     val earliestOffset: Long? = null,
     val latestOffset: Long? = null,
+)
+
+data class KafkaTopicConsumerGroupsSummaryResponse(
+    val status: String = "EMPTY",
+    val message: String? = null,
+    val groups: List<KafkaTopicConsumerGroupSummaryResponse> = emptyList(),
+)
+
+data class KafkaTopicConsumerGroupSummaryResponse(
+    val groupId: String,
+    val state: String? = null,
+    val memberCount: Int? = null,
+    val metadataAvailable: Boolean = true,
+    val totalLag: Long? = null,
+    val lagStatus: String = "OK",
+    val note: String? = null,
+    val partitions: List<KafkaTopicConsumerGroupPartitionLagResponse> = emptyList(),
+)
+
+data class KafkaTopicConsumerGroupPartitionLagResponse(
+    val partition: Int,
+    val committedOffset: Long? = null,
+    val latestOffset: Long? = null,
+    val lag: Long? = null,
+)
+
+data class KafkaTopicMessageReadRequestPayload(
+    val clusterId: String,
+    val topicName: String,
+    val scope: String = "SELECTED_PARTITION",
+    val partition: Int? = null,
+    val mode: String,
+    val limit: Int? = null,
+    val offset: Long? = null,
+    val timestampMs: Long? = null,
+)
+
+data class KafkaTopicMessageReadResponse(
+    val cluster: KafkaClusterCatalogEntryResponse,
+    val topicName: String,
+    val scope: String,
+    val partition: Int? = null,
+    val mode: String,
+    val requestedLimit: Int,
+    val effectiveLimit: Int,
+    val requestedOffset: Long? = null,
+    val requestedTimestampMs: Long? = null,
+    val effectiveStartOffset: Long? = null,
+    val note: String? = null,
+    val records: List<KafkaTopicMessageRecordResponse> = emptyList(),
+)
+
+data class KafkaTopicMessageRecordResponse(
+    val partition: Int,
+    val offset: Long,
+    val timestamp: Long? = null,
+    val key: KafkaRenderedBytesResponse? = null,
+    val value: KafkaRenderedBytesResponse? = null,
+    val headers: List<KafkaTopicMessageHeaderResponse> = emptyList(),
+)
+
+data class KafkaTopicProduceRequestPayload(
+    val clusterId: String,
+    val topicName: String,
+    val partition: Int? = null,
+    val keyText: String? = null,
+    val payloadText: String,
+    val headers: List<KafkaTopicProduceHeaderRequestPayload> = emptyList(),
+)
+
+data class KafkaTopicProduceHeaderRequestPayload(
+    val name: String,
+    val valueText: String? = null,
+)
+
+data class KafkaTopicProduceResponse(
+    val cluster: KafkaClusterCatalogEntryResponse,
+    val topicName: String,
+    val partition: Int,
+    val offset: Long,
+    val timestamp: Long? = null,
+)
+
+data class KafkaSettingsResponse(
+    val editableConfigPath: String? = null,
+    val clusters: List<KafkaEditableClusterResponse> = emptyList(),
+)
+
+data class KafkaEditableClusterResponse(
+    val id: String,
+    val name: String,
+    val readOnly: Boolean,
+    val bootstrapServers: String = "",
+    val clientId: String = "",
+    val securityProtocol: String = "PLAINTEXT",
+    val truststoreType: String = "",
+    val truststoreLocation: String = "",
+    val truststoreCertificates: String = "",
+    val keystoreType: String = "",
+    val keystoreLocation: String = "",
+    val keystoreCertificateChain: String = "",
+    val keystoreKey: String = "",
+    val keyPassword: String = "",
+    val additionalProperties: Map<String, String> = emptyMap(),
+)
+
+data class KafkaSettingsUpdateRequestPayload(
+    val clusters: List<KafkaEditableClusterRequestPayload> = emptyList(),
+)
+
+data class KafkaEditableClusterRequestPayload(
+    val id: String,
+    val name: String,
+    val readOnly: Boolean,
+    val bootstrapServers: String = "",
+    val clientId: String = "",
+    val securityProtocol: String = "PLAINTEXT",
+    val truststoreType: String = "",
+    val truststoreLocation: String = "",
+    val truststoreCertificates: String = "",
+    val keystoreType: String = "",
+    val keystoreLocation: String = "",
+    val keystoreCertificateChain: String = "",
+    val keystoreKey: String = "",
+    val keyPassword: String = "",
+    val additionalProperties: Map<String, String> = emptyMap(),
+)
+
+data class KafkaSettingsConnectionTestRequestPayload(
+    val cluster: KafkaEditableClusterRequestPayload,
+)
+
+data class KafkaSettingsConnectionTestResponse(
+    val success: Boolean,
+    val message: String,
+    val nodeCount: Int? = null,
+)
+
+data class KafkaTopicMessageHeaderResponse(
+    val name: String,
+    val value: KafkaRenderedBytesResponse? = null,
+)
+
+data class KafkaRenderedBytesResponse(
+    val sizeBytes: Int,
+    val truncated: Boolean,
+    val text: String? = null,
+    val jsonPrettyText: String? = null,
 )

@@ -6,7 +6,7 @@ internal fun Route.registerPageComposeAliasRoutes() {
     registerComposeRedirect(
         "/compose-kafka",
         "screen" to "kafka",
-        forwardedParams = listOf("clusterId", "topic"),
+        forwardedParams = listOf("clusterId", "topic", "query", "pane", "scope", "mode", "partition"),
     )
     registerComposeRedirect(
         "/compose-runs",

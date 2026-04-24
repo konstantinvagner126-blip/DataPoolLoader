@@ -6,6 +6,7 @@ import com.sbrf.lt.platform.ui.config.UiConfigPersistenceService
 import com.sbrf.lt.platform.ui.config.UiRuntimeConfigResolver
 import com.sbrf.lt.platform.ui.config.UiRuntimeContext
 import com.sbrf.lt.platform.ui.config.UiRuntimeContextService
+import com.sbrf.lt.platform.ui.kafka.UiKafkaSettingsOperations
 import com.sbrf.lt.platform.ui.module.ConfigFormService
 import com.sbrf.lt.platform.ui.module.DatabaseModuleRegistryOperations
 import com.sbrf.lt.platform.ui.module.backend.DatabaseModuleBackend
@@ -23,6 +24,8 @@ import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleExecutionHistoryService
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleExportService
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleStateService
 import com.sbrf.lt.datapool.kafka.KafkaMetadataOperations
+import com.sbrf.lt.datapool.kafka.KafkaMessageOperations
+import com.sbrf.lt.datapool.kafka.KafkaProduceOperations
 import com.sbrf.lt.datapool.module.sync.ModuleSyncService
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleOperations
 
@@ -49,6 +52,9 @@ internal class UiServerContext(
     internal val sqlConsoleExecutionHistoryService: SqlConsoleExecutionHistoryService,
     internal val sqlConsoleStateService: SqlConsoleStateService,
     internal val kafkaMetadataService: KafkaMetadataOperations,
+    internal val kafkaMessageService: KafkaMessageOperations,
+    internal val kafkaProduceService: KafkaProduceOperations,
+    internal val kafkaSettingsService: UiKafkaSettingsOperations,
     internal val uiConfigPersistenceService: UiConfigPersistenceService,
     internal val moduleSyncService: ModuleSyncService?,
     internal val databaseModuleRunService: DatabaseModuleRunOperations?,

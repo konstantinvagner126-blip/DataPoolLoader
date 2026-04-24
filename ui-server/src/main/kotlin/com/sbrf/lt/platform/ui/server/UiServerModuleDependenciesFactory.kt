@@ -3,12 +3,15 @@ package com.sbrf.lt.platform.ui.server
 import com.sbrf.lt.datapool.module.sync.ModuleSyncService
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleOperations
 import com.sbrf.lt.datapool.kafka.KafkaMetadataOperations
+import com.sbrf.lt.datapool.kafka.KafkaMessageOperations
+import com.sbrf.lt.datapool.kafka.KafkaProduceOperations
 import com.sbrf.lt.platform.ui.config.UiAppConfig
 import com.sbrf.lt.platform.ui.config.UiConfigLoader
 import com.sbrf.lt.platform.ui.config.UiConfigPersistenceService
 import com.sbrf.lt.platform.ui.config.UiRuntimeConfigResolver
 import com.sbrf.lt.platform.ui.config.UiRuntimeContext
 import com.sbrf.lt.platform.ui.config.UiRuntimeContextService
+import com.sbrf.lt.platform.ui.kafka.UiKafkaSettingsOperations
 import com.sbrf.lt.platform.ui.module.ConfigFormService
 import com.sbrf.lt.platform.ui.module.DatabaseModuleRegistryOperations
 import com.sbrf.lt.platform.ui.module.ModuleRegistry
@@ -46,6 +49,9 @@ internal fun buildUiServerModuleContextDependencies(
     sqlConsoleExecutionHistoryService: SqlConsoleExecutionHistoryService? = null,
     sqlConsoleStateService: SqlConsoleStateService? = null,
     kafkaMetadataService: KafkaMetadataOperations? = null,
+    kafkaMessageService: KafkaMessageOperations? = null,
+    kafkaProduceService: KafkaProduceOperations? = null,
+    kafkaSettingsService: UiKafkaSettingsOperations? = null,
     uiConfigPersistenceService: UiConfigPersistenceService? = null,
     moduleSyncService: ModuleSyncService?,
     databaseModuleRunService: DatabaseModuleRunOperations?,
@@ -83,7 +89,14 @@ internal fun buildUiServerModuleContextDependencies(
         workspaceRetentionService = resolvedSqlConsoleWorkspaceRetentionService,
     )
     val resolvedKafkaMetadataService = kafkaMetadataService ?: defaultKafkaMetadataService(resolvedRuntimeUiConfig)
+    val resolvedKafkaMessageService = kafkaMessageService ?: defaultKafkaMessageService(resolvedRuntimeUiConfig)
+    val resolvedKafkaProduceService = kafkaProduceService ?: defaultKafkaProduceService(resolvedRuntimeUiConfig)
     val resolvedUiConfigPersistenceService = uiConfigPersistenceService ?: UiConfigPersistenceService()
+    val resolvedKafkaSettingsService =
+        kafkaSettingsService ?: defaultKafkaSettingsService(
+            uiConfigPersistenceService = resolvedUiConfigPersistenceService,
+            runtimeConfigResolver = resolvedRuntimeConfigResolver,
+        )
     val resolvedDatabaseModuleActiveRunRegistry =
         databaseModuleActiveRunRegistry ?: DatabaseModuleActiveRunRegistry()
     val resolvedFilesModuleRunHistoryService =
@@ -108,6 +121,9 @@ internal fun buildUiServerModuleContextDependencies(
         sqlConsoleExecutionHistoryService = resolvedSqlConsoleExecutionHistoryService,
         sqlConsoleStateService = resolvedSqlConsoleStateService,
         kafkaMetadataService = resolvedKafkaMetadataService,
+        kafkaMessageService = resolvedKafkaMessageService,
+        kafkaProduceService = resolvedKafkaProduceService,
+        kafkaSettingsService = resolvedKafkaSettingsService,
         uiConfigPersistenceService = resolvedUiConfigPersistenceService,
         moduleSyncService = moduleSyncService,
         databaseModuleRunService = databaseModuleRunService,

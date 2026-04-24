@@ -376,6 +376,25 @@
 - recovery:
   preview/result screen state не считается persisted history и не восстанавливается после refresh
 
+### 5.6. Kafka explorer state
+
+- Контракты:
+  [KafkaModels.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/kafka/KafkaModels.kt)
+
+Классификация:
+
+- тип: `transient runtime state`
+- source of truth: server responses `info/topics/topicOverview/messages/settings` + local page drafts для message browser, produce и settings UI
+- route-owned recovery anchors:
+  `clusterId`, `topic`, `query`, `pane`, `scope`, `mode`, `partition`
+- не является source of truth для:
+  Kafka cluster catalog, TLS material, secrets и connection properties
+- recovery:
+  refresh восстанавливает route-driven selection и заново запрашивает metadata/config from `ui-server`;
+  drafts чтения сообщений, produce и settings-editing не считаются persisted state и не должны молча переживать restart
+- cleanup:
+  route switch, page reload, explicit config save/reload, page close
+
 ## 6. Правила восстановления и очистки
 
 ### 6.1. Что должно переживать перезапуск

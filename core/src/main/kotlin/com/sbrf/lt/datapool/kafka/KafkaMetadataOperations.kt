@@ -35,6 +35,7 @@ data class KafkaTopicOverview(
     val cluster: KafkaClusterCatalogEntry,
     val topic: KafkaTopicSummary,
     val partitions: List<KafkaTopicPartitionSummary> = emptyList(),
+    val consumerGroups: KafkaTopicConsumerGroupsSummary = KafkaTopicConsumerGroupsSummary(),
 )
 
 data class KafkaTopicPartitionSummary(
@@ -44,6 +45,44 @@ data class KafkaTopicPartitionSummary(
     val inSyncReplicaCount: Int,
     val earliestOffset: Long? = null,
     val latestOffset: Long? = null,
+)
+
+data class KafkaTopicConsumerGroupsSummary(
+    val status: KafkaTopicConsumerGroupsStatus = KafkaTopicConsumerGroupsStatus.EMPTY,
+    val message: String? = null,
+    val groups: List<KafkaTopicConsumerGroupSummary> = emptyList(),
+)
+
+enum class KafkaTopicConsumerGroupsStatus {
+    AVAILABLE,
+    EMPTY,
+    ERROR,
+}
+
+data class KafkaTopicConsumerGroupSummary(
+    val groupId: String,
+    val state: String? = null,
+    val memberCount: Int? = null,
+    val metadataAvailable: Boolean = true,
+    val totalLag: Long? = null,
+    val lagStatus: KafkaTopicConsumerGroupLagStatus = KafkaTopicConsumerGroupLagStatus.OK,
+    val note: String? = null,
+    val partitions: List<KafkaTopicConsumerGroupPartitionLag> = emptyList(),
+)
+
+enum class KafkaTopicConsumerGroupLagStatus {
+    OK,
+    PARTIAL,
+    AUTHORIZATION_FAILED,
+    TIMEOUT,
+    ERROR,
+}
+
+data class KafkaTopicConsumerGroupPartitionLag(
+    val partition: Int,
+    val committedOffset: Long? = null,
+    val latestOffset: Long? = null,
+    val lag: Long? = null,
 )
 
 interface KafkaMetadataOperations {

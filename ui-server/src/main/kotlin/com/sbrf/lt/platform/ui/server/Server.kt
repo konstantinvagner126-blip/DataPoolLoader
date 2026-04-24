@@ -6,6 +6,7 @@ import com.sbrf.lt.platform.ui.config.UiConfigPersistenceService
 import com.sbrf.lt.platform.ui.config.UiRuntimeConfigResolver
 import com.sbrf.lt.platform.ui.config.UiRuntimeContext
 import com.sbrf.lt.platform.ui.config.UiRuntimeContextService
+import com.sbrf.lt.platform.ui.kafka.UiKafkaSettingsOperations
 import com.sbrf.lt.platform.ui.module.ConfigFormService
 import com.sbrf.lt.platform.ui.module.DatabaseModuleRegistryOperations
 import com.sbrf.lt.platform.ui.module.ModuleRegistry
@@ -20,6 +21,8 @@ import com.sbrf.lt.platform.ui.run.UiCredentialsService
 import com.sbrf.lt.platform.ui.run.history.FilesModuleRunHistoryService
 import com.sbrf.lt.platform.ui.run.history.ModuleRunHistoryService
 import com.sbrf.lt.datapool.kafka.KafkaMetadataOperations
+import com.sbrf.lt.datapool.kafka.KafkaMessageOperations
+import com.sbrf.lt.datapool.kafka.KafkaProduceOperations
 import com.sbrf.lt.datapool.module.sync.ModuleSyncService
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleAsyncQueryOperations
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleExecutionHistoryService
@@ -48,6 +51,9 @@ internal fun Application.uiModule(
     sqlConsoleExecutionHistoryService: SqlConsoleExecutionHistoryService? = null,
     sqlConsoleStateService: SqlConsoleStateService? = null,
     kafkaMetadataService: KafkaMetadataOperations? = null,
+    kafkaMessageService: KafkaMessageOperations? = null,
+    kafkaProduceService: KafkaProduceOperations? = null,
+    kafkaSettingsService: UiKafkaSettingsOperations? = null,
     uiConfigPersistenceService: UiConfigPersistenceService? = null,
     moduleSyncService: ModuleSyncService? = null,
     databaseModuleRunService: DatabaseModuleRunOperations? = null,
@@ -77,8 +83,11 @@ internal fun Application.uiModule(
             sqlConsoleExportService = sqlConsoleExportService,
             sqlConsoleExecutionHistoryService = sqlConsoleExecutionHistoryService,
             sqlConsoleStateService = sqlConsoleStateService,
-            kafkaMetadataService = kafkaMetadataService,
-            uiConfigPersistenceService = uiConfigPersistenceService,
+                kafkaMetadataService = kafkaMetadataService,
+                kafkaMessageService = kafkaMessageService,
+                kafkaProduceService = kafkaProduceService,
+                kafkaSettingsService = kafkaSettingsService,
+                uiConfigPersistenceService = uiConfigPersistenceService,
             moduleSyncService = moduleSyncService,
             databaseModuleRunService = databaseModuleRunService,
             databaseModuleActiveRunRegistry = databaseModuleActiveRunRegistry,

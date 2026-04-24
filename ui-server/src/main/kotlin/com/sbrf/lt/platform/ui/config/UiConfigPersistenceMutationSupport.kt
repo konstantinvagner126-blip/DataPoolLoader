@@ -31,6 +31,19 @@ internal class UiConfigPersistenceMutationSupport(
         return writeUiConfig(targetPath, updatedUiConfig)
     }
 
+    fun updateKafkaClusterCatalog(
+        targetPath: Path,
+        clusters: List<UiKafkaClusterConfig>,
+    ): UiAppConfig {
+        val baseUiConfig = readBaseUiConfig(targetPath)
+        val updatedUiConfig = baseUiConfig.copy(
+            kafka = baseUiConfig.kafka.copy(
+                clusters = clusters,
+            ),
+        )
+        return writeUiConfig(targetPath, updatedUiConfig)
+    }
+
     private fun readBaseUiConfig(targetPath: Path): UiAppConfig {
         return if (Files.exists(targetPath)) {
             readUiConfigFile(targetPath, configLoader)

@@ -1147,6 +1147,20 @@ ui:
 4. Kafka отражена на home-screen как полноценный primary tool платформы и ведет на отдельный `/kafka` screen;
 5. текст карточки `О проекте` синхронизирован с фактическим экраном и больше не обещает лишний explanatory content.
 
+#### 15.1.1. Выравнивание ширины primary-card на главной странице
+
+Контекст:
+
+- ручная проверка показала, что блок `Работа с модулями загрузки данных` на главной странице растянут на всю ширину grid, тогда как блоки `SQL и Kafka` и `Справка и проект` живут как обычные card-column;
+- из-за этого home screen выглядит как смесь двух разных layout-контрактов вместо единой панели инструментов.
+
+Что нужно сделать:
+
+1. выровнять главный grid-контракт home screen так, чтобы основные блоки страницы читались как единообразные card-column;
+2. убрать special-case растягивание блока `Работа с модулями загрузки данных` на всю ширину, если для этого нет отдельной продуктовой причины;
+3. сохранить внутреннюю иерархию режима `Файлы / База данных` и cleanup-card, но не за счет ломания внешнего layout;
+4. обновить visual baseline главной страницы после выравнивания layout.
+
 #### 15.2. Metadata baseline: clusters, topics, topic overview
 
 Статус:
@@ -1191,127 +1205,155 @@ ui:
 
 Статус:
 
-- запланировано
+- реализовано
 
-Что нужно сделать:
+Что сделано:
 
-1. для выбранного топика показывать связанные consumer groups;
-2. для каждой group показывать:
-   - member count;
-   - total lag;
-   - lag по partition при drill-down;
-3. не сводить это к одному “числу консюмеров”, которое теряет смысл;
-4. отдельно обработать состояния:
+1. `KafkaTopicOverview` расширен отдельным `consumerGroups` section contract, а не одним бессмысленным “числом консюмеров”;
+2. для выбранного топика UI показывает связанные consumer groups с:
+   - `member count`;
+   - `total lag`;
+   - partition-level lag через drill-down;
+3. `ui-server` считает topic-scoped lag через `AdminClient`, но делает это partial-safe:
+   - authorization/timeout на consumer groups не ломают весь topic overview;
+   - section consumer groups может вернуться как `AVAILABLE`, `EMPTY` или `ERROR`;
+4. отдельно покрыты состояния:
    - group metadata unavailable;
    - topic exists, но consumers нет;
-   - timeout/authorization failure.
+   - timeout/authorization failure на consumer-group metadata;
+5. добавлены server-side tests на normal lag summary и partial-access path.
 
 #### 15.4. Bounded message browser
 
 Статус:
 
-- запланировано
+- реализовано
 
-Что нужно сделать:
+Что сделано:
 
-1. добавить bounded reading сообщений:
-   - latest records;
-   - read from explicit offset;
-   - read from timestamp, если это не усложняет baseline непропорционально;
-2. сделать partition-aware UX;
-3. не коммитить offsets и не держать background consumer session;
-4. явно ограничить объем чтения и payload rendering;
-5. продумать message value presentation:
-   - raw text;
-   - JSON pretty-print best-effort;
-   - headers / key / timestamp / partition / offset.
+1. добавлен отдельный `KafkaMessageOperations` contract и server boundary для bounded reading сообщений, без смешения с metadata service;
+2. реализованы три режима чтения:
+   - `latest records`;
+   - `from explicit offset`;
+   - `from timestamp`;
+3. UI стал partition-aware:
+   - чтение идет по явно выбранной partition;
+   - offset/timestamp controls меняются по read mode;
+4. message browser работает через `assign + seek`, без `subscribe()`, без commit offsets и без background consumer session;
+5. payload rendering ограничен `ui.kafka.maxPayloadBytes`, с честным `truncated` сигналом;
+6. message presentation показывает:
+   - key;
+   - value;
+   - headers;
+   - timestamp;
+   - partition;
+   - offset;
+   - JSON pretty-print best-effort для text payload.
+
+#### 15.4.1. Topic-wide message read mode across all partitions
+
+Статус:
+
+- реализовано
+
+Что сделано:
+
+1. в message browser добавлен явный scope selector:
+   - `selected partition`;
+   - `all partitions`;
+2. режим `all partitions` читает сообщения по topic scope через тот же bounded consumer path, без background session и без commit offsets;
+3. `limit` трактуется как общий размер merged result, а не как неограниченный fan-out по partition;
+4. merged result явно показывает `partition` и `offset` у каждой записи;
+5. server-side и shared/store tests покрывают topic-wide request mapping и UI-state contract.
 
 #### 15.5. Controlled produce flow
 
 Статус:
 
-- запланировано
+- реализовано
 
-Что нужно сделать:
+Что сделано:
 
-1. добавить отправку одного сообщения в topic;
-2. поддержать key, headers, partition override и payload text;
-3. валидировать size/empty/error states до отправки;
-4. возвращать честный delivery result:
-   - topic;
-   - partition;
-   - offset;
-   - timestamp, если доступен;
-5. не делать batch produce и file-import в baseline.
+1. добавлена отправка одного сообщения в topic через отдельный `KafkaProduceOperations` boundary;
+2. baseline поддерживает `key`, `headers`, `partition override` и `payload text`;
+3. read-only cluster блокирует produce path до Kafka client call;
+4. UI и server contract возвращают честный delivery result:
+   - `topic`;
+   - `partition`;
+   - `offset`;
+   - `timestamp`;
+5. batch produce и file-import в baseline не добавлялись.
 
 #### 15.6. Kafka UI state, route model и local persistence
 
 Статус:
 
-- запланировано
+- реализовано
 
-Что нужно сделать:
+Что сделано:
 
-1. определить минимальный state contract:
-   - что идет в URL;
-   - что живет только в screen state;
-   - что при необходимости можно локально persist;
-2. не повторять SQL-console `workspace` model без доказанной пользы;
-3. если появляется persisted local state, отдельно классифицировать его в [STATE_MODEL_MAP.md](/Users/kwdev/DataPoolLoader/STATE_MODEL_MAP.md);
-4. явно определить recovery после refresh/reopen.
+1. зафиксирован route-driven contract для `/kafka`:
+   - `clusterId`;
+   - `topic`;
+   - `query`;
+   - `pane`;
+   - `scope`;
+   - `mode`;
+   - `partition`;
+2. Kafka screen не получил отдельный `workspace` layer и не повторяет SQL-console model без нужды;
+3. browser-local drafts для message browser, produce и settings остаются transient и не стали скрытым persisted state;
+4. [STATE_MODEL_MAP.md](/Users/kwdev/DataPoolLoader/STATE_MODEL_MAP.md) синхронизирован под Kafka page state/recovery contract.
 
 #### 15.7. Regression coverage и visual baseline для Kafka subsystem
 
 Статус:
 
-- запланировано
+- частично реализовано
 
-Что нужно сделать:
+Что сделано:
 
-1. добавить server-side tests на metadata/read/produce boundaries;
-2. добавить shared/store tests на route/state behavior;
-3. добавить browser smoke и visual baseline минимум для:
-   - cluster/topic shell;
-   - topic overview;
-   - empty/error states;
-   - message browser;
-   - produce dialog/pane.
+1. добавлены server-side tests на:
+   - metadata;
+   - all-partitions read;
+   - controlled produce;
+   - settings load/save/test routes;
+2. добавлены shared/store tests на:
+   - route-driven load state;
+   - topic-wide read request mapping;
+   - produce request mapping;
+   - settings workflow state transitions;
+3. добавлены browser-level visual baselines для:
+   - Kafka message browser shell;
+   - produce pane;
+   - settings pane.
+
+Что осталось:
+
+1. довести visual coverage для явных `empty/error` состояний Kafka screen.
 
 #### 15.8. Kafka config settings UI для cluster connection editing
 
 Статус:
 
-- запланировано
+- реализовано
 
-Что нужно сделать:
+Что сделано:
 
-1. добавить отдельный UI для редактирования Kafka cluster catalog в управляемом `ui-application.yml`;
-2. scope первого settings-экрана сделать узким и практичным:
+1. добавлен отдельный settings pane для редактирования Kafka cluster catalog в управляемом `ui-application.yml`;
+2. первый scope узкий и практичный:
    - add/edit/remove cluster;
    - `id / name / readOnly`;
    - `bootstrap.servers`;
-   - SSL/TLS transport properties;
-   - пути к `JKS`;
-   - file-backed PEM paths через `${file:/...}` contract;
-3. не превращать этот экран в generic editor всех Kafka properties;
-4. сохранить `properties`-first модель:
-   - UI редактирует поддерживаемый поднабор стандартных Kafka keys;
-   - неизвестные/advanced properties не должны молча теряться при сохранении;
-5. использовать существующую infrastructure сохранения внешнего `ui-application.yml`, а не писать отдельный ad-hoc persistence path;
-6. добавить path validation для локального режима:
-   - существование файлов truststore/keystore/cert/key;
-   - внятные ошибки для отсутствующих путей;
-   - без проверки секретов по месту, если они заданы через `${...}`;
-7. отдельно определить UX для секретов:
-   - placeholder strings должны сохраняться как есть;
-   - UI не должен раскрывать содержимое секретов из runtime-resolved config обратно в editable form;
-8. добавить connection test из settings-экрана до сохранения или сразу после сохранения;
-9. покрыть server/store/browser tests на сценарии:
-   - update broker hosts;
-   - update JKS paths;
-   - update PEM file paths;
-   - invalid path;
-   - сохранение placeholder-based secret values.
+   - `client.id`;
+   - transport/security fields для `PLAINTEXT` и `SSL`;
+   - `JKS` paths;
+   - file-backed PEM values через `${file:/...}`;
+3. settings UI не стал generic editor всех Kafka properties:
+   - поддерживаемый поднабор редактируется явно;
+   - unknown `additionalProperties` показываются и не теряются при сохранении;
+4. сохранение идет через существующий `UiConfigPersistenceService`, без ad-hoc persistence path;
+5. connection test добавлен прямо в settings pane;
+6. server/store/browser coverage добавлена на update/save/test сценарии.
 
 Критерий завершения:
 

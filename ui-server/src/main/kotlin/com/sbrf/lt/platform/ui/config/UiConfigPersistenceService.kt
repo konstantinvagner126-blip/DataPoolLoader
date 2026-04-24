@@ -46,6 +46,15 @@ open class UiConfigPersistenceService(
         return updateSqlConsoleSettings(maxRowsPerShard, currentTimeout)
     }
 
+    open fun updateKafkaClusterCatalog(
+        clusters: List<UiKafkaClusterConfig>,
+    ): UiAppConfig {
+        val targetPath = requireNotNull(resolveEditableConfigPath()) {
+            "Не удалось определить редактируемый ui-конфиг. Укажи внешний ui-application.yml или запусти UI из проекта."
+        }
+        return mutationSupport.updateKafkaClusterCatalog(targetPath, clusters)
+    }
+
     private fun resolveExplicitExternalConfigPath(): Path? {
         return resolveExplicitUiConfigPath()
     }

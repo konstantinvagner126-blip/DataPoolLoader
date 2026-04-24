@@ -10,11 +10,19 @@ internal interface UiKafkaAdminFacadeFactory {
 }
 
 internal interface UiKafkaAdminFacade : AutoCloseable {
+    fun loadBrokerNodeCount(): Int
+
     fun listTopics(): List<UiKafkaTopicListing>
 
     fun describeTopics(topicNames: List<String>): List<UiKafkaTopicDetails>
 
     fun describeTopicConfigs(topicNames: List<String>): Map<String, Map<String, String>>
+
+    fun listConsumerGroups(): List<UiKafkaConsumerGroupListing>
+
+    fun describeConsumerGroups(groupIds: List<String>): Map<String, UiKafkaConsumerGroupDetails>
+
+    fun loadConsumerGroupOffsets(groupId: String): List<UiKafkaCommittedOffset>
 
     fun loadOffsets(
         topicName: String,
@@ -45,6 +53,22 @@ internal data class UiKafkaPartitionOffsets(
     val latestOffset: Long? = null,
 )
 
+internal data class UiKafkaConsumerGroupListing(
+    val groupId: String,
+)
+
+internal data class UiKafkaConsumerGroupDetails(
+    val groupId: String,
+    val state: String? = null,
+    val memberCount: Int,
+)
+
+internal data class UiKafkaCommittedOffset(
+    val topicName: String,
+    val partition: Int,
+    val committedOffset: Long,
+)
+
 internal class DefaultUiKafkaAdminFacadeFactory(
     private val clientFactory: UiKafkaClientFactory = DefaultUiKafkaClientFactory(),
 ) : UiKafkaAdminFacadeFactory {
@@ -57,6 +81,9 @@ internal class DefaultUiKafkaAdminFacadeFactory(
 private class AdminClientUiKafkaAdminFacade(
     private val adminClient: org.apache.kafka.clients.admin.AdminClient,
 ) : UiKafkaAdminFacade {
+
+    override fun loadBrokerNodeCount(): Int =
+        adminClient.describeCluster().nodes().get().size
 
     override fun listTopics(): List<UiKafkaTopicListing> =
         adminClient.listTopics().listings().get().map { listing ->
@@ -102,6 +129,36 @@ private class AdminClientUiKafkaAdminFacade(
                 .orEmpty()
         }
     }
+
+    override fun listConsumerGroups(): List<UiKafkaConsumerGroupListing> =
+        adminClient.listConsumerGroups().all().get().map { listing ->
+            UiKafkaConsumerGroupListing(
+                groupId = listing.groupId(),
+            )
+        }
+
+    override fun describeConsumerGroups(groupIds: List<String>): Map<String, UiKafkaConsumerGroupDetails> {
+        if (groupIds.isEmpty()) {
+            return emptyMap()
+        }
+        val descriptions = adminClient.describeConsumerGroups(groupIds).all().get()
+        return descriptions.mapValues { (_, description) ->
+            UiKafkaConsumerGroupDetails(
+                groupId = description.groupId(),
+                state = description.state()?.toString(),
+                memberCount = description.members().size,
+            )
+        }
+    }
+
+    override fun loadConsumerGroupOffsets(groupId: String): List<UiKafkaCommittedOffset> =
+        adminClient.listConsumerGroupOffsets(groupId).partitionsToOffsetAndMetadata().get().map { (topicPartition, offsetAndMetadata) ->
+            UiKafkaCommittedOffset(
+                topicName = topicPartition.topic(),
+                partition = topicPartition.partition(),
+                committedOffset = offsetAndMetadata.offset(),
+            )
+        }
 
     override fun loadOffsets(
         topicName: String,
