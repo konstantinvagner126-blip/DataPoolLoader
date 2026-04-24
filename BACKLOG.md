@@ -185,7 +185,7 @@
 
 Статус:
 
-- частично реализовано
+- реализовано
 
 Цель:
 
@@ -211,14 +211,18 @@
 - giant [styles.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles.css) переведен в import-manifest;
 - порядок каскада сохранен через ordered CSS-chunks:
   - [00-foundation.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/00-foundation.css)
+  - [01-hero-visuals.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/01-hero-visuals.css)
   - [05-home.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/05-home.css)
   - [06-about.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/06-about.css)
   - [07-help-api.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/07-help-api.css)
   - [10-config-editor.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/10-config-editor.css)
+  - [11-module-workspace.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/11-module-workspace.css)
   - [20-sql-console.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/20-sql-console.css)
   - [21-sql-catalog.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/21-sql-catalog.css)
   - [22-sql-tool-windows.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/22-sql-tool-windows.css)
   - [30-run-history.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/30-run-history.css)
+  - [31-run-progress.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/31-run-progress.css)
+  - [32-run-summary.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/32-run-summary.css)
   - [35-sync-maintenance.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/35-sync-maintenance.css)
   - [40-sql-sources.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/40-sql-sources.css)
   - [41-sql-result-pane.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/41-sql-result-pane.css)
@@ -228,6 +232,9 @@
   - [45-kafka.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/45-kafka.css);
 - первые дубли селекторов и нелогичные cross-feature зависимости уже убраны;
 - ресурсы проходят packaging и попадают в `ui-server` bundle.
+- closure review после пакетов `4.1 -> 4.5` показал, что remaining CSS files больше не являются mixed giant-clusters:
+  - крупнейшие chunks теперь subsystem-local и reviewable (`41-sql-result-pane.css`, `20-sql-console.css`, `07-help-api.css`, `32-run-summary.css`, `45-kafka.css`);
+  - второй круг распила этих же CSS-файлов не даст нового архитектурного эффекта и нарушит stop-condition из [ARCHITECTURE_RULES.md](/Users/kwdev/DataPoolLoader/ARCHITECTURE_RULES.md).
 
 История:
 
@@ -413,6 +420,49 @@ Batch из 5 задач:
 - import-manifest [styles.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles.css) обновлен под новую ordered topology;
 - compile/assets sync подтвержден, а closure validation выполнена через green full visual suite после normalization-пакета `16.16`.
 
+#### 4.5. Split giant `00-foundation.css` into shell, hero visuals and module workspace chunks
+
+Статус:
+
+- реализовано
+
+Проблема:
+
+- [00-foundation.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/00-foundation.css) остается крупнейшим CSS chunk проекта (`700+` строк) и уже перестал быть чистым foundation-файлом;
+- внутри одного файла сейчас смешаны разные responsibility-группы:
+  - page shell / `panel` / `hero-card` foundation primitives;
+  - hero visual diagrams и animation helpers для home / module runs / module editor / SQL-console;
+  - module workspace widgets: catalog list, validation badges, toolbar, message box и related status chips;
+  - stray overview-card selectors, часть из которых уже subsystem-local или мертвая;
+- такой chunk уже плохо ревьюить и опасно расширять дальше.
+
+Целевой контракт:
+
+- в [00-foundation.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/00-foundation.css) остаются только base shell primitives и общие page-surface styles;
+- hero visuals и animation helpers живут в отдельном reviewable chunk;
+- module workspace/catalog/toolbar/message styles живут в отдельном reviewable chunk;
+- subsystem-local overview styles вынесены ближе к своим CSS chunks, а мертвые `sql-console-overview-*` удалены;
+- import-manifest сохраняет явный порядок каскада;
+- full visual suite после split остается зеленым.
+
+Batch из 5 задач:
+
+1. зафиксировать bounded split-пакет в backlog;
+2. вынести `flow-stage` / `sql-console-stage` / `source-node` / `merge-hub` / `gear-*` hero visuals и связанные animations в отдельный chunk;
+3. вынести `module-list` / validation / toolbar / message-box / draft-status styles в отдельный module-workspace chunk;
+4. удалить dead `sql-console-overview-*`, перенести `runs-overview-*` в run-history chunk и обновить import-manifest;
+5. прогнать compile/assets sync и full visual regression suite.
+
+Что сделано:
+
+- giant [00-foundation.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/00-foundation.css) сокращен до реального foundation shell `740 -> 65` строк;
+- hero visual diagrams и animation helpers вынесены в [01-hero-visuals.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/01-hero-visuals.css);
+- module workspace/catalog/toolbar/message styles вынесены в [11-module-workspace.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/11-module-workspace.css);
+- responsive override для `module-editor-toolbar` убран из [10-config-editor.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/10-config-editor.css) и переехал в новый module-workspace chunk;
+- dead `sql-console-overview-*` удалены, а `runs-overview-*` перенесены в [32-run-summary.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/32-run-summary.css);
+- import-manifest [styles.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles.css) обновлен под новый ordered CSS topology;
+- full browser-level visual suite снова зеленый после дополнительной shell normalization в [ui-visual.smoke.spec.mjs](/Users/kwdev/DataPoolLoader/tools/sql-console-browser-smoke/tests/ui-visual.smoke.spec.mjs) для `home`, `module editor loading`, `module runs selected`, `module sync runtime-fallback`, `run history cleanup shell` и `kafka produce`.
+
 ### 5. Архитектурная программа: провести cleanup legacy и мусора
 
 Статус:
@@ -571,13 +621,13 @@ Batch из 5 задач:
 
 Статус:
 
-- частично реализовано
+- реализовано
 
 Цель:
 
 - не допустить, чтобы `ui-compose-shared` превратился в mini-backend.
 
-Первый приоритет:
+Исторический фокус:
 
 - [ModuleEditorStore.kt](/Users/kwdev/DataPoolLoader/ui-compose-shared/src/commonMain/kotlin/com/sbrf/lt/platform/composeui/module_editor/ModuleEditorStore.kt)
 - store-слои SQL-консоли;
@@ -602,14 +652,21 @@ Batch из 5 задач:
   - draft/resource/config/save/run/lifecycle/storage boundaries уже разнесены;
   - remaining workflow/store wiring выглядит как reviewable façade, а не как giant knowledge-heavy cluster.
 - `module_runs`, `module_sync` и `run_history_cleanup` уже получили bounded splits по runtime, selection, action и loading-state policy;
+- Kafka baseline после feature-wave больше не оставил нового thick cluster:
+  - `KafkaStore` переведен в façade над loading/message/produce/settings/state support boundaries;
+  - giant Kafka page-layer разрезан на reviewable overview/messages/produce/settings/consumer-groups sections;
 - новые support-boundary extraction-волны страхуются common tests, чтобы cleanup не оставался без regression coverage;
+- closure review remaining shared-store top offenders завершен:
+  - верхние по размеру файлы теперь в основном `Models`, `Labels` и narrow state/support helpers;
+  - нового реального thick store-cluster после Kafka cleanup не осталось;
+  - продолжать инерционный split reviewable façade/support файлов дальше нельзя без нового архитектурного эффекта;
 - детальная хронология выполненных волн вынесена в [BACKLOG_HISTORY.md](/Users/kwdev/DataPoolLoader/BACKLOG_HISTORY.md).
 
-Следующий шаг:
+Closure review:
 
-- сделать отдельный review remaining shared-store top-offenders;
-- если нового реального thick cluster уже нет, закрыть эту волну как завершенную и не продолжать инерционный split уже reviewable façade-файлов;
-- если thick cluster еще есть, назвать его явно и завести следующий bounded пакет с конкретной причиной, а не “дробить дальше все подряд”.
+- review remaining shared-store top offenders выполнен;
+- новый bounded cleanup-пакет в этой секции должен открываться только если появляется новый concrete thick cluster с явной смешанной ответственностью;
+- дальнейший split уже reviewable façade/store-support файлов без такого сигнала считается нарушением stop-condition giant-file wave.
 
 #### 10.1. Kafka store/page cleanup после baseline
 

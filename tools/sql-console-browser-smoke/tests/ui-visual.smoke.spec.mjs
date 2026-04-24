@@ -216,6 +216,10 @@ test("home page visual baseline", async ({ page }) => {
   await page.addStyleTag({
     content: "html { scrollbar-gutter: stable both-edges !important; } body { overflow-y: scroll !important; } .home-visual-shell { width: 1416px !important; height: 1022px !important; overflow: hidden !important; }"
   });
+  await expect(page.getByText("SQL-консоль", { exact: true })).toBeVisible();
+  await expect(page.getByText("Kafka-инструмент", { exact: true })).toBeVisible();
+  await expect(page.getByText("Справка и проект", { exact: true })).toBeVisible();
+  await page.waitForTimeout(300);
   await expect(page.locator(".home-visual-shell")).toBeVisible();
   await expect(page.locator(".home-visual-shell")).toHaveScreenshot("home-shell.png", {
     animations: "disabled",
@@ -750,7 +754,7 @@ test("module editor loading-state visual baseline", async ({ page }) => {
   });
   await prepareVisualPage(page, "/modules?module=local-manual-test", "Управление пулами данных НТ");
   await page.addStyleTag({
-    content: "html { scrollbar-gutter: stable both-edges !important; } body { overflow-y: scroll !important; } .module-editor-content-shell { width: 1416px !important; max-height: 320px; overflow: hidden !important; }"
+    content: "html { scrollbar-gutter: stable both-edges !important; } body { overflow-y: scroll !important; } .module-editor-content-shell { width: 1416px !important; height: 262px !important; min-height: 262px !important; max-height: 262px !important; box-sizing: border-box !important; overflow: hidden !important; }"
   });
   await expect(page.getByText("Загружаю compose-shell выбранного модуля.")).toBeVisible();
   await expect(page.locator(".module-editor-content-shell")).toBeVisible();
@@ -1073,7 +1077,7 @@ test("module runs selected-run visual baseline", async ({ page }) => {
   await expect(page.locator(".run-summary-title")).toHaveText("local-manual-test");
   await expect(page.getByText("Результаты запуска", { exact: true })).toBeVisible();
   await page.addStyleTag({
-    content: "html { scrollbar-gutter: stable both-edges !important; } body { overflow-y: scroll !important; } .module-runs-content-shell { width: 1416px !important; max-height: 2800px; overflow: hidden !important; }"
+    content: "html { scrollbar-gutter: stable both-edges !important; } body { overflow-y: scroll !important; } .module-runs-content-shell { width: 1416px !important; height: 2801px !important; min-height: 2801px !important; max-height: 2801px !important; box-sizing: border-box !important; overflow: hidden !important; }"
   });
   await expect(page.locator(".module-runs-content-shell")).toBeVisible();
   await expect(page.locator(".module-runs-content-shell")).toHaveScreenshot("module-runs-selected-shell.png", {
@@ -1190,7 +1194,9 @@ test("module sync runtime-fallback visual baseline", async ({ page }) => {
     });
   });
   await prepareVisualPage(page, "/compose-sync", "Импорт модулей из файлов");
-  await page.addStyleTag({ content: "html, body { overflow-y: hidden !important; }" });
+  await page.addStyleTag({
+    content: "html { scrollbar-gutter: stable both-edges !important; } body { overflow-y: scroll !important; } .module-sync-content-shell { width: 1416px !important; height: 698px !important; min-height: 698px !important; max-height: 698px !important; box-sizing: border-box !important; overflow: hidden !important; }"
+  });
   await expect(page.getByText("Для импорта нужен активный режим «База данных».")).toBeVisible();
   await expect(page.getByRole("button", { name: "Синхронизировать все модули" })).toBeDisabled();
   await expect(page.getByRole("button", { name: "Выбрать модули" })).toBeDisabled();
@@ -1328,11 +1334,9 @@ test("run history cleanup shell visual baseline", async ({ page }) => {
     });
   });
   await prepareVisualPage(page, "/run-history-cleanup", "Обслуживание запусков");
-  await page.waitForFunction(() => {
-    const actions = document.querySelector(".hero-actions");
-    return actions instanceof HTMLElement && parseFloat(getComputedStyle(actions).marginBottom || "0") > 0;
+  await page.addStyleTag({
+    content: "html { scrollbar-gutter: stable both-edges !important; } body { overflow-y: scroll !important; } .run-history-cleanup-panels-shell { width: 1416px !important; height: 1539px !important; min-height: 1539px !important; max-height: 1539px !important; box-sizing: border-box !important; overflow: hidden !important; }"
   });
-  await page.addStyleTag({ content: "html, body { overflow-y: hidden !important; }" });
   await page.waitForTimeout(750);
   await expect(page.getByText("Retention output-каталогов", { exact: true })).toBeVisible();
   await expect(page.locator(".run-history-cleanup-panels-shell")).toBeVisible();
@@ -1873,7 +1877,7 @@ test("kafka produce visual baseline", async ({ page }) => {
   await page.locator(".kafka-produce-payload").fill("{\"id\":42}");
   await expect(page.getByText("Single-message produce", { exact: false })).toBeVisible();
   await page.addStyleTag({
-    content: "html { scrollbar-gutter: stable both-edges !important; } body { overflow-y: scroll !important; } .kafka-content-shell { width: 1416px !important; max-height: 1184px !important; overflow: hidden !important; }"
+    content: "html { scrollbar-gutter: stable both-edges !important; } body { overflow-y: scroll !important; } .kafka-content-shell { width: 1416px !important; height: 1020px !important; min-height: 1020px !important; max-height: 1020px !important; box-sizing: border-box !important; overflow: hidden !important; }"
   });
   await expect(page.locator(".kafka-content-shell")).toHaveScreenshot("kafka-produce-shell.png", {
     animations: "disabled",

@@ -1,0 +1,286 @@
+.sql-console-hero {
+  align-items: stretch;
+}
+
+.sql-console-hero-copy {
+  display: flex;
+  flex: 1 1 420px;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.flow-stage {
+  position: relative;
+  width: 280px;
+  height: 140px;
+}
+
+.sql-console-stage {
+  position: relative;
+  width: 360px;
+  height: 150px;
+}
+
+.source-node,
+.merge-hub {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  box-shadow: 0 10px 24px rgba(19, 34, 56, 0.12);
+}
+
+.source-node {
+  width: 54px;
+  height: 24px;
+  background: #132238;
+  color: #eff6ff;
+}
+
+.sql-console-node,
+.sql-console-hub {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  box-shadow: 0 12px 26px rgba(19, 34, 56, 0.12);
+}
+
+.sql-console-node {
+  min-width: 88px;
+  height: 30px;
+  padding: 0 0.8rem;
+  background: #132238;
+  color: #eff6ff;
+}
+
+.sql-console-hub {
+  left: 128px;
+  top: 34px;
+  width: 112px;
+  height: 82px;
+  flex-direction: column;
+  background: linear-gradient(135deg, #111827 0%, #1e293b 100%);
+  color: #fff;
+  border-radius: 20px;
+}
+
+.sql-console-node-sources {
+  left: 0;
+  top: 0;
+}
+
+.sql-console-node-check {
+  left: 0;
+  top: 58px;
+}
+
+.sql-console-node-sql {
+  left: 0;
+  top: 116px;
+}
+
+.sql-console-node-results {
+  right: 0;
+  top: 22px;
+}
+
+.sql-console-node-status {
+  right: 0;
+  top: 94px;
+}
+
+.source-node-1 { left: 0; top: 4px; }
+.source-node-2 { left: 0; top: 30px; }
+.source-node-3 { left: 0; top: 58px; }
+.source-node-4 { left: 0; top: 86px; }
+.source-node-5 { left: 0; top: 114px; }
+
+.merge-hub {
+  right: 0;
+  top: 28px;
+  width: 124px;
+  height: 84px;
+  flex-direction: column;
+  background: linear-gradient(135deg, #111827 0%, #1e293b 100%);
+  color: #fff;
+  border-radius: 20px;
+}
+
+.merge-title {
+  font-size: 1rem;
+  letter-spacing: 0.12em;
+}
+
+.merge-subtitle {
+  margin-top: 0.2rem;
+  font-size: 0.62rem;
+  color: #cbd5e1;
+  letter-spacing: 0.08em;
+}
+
+.flow-line {
+  position: absolute;
+  left: 56px;
+  width: 124px;
+  height: 2px;
+  background: linear-gradient(90deg, rgba(29, 111, 216, 0.15), rgba(29, 111, 216, 0.55), rgba(29, 111, 216, 0.15));
+  transform-origin: left center;
+}
+
+.sql-console-line {
+  position: absolute;
+  height: 2px;
+  background: linear-gradient(90deg, rgba(29, 111, 216, 0.14), rgba(29, 111, 216, 0.6), rgba(29, 111, 216, 0.14));
+  transform-origin: left center;
+}
+
+.sql-console-line-left-top {
+  left: 88px;
+  top: 23px;
+  width: 62px;
+  transform: rotate(18deg);
+}
+
+.sql-console-line-left-middle {
+  left: 88px;
+  top: 73px;
+  width: 56px;
+  transform: rotate(0deg);
+}
+
+.sql-console-line-left-bottom {
+  left: 88px;
+  top: 123px;
+  width: 62px;
+  transform: rotate(-18deg);
+}
+
+.sql-console-line-right-top {
+  left: 236px;
+  top: 63px;
+  width: 62px;
+  transform: rotate(-18deg);
+}
+
+.sql-console-line-right-bottom {
+  left: 236px;
+  top: 86px;
+  width: 62px;
+  transform: rotate(18deg);
+}
+
+.flow-line-1 { top: 16px; transform: rotate(15deg); }
+.flow-line-2 { top: 40px; transform: rotate(9deg); }
+.flow-line-3 { top: 69px; transform: rotate(0deg); }
+.flow-line-4 { top: 97px; transform: rotate(-9deg); }
+.flow-line-5 { top: 122px; transform: rotate(-15deg); }
+
+.flow-dot {
+  position: absolute;
+  top: -4px;
+  left: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #f97316;
+  box-shadow: 0 0 0 5px rgba(249, 115, 22, 0.16);
+  animation: flow-move 2.3s linear infinite;
+}
+
+.sql-console-dot {
+  position: absolute;
+  top: -4px;
+  left: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #f97316;
+  box-shadow: 0 0 0 4px rgba(249, 115, 22, 0.14);
+  animation: pulse-line 2.6s ease-in-out infinite;
+}
+
+.sql-console-dot-left-top { animation-delay: 0s; }
+.sql-console-dot-left-middle { animation-delay: 0.4s; }
+.sql-console-dot-left-bottom { animation-delay: 0.8s; }
+.sql-console-dot-right-top { animation-delay: 1.2s; }
+.sql-console-dot-right-bottom { animation-delay: 1.6s; }
+
+.dot-2 { animation-delay: 0.25s; }
+.dot-3 { animation-delay: 0.5s; }
+.dot-4 { animation-delay: 0.75s; }
+.dot-5 { animation-delay: 1s; }
+
+@keyframes flow-move {
+  0% {
+    left: 0;
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  10% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    left: calc(100% - 10px);
+    opacity: 0;
+    transform: scale(1.1);
+  }
+}
+
+.gear-wrap {
+  position: relative;
+  width: 140px;
+  height: 100px;
+}
+
+.gear {
+  position: absolute;
+  color: #1d6fd8;
+  filter: drop-shadow(0 8px 18px rgba(29, 111, 216, 0.25));
+  display: inline-block;
+}
+
+.gear-lg {
+  right: 0;
+  top: 5px;
+  font-size: 4rem;
+  animation: spin-cw 10s linear infinite;
+}
+
+.gear-md {
+  left: 36px;
+  top: 34px;
+  font-size: 2.7rem;
+  color: #0d9488;
+  animation: spin-ccw 7s linear infinite;
+}
+
+.gear-sm {
+  left: 0;
+  top: 5px;
+  font-size: 2rem;
+  color: #f08c00;
+  animation: spin-cw 5s linear infinite;
+}
+
+@keyframes spin-cw {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes spin-ccw {
+  from { transform: rotate(360deg); }
+  to { transform: rotate(0deg); }
+}
