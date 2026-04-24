@@ -61,20 +61,23 @@ class KafkaServerTest {
 
         val noRedirectClient = createClient { followRedirects = false }
 
-        val composeKafkaRedirect =
-            noRedirectClient.get("/compose-kafka?clusterId=local&topic=datapool-test&query=data&pane=messages&scope=ALL_PARTITIONS&mode=OFFSET&partition=1")
-        assertEquals(HttpStatusCode.Found, composeKafkaRedirect.status)
-        assertEquals(
-            "/static/compose-app/index.html?screen=kafka&clusterId=local&topic=datapool-test&query=data&pane=messages&scope=ALL_PARTITIONS&mode=OFFSET&partition=1",
-            composeKafkaRedirect.headers[HttpHeaders.Location],
-        )
-
-        val kafkaRedirect = noRedirectClient.get("/kafka?clusterId=local&pane=settings")
+        val kafkaRedirect =
+            noRedirectClient.get("/kafka?clusterId=local&topic=datapool-test&query=data&pane=messages&scope=ALL_PARTITIONS&mode=OFFSET&partition=1")
         assertEquals(HttpStatusCode.Found, kafkaRedirect.status)
         assertEquals(
-            "/static/compose-app/index.html?screen=kafka&clusterId=local&pane=settings",
+            "/static/compose-app/index.html?screen=kafka&clusterId=local&topic=datapool-test&query=data&pane=messages&scope=ALL_PARTITIONS&mode=OFFSET&partition=1",
             kafkaRedirect.headers[HttpHeaders.Location],
         )
+
+        val kafkaSettingsRedirect = noRedirectClient.get("/kafka?clusterId=local&pane=settings")
+        assertEquals(HttpStatusCode.Found, kafkaSettingsRedirect.status)
+        assertEquals(
+            "/static/compose-app/index.html?screen=kafka&clusterId=local&pane=settings",
+            kafkaSettingsRedirect.headers[HttpHeaders.Location],
+        )
+
+        val removedComposeKafkaRedirect = noRedirectClient.get("/compose-kafka?clusterId=local")
+        assertEquals(HttpStatusCode.NotFound, removedComposeKafkaRedirect.status)
 
         val info = client.get("/api/kafka/info").bodyAsText()
         assertTrue(info.contains("\"configured\":true"))

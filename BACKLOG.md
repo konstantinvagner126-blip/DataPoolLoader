@@ -510,6 +510,136 @@ Batch из 5 задач:
 - в проекте уменьшено число legacy-paths;
 - кодовая база чище, проще и с меньшим количеством “исторических хвостов”.
 
+#### 5.1. Remove legacy `compose-*` page aliases and `compose-spike` static compatibility path
+
+Статус:
+
+- реализовано
+
+Проблема:
+
+- server page-layer все еще держит compatibility routes от старой compose-shell эпохи:
+  - [PageComposeAliasRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/PageComposeAliasRoutes.kt)
+  - `/compose-kafka`
+  - `/compose-runs`
+  - `/compose-editor`
+  - `/compose-sync`
+  - `/compose-run-history-cleanup`
+  - `/compose-sql-console`
+  - `/compose-sql-console-objects`
+- static layer все еще содержит migration redirect для `/static/compose-spike/*` в [PageStaticResourceSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/PageStaticResourceSupport.kt);
+- в самом приложении уже есть canonical routes (`/kafka`, `/sql-console`, `/modules`, `/module-runs`, `/db-sync`, `/run-history-cleanup`), а compatibility-layer живет в основном ради старых server tests и visual harness;
+- это уже не feature-ценность, а прямой legacy noise в page routing.
+
+Целевой контракт:
+
+- page-layer обслуживает только canonical screen routes;
+- `compose-*` aliases и `compose-spike` static redirect удалены;
+- visual harness больше не использует removed compatibility paths и переведен на canonical или neutral screen-entry routes без `compose-*` aliases;
+- server tests и browser-level visual harness используют canonical routes, а не compatibility paths;
+- cleanup не меняет screen behavior и redirect contract canonical routes.
+
+Batch из 5 задач:
+
+1. зафиксировать bounded cleanup-пакет в backlog;
+2. удалить `PageComposeAliasRoutes` из page routing и убрать `compose-spike` static redirect;
+3. перевести server tests с compatibility routes на canonical paths;
+4. перевести visual harness с `/compose-sync` и других legacy paths на canonical или neutral screen-entry routes без `compose-*` aliases;
+5. прогнать compile и relevant server/browser regression coverage.
+
+Что сделано:
+
+- удален compatibility route file [PageComposeAliasRoutes.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/PageComposeAliasRoutes.kt), а `page`-layer переведен только на canonical screen routes;
+- из [PageStaticResourceSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/server/PageStaticResourceSupport.kt) удален migration redirect `/static/compose-spike/* -> /static/compose-app/*`;
+- server tests переведены с `compose-*` paths на canonical routes и теперь отдельно фиксируют, что removed compatibility paths дают `404`:
+  - [ServerTest.kt](/Users/kwdev/DataPoolLoader/ui-server/src/test/kotlin/com/sbrf/lt/platform/ui/server/ServerTest.kt)
+  - [SqlConsoleServerTest.kt](/Users/kwdev/DataPoolLoader/ui-server/src/test/kotlin/com/sbrf/lt/platform/ui/server/SqlConsoleServerTest.kt)
+  - [KafkaServerTest.kt](/Users/kwdev/DataPoolLoader/ui-server/src/test/kotlin/com/sbrf/lt/platform/ui/server/KafkaServerTest.kt)
+- browser-level visual harness больше не использует removed alias `/compose-sync`; для `module sync` screen он переведен на neutral screen-entry через root query в [ui-visual.smoke.spec.mjs](/Users/kwdev/DataPoolLoader/tools/sql-console-browser-smoke/tests/ui-visual.smoke.spec.mjs);
+- backlog синхронизирован с новым route contract:
+  - Kafka screen больше описывается только через canonical `/kafka`;
+  - historical mention `/compose-sync` в visual section заменена на neutral/canonical screen-entry wording.
+
+#### 5.2. Normalize SQL-console legacy split-preferences migration and remove hidden mixed-state persistence
+
+Статус:
+
+- реализовано
+
+Проблема:
+
+- SQL-console legacy migration вокруг `preferences/library` сейчас остается нечестной:
+  - [SqlConsoleLibraryStateStore.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/sqlconsole/SqlConsoleLibraryStateStore.kt) читает старый `sql-console-preferences-state.json` как промежуточный legacy source для library data;
+  - [SqlConsolePreferencesStateStore.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/sqlconsole/SqlConsolePreferencesStateStore.kt) при этом может принять тот же файл как уже “новый” preferences state, потому что [PersistedSqlConsolePreferencesState.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/sqlconsole/PersistedSqlConsolePreferencesState.kt) игнорирует unknown fields;
+- в результате старый mixed `sql-console-preferences-state.json` с `recentQueries/favoriteQueries/favoriteObjects` может остаться на диске навсегда и выглядеть как current source of truth, хотя по state-model это уже legacy migration-only формат;
+- это уже не просто compatibility-хвост, а скрытое смешение current state и legacy payload.
+
+Целевой контракт:
+
+- old split-preferences payload распознается как legacy migration input, а не как текущий preferences source of truth;
+- при первом чтении такого файла migration:
+  - выделяет library state в отдельный `sql-console-library-state.json`;
+  - переписывает `sql-console-preferences-state.json` в current-only format без library fields;
+- после migration disk state выглядит честно: `workspace / library / preferences` без скрытого legacy mixed payload;
+- combined `sql-console-state.json` остается отдельным migration-only path и не смешивается с intermediate split migration.
+
+Batch из 5 задач:
+
+1. зафиксировать bounded cleanup-пакет в backlog;
+2. ввести явный detector/normalizer для legacy split-preferences payload;
+3. переписать migration path так, чтобы old preferences file нормализовался в current-only preferences state;
+4. обновить server tests и [STATE_MODEL_MAP.md](/Users/kwdev/DataPoolLoader/STATE_MODEL_MAP.md) под честный migration contract;
+5. прогнать relevant `ui-server` tests.
+
+Что сделано:
+
+- в [SqlConsoleStateFileSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/sqlconsole/SqlConsoleStateFileSupport.kt) добавлен idempotent normalizer для old split-preferences payload:
+  - распознает legacy `sql-console-preferences-state.json` с `recentQueries/favoriteQueries/favoriteObjects`;
+  - выделяет library data в dedicated `sql-console-library-state.json`;
+  - переписывает `sql-console-preferences-state.json` в current-only preferences format;
+- [SqlConsoleLibraryStateStore.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/sqlconsole/SqlConsoleLibraryStateStore.kt) больше не использует hidden fallback через shared legacy preferences file как псевдо-source of truth;
+- [SqlConsolePreferencesStateStore.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/sqlconsole/SqlConsolePreferencesStateStore.kt) теперь сначала нормализует old split payload, а потом читает уже current preferences state;
+- regression coverage усилена в [LegacySqlConsoleStateStoreTest.kt](/Users/kwdev/DataPoolLoader/ui-server/src/test/kotlin/com/sbrf/lt/platform/ui/sqlconsole/LegacySqlConsoleStateStoreTest.kt):
+  - old split-preferences payload теперь не только мигрирует library data, но и переписывается без library fields;
+  - добавлен order-independent сценарий, где preferences store загружается раньше library store;
+- [STATE_MODEL_MAP.md](/Users/kwdev/DataPoolLoader/STATE_MODEL_MAP.md) синхронизирован: old split-preferences payload теперь явно описан как migration input, а не current source of truth.
+
+#### 5.3. Normalize legacy uploaded credentials migration and remove stale secret copy from `run-state.json`
+
+Статус:
+
+- реализовано
+
+Проблема:
+
+- credentials state уже вынесен в отдельный [UiCredentialsStateStore.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/UiCredentialsStateStore.kt) и `credentials-state.json`, но legacy migration вокруг `run-state.json.uploadedCredentials` остается нечестной;
+- текущий `load()` мигрирует legacy uploaded credentials только если dedicated `credentials-state.json` еще не существует;
+- если dedicated state уже есть, old `uploadedCredentials` blob может оставаться внутри `run-state.json` бесконечно как stale duplicate copy чувствительных данных;
+- по [STATE_MODEL_MAP.md](/Users/kwdev/DataPoolLoader/STATE_MODEL_MAP.md) `run-state.json` должен быть source of truth только для run history, а legacy uploaded credentials допустимы только как temporary migration input.
+
+Целевой контракт:
+
+- `credentials-state.json` остается единственным source of truth для uploaded credentials;
+- legacy `run-state.json.uploadedCredentials` рассматривается только как migration input и очищается idempotent-нормализацией при любом чтении credentials state;
+- если dedicated `credentials-state.json` уже существует, legacy uploaded credentials не реанимируются и не конкурируют с current state;
+- cleanup legacy credentials не затрагивает run history payload внутри `run-state.json`.
+
+Batch из 5 задач:
+
+1. зафиксировать bounded cleanup-пакет в backlog;
+2. сделать credentials migration path idempotent и очищающим stale legacy copy даже при наличии dedicated state;
+3. добавить regression test на сценарий `credentials-state.json already exists + run-state.json still contains uploadedCredentials`;
+4. синхронизировать [STATE_MODEL_MAP.md](/Users/kwdev/DataPoolLoader/STATE_MODEL_MAP.md) под честный credentials migration contract;
+5. прогнать relevant `ui-server` tests.
+
+Что сделано:
+
+- [UiCredentialsStateStore.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/run/UiCredentialsStateStore.kt) теперь всегда нормализует legacy `run-state.json.uploadedCredentials`:
+  - если current `credentials-state.json` уже существует, stale legacy secret copy очищается без перезаписи dedicated state;
+  - если dedicated state еще нет, legacy uploaded credentials мигрируются в `credentials-state.json`, после чего legacy field удаляется из `run-state.json`;
+- в [UiCredentialsStateStoreTest.kt](/Users/kwdev/DataPoolLoader/ui-server/src/test/kotlin/com/sbrf/lt/platform/ui/run/UiCredentialsStateStoreTest.kt) добавлен regression scenario, который фиксирует, что current dedicated credentials state побеждает, а legacy uploaded credentials очищаются из `run-state.json` без потери `history`;
+- [STATE_MODEL_MAP.md](/Users/kwdev/DataPoolLoader/STATE_MODEL_MAP.md) синхронизирован: legacy uploaded credentials теперь явно описаны как temporary migration input, который очищается даже если dedicated credentials state уже существует.
+
 ### 6. SQL-консоль: единая программа развития
 
 Статус:
@@ -1491,7 +1621,7 @@ ui:
    - `GET /api/kafka/info`;
    - `GET /api/kafka/topics?clusterId=...&query=...`;
    - `GET /api/kafka/topic-overview?clusterId=...&topic=...`;
-4. добавлен page route `/kafka` и compose alias `/compose-kafka` c route params `clusterId/topic`;
+4. добавлен canonical page route `/kafka` c route params `clusterId/topic`;
 5. в `ui-compose-web` появился основной Kafka screen:
    - cluster strip;
    - topic list с filter/search;
@@ -1902,7 +2032,7 @@ Closure review:
 Что сделано:
 
 - для экрана импорта модулей добавлен стабильный shell target `module-sync-content-shell`;
-- visual spec расширен отдельным baseline-сценарием для `/compose-sync`;
+- visual spec расширен отдельным baseline-сценарием для canonical route `/db-sync`;
 - committed snapshot `module-sync-shell` добавлен в visual suite и проходит browser regression.
 
 #### 16.7. Visual baseline для run history cleanup shell

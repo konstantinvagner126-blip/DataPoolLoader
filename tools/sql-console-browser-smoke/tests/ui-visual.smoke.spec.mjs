@@ -1133,7 +1133,7 @@ test("module sync shell visual baseline", async ({ page }) => {
       })
     });
   });
-  await prepareVisualPage(page, "/compose-sync", "Импорт модулей из файлов");
+  await prepareVisualPage(page, "/?screen=module-sync", "Импорт модулей из файлов");
   await page.waitForTimeout(750);
   await expect(page.getByText("Импорт модулей", { exact: true })).toBeVisible();
   await expect(page.getByText("Импорты пока не запускались.")).toBeVisible();
@@ -1193,7 +1193,7 @@ test("module sync runtime-fallback visual baseline", async ({ page }) => {
       })
     });
   });
-  await prepareVisualPage(page, "/compose-sync", "Импорт модулей из файлов");
+  await prepareVisualPage(page, "/?screen=module-sync", "Импорт модулей из файлов");
   await page.addStyleTag({
     content: "html { scrollbar-gutter: stable both-edges !important; } body { overflow-y: scroll !important; } .module-sync-content-shell { width: 1416px !important; height: 698px !important; min-height: 698px !important; max-height: 698px !important; box-sizing: border-box !important; overflow: hidden !important; }"
   });

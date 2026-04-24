@@ -174,27 +174,6 @@ class SqlConsoleServerTest {
 
         val noRedirectClient = createClient { followRedirects = false }
 
-        val staticCompatibilityRedirect = noRedirectClient.get("/static/compose-spike/index.html?screen=sql-console")
-        assertEquals(HttpStatusCode.Found, staticCompatibilityRedirect.status)
-        assertEquals(
-            "/static/compose-app/index.html?screen=sql-console",
-            staticCompatibilityRedirect.headers[HttpHeaders.Location],
-        )
-
-        val composeSqlConsoleRedirect = noRedirectClient.get("/compose-sql-console")
-        assertEquals(HttpStatusCode.Found, composeSqlConsoleRedirect.status)
-        assertEquals(
-            "/static/compose-app/index.html?screen=sql-console",
-            composeSqlConsoleRedirect.headers[HttpHeaders.Location],
-        )
-
-        val composeSqlConsoleObjectsRedirect = noRedirectClient.get("/compose-sql-console-objects?workspaceId=workspace-a&query=offer")
-        assertEquals(HttpStatusCode.Found, composeSqlConsoleObjectsRedirect.status)
-        assertEquals(
-            "/static/compose-app/index.html?screen=sql-console-objects&workspaceId=workspace-a&query=offer",
-            composeSqlConsoleObjectsRedirect.headers[HttpHeaders.Location],
-        )
-
         val sqlConsoleRedirect = noRedirectClient.get("/sql-console")
         assertEquals(HttpStatusCode.Found, sqlConsoleRedirect.status)
         assertEquals(
@@ -208,6 +187,15 @@ class SqlConsoleServerTest {
             "/static/compose-app/index.html?screen=sql-console-objects&workspaceId=workspace-a&type=TABLE",
             sqlConsoleObjectsRedirect.headers[HttpHeaders.Location],
         )
+
+        val removedStaticCompatibility = noRedirectClient.get("/static/compose-spike/index.html?screen=sql-console")
+        assertEquals(HttpStatusCode.NotFound, removedStaticCompatibility.status)
+
+        val removedComposeSqlConsole = noRedirectClient.get("/compose-sql-console")
+        assertEquals(HttpStatusCode.NotFound, removedComposeSqlConsole.status)
+
+        val removedComposeSqlConsoleObjects = noRedirectClient.get("/compose-sql-console-objects?workspaceId=workspace-a&query=offer")
+        assertEquals(HttpStatusCode.NotFound, removedComposeSqlConsoleObjects.status)
 
         val info = client.get("/api/sql-console/info").bodyAsText()
         assertTrue(info.contains("\"sourceCatalog\":[{\"name\":\"shard1\"}]"))

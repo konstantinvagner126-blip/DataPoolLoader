@@ -60,7 +60,8 @@ class LegacySqlConsoleStateStoreTest {
     @Test
     fun `migrates content from old split preferences file into dedicated library store`() {
         val storageDir = Files.createTempDirectory("sql-console-state-old-preferences")
-        storageDir.resolve("sql-console-preferences-state.json").writeText(
+        val preferencesFile = storageDir.resolve(SQL_CONSOLE_PREFERENCES_STATE_FILE_NAME)
+        preferencesFile.writeText(
             """
             {
               "recentQueries":["select * from offer","select * from offer","select 1"],
@@ -77,6 +78,7 @@ class LegacySqlConsoleStateStoreTest {
 
         val library = SqlConsoleLibraryStateStore(storageDir).load()
         val preferences = SqlConsolePreferencesStateStore(storageDir).load()
+        val normalizedPreferencesTree = ConfigLoader().objectMapper().readTree(preferencesFile.toFile())
 
         assertEquals(listOf("select * from offer", "select 1"), library.recentQueries)
         assertEquals(listOf("select count(*) from offer"), library.favoriteQueries)
@@ -87,7 +89,46 @@ class LegacySqlConsoleStateStoreTest {
         assertEquals(100, preferences.pageSize)
         assertTrue(preferences.strictSafetyEnabled)
         assertEquals("TRANSACTION_PER_SHARD", preferences.transactionMode)
-        assertTrue(Files.exists(storageDir.resolve("sql-console-library-state.json")))
+        assertTrue(Files.exists(storageDir.resolve(SQL_CONSOLE_LIBRARY_STATE_FILE_NAME)))
+        assertFalse(normalizedPreferencesTree.has("recentQueries"))
+        assertFalse(normalizedPreferencesTree.has("favoriteQueries"))
+        assertFalse(normalizedPreferencesTree.has("favoriteObjects"))
+    }
+
+    @Test
+    fun `preferences store normalizes old split preferences payload before library load`() {
+        val storageDir = Files.createTempDirectory("sql-console-state-old-preferences-order")
+        val preferencesFile = storageDir.resolve(SQL_CONSOLE_PREFERENCES_STATE_FILE_NAME)
+        preferencesFile.writeText(
+            """
+            {
+              "recentQueries":["select * from source_1"],
+              "favoriteQueries":["select count(*) from source_1"],
+              "favoriteObjects":[
+                {"sourceName":"db1","schemaName":"public","objectName":"source_1","objectType":"table"}
+              ],
+              "pageSize":25,
+              "strictSafetyEnabled":false,
+              "transactionMode":"AUTO_COMMIT"
+            }
+            """.trimIndent()
+        )
+
+        val preferences = SqlConsolePreferencesStateStore(storageDir).load()
+        val library = SqlConsoleLibraryStateStore(storageDir).load()
+        val normalizedPreferencesTree = ConfigLoader().objectMapper().readTree(preferencesFile.toFile())
+
+        assertEquals(25, preferences.pageSize)
+        assertEquals(listOf("select * from source_1"), library.recentQueries)
+        assertEquals(listOf("select count(*) from source_1"), library.favoriteQueries)
+        assertEquals(
+            listOf(PersistedSqlConsoleFavoriteObject("db1", "public", "source_1", "TABLE")),
+            library.favoriteObjects,
+        )
+        assertTrue(Files.exists(storageDir.resolve(SQL_CONSOLE_LIBRARY_STATE_FILE_NAME)))
+        assertFalse(normalizedPreferencesTree.has("recentQueries"))
+        assertFalse(normalizedPreferencesTree.has("favoriteQueries"))
+        assertFalse(normalizedPreferencesTree.has("favoriteObjects"))
     }
 
     @Test

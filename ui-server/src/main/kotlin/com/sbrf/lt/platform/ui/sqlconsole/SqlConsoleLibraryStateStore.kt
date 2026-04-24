@@ -9,8 +9,7 @@ class SqlConsoleLibraryStateStore(
     private val configLoader: ConfigLoader = ConfigLoader(),
     private val legacyStateStore: LegacySqlConsoleStateStore = LegacySqlConsoleStateStore(storageDir, configLoader),
 ) {
-    private val stateFile: Path = storageDir.resolve("sql-console-library-state.json")
-    private val legacyPreferencesFile: Path = storageDir.resolve("sql-console-preferences-state.json")
+    private val stateFile: Path = storageDir.resolve(SQL_CONSOLE_LIBRARY_STATE_FILE_NAME)
 
     fun load(): PersistedSqlConsoleLibraryState {
         readOptionalSqlConsoleStateFile(
@@ -19,11 +18,17 @@ class SqlConsoleLibraryStateStore(
             stateClass = PersistedSqlConsoleLibraryState::class.java,
         )?.normalized()?.let { return it }
 
-        val migrated = loadLegacyPreferencesState()
-            ?: legacyStateStore.load().toLibraryState()
+        normalizeLegacySplitPreferencesStateIfNeeded(storageDir, configLoader)
+        readOptionalSqlConsoleStateFile(
+            stateFile = stateFile,
+            configLoader = configLoader,
+            stateClass = PersistedSqlConsoleLibraryState::class.java,
+        )?.normalized()?.let { return it }
+
+        val migrated = legacyStateStore.load().toLibraryState()
         return migrateSqlConsoleStateIfNeeded(
             storageDir = storageDir,
-            shouldMigrate = legacyPreferencesFile.exists() || legacyStateStore.exists(),
+            shouldMigrate = legacyStateStore.exists(),
             legacyStateStore = legacyStateStore,
             migratedState = migrated,
             save = ::save,
@@ -37,13 +42,5 @@ class SqlConsoleLibraryStateStore(
             configLoader = configLoader,
             state = state.normalized(),
         )
-    }
-
-    private fun loadLegacyPreferencesState(): PersistedSqlConsoleLibraryState? {
-        return readOptionalSqlConsoleStateFile(
-            stateFile = legacyPreferencesFile,
-            configLoader = configLoader,
-            stateClass = LegacySqlConsoleState::class.java,
-        )?.toLibraryState()
     }
 }

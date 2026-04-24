@@ -263,34 +263,6 @@ class ServerTest {
         assertEquals(HttpStatusCode.Found, homeRedirect.status)
         assertEquals("/static/compose-app/index.html", homeRedirect.headers[HttpHeaders.Location])
 
-        val staticCompatibilityRedirect = noRedirectClient.get("/static/compose-spike/index.html?screen=sql-console")
-        assertEquals(HttpStatusCode.Found, staticCompatibilityRedirect.status)
-        assertEquals(
-            "/static/compose-app/index.html?screen=sql-console",
-            staticCompatibilityRedirect.headers[HttpHeaders.Location],
-        )
-
-        val composeRunsRedirect = noRedirectClient.get("/compose-runs?storage=files&module=demo-app")
-        assertEquals(HttpStatusCode.Found, composeRunsRedirect.status)
-        assertEquals(
-            "/static/compose-app/index.html?screen=module-runs&storage=files&module=demo-app",
-            composeRunsRedirect.headers[HttpHeaders.Location]
-        )
-
-        val composeEditorRedirect = noRedirectClient.get("/compose-editor?storage=files&module=demo-app")
-        assertEquals(HttpStatusCode.Found, composeEditorRedirect.status)
-        assertEquals(
-            "/static/compose-app/index.html?screen=module-editor&storage=files&module=demo-app",
-            composeEditorRedirect.headers[HttpHeaders.Location]
-        )
-
-        val composeSyncRedirect = noRedirectClient.get("/compose-sync")
-        assertEquals(HttpStatusCode.Found, composeSyncRedirect.status)
-        assertEquals(
-            "/static/compose-app/index.html?screen=module-sync",
-            composeSyncRedirect.headers[HttpHeaders.Location]
-        )
-
         val aboutRedirect = noRedirectClient.get("/about")
         assertEquals(HttpStatusCode.Found, aboutRedirect.status)
         assertEquals(
@@ -304,6 +276,32 @@ class ServerTest {
             "/static/compose-app/index.html?screen=module-editor&storage=files",
             modulesRedirect.headers[HttpHeaders.Location],
         )
+
+        val moduleRunsRedirect = noRedirectClient.get("/module-runs?storage=files&module=demo-app")
+        assertEquals(HttpStatusCode.Found, moduleRunsRedirect.status)
+        assertEquals(
+            "/static/compose-app/index.html?screen=module-runs&storage=files&module=demo-app",
+            moduleRunsRedirect.headers[HttpHeaders.Location]
+        )
+
+        val dbSyncRedirect = noRedirectClient.get("/db-sync")
+        assertEquals(HttpStatusCode.Found, dbSyncRedirect.status)
+        assertEquals(
+            "/static/compose-app/index.html?modeAccessError=db-sync",
+            dbSyncRedirect.headers[HttpHeaders.Location]
+        )
+
+        val removedStaticCompatibilityRedirect = noRedirectClient.get("/static/compose-spike/index.html?screen=sql-console")
+        assertEquals(HttpStatusCode.NotFound, removedStaticCompatibilityRedirect.status)
+
+        val removedComposeRunsRedirect = noRedirectClient.get("/compose-runs?storage=files&module=demo-app")
+        assertEquals(HttpStatusCode.NotFound, removedComposeRunsRedirect.status)
+
+        val removedComposeEditorRedirect = noRedirectClient.get("/compose-editor?storage=files&module=demo-app")
+        assertEquals(HttpStatusCode.NotFound, removedComposeEditorRedirect.status)
+
+        val removedComposeSyncRedirect = noRedirectClient.get("/compose-sync")
+        assertEquals(HttpStatusCode.NotFound, removedComposeSyncRedirect.status)
 
         val helpHtml = client.get("/help").bodyAsText()
         assertTrue(helpHtml.contains("Справка"))
@@ -729,7 +727,7 @@ class ServerTest {
     }
 
     @Test
-    fun `compose runs route redirects to compose bundle with module runs screen`() = testApplication {
+    fun `module runs route redirects to compose bundle with module runs screen`() = testApplication {
         val noRedirectClient = createClient {
             followRedirects = false
         }
@@ -748,7 +746,7 @@ class ServerTest {
             )
         }
 
-        val response = noRedirectClient.get("/compose-runs?storage=files&module=demo-app")
+        val response = noRedirectClient.get("/module-runs?storage=files&module=demo-app")
 
         assertEquals(HttpStatusCode.Found, response.status)
         assertEquals(
@@ -758,7 +756,7 @@ class ServerTest {
     }
 
     @Test
-    fun `compose editor route redirects to compose bundle with editor screen`() = testApplication {
+    fun `modules route redirects to compose bundle with editor screen`() = testApplication {
         val noRedirectClient = createClient {
             followRedirects = false
         }
@@ -777,7 +775,7 @@ class ServerTest {
             )
         }
 
-        val response = noRedirectClient.get("/compose-editor?storage=files&module=demo-app")
+        val response = noRedirectClient.get("/modules?module=demo-app")
 
         assertEquals(HttpStatusCode.Found, response.status)
         assertEquals(

@@ -115,7 +115,7 @@
 - recovery:
   состояние восстанавливается на старте без привязки к run history
 - cleanup:
-  legacy `uploadedCredentials` мигрируются из `run-state.json` и удаляются из legacy места хранения
+  legacy `uploadedCredentials` мигрируются из `run-state.json` и удаляются из legacy места хранения; stale legacy copy очищается даже если dedicated `credentials-state.json` уже существует
 
 ### 3.3. SQL console workspace state
 
@@ -159,7 +159,8 @@
 - замечание:
   favorites и recent history живут в одном library boundary, но этот boundary отделен от workspace state и preferences
 - recovery:
-  возможна миграция из legacy combined SQL-console state
+  возможна миграция из legacy combined SQL-console state и из old split-preferences payload,
+  который при первом чтении нормализуется в dedicated library/preferences files
 - cleanup:
   normalization ограничивает размер и удаляет дубли
 
@@ -177,7 +178,8 @@
 - что хранится:
   `pageSize`, `strictSafetyEnabled`, `transactionMode`
 - recovery:
-  миграция возможна из legacy combined state
+  миграция возможна из legacy combined state; old split-preferences payload больше не считается current source of truth
+  и при первом чтении переписывается в current-only preferences format
 - cleanup:
   normalization оставляет только допустимые значения
 
@@ -419,7 +421,7 @@
 ### 6.3. Legacy migration policy
 
 - combined SQL console state допустим только как migration-only слой;
-- legacy uploaded credentials inside `run-state.json` допустимы только как temporary migration input;
+- legacy uploaded credentials inside `run-state.json` допустимы только как temporary migration input и должны очищаться idempotent migration-нормализацией;
 - новые combined JSON blobs, которые смешивают preferences, draft, execution и history, запрещены.
 
 ## 7. Практические правила для следующих изменений

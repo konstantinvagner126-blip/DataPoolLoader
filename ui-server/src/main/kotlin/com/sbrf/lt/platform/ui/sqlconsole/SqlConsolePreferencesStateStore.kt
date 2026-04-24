@@ -8,9 +8,10 @@ class SqlConsolePreferencesStateStore(
     private val configLoader: ConfigLoader = ConfigLoader(),
     private val legacyStateStore: LegacySqlConsoleStateStore = LegacySqlConsoleStateStore(storageDir, configLoader),
 ) {
-    private val stateFile: Path = storageDir.resolve("sql-console-preferences-state.json")
+    private val stateFile: Path = storageDir.resolve(SQL_CONSOLE_PREFERENCES_STATE_FILE_NAME)
 
     fun load(): PersistedSqlConsolePreferencesState {
+        normalizeLegacySplitPreferencesStateIfNeeded(storageDir, configLoader)
         readOptionalSqlConsoleStateFile(
             stateFile = stateFile,
             configLoader = configLoader,

@@ -17,6 +17,7 @@ class UiCredentialsStateStore(
 
     fun load(): PersistedCredentialsState {
         readOptionalRunStateFile(stateFile, configLoader, PersistedCredentialsState::class.java)?.let {
+            clearLegacyUploadedCredentials()
             return it
         }
         val migratedState = loadLegacyState()

@@ -42,4 +42,48 @@ class UiCredentialsStateStoreTest {
         assertFalse(legacyRunStateTree.has("uploadedCredentials"))
         assertTrue(legacyRunStateTree.has("history"))
     }
+
+    @Test
+    fun `existing dedicated credentials state clears stale legacy uploaded credentials copy`() {
+        val storageDir = createTempDirectory("ui-credentials-state-store-")
+        val legacyRunState = storageDir.resolve("run-state.json")
+        val dedicatedStateFile = storageDir.resolve("credentials-state.json")
+        legacyRunState.writeText(
+            """
+            {
+              "uploadedCredentials": {
+                "fileName": "legacy.properties",
+                "content": "DB1_USERNAME=legacy"
+              },
+              "history": [
+                {
+                  "id": "run-1"
+                }
+              ]
+            }
+            """.trimIndent(),
+        )
+        dedicatedStateFile.writeText(
+            """
+            {
+              "uploadedCredentials": {
+                "fileName": "dedicated.properties",
+                "content": "DB1_USERNAME=dedicated"
+              }
+            }
+            """.trimIndent(),
+        )
+
+        val store = UiCredentialsStateStore(storageDir)
+
+        val loaded = store.load()
+
+        assertEquals("dedicated.properties", loaded.uploadedCredentials?.fileName)
+        assertEquals("DB1_USERNAME=dedicated", loaded.uploadedCredentials?.content)
+        assertTrue(dedicatedStateFile.readText().contains("dedicated.properties"))
+        assertFalse(dedicatedStateFile.readText().contains("legacy.properties"))
+        val legacyRunStateTree = ConfigLoader().objectMapper().readTree(legacyRunState.toFile())
+        assertFalse(legacyRunStateTree.has("uploadedCredentials"))
+        assertTrue(legacyRunStateTree.has("history"))
+    }
 }
