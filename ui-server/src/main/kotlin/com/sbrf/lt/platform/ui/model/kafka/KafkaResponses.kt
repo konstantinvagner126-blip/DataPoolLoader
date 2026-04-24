@@ -71,6 +71,45 @@ data class KafkaTopicConsumerGroupPartitionLagResponse(
     val lag: Long? = null,
 )
 
+data class KafkaClusterConsumerGroupsCatalogResponse(
+    val cluster: KafkaClusterCatalogEntryResponse,
+    val status: String = "EMPTY",
+    val message: String? = null,
+    val groups: List<KafkaClusterConsumerGroupSummaryResponse> = emptyList(),
+)
+
+data class KafkaClusterConsumerGroupSummaryResponse(
+    val groupId: String,
+    val state: String? = null,
+    val memberCount: Int? = null,
+    val metadataAvailable: Boolean = true,
+    val totalLag: Long? = null,
+    val lagStatus: String = "OK",
+    val note: String? = null,
+    val topics: List<KafkaClusterConsumerGroupTopicSummaryResponse> = emptyList(),
+)
+
+data class KafkaClusterConsumerGroupTopicSummaryResponse(
+    val topicName: String,
+    val partitionCount: Int,
+    val totalLag: Long? = null,
+    val partitions: List<KafkaTopicConsumerGroupPartitionLagResponse> = emptyList(),
+)
+
+data class KafkaClusterBrokersCatalogResponse(
+    val cluster: KafkaClusterCatalogEntryResponse,
+    val controllerBrokerId: Int? = null,
+    val brokers: List<KafkaBrokerSummaryResponse> = emptyList(),
+)
+
+data class KafkaBrokerSummaryResponse(
+    val brokerId: Int,
+    val host: String,
+    val port: Int,
+    val rack: String? = null,
+    val controller: Boolean = false,
+)
+
 data class KafkaTopicMessageReadRequestPayload(
     val clusterId: String,
     val topicName: String,

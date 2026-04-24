@@ -139,7 +139,58 @@ fun ComposeKafkaPage(
                 onClusterSectionChange = { section ->
                     scope.launch {
                         state = store.updateClusterSection(state, section)
+                        when (state.clusterSection) {
+                            "consumer-groups" -> {
+                                state = store.startConsumerGroupsReload(state)
+                                state = runCatching {
+                                    store.loadConsumerGroups(state)
+                                }.getOrElse { error ->
+                                    state.copy(
+                                        consumerGroupsLoading = false,
+                                        consumerGroupsError = error.message ?: "Не удалось загрузить cluster-level consumer groups.",
+                                    )
+                                }
+                            }
+
+                            "brokers" -> {
+                                state = store.startBrokersReload(state)
+                                state = runCatching {
+                                    store.loadBrokers(state)
+                                }.getOrElse { error ->
+                                    state.copy(
+                                        brokersLoading = false,
+                                        brokersError = error.message ?: "Не удалось загрузить broker metadata.",
+                                    )
+                                }
+                            }
+                        }
                         replaceBrowserRoute(currentRouteState())
+                    }
+                },
+                onReloadConsumerGroups = {
+                    scope.launch {
+                        state = store.startConsumerGroupsReload(state)
+                        state = runCatching {
+                            store.loadConsumerGroups(state)
+                        }.getOrElse { error ->
+                            state.copy(
+                                consumerGroupsLoading = false,
+                                consumerGroupsError = error.message ?: "Не удалось загрузить cluster-level consumer groups.",
+                            )
+                        }
+                    }
+                },
+                onReloadBrokers = {
+                    scope.launch {
+                        state = store.startBrokersReload(state)
+                        state = runCatching {
+                            store.loadBrokers(state)
+                        }.getOrElse { error ->
+                            state.copy(
+                                brokersLoading = false,
+                                brokersError = error.message ?: "Не удалось загрузить broker metadata.",
+                            )
+                        }
                     }
                 },
                 onTopicQueryChange = { query ->

@@ -379,6 +379,64 @@
   vertical-align: middle;
 }
 
+.kafka-cluster-consumer-group-table th,
+.kafka-cluster-consumer-group-table td,
+.kafka-cluster-consumer-topic-table th,
+.kafka-cluster-consumer-topic-table td {
+  vertical-align: middle;
+}
+
+.kafka-cluster-consumer-group-lag {
+  font-weight: 600;
+  color: #132238;
+}
+
+.kafka-cluster-consumer-group-detail {
+  padding: 0.4rem 0;
+}
+
+.kafka-brokers-shell {
+  display: grid;
+  gap: 1rem;
+}
+
+.kafka-brokers-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 0.85rem;
+}
+
+.kafka-brokers-table th,
+.kafka-brokers-table td {
+  vertical-align: middle;
+}
+
+.kafka-broker-endpoint {
+  font-weight: 600;
+  color: #132238;
+}
+
+.kafka-broker-rack {
+  color: #41556e;
+}
+
+.kafka-broker-role {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.18rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(19, 34, 56, 0.06);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #607289;
+}
+
+.kafka-broker-role-controller {
+  background: rgba(29, 111, 216, 0.12);
+  color: #1d6fd8;
+}
+
 .kafka-topic-settings-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));

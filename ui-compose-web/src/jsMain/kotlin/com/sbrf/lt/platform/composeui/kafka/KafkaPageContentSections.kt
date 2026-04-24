@@ -12,6 +12,8 @@ import org.jetbrains.compose.web.dom.Div
 internal fun KafkaPageContent(
     state: KafkaPageState,
     onClusterSectionChange: (String) -> Unit,
+    onReloadConsumerGroups: () -> Unit,
+    onReloadBrokers: () -> Unit,
     onTopicQueryChange: (String) -> Unit,
     onApplyTopicQuery: () -> Unit,
     onReloadTopicOverview: (String) -> Unit,
@@ -85,16 +87,18 @@ internal fun KafkaPageContent(
                 }
 
                 state.clusterSection == "consumer-groups" -> {
-                    KafkaClusterSectionPlaceholder(
-                        title = "Consumer Groups",
-                        text = "Следующий пакет вынесет consumer groups в отдельный cluster-level screen. Topic-scoped consumers останутся как отдельная вкладка на странице топика.",
+                    KafkaClusterConsumerGroupsSection(
+                        state = state,
+                        selectedCluster = selectedCluster,
+                        onReloadConsumerGroups = onReloadConsumerGroups,
                     )
                 }
 
                 state.clusterSection == "brokers" -> {
-                    KafkaClusterSectionPlaceholder(
-                        title = "Brokers",
-                        text = "Следующий пакет добавит read-only broker metadata screen без admin actions и destructive операций.",
+                    KafkaClusterBrokersSection(
+                        state = state,
+                        selectedCluster = selectedCluster,
+                        onReloadBrokers = onReloadBrokers,
                     )
                 }
 

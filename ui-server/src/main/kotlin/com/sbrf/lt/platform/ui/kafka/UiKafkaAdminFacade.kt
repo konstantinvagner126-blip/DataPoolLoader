@@ -12,6 +12,8 @@ internal interface UiKafkaAdminFacadeFactory {
 internal interface UiKafkaAdminFacade : AutoCloseable {
     fun loadBrokerNodeCount(): Int
 
+    fun describeClusterBrokers(): UiKafkaClusterBrokers
+
     fun listTopics(): List<UiKafkaTopicListing>
 
     fun describeTopics(topicNames: List<String>): List<UiKafkaTopicDetails>
@@ -53,6 +55,18 @@ internal data class UiKafkaPartitionOffsets(
     val latestOffset: Long? = null,
 )
 
+internal data class UiKafkaClusterBrokers(
+    val controllerBrokerId: Int? = null,
+    val brokers: List<UiKafkaBrokerNode> = emptyList(),
+)
+
+internal data class UiKafkaBrokerNode(
+    val brokerId: Int,
+    val host: String,
+    val port: Int,
+    val rack: String? = null,
+)
+
 internal data class UiKafkaConsumerGroupListing(
     val groupId: String,
 )
@@ -84,6 +98,25 @@ private class AdminClientUiKafkaAdminFacade(
 
     override fun loadBrokerNodeCount(): Int =
         adminClient.describeCluster().nodes().get().size
+
+    override fun describeClusterBrokers(): UiKafkaClusterBrokers {
+        val description = adminClient.describeCluster()
+        val brokers = description.nodes().get().map { node ->
+            UiKafkaBrokerNode(
+                brokerId = node.id(),
+                host = node.host(),
+                port = node.port(),
+                rack = node.rack(),
+            )
+        }.sortedBy { it.brokerId }
+        val controllerBrokerId = runCatching {
+            description.controller().get()?.id()?.takeIf { it >= 0 }
+        }.getOrNull()
+        return UiKafkaClusterBrokers(
+            controllerBrokerId = controllerBrokerId,
+            brokers = brokers,
+        )
+    }
 
     override fun listTopics(): List<UiKafkaTopicListing> =
         adminClient.listTopics().listings().get().map { listing ->

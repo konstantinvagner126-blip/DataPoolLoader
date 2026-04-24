@@ -21,6 +21,22 @@ class KafkaApiClient(
             KafkaTopicsCatalogResponse.serializer(),
         )
 
+    override suspend fun loadConsumerGroups(
+        clusterId: String,
+    ): KafkaClusterConsumerGroupsCatalogResponse =
+        httpClient.get(
+            "/api/kafka/consumer-groups?clusterId=${urlEncode(clusterId)}",
+            KafkaClusterConsumerGroupsCatalogResponse.serializer(),
+        )
+
+    override suspend fun loadBrokers(
+        clusterId: String,
+    ): KafkaClusterBrokersCatalogResponse =
+        httpClient.get(
+            "/api/kafka/brokers?clusterId=${urlEncode(clusterId)}",
+            KafkaClusterBrokersCatalogResponse.serializer(),
+        )
+
     override suspend fun loadTopicOverview(
         clusterId: String,
         topicName: String,

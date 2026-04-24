@@ -202,6 +202,119 @@ class UiKafkaMetadataServiceTest {
         assertTrue(overview.consumerGroups.message.orEmpty().contains("не хватает прав"))
         assertEquals(15L, overview.partitions.single().latestOffset)
     }
+
+    @Test
+    fun `lists cluster level consumer groups with grouped topic lag`() {
+        val service = ConfigBackedKafkaMetadataService(
+            kafkaConfig = testKafkaConfig(),
+            adminFacadeFactory = FakeUiKafkaAdminFacadeFactory(
+                consumerGroups = listOf(
+                    UiKafkaConsumerGroupListing("datapool-test-group"),
+                ),
+                consumerGroupDetails = mapOf(
+                    "datapool-test-group" to UiKafkaConsumerGroupDetails(
+                        groupId = "datapool-test-group",
+                        state = "STABLE",
+                        memberCount = 2,
+                    ),
+                ),
+                consumerGroupOffsets = mapOf(
+                    "datapool-test-group" to listOf(
+                        UiKafkaCommittedOffset(topicName = "datapool-test", partition = 0, committedOffset = 10),
+                        UiKafkaCommittedOffset(topicName = "datapool-test", partition = 1, committedOffset = 20),
+                    ),
+                ),
+                partitionOffsets = mapOf(
+                    "datapool-test" to mapOf(
+                        0 to UiKafkaPartitionOffsets(latestOffset = 12),
+                        1 to UiKafkaPartitionOffsets(latestOffset = 27),
+                    ),
+                ),
+            ),
+        )
+
+        val catalog = service.listConsumerGroups("local")
+
+        assertEquals("AVAILABLE", catalog.status.name)
+        assertEquals("Local Kafka", catalog.cluster.name)
+        assertEquals(1, catalog.groups.size)
+        val group = catalog.groups.single()
+        assertEquals("datapool-test-group", group.groupId)
+        assertEquals(2, group.memberCount)
+        assertEquals(9L, group.totalLag)
+        assertEquals(1, group.topics.size)
+        assertEquals("datapool-test", group.topics.single().topicName)
+        assertEquals(2, group.topics.single().partitionCount)
+        assertEquals(9L, group.topics.single().totalLag)
+    }
+
+    @Test
+    fun `keeps cluster level consumer group row when offsets are unauthorized`() {
+        val service = ConfigBackedKafkaMetadataService(
+            kafkaConfig = testKafkaConfig(),
+            adminFacadeFactory = FakeUiKafkaAdminFacadeFactory(
+                consumerGroups = listOf(
+                    UiKafkaConsumerGroupListing("datapool-test-group"),
+                ),
+                consumerGroupDetails = mapOf(
+                    "datapool-test-group" to UiKafkaConsumerGroupDetails(
+                        groupId = "datapool-test-group",
+                        state = "STABLE",
+                        memberCount = 1,
+                    ),
+                ),
+                consumerGroupOffsetsFailures = mapOf(
+                    "datapool-test-group" to AuthorizationException("denied"),
+                ),
+            ),
+        )
+
+        val catalog = service.listConsumerGroups("local")
+
+        assertEquals("AVAILABLE", catalog.status.name)
+        assertEquals(1, catalog.groups.size)
+        val group = catalog.groups.single()
+        assertEquals("datapool-test-group", group.groupId)
+        assertEquals("AUTHORIZATION_FAILED", group.lagStatus.name)
+        assertTrue(group.note.orEmpty().contains("committed offsets"))
+        assertTrue(group.topics.isEmpty())
+    }
+
+    @Test
+    fun `lists cluster brokers with controller and rack metadata`() {
+        val service = ConfigBackedKafkaMetadataService(
+            kafkaConfig = testKafkaConfig(),
+            adminFacadeFactory = FakeUiKafkaAdminFacadeFactory(
+                clusterBrokers = UiKafkaClusterBrokers(
+                    controllerBrokerId = 2,
+                    brokers = listOf(
+                        UiKafkaBrokerNode(
+                            brokerId = 1,
+                            host = "broker-1.local",
+                            port = 19092,
+                            rack = "rack-a",
+                        ),
+                        UiKafkaBrokerNode(
+                            brokerId = 2,
+                            host = "broker-2.local",
+                            port = 19093,
+                            rack = null,
+                        ),
+                    ),
+                ),
+            ),
+        )
+
+        val catalog = service.listBrokers("local")
+
+        assertEquals("Local Kafka", catalog.cluster.name)
+        assertEquals(2, catalog.controllerBrokerId)
+        assertEquals(2, catalog.brokers.size)
+        assertEquals(1, catalog.brokers.first().brokerId)
+        assertEquals("broker-1.local", catalog.brokers.first().host)
+        assertEquals("rack-a", catalog.brokers.first().rack)
+        assertEquals(true, catalog.brokers.last().controller)
+    }
 }
 
 private fun testKafkaConfig(): UiKafkaConfig =
@@ -220,6 +333,17 @@ private fun testKafkaConfig(): UiKafkaConfig =
     )
 
 private class FakeUiKafkaAdminFacadeFactory(
+    private val clusterBrokers: UiKafkaClusterBrokers = UiKafkaClusterBrokers(
+        controllerBrokerId = 1,
+        brokers = listOf(
+            UiKafkaBrokerNode(
+                brokerId = 1,
+                host = "localhost",
+                port = 19092,
+                rack = null,
+            ),
+        ),
+    ),
     private val topics: List<UiKafkaTopicListing> = emptyList(),
     private val topicDetails: List<UiKafkaTopicDetails> = emptyList(),
     private val topicConfigs: Map<String, Map<String, String>> = emptyMap(),
@@ -234,6 +358,8 @@ private class FakeUiKafkaAdminFacadeFactory(
     override fun open(cluster: UiKafkaClusterConfig): UiKafkaAdminFacade =
         object : UiKafkaAdminFacade {
             override fun loadBrokerNodeCount(): Int = 1
+
+            override fun describeClusterBrokers(): UiKafkaClusterBrokers = clusterBrokers
 
             override fun listTopics(): List<UiKafkaTopicListing> = topics
 

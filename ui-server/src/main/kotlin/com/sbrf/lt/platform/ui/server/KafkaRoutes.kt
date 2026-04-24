@@ -48,6 +48,40 @@ internal fun Route.registerKafkaRoutes(context: UiServerContext) {
         }
     }
 
+    get("/api/kafka/consumer-groups") {
+        val clusterId = call.request.queryParameters["clusterId"]?.trim().orEmpty()
+        if (clusterId.isBlank()) {
+            call.respond(HttpStatusCode.BadRequest, "Параметр clusterId обязателен для /api/kafka/consumer-groups.")
+            return@get
+        }
+        try {
+            call.respond(
+                context.kafkaMetadataService.listConsumerGroups(
+                    clusterId = clusterId,
+                ).toResponse(),
+            )
+        } catch (e: KafkaClusterNotFoundException) {
+            call.respond(HttpStatusCode.NotFound, e.message.orEmpty())
+        }
+    }
+
+    get("/api/kafka/brokers") {
+        val clusterId = call.request.queryParameters["clusterId"]?.trim().orEmpty()
+        if (clusterId.isBlank()) {
+            call.respond(HttpStatusCode.BadRequest, "Параметр clusterId обязателен для /api/kafka/brokers.")
+            return@get
+        }
+        try {
+            call.respond(
+                context.kafkaMetadataService.listBrokers(
+                    clusterId = clusterId,
+                ).toResponse(),
+            )
+        } catch (e: KafkaClusterNotFoundException) {
+            call.respond(HttpStatusCode.NotFound, e.message.orEmpty())
+        }
+    }
+
     get("/api/kafka/topic-overview") {
         val clusterId = call.request.queryParameters["clusterId"]?.trim().orEmpty()
         val topicName = call.request.queryParameters["topic"]?.trim().orEmpty()

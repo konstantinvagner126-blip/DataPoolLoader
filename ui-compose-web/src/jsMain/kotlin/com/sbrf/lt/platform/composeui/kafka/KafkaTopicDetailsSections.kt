@@ -236,16 +236,3 @@ private fun KafkaTopicSettingsSection(
         }
     }
 }
-
-@Composable
-internal fun KafkaClusterSectionPlaceholder(
-    title: String,
-    text: String,
-) {
-    SectionCard(
-        title = title,
-        subtitle = "Shell уже выделен в cluster-level navigation, data screen будет добавлен следующим bounded пакетом.",
-    ) {
-        P({ classes("kafka-placeholder-note") }) { Text(text) }
-    }
-}

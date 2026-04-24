@@ -108,7 +108,7 @@
 
 Статус:
 
-- запланировано
+- реализовано
 
 Контекст:
 
@@ -123,11 +123,18 @@
 3. сохранить desktop-иерархию внутренних section-grid для вложенных карточек;
 4. обновить visual baseline главной страницы уже после стабилизации UI-волны.
 
+Что сделано:
+
+1. главный `home-grid` переведен в одноколоночный layout, так что три group-card теперь идут тремя явными строками;
+2. каждый group-card растянут на полную ширину home shell;
+3. внутренние desktop grids внутри блоков `SQL и Kafka` и `Справка и проект` сохранены без изменений;
+4. visual baseline сознательно не обновлялся: он остается отложенным до стабилизации текущей UI-волны, по действующему временному контракту.
+
 #### 15.9. Kafka UI redesign toward `kafka-ui` structural model
 
 Статус:
 
-- запланировано
+- реализовано
 
 Согласованный продуктовый контракт:
 
@@ -155,6 +162,16 @@
   - server/store tests там, где меняется контракт;
   - targeted manual verification там, где меняется shell/navigation;
 - после стабилизации shell/navigation структура должна быть заново зафиксирована новыми visual baseline-ами.
+
+Итог первой волны:
+
+- cluster-first navigation реализована;
+- topic details переведены в explicit tab shell;
+- cluster-level screens `Topics / Consumer Groups / Brokers` собраны как отдельные bounded entry points;
+- дальнейшее развитие Kafka UI после этой точки должно идти уже как отдельные пакеты:
+  - visual baseline reset;
+  - second-wave cleanup удаления deprecated fragments;
+  - новые product features вне baseline redesign.
 
 #### 15.9.1. Cluster landing и left navigation shell
 
@@ -260,6 +277,10 @@
 
 #### 15.9.4. Consumer Groups screen и topic-consumers drill-down
 
+Статус:
+
+- реализовано
+
 Что нужно сделать:
 
 1. сделать отдельный cluster-level screen `Consumer Groups`;
@@ -271,18 +292,43 @@
    - `lag`;
 4. partial-access и authorization failures должны оставаться section-level, а не валить весь Kafka shell.
 
+Что сделано:
+
+1. добавлен отдельный cluster-level screen `Consumer Groups` с собственным read-only metadata endpoint и table-first UI;
+2. topic-scoped вкладка `Consumers`, введенная в `15.9.3`, сохранена как drill-down цель для cluster-level screen;
+3. cluster-level rows теперь показывают:
+   - `group id`;
+   - `state`;
+   - `member count`;
+   - `topics count`;
+   - `total lag`;
+4. у каждой consumer group есть expandable topic summary с переходом в `topic -> Consumers` tab;
+5. partial-access path сделан section-level:
+   - list/offset failures не валят весь Kafka shell;
+   - authorization/timeout errors сохраняются как local warning state в consumer-groups screen;
+6. server/page routing синхронизированы:
+   - добавлен `/api/kafka/consumer-groups`;
+   - `/kafka` redirect теперь корректно прокидывает `section`.
+
 #### 15.9.5. Brokers screen и read-only cluster operations shell
 
-Что нужно сделать:
+Статус:
 
-1. добавить cluster-level read-only screen `Brokers`;
-2. показывать минимально полезную broker metadata:
+- реализовано
+
+Что сделано:
+
+1. добавлен cluster-level read-only screen `Brokers`;
+2. broker metadata теперь включает:
    - broker id;
-   - host/port или advertised endpoint, если доступно;
+   - host/port endpoint;
    - controller flag;
-   - rack, если доступен без лишнего усложнения;
-3. не добавлять broker actions и admin operations;
-4. зафиксировать, какие existing Kafka UI fragments после `15.9.1–15.9.5` считаются deprecated и подлежат удалению во второй волне.
+   - rack, если он доступен из Kafka node metadata;
+3. отдельный `/api/kafka/brokers` добавлен без admin actions и destructive операций;
+4. после `15.9.1–15.9.5` deprecated считаются:
+   - pre-redesign placeholder branch для `Brokers`;
+   - любые новые cluster-level summary/dashboard fragments внутри `Topics` или topic `Overview`, которые дублируют dedicated screens `Topics / Consumer Groups / Brokers`;
+   - любые новые Kafka UI additions вне shell `KafkaShellSections / KafkaTopicDetailsSections / KafkaClusterConsumerGroupsSections / KafkaClusterBrokersSections`.
 
 ## P2
 

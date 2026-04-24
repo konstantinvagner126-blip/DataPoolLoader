@@ -123,6 +123,18 @@ class UiKafkaSettingsServiceTest {
                             return 1
                         }
 
+                        override fun describeClusterBrokers(): UiKafkaClusterBrokers =
+                            UiKafkaClusterBrokers(
+                                controllerBrokerId = 1,
+                                brokers = listOf(
+                                    UiKafkaBrokerNode(
+                                        brokerId = 1,
+                                        host = "localhost",
+                                        port = 19092,
+                                    ),
+                                ),
+                            )
+
                         override fun listTopics(): List<UiKafkaTopicListing> = emptyList()
 
                         override fun describeTopics(topicNames: List<String>): List<UiKafkaTopicDetails> = emptyList()

@@ -51,6 +51,18 @@ class KafkaStore(
     ): KafkaPageState =
         loadingSupport.updateClusterSection(current, section)
 
+    fun startConsumerGroupsReload(current: KafkaPageState): KafkaPageState =
+        loadingSupport.startConsumerGroupsReload(current)
+
+    suspend fun loadConsumerGroups(current: KafkaPageState): KafkaPageState =
+        loadingSupport.loadConsumerGroups(current)
+
+    fun startBrokersReload(current: KafkaPageState): KafkaPageState =
+        loadingSupport.startBrokersReload(current)
+
+    suspend fun loadBrokers(current: KafkaPageState): KafkaPageState =
+        loadingSupport.loadBrokers(current)
+
     fun startTopicsReload(current: KafkaPageState): KafkaPageState =
         loadingSupport.startTopicsReload(current)
 

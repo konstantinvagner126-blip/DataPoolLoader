@@ -1,7 +1,9 @@
 package com.sbrf.lt.platform.ui.server
 
 import com.sbrf.lt.datapool.kafka.KafkaClusterCatalogEntry
+import com.sbrf.lt.datapool.kafka.KafkaClusterBrokersCatalog
 import com.sbrf.lt.datapool.kafka.KafkaClusterNotFoundException
+import com.sbrf.lt.datapool.kafka.KafkaBrokerSummary
 import com.sbrf.lt.datapool.kafka.KafkaMetadataOperations
 import com.sbrf.lt.datapool.kafka.KafkaMessageOperations
 import com.sbrf.lt.datapool.kafka.KafkaProduceOperations
@@ -62,17 +64,17 @@ class KafkaServerTest {
         val noRedirectClient = createClient { followRedirects = false }
 
         val kafkaRedirect =
-            noRedirectClient.get("/kafka?clusterId=local&topic=datapool-test&query=data&pane=messages&scope=ALL_PARTITIONS&mode=OFFSET&partition=1")
+            noRedirectClient.get("/kafka?clusterId=local&section=topics&topic=datapool-test&query=data&pane=messages&scope=ALL_PARTITIONS&mode=OFFSET&partition=1")
         assertEquals(HttpStatusCode.Found, kafkaRedirect.status)
         assertEquals(
-            "/static/compose-app/index.html?screen=kafka&clusterId=local&topic=datapool-test&query=data&pane=messages&scope=ALL_PARTITIONS&mode=OFFSET&partition=1",
+            "/static/compose-app/index.html?screen=kafka&clusterId=local&section=topics&topic=datapool-test&query=data&pane=messages&scope=ALL_PARTITIONS&mode=OFFSET&partition=1",
             kafkaRedirect.headers[HttpHeaders.Location],
         )
 
-        val kafkaSettingsRedirect = noRedirectClient.get("/kafka?clusterId=local&pane=settings")
+        val kafkaSettingsRedirect = noRedirectClient.get("/kafka?clusterId=local&section=consumer-groups")
         assertEquals(HttpStatusCode.Found, kafkaSettingsRedirect.status)
         assertEquals(
-            "/static/compose-app/index.html?screen=kafka&clusterId=local&pane=settings",
+            "/static/compose-app/index.html?screen=kafka&clusterId=local&section=consumer-groups",
             kafkaSettingsRedirect.headers[HttpHeaders.Location],
         )
 
@@ -86,6 +88,17 @@ class KafkaServerTest {
         val topics = client.get("/api/kafka/topics?clusterId=local&query=data").bodyAsText()
         assertTrue(topics.contains("\"clusterId\":\"local\""))
         assertTrue(topics.contains("\"name\":\"datapool-test\""))
+
+        val consumerGroups = client.get("/api/kafka/consumer-groups?clusterId=local").bodyAsText()
+        assertTrue(consumerGroups.contains("\"cluster\":{\"id\":\"local\""))
+        assertTrue(consumerGroups.contains("\"groupId\":\"datapool-test-group\""))
+        assertTrue(consumerGroups.contains("\"topicName\":\"datapool-test\""))
+
+        val brokers = client.get("/api/kafka/brokers?clusterId=local").bodyAsText()
+        assertTrue(brokers.contains("\"cluster\":{\"id\":\"local\""))
+        assertTrue(brokers.contains("\"controllerBrokerId\":1"))
+        assertTrue(brokers.contains("\"brokerId\":1"))
+        assertTrue(brokers.contains("\"host\":\"localhost\""))
 
         val overview = client.get("/api/kafka/topic-overview?clusterId=local&topic=datapool-test").bodyAsText()
         assertTrue(overview.contains("\"topic\":{\"name\":\"datapool-test\""))
@@ -187,6 +200,59 @@ private class FakeKafkaMetadataOperations : KafkaMetadataOperations {
             topics = if (query.isBlank() || topic.name.contains(query, ignoreCase = true)) listOf(topic) else emptyList(),
         )
     }
+
+    override fun listConsumerGroups(clusterId: String) =
+        if (clusterId != "local") {
+            throw KafkaClusterNotFoundException(clusterId)
+        } else {
+            com.sbrf.lt.datapool.kafka.KafkaClusterConsumerGroupsCatalog(
+                cluster = cluster,
+                status = com.sbrf.lt.datapool.kafka.KafkaClusterConsumerGroupsStatus.AVAILABLE,
+                groups = listOf(
+                    com.sbrf.lt.datapool.kafka.KafkaClusterConsumerGroupSummary(
+                        groupId = "datapool-test-group",
+                        state = "STABLE",
+                        memberCount = 1,
+                        totalLag = 5,
+                        lagStatus = KafkaTopicConsumerGroupLagStatus.OK,
+                        topics = listOf(
+                            com.sbrf.lt.datapool.kafka.KafkaClusterConsumerGroupTopicSummary(
+                                topicName = "datapool-test",
+                                partitionCount = 1,
+                                totalLag = 5,
+                                partitions = listOf(
+                                    KafkaTopicConsumerGroupPartitionLag(
+                                        partition = 0,
+                                        committedOffset = 7,
+                                        latestOffset = 12,
+                                        lag = 5,
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+            )
+        }
+
+    override fun listBrokers(clusterId: String) =
+        if (clusterId != "local") {
+            throw KafkaClusterNotFoundException(clusterId)
+        } else {
+            KafkaClusterBrokersCatalog(
+                cluster = cluster,
+                controllerBrokerId = 1,
+                brokers = listOf(
+                    KafkaBrokerSummary(
+                        brokerId = 1,
+                        host = "localhost",
+                        port = 19092,
+                        rack = "rack-a",
+                        controller = true,
+                    ),
+                ),
+            )
+        }
 
     override fun loadTopicOverview(
         clusterId: String,

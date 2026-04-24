@@ -16,13 +16,14 @@ internal class KafkaStoreLoadingSupport(
     ): KafkaPageState {
         val runtimeContext = api.loadRuntimeContext()
         val info = api.loadInfo()
+        val clusterSection = stateSupport.normalizeClusterSection(preferredClusterSection)
         val selectedClusterId = stateSupport.resolveClusterId(info, preferredClusterId)
         if (selectedClusterId == null) {
             return KafkaPageState(
                 loading = false,
                 runtimeContext = runtimeContext,
                 info = info,
-                clusterSection = stateSupport.normalizeClusterSection(preferredClusterSection),
+                clusterSection = clusterSection,
                 topicQuery = topicQuery,
                 activePane = stateSupport.normalizePane(activePane),
                 messageReadScope = stateSupport.normalizeMessageScope(preferredMessageReadScope),
@@ -31,7 +32,21 @@ internal class KafkaStoreLoadingSupport(
         }
 
         val topics = api.loadTopics(selectedClusterId, topicQuery)
-        val selectedTopicName = stateSupport.resolveTopicName(topics, preferredTopicName)
+        val consumerGroups = if (clusterSection == "consumer-groups") {
+            api.loadConsumerGroups(selectedClusterId)
+        } else {
+            null
+        }
+        val brokers = if (clusterSection == "brokers") {
+            api.loadBrokers(selectedClusterId)
+        } else {
+            null
+        }
+        val selectedTopicName = if (clusterSection == "topics") {
+            stateSupport.resolveTopicName(topics, preferredTopicName)
+        } else {
+            null
+        }
         val topicOverview = selectedTopicName?.let { api.loadTopicOverview(selectedClusterId, it) }
         val resolvedPane = stateSupport.resolveActivePane(
             requestedPane = activePane,
@@ -42,9 +57,11 @@ internal class KafkaStoreLoadingSupport(
             runtimeContext = runtimeContext,
             info = info,
             selectedClusterId = selectedClusterId,
-            clusterSection = stateSupport.normalizeClusterSection(preferredClusterSection),
+            clusterSection = clusterSection,
             topicQuery = topicQuery,
             topics = topics,
+            consumerGroups = consumerGroups,
+            brokers = brokers,
             selectedTopicName = selectedTopicName,
             topicOverview = topicOverview,
             activePane = resolvedPane,
@@ -74,6 +91,8 @@ internal class KafkaStoreLoadingSupport(
         current.copy(
             activePane = stateSupport.resolveActivePane(pane, current.selectedTopicName),
             errorMessage = null,
+            consumerGroupsError = null,
+            brokersError = null,
             settingsError = null,
             settingsStatusMessage = null,
         )
@@ -86,11 +105,47 @@ internal class KafkaStoreLoadingSupport(
             clusterSection = stateSupport.normalizeClusterSection(section),
             activePane = "overview",
             errorMessage = null,
+            consumerGroupsError = null,
+            brokersError = null,
             messagesError = null,
             produceError = null,
             settingsError = null,
             settingsStatusMessage = null,
         )
+
+    fun startConsumerGroupsReload(current: KafkaPageState): KafkaPageState =
+        current.copy(
+            consumerGroupsLoading = true,
+            consumerGroupsError = null,
+            errorMessage = null,
+        )
+
+    suspend fun loadConsumerGroups(current: KafkaPageState): KafkaPageState {
+        val clusterId = current.selectedClusterId ?: return current.copy(consumerGroupsLoading = false)
+        val consumerGroups = api.loadConsumerGroups(clusterId)
+        return current.copy(
+            consumerGroupsLoading = false,
+            consumerGroups = consumerGroups,
+            consumerGroupsError = null,
+        )
+    }
+
+    fun startBrokersReload(current: KafkaPageState): KafkaPageState =
+        current.copy(
+            brokersLoading = true,
+            brokersError = null,
+            errorMessage = null,
+        )
+
+    suspend fun loadBrokers(current: KafkaPageState): KafkaPageState {
+        val clusterId = current.selectedClusterId ?: return current.copy(brokersLoading = false)
+        val brokers = api.loadBrokers(clusterId)
+        return current.copy(
+            brokersLoading = false,
+            brokers = brokers,
+            brokersError = null,
+        )
+    }
 
     fun startTopicsReload(current: KafkaPageState): KafkaPageState =
         current.copy(

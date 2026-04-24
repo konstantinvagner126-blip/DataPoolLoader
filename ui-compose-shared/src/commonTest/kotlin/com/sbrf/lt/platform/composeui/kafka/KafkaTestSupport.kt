@@ -80,11 +80,75 @@ internal fun sampleKafkaOverview(): KafkaTopicOverviewResponse =
         ),
     )
 
+internal fun sampleKafkaConsumerGroupsCatalog(): KafkaClusterConsumerGroupsCatalogResponse =
+    KafkaClusterConsumerGroupsCatalogResponse(
+        cluster = sampleKafkaInfo().clusters.first(),
+        status = "AVAILABLE",
+        groups = listOf(
+            KafkaClusterConsumerGroupSummaryResponse(
+                groupId = "datapool-test-group",
+                state = "STABLE",
+                memberCount = 2,
+                totalLag = 9,
+                lagStatus = "OK",
+                topics = listOf(
+                    KafkaClusterConsumerGroupTopicSummaryResponse(
+                        topicName = "datapool-test",
+                        partitionCount = 2,
+                        totalLag = 9,
+                        partitions = listOf(
+                            KafkaTopicConsumerGroupPartitionLagResponse(
+                                partition = 0,
+                                committedOffset = 10,
+                                latestOffset = 12,
+                                lag = 2,
+                            ),
+                            KafkaTopicConsumerGroupPartitionLagResponse(
+                                partition = 1,
+                                committedOffset = 20,
+                                latestOffset = 27,
+                                lag = 7,
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        ),
+    )
+
+internal fun sampleKafkaBrokersCatalog(): KafkaClusterBrokersCatalogResponse =
+    KafkaClusterBrokersCatalogResponse(
+        cluster = sampleKafkaInfo().clusters.first(),
+        controllerBrokerId = 1,
+        brokers = listOf(
+            KafkaBrokerSummaryResponse(
+                brokerId = 1,
+                host = "broker-1.local",
+                port = 19092,
+                rack = "rack-a",
+                controller = true,
+            ),
+            KafkaBrokerSummaryResponse(
+                brokerId = 2,
+                host = "broker-2.local",
+                port = 19092,
+                rack = null,
+                controller = false,
+            ),
+        ),
+    )
+
 internal class StubKafkaApi(
     private val runtimeContextHandler: suspend () -> RuntimeContext = { sampleKafkaRuntimeContext() },
     private val infoHandler: suspend () -> KafkaToolInfoResponse = { sampleKafkaInfo() },
     private val loadTopicsHandler: suspend (String, String) -> KafkaTopicsCatalogResponse = { _, query ->
         sampleKafkaTopics(query)
+    },
+    private val loadConsumerGroupsHandler: suspend (String) -> KafkaClusterConsumerGroupsCatalogResponse = {
+        sampleKafkaConsumerGroupsCatalog()
+    },
+    private val loadBrokersHandler: suspend (String) -> KafkaClusterBrokersCatalogResponse = {
+        sampleKafkaBrokersCatalog()
     },
     private val loadTopicOverviewHandler: suspend (String, String) -> KafkaTopicOverviewResponse = { _, _ ->
         sampleKafkaOverview()
@@ -111,6 +175,14 @@ internal class StubKafkaApi(
         clusterId: String,
         query: String,
     ): KafkaTopicsCatalogResponse = loadTopicsHandler(clusterId, query)
+
+    override suspend fun loadConsumerGroups(
+        clusterId: String,
+    ): KafkaClusterConsumerGroupsCatalogResponse = loadConsumerGroupsHandler(clusterId)
+
+    override suspend fun loadBrokers(
+        clusterId: String,
+    ): KafkaClusterBrokersCatalogResponse = loadBrokersHandler(clusterId)
 
     override suspend fun loadTopicOverview(
         clusterId: String,

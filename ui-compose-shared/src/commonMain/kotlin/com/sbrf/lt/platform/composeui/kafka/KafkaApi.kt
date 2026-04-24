@@ -12,6 +12,14 @@ interface KafkaApi {
         query: String = "",
     ): KafkaTopicsCatalogResponse
 
+    suspend fun loadConsumerGroups(
+        clusterId: String,
+    ): KafkaClusterConsumerGroupsCatalogResponse
+
+    suspend fun loadBrokers(
+        clusterId: String,
+    ): KafkaClusterBrokersCatalogResponse
+
     suspend fun loadTopicOverview(
         clusterId: String,
         topicName: String,

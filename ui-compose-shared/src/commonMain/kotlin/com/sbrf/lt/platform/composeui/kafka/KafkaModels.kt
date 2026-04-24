@@ -84,6 +84,50 @@ data class KafkaTopicConsumerGroupPartitionLagResponse(
 )
 
 @Serializable
+data class KafkaClusterConsumerGroupsCatalogResponse(
+    val cluster: KafkaClusterCatalogEntryResponse,
+    val status: String = "EMPTY",
+    val message: String? = null,
+    val groups: List<KafkaClusterConsumerGroupSummaryResponse> = emptyList(),
+)
+
+@Serializable
+data class KafkaClusterConsumerGroupSummaryResponse(
+    val groupId: String,
+    val state: String? = null,
+    val memberCount: Int? = null,
+    val metadataAvailable: Boolean = true,
+    val totalLag: Long? = null,
+    val lagStatus: String = "OK",
+    val note: String? = null,
+    val topics: List<KafkaClusterConsumerGroupTopicSummaryResponse> = emptyList(),
+)
+
+@Serializable
+data class KafkaClusterConsumerGroupTopicSummaryResponse(
+    val topicName: String,
+    val partitionCount: Int,
+    val totalLag: Long? = null,
+    val partitions: List<KafkaTopicConsumerGroupPartitionLagResponse> = emptyList(),
+)
+
+@Serializable
+data class KafkaClusterBrokersCatalogResponse(
+    val cluster: KafkaClusterCatalogEntryResponse,
+    val controllerBrokerId: Int? = null,
+    val brokers: List<KafkaBrokerSummaryResponse> = emptyList(),
+)
+
+@Serializable
+data class KafkaBrokerSummaryResponse(
+    val brokerId: Int,
+    val host: String,
+    val port: Int,
+    val rack: String? = null,
+    val controller: Boolean = false,
+)
+
+@Serializable
 data class KafkaTopicMessageReadRequestPayload(
     val clusterId: String,
     val topicName: String,
@@ -224,9 +268,13 @@ data class KafkaRenderedBytesResponse(
 data class KafkaPageState(
     val loading: Boolean = true,
     val topicsLoading: Boolean = false,
+    val consumerGroupsLoading: Boolean = false,
+    val brokersLoading: Boolean = false,
     val topicOverviewLoading: Boolean = false,
     val messagesLoading: Boolean = false,
     val errorMessage: String? = null,
+    val consumerGroupsError: String? = null,
+    val brokersError: String? = null,
     val messagesError: String? = null,
     val runtimeContext: RuntimeContext? = null,
     val info: KafkaToolInfoResponse? = null,
@@ -234,6 +282,8 @@ data class KafkaPageState(
     val clusterSection: String = "topics",
     val topicQuery: String = "",
     val topics: KafkaTopicsCatalogResponse? = null,
+    val consumerGroups: KafkaClusterConsumerGroupsCatalogResponse? = null,
+    val brokers: KafkaClusterBrokersCatalogResponse? = null,
     val selectedTopicName: String? = null,
     val topicOverview: KafkaTopicOverviewResponse? = null,
     val activePane: String = "overview",

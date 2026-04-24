@@ -1,6 +1,11 @@
 package com.sbrf.lt.platform.ui.model
 
 import com.sbrf.lt.datapool.kafka.KafkaClusterCatalogEntry
+import com.sbrf.lt.datapool.kafka.KafkaClusterBrokersCatalog
+import com.sbrf.lt.datapool.kafka.KafkaClusterConsumerGroupSummary
+import com.sbrf.lt.datapool.kafka.KafkaClusterConsumerGroupTopicSummary
+import com.sbrf.lt.datapool.kafka.KafkaClusterConsumerGroupsCatalog
+import com.sbrf.lt.datapool.kafka.KafkaBrokerSummary
 import com.sbrf.lt.datapool.kafka.KafkaProduceOperations
 import com.sbrf.lt.datapool.kafka.KafkaRenderedBytes
 import com.sbrf.lt.datapool.kafka.KafkaToolInfo
@@ -34,6 +39,21 @@ internal fun KafkaTopicsCatalog.toResponse(): KafkaTopicsCatalogResponse =
         clusterId = clusterId,
         query = query,
         topics = topics.map { it.toResponse() },
+    )
+
+internal fun KafkaClusterConsumerGroupsCatalog.toResponse(): KafkaClusterConsumerGroupsCatalogResponse =
+    KafkaClusterConsumerGroupsCatalogResponse(
+        cluster = cluster.toResponse(),
+        status = status.name,
+        message = message,
+        groups = groups.map { it.toResponse() },
+    )
+
+internal fun KafkaClusterBrokersCatalog.toResponse(): KafkaClusterBrokersCatalogResponse =
+    KafkaClusterBrokersCatalogResponse(
+        cluster = cluster.toResponse(),
+        controllerBrokerId = controllerBrokerId,
+        brokers = brokers.map { it.toResponse() },
     )
 
 internal fun KafkaTopicOverview.toResponse(): KafkaTopicOverviewResponse =
@@ -99,6 +119,35 @@ private fun KafkaTopicConsumerGroupPartitionLag.toResponse(): KafkaTopicConsumer
         committedOffset = committedOffset,
         latestOffset = latestOffset,
         lag = lag,
+    )
+
+private fun KafkaClusterConsumerGroupSummary.toResponse(): KafkaClusterConsumerGroupSummaryResponse =
+    KafkaClusterConsumerGroupSummaryResponse(
+        groupId = groupId,
+        state = state,
+        memberCount = memberCount,
+        metadataAvailable = metadataAvailable,
+        totalLag = totalLag,
+        lagStatus = lagStatus.name,
+        note = note,
+        topics = topics.map { it.toResponse() },
+    )
+
+private fun KafkaClusterConsumerGroupTopicSummary.toResponse(): KafkaClusterConsumerGroupTopicSummaryResponse =
+    KafkaClusterConsumerGroupTopicSummaryResponse(
+        topicName = topicName,
+        partitionCount = partitionCount,
+        totalLag = totalLag,
+        partitions = partitions.map { it.toResponse() },
+    )
+
+private fun KafkaBrokerSummary.toResponse(): KafkaBrokerSummaryResponse =
+    KafkaBrokerSummaryResponse(
+        brokerId = brokerId,
+        host = host,
+        port = port,
+        rack = rack,
+        controller = controller,
     )
 
 internal fun KafkaTopicMessageReadRequestPayload.toCoreRequest(): KafkaTopicMessageReadRequest =

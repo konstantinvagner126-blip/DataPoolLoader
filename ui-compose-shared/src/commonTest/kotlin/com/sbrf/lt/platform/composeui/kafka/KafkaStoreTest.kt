@@ -79,6 +79,43 @@ class KafkaStoreTest {
     }
 
     @Test
+    fun `load cluster consumer groups when section is consumer-groups`() {
+        val store = KafkaStore(StubKafkaApi())
+
+        val state = runKafkaSuspend {
+            store.load(
+                preferredClusterId = "local",
+                preferredClusterSection = "consumer-groups",
+            )
+        }
+
+        assertEquals("consumer-groups", state.clusterSection)
+        assertNull(state.selectedTopicName)
+        assertNull(state.topicOverview)
+        assertEquals("AVAILABLE", state.consumerGroups?.status)
+        assertEquals("datapool-test-group", state.consumerGroups?.groups?.single()?.groupId)
+    }
+
+    @Test
+    fun `load cluster brokers when section is brokers`() {
+        val store = KafkaStore(StubKafkaApi())
+
+        val state = runKafkaSuspend {
+            store.load(
+                preferredClusterId = "local",
+                preferredClusterSection = "brokers",
+            )
+        }
+
+        assertEquals("brokers", state.clusterSection)
+        assertNull(state.selectedTopicName)
+        assertNull(state.topicOverview)
+        assertEquals(1, state.brokers?.controllerBrokerId)
+        assertEquals(2, state.brokers?.brokers?.size)
+        assertEquals(true, state.brokers?.brokers?.first()?.controller)
+    }
+
+    @Test
     fun `read messages in all partitions mode sends topic wide bounded request`() {
         var capturedRequest: KafkaTopicMessageReadRequestPayload? = null
         val store = KafkaStore(

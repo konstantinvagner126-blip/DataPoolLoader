@@ -1,6 +1,12 @@
 package com.sbrf.lt.platform.ui.kafka
 
 import com.sbrf.lt.datapool.kafka.KafkaClusterCatalogEntry
+import com.sbrf.lt.datapool.kafka.KafkaClusterBrokersCatalog
+import com.sbrf.lt.datapool.kafka.KafkaBrokerSummary
+import com.sbrf.lt.datapool.kafka.KafkaClusterConsumerGroupSummary
+import com.sbrf.lt.datapool.kafka.KafkaClusterConsumerGroupTopicSummary
+import com.sbrf.lt.datapool.kafka.KafkaClusterConsumerGroupsCatalog
+import com.sbrf.lt.datapool.kafka.KafkaClusterConsumerGroupsStatus
 import com.sbrf.lt.datapool.kafka.KafkaClusterNotFoundException
 import com.sbrf.lt.datapool.kafka.KafkaMetadataOperations
 import com.sbrf.lt.datapool.kafka.KafkaToolInfo
@@ -62,6 +68,62 @@ internal class ConfigBackedKafkaMetadataService(
                 query = normalizedQuery,
                 topics = topicNames.mapNotNull { topicName ->
                     topicDetails[topicName]?.toTopicSummary(topicConfigs[topicName].orEmpty())
+                },
+            )
+        }
+    }
+
+    override fun listConsumerGroups(clusterId: String): KafkaClusterConsumerGroupsCatalog {
+        val cluster = requireCluster(clusterId)
+        adminFacadeFactory.open(cluster).use { admin ->
+            val groupListings = try {
+                admin.listConsumerGroups().sortedBy { it.groupId.lowercase() }
+            } catch (e: Throwable) {
+                return KafkaClusterConsumerGroupsCatalog(
+                    cluster = cluster.toCatalogEntry(),
+                    status = KafkaClusterConsumerGroupsStatus.ERROR,
+                    message = describeConsumerGroupSectionFailure(e),
+                )
+            }
+
+            if (groupListings.isEmpty()) {
+                return KafkaClusterConsumerGroupsCatalog(
+                    cluster = cluster.toCatalogEntry(),
+                    status = KafkaClusterConsumerGroupsStatus.EMPTY,
+                    message = "В кластере нет consumer groups.",
+                )
+            }
+
+            val latestOffsetsCache = mutableMapOf<String, Map<Int, Long?>>()
+            return KafkaClusterConsumerGroupsCatalog(
+                cluster = cluster.toCatalogEntry(),
+                status = KafkaClusterConsumerGroupsStatus.AVAILABLE,
+                groups = groupListings.map { listing ->
+                    loadClusterConsumerGroupSummary(
+                        admin = admin,
+                        groupId = listing.groupId,
+                        latestOffsetsCache = latestOffsetsCache,
+                    )
+                },
+            )
+        }
+    }
+
+    override fun listBrokers(clusterId: String): KafkaClusterBrokersCatalog {
+        val cluster = requireCluster(clusterId)
+        adminFacadeFactory.open(cluster).use { admin ->
+            val clusterBrokers = admin.describeClusterBrokers()
+            return KafkaClusterBrokersCatalog(
+                cluster = cluster.toCatalogEntry(),
+                controllerBrokerId = clusterBrokers.controllerBrokerId,
+                brokers = clusterBrokers.brokers.map { broker ->
+                    KafkaBrokerSummary(
+                        brokerId = broker.brokerId,
+                        host = broker.host,
+                        port = broker.port,
+                        rack = broker.rack,
+                        controller = broker.brokerId == clusterBrokers.controllerBrokerId,
+                    )
                 },
             )
         }
@@ -243,6 +305,90 @@ internal class ConfigBackedKafkaMetadataService(
             ),
         )
     }
+
+    private fun loadClusterConsumerGroupSummary(
+        admin: UiKafkaAdminFacade,
+        groupId: String,
+        latestOffsetsCache: MutableMap<String, Map<Int, Long?>>,
+    ): KafkaClusterConsumerGroupSummary {
+        val descriptionResult = runCatching { admin.describeConsumerGroups(listOf(groupId))[groupId] }
+        val description = descriptionResult.getOrNull()
+        val metadataNote = descriptionResult.exceptionOrNull()?.let { describeConsumerGroupMetadataFailure(it) }
+
+        val committedOffsetsResult = runCatching { admin.loadConsumerGroupOffsets(groupId) }
+        val committedOffsets = committedOffsetsResult.getOrNull().orEmpty()
+        val offsetFailure = committedOffsetsResult.exceptionOrNull()
+        if (offsetFailure != null) {
+            return KafkaClusterConsumerGroupSummary(
+                groupId = groupId,
+                state = description?.state,
+                memberCount = description?.memberCount,
+                metadataAvailable = description != null,
+                lagStatus = classifyConsumerGroupLagFailure(offsetFailure),
+                note = mergeGroupNotes(
+                    metadataNote,
+                    describeClusterConsumerGroupOffsetsFailure(offsetFailure),
+                ),
+            )
+        }
+
+        val groupedOffsets = committedOffsets.groupBy { it.topicName }.toSortedMap()
+        val topicNotes = mutableListOf<String>()
+        val lagStatuses = mutableListOf<KafkaTopicConsumerGroupLagStatus>()
+        val topics = groupedOffsets.map { (topicName, topicOffsets) ->
+            val partitions = topicOffsets.map { it.partition }.distinct().sorted()
+            val latestOffsets = runCatching {
+                loadLatestOffsets(
+                    admin = admin,
+                    topicName = topicName,
+                    partitions = partitions,
+                    latestOffsetsCache = latestOffsetsCache,
+                )
+            }.getOrElse { error ->
+                lagStatuses += classifyConsumerGroupLagFailure(error)
+                topicNotes += "Offsets для topic '$topicName' недоступны: ${describeClusterConsumerGroupOffsetsFailure(error)}"
+                emptyMap()
+            }
+
+            val partitionLag = partitions.map { partition ->
+                val committedOffset = topicOffsets.firstOrNull { it.partition == partition }?.committedOffset
+                val latestOffset = latestOffsets[partition]
+                KafkaTopicConsumerGroupPartitionLag(
+                    partition = partition,
+                    committedOffset = committedOffset,
+                    latestOffset = latestOffset,
+                    lag = if (committedOffset != null && latestOffset != null) {
+                        (latestOffset - committedOffset).coerceAtLeast(0L)
+                    } else {
+                        null
+                    },
+                )
+            }
+            if (partitionLag.any { it.lag == null }) {
+                lagStatuses += KafkaTopicConsumerGroupLagStatus.PARTIAL
+            }
+            KafkaClusterConsumerGroupTopicSummary(
+                topicName = topicName,
+                partitionCount = partitions.size,
+                totalLag = partitionLag.mapNotNull { it.lag }.sum().takeIf { partitionLag.any { lag -> lag.lag != null } },
+                partitions = partitionLag,
+            )
+        }
+
+        return KafkaClusterConsumerGroupSummary(
+            groupId = groupId,
+            state = description?.state,
+            memberCount = description?.memberCount,
+            metadataAvailable = description != null,
+            totalLag = topics.mapNotNull { it.totalLag }.sum().takeIf { topics.any { topic -> topic.totalLag != null } },
+            lagStatus = mergeClusterLagStatuses(lagStatuses),
+            note = mergeGroupNotes(
+                metadataNote,
+                topicNotes.joinToString(" ").ifBlank { null },
+            ),
+            topics = topics,
+        )
+    }
 }
 
 private fun UiKafkaTopicDetails.toTopicSummary(config: Map<String, String>): KafkaTopicSummary =
@@ -291,6 +437,47 @@ private fun mergeGroupNotes(
     metadataNote: String?,
 ): String? =
     listOfNotNull(lagNote, metadataNote).joinToString(" ").ifBlank { null }
+
+private fun describeClusterConsumerGroupOffsetsFailure(error: Throwable): String =
+    when (classifyKafkaOperationFailure(error)) {
+        KafkaOperationFailure.AUTHORIZATION ->
+            "не хватает прав на committed offsets."
+        KafkaOperationFailure.TIMEOUT ->
+            "Kafka admin timeout."
+        KafkaOperationFailure.ERROR ->
+            error.rootCause().message ?: error.rootCause().javaClass.simpleName
+    }
+
+private fun classifyConsumerGroupLagFailure(error: Throwable): KafkaTopicConsumerGroupLagStatus =
+    when (classifyKafkaOperationFailure(error)) {
+        KafkaOperationFailure.AUTHORIZATION -> KafkaTopicConsumerGroupLagStatus.AUTHORIZATION_FAILED
+        KafkaOperationFailure.TIMEOUT -> KafkaTopicConsumerGroupLagStatus.TIMEOUT
+        KafkaOperationFailure.ERROR -> KafkaTopicConsumerGroupLagStatus.ERROR
+    }
+
+private fun mergeClusterLagStatuses(statuses: List<KafkaTopicConsumerGroupLagStatus>): KafkaTopicConsumerGroupLagStatus =
+    when {
+        statuses.any { it == KafkaTopicConsumerGroupLagStatus.AUTHORIZATION_FAILED } -> KafkaTopicConsumerGroupLagStatus.AUTHORIZATION_FAILED
+        statuses.any { it == KafkaTopicConsumerGroupLagStatus.TIMEOUT } -> KafkaTopicConsumerGroupLagStatus.TIMEOUT
+        statuses.any { it == KafkaTopicConsumerGroupLagStatus.ERROR } -> KafkaTopicConsumerGroupLagStatus.ERROR
+        statuses.any { it == KafkaTopicConsumerGroupLagStatus.PARTIAL } -> KafkaTopicConsumerGroupLagStatus.PARTIAL
+        else -> KafkaTopicConsumerGroupLagStatus.OK
+    }
+
+private fun loadLatestOffsets(
+    admin: UiKafkaAdminFacade,
+    topicName: String,
+    partitions: List<Int>,
+    latestOffsetsCache: MutableMap<String, Map<Int, Long?>>,
+): Map<Int, Long?> {
+    val cachedOffsets = latestOffsetsCache[topicName].orEmpty()
+    val missingPartitions = partitions.filterNot { cachedOffsets.containsKey(it) }
+    if (missingPartitions.isEmpty()) {
+        return cachedOffsets
+    }
+    val loadedOffsets = admin.loadOffsets(topicName, missingPartitions).mapValues { (_, offsets) -> offsets.latestOffset }
+    return (cachedOffsets + loadedOffsets).also { latestOffsetsCache[topicName] = it }
+}
 
 private fun classifyKafkaOperationFailure(error: Throwable): KafkaOperationFailure =
     when (val rootCause = error.rootCause()) {

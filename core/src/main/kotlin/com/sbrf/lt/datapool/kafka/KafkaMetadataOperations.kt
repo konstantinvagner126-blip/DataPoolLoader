@@ -85,6 +85,51 @@ data class KafkaTopicConsumerGroupPartitionLag(
     val lag: Long? = null,
 )
 
+data class KafkaClusterConsumerGroupsCatalog(
+    val cluster: KafkaClusterCatalogEntry,
+    val status: KafkaClusterConsumerGroupsStatus = KafkaClusterConsumerGroupsStatus.EMPTY,
+    val message: String? = null,
+    val groups: List<KafkaClusterConsumerGroupSummary> = emptyList(),
+)
+
+enum class KafkaClusterConsumerGroupsStatus {
+    AVAILABLE,
+    EMPTY,
+    ERROR,
+}
+
+data class KafkaClusterConsumerGroupSummary(
+    val groupId: String,
+    val state: String? = null,
+    val memberCount: Int? = null,
+    val metadataAvailable: Boolean = true,
+    val totalLag: Long? = null,
+    val lagStatus: KafkaTopicConsumerGroupLagStatus = KafkaTopicConsumerGroupLagStatus.OK,
+    val note: String? = null,
+    val topics: List<KafkaClusterConsumerGroupTopicSummary> = emptyList(),
+)
+
+data class KafkaClusterConsumerGroupTopicSummary(
+    val topicName: String,
+    val partitionCount: Int,
+    val totalLag: Long? = null,
+    val partitions: List<KafkaTopicConsumerGroupPartitionLag> = emptyList(),
+)
+
+data class KafkaClusterBrokersCatalog(
+    val cluster: KafkaClusterCatalogEntry,
+    val controllerBrokerId: Int? = null,
+    val brokers: List<KafkaBrokerSummary> = emptyList(),
+)
+
+data class KafkaBrokerSummary(
+    val brokerId: Int,
+    val host: String,
+    val port: Int,
+    val rack: String? = null,
+    val controller: Boolean = false,
+)
+
 interface KafkaMetadataOperations {
     fun info(): KafkaToolInfo
 
@@ -92,6 +137,14 @@ interface KafkaMetadataOperations {
         clusterId: String,
         query: String = "",
     ): KafkaTopicsCatalog
+
+    fun listConsumerGroups(
+        clusterId: String,
+    ): KafkaClusterConsumerGroupsCatalog
+
+    fun listBrokers(
+        clusterId: String,
+    ): KafkaClusterBrokersCatalog
 
     fun loadTopicOverview(
         clusterId: String,
