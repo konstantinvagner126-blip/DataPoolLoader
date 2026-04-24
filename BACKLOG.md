@@ -23,7 +23,7 @@
 
 ## Активные приоритеты
 
-1. [17. Kafka follow-up после завершенного redesign](/Users/kwdev/DataPoolLoader/BACKLOG.md)
+1. [18. SQL-консоль: модернизация интерфейса под рабочий IDE/tool experience](/Users/kwdev/DataPoolLoader/BACKLOG.md)
 2. [9. Операционная надежность long-running операций](/Users/kwdev/DataPoolLoader/BACKLOG.md)
 3. [11. Repo-level архитектурная дисциплина](/Users/kwdev/DataPoolLoader/BACKLOG.md)
 4. [16. Тестовая стратегия](/Users/kwdev/DataPoolLoader/BACKLOG.md)
@@ -40,446 +40,400 @@
 
 ## P1
 
-### 17. Kafka follow-up после завершенного redesign
+### 18. SQL-консоль: модернизация интерфейса под рабочий IDE/tool experience
 
 Статус:
 
-- реализовано
+- проектируется
 
 Контекст:
 
-- Kafka redesign wave формально закрыта и архивирована;
-- новые Kafka-доработки после этого момента допускаются только как отдельные bounded follow-up пакеты.
+- по итогам визуального review SQL-консоли текущий экран все еще ощущается как смесь landing/tool-dashboard и рабочего IDE-инструмента;
+- SQL-консоль должна восприниматься как основной рабочий инструмент для повторяемой ручной инженерной работы, а не как демонстрационная страница;
+- в scope входит только SQL-консоль и связанные SQL-экраны:
+  - main SQL workspace;
+  - source navigator;
+  - query editor;
+  - result pane;
+  - execution/status/transaction states;
+  - SQL execution history screen;
+  - DB objects / inspector / editor navigation links, если они влияют на SQL-console flow;
+- safety contracts из [SQL_CONSOLE_FAILURE_SCENARIOS.md](/Users/kwdev/DataPoolLoader/SQL_CONSOLE_FAILURE_SCENARIOS.md) не меняются и не ослабляются;
+- Monaco/autocomplete contracts из [SQL_CONSOLE_MONACO_AUTOCOMPLETE.md](/Users/kwdev/DataPoolLoader/SQL_CONSOLE_MONACO_AUTOCOMPLETE.md) считаются частью текущей функциональности и не должны деградировать.
+- детальный contract переноса макета в product UI зафиксирован в [SQL_CONSOLE_MODERNIZATION_IMPLEMENTATION_GUIDE.md](/Users/kwdev/DataPoolLoader/SQL_CONSOLE_MODERNIZATION_IMPLEMENTATION_GUIDE.md).
 
-#### 17.1. Message browser layout aligned with kafka-ui table-first view
+Целевые требования:
+
+1. первый экран SQL-консоли должен сразу показывать рабочую область:
+   - source navigator;
+   - SQL editor;
+   - execution controls;
+   - result pane;
+2. верхний hero должен стать компактным tool header, без маркетингового визуального веса;
+3. editor и results должны быть главными визуальными объектами страницы;
+4. вторичные блоки `Шаблоны`, `Быстрые действия`, `Избранное`, `История запусков` не должны конкурировать с editor;
+5. source navigator должен читаться как tree/list pane, а не как набор nested cards;
+6. transaction/safety state должен быть заметен, но не раздувать layout;
+7. текстовый слой должен быть единообразным:
+   - преимущественно русский UI;
+   - английские technical terms только там, где они являются доменными терминами;
+   - убрать visible labels вроде `Tool window`, если они не помогают действию;
+8. empty/loading/error/result states должны быть компактными и предсказуемыми;
+9. mobile/tablet не являются главным сценарием, но layout не должен разваливаться;
+10. visual tests пока не являются обязательным gate для redesign, но после стабилизации нужно вернуть targeted visual baselines.
+
+Non-goals первой волны:
+
+- не менять SQL execution lifecycle;
+- не менять server/store state model без отдельной задачи;
+- не трогать owner-token/heartbeat/rollback safety stream в рамках чистого UI redesign;
+- не внедрять полноценный SQL LSP;
+- не возвращать большой execution history block на основной экран.
+
+#### 18.1. SQL console UI modernization requirements and target layout
 
 Статус:
 
-- реализовано
-
-Контекст:
-
-- текущий `Messages` tab рендерит каждую Kafka message как отдельную card;
-- это визуально расходится с `kafka-ui`, где messages поданы table-first списком с выбором записи и отдельным details-view;
-- server/store safety contract уже достаточен:
-  - bounded read;
-  - `assign + seek`;
-  - no commit;
-  - explicit `selected partition / all partitions`.
+- согласовано к реализации
 
 Что нужно сделать:
 
-1. убрать card-stack presentation для message records;
-2. перевести `Messages` tab на table-first list, ближе к `kafka-ui`;
-3. добавить row selection и отдельный details-pane для выбранного сообщения;
-4. не менять server API и bounded read contract без явной необходимости;
-5. оставить текущие read controls и safety text, но выровнять presentation к более IDE/tool-like message browser.
+1. зафиксировать финальный target layout для main SQL-console workspace;
+2. определить, какие блоки остаются always visible, а какие уходят в secondary/collapsible zones;
+3. описать ожидаемый порядок визуальной важности:
+   - source navigator;
+   - editor;
+   - execution controls;
+   - result pane;
+   - status/transaction line;
+   - secondary actions;
+4. зафиксировать copy-language rules для SQL-консоли;
+5. подготовить review-картинки для основных SQL screens до правок product UI;
+6. зафиксировать, что вместо hero-шапки нужен компактный tool header с собственной SQL tool icon;
+7. зафиксировать result display model:
+   - result pane поддерживает три режима просмотра:
+     - `Общий grid`;
+     - `По источникам`;
+     - `Diff`;
+   - основной/default grid показывает объединенный результат по всем выбранным источникам;
+   - колонка `source` обязательна для результата по нескольким источникам;
+   - рядом должны быть статусы/фильтр по sources, чтобы не терять диагностику;
+   - режим `По источникам` должен оставаться полноценным раздельным просмотром с выбором source;
+   - режим `Diff` должен сохраниться как отдельный compare-view, а не смешиваться с обычной таблицей;
+   - текущую функциональную таблицу результатов нужно сохранить как основу result grid:
+     - per-source table view;
+     - pagination;
+     - wrap / nowrap;
+     - autosize колонок;
+     - ручное расширение/сужение колонок;
+     - copy cell / copy row / copy column;
+     - активная ячейка, строка и колонка;
+     - row index column;
+     - horizontal scroll для широких результатов;
+   - result export должен быть доступен из result pane:
+     - `Экспорт общий` выгружает один объединенный файл с обязательной колонкой `source`;
+     - `Экспорт по sources` выгружает отдельный файл для каждого source;
+     - до появления результата export actions видимы, но недоступны;
+     - финальная export-семантика отложена в отдельное обсуждение: экспорт должен уметь выгружать полный набор данных, а не только ограниченный отображаемый result по `maxRowsPerShard`;
+8. после согласования считать этот пункт входным design contract для следующих задач.
+9. перед изменением product UI сверяться с [SQL_CONSOLE_MODERNIZATION_IMPLEMENTATION_GUIDE.md](/Users/kwdev/DataPoolLoader/SQL_CONSOLE_MODERNIZATION_IMPLEMENTATION_GUIDE.md), чтобы не потерять существующие execution, Monaco, result grid, export и source-selection сценарии.
 
-Что сделано:
-
-1. card-stack presentation для Kafka messages удалена;
-2. `Messages` tab переведен на table-first list с columns:
-   - `Offset`;
-   - `Partition`;
-   - `Timestamp`;
-   - `Key`;
-   - `Value`;
-   - `Headers`;
-3. добавлен row selection и отдельный details-pane для выбранного сообщения вместо набора самостоятельных cards;
-4. server/store API и bounded read semantics не менялись:
-   - `assign + seek`;
-   - no commit;
-   - explicit `selected partition / all partitions`;
-5. текущие read controls и safety subtitle сохранены, но screen presentation выровнена ближе к `kafka-ui`.
-
-#### 17.2. Create topic admin path
-
-Статус:
-
-- реализовано
-
-Контекст:
-
-- после завершенного redesign в Kafka UI остается явный functional gap: нельзя создать новый topic;
-- cluster-level `Topics` screen уже стал основной точкой входа и именно там должен появиться create-topic flow;
-- topic create нельзя смешивать с metadata read paths или settings UI: нужен отдельный узкий admin contract.
-
-Что нужно сделать:
-
-1. добавить отдельный `create topic` contract рядом с Kafka metadata/produce contracts;
-2. реализовать server route и AdminClient-based service для create-topic path;
-3. поддержать базовые поля:
-   - `topic name`;
-   - `partitions`;
-   - `replication factor`;
-   - optional `cleanup policy`;
-   - optional `retention.ms`;
-   - optional `retention.bytes`;
-4. запретить create-topic path для `readOnly` cluster до Kafka client call;
-5. вывести create-topic action на `Topics` screen, без прятанья в settings;
-6. после успешного create обновлять topic catalog и открывать созданный topic без ручного refresh;
-7. добавить targeted server/store regression coverage.
-
-Что сделано:
-
-1. добавлен отдельный `create topic` contract рядом с Kafka metadata/produce contracts;
-2. реализованы server route и AdminClient-based service для create-topic path;
-3. поддержаны поля:
-   - `topic name`;
-   - `partitions`;
-   - `replication factor`;
-   - optional `cleanup policy`;
-   - optional `retention.ms`;
-   - optional `retention.bytes`;
-4. `readOnly` cluster блокируется до Kafka client call;
-5. create-topic action выведен на `Topics` screen;
-6. после успешного create topic catalog и topic details обновляются автоматически;
-7. добавлены targeted server/store/service regressions.
-
-#### 17.3. Produce form aligned with kafka-ui structured editor
+#### 18.2. Compact SQL tool header with dedicated tool icon
 
 Статус:
 
-- реализовано
+- запланировано
 
 Контекст:
 
-- current `Produce` tab функционально работает, но UI остается слишком примитивным:
-  - raw textarea для headers;
-  - слабая visual hierarchy;
-  - форма не похожа на `kafka-ui`;
-- после `17.1` messages уже выровнены к `kafka-ui`, produce path должен получить такую же плотную tool-like presentation.
+- пользователь после review подтвердил, что большой hero лучше убрать;
+- при этом инструменту нужен сильный визуальный якорь, чтобы экран не стал сухим;
+- SQL-консоль должна выглядеть как рабочий IDE/tool screen, а не landing/dashboard.
 
 Что нужно сделать:
 
-1. убрать raw multiline `headers` textarea и заменить ее на structured header rows;
-2. перестроить `Produce` tab в более плотный editor-like shell:
-   - key;
-   - partition override;
-   - headers list;
-   - payload editor;
-   - delivery result block;
-3. не менять существующий server produce contract без необходимости;
-4. сохранить текущие safety invariants:
-   - no background producer session state;
-   - `readOnly` cluster block;
-   - payload size guard;
-5. добавить regression coverage на shared store mapping produce headers и server route/produce path.
+1. заменить hero-шапку SQL-консоли на compact tool header:
+   - `Load Testing Data Platform`;
+   - `SQL-консоль по источникам`;
+   - navigation actions `На главную / Объекты БД / SQL-консоль`;
+   - выбранные sources / workspace / autocommit / connection status;
+2. не переносить execution controls в hero;
+3. добавить красивую векторную SQL tool icon вместо текущего `SqlConsoleHeroArt`;
+4. не добавлять новый competing header внутри workspace;
+5. ниже шапки сделать плотный SQL workspace без лишнего повторения title/copy;
+6. проверить, что editor и result pane остаются хорошо видимыми на первом viewport после compact header.
 
-Что сделано:
-
-1. raw multiline `headers` textarea удален и заменен на structured header rows;
-2. `Produce` tab перестроен в более плотный editor-like shell:
-   - key;
-   - partition override;
-   - headers list;
-   - payload editor;
-   - delivery result block;
-3. существующий server produce contract сохранен;
-4. safety invariants сохранены:
-   - no background producer session state;
-   - `readOnly` cluster block;
-   - payload size guard;
-5. regression coverage расширена на shared store mapping produce headers и server route/produce path.
-
-#### 17.4. Fix DOMTokenList runtime error in Kafka all-partitions message browser
+#### 18.3. Rebalance workspace hierarchy around editor and result pane
 
 Статус:
 
-- реализовано
+- запланировано
 
 Контекст:
 
-- при чтении Kafka messages в режиме `ALL_PARTITIONS` UI получал browser-side runtime error:
-  - `SyntaxError: The string did not match the expected pattern`;
-- фактическая причина была в рендере CSS-классов:
-  - в message rows и broker badges в `classes(...)` передавался пустой токен через `if (...) "..." else ""`;
-- ошибка проявлялась на message results render и ломала normal message browser flow, хотя server response уже был корректным.
+- над editor сейчас слишком много secondary UI;
+- `Tool window`, шаблоны, quick actions и selector blocks визуально спорят с editor.
 
 Что нужно сделать:
 
-1. убрать передачу пустых CSS-class token в Kafka web sections;
-2. починить `Messages` tab для режима `ALL_PARTITIONS`, не меняя server/store contract;
-3. убрать такой же latent defect из `Brokers` screen;
-4. добавить targeted browser regression, который проверяет:
-   - `ALL_PARTITIONS` read completes;
-   - results render;
-   - page errors отсутствуют.
+1. сделать editor и result pane основным вертикальным flow;
+2. демотировать шаблоны, quick actions и query-library в secondary compact zone;
+3. убрать лишние card shells вокруг controls, если они не несут отдельной ответственности;
+4. оставить frequently used execution actions доступными без скролла;
+5. не ломать текущие actions:
+   - execute;
+   - explain;
+   - transaction;
+   - export;
+   - favorite/recent query flows.
 
-Что сделано:
-
-1. пустые CSS-class token убраны из Kafka message rows и broker role badge rendering;
-2. `Messages` tab в режиме `ALL_PARTITIONS` больше не падает на DOMTokenList error;
-3. latent broker-screen defect устранен тем же safe class rendering pattern;
-4. добавлен targeted Playwright smoke regression на `ALL_PARTITIONS` message read без page errors.
-
-#### 17.5. Local file chooser for Kafka TLS material paths in settings UI
+#### 18.4. Source navigator as dense IDE-like tree/list pane
 
 Статус:
 
-- реализовано
+- запланировано
 
 Контекст:
 
-- Kafka settings UI уже умеет редактировать `JKS` и `PEM` path-like поля, но сейчас только как raw text inputs;
-- для локального инструмента этого недостаточно:
-  - при добавлении нового cluster пользователь должен иметь возможность выбрать certificate / keystore files из системы;
-- browser `input type=file` здесь не подходит как source of truth, потому что Kafka config хранит path values, а не uploaded file content.
+- source navigator уже отделен как pane, но визуально остается слишком card-heavy;
+- группы и источники занимают много вертикального места, особенно при нескольких groups.
 
 Что нужно сделать:
 
-1. добавить local-only file chooser path через `ui-server`, а не через browser upload;
-2. поддержать выбор файлов для Kafka TLS material полей:
-   - `ssl.truststore.location`;
-   - `ssl.truststore.certificates`;
-   - `ssl.keystore.location`;
-   - `ssl.keystore.certificate.chain`;
-   - `ssl.keystore.key`;
-3. для `JKS` полей возвращать обычный filesystem path;
-4. для `PEM` полей возвращать config-ready placeholder вида `${file:/abs/path/to/file}`;
-5. встроить `Browse` actions в Kafka settings UI рядом с соответствующими path fields;
-6. сохранить текущий `ui.kafka` config contract:
-   - source of truth остается `ui-application.yml`;
-   - browser local state не становится вторым config source;
-7. добавить targeted service/store/server coverage.
+1. перевести groups/sources в более плотную tree/list model;
+2. уменьшить nested card feeling и большие rounded containers;
+3. сделать selected/partial/unchecked states читабельными без лишнего текста на каждой строке;
+4. сохранить действия проверки connection и per-source status;
+5. убрать загрузку `credential.properties` из рабочего source pane:
+   - не показывать `credential.properties` или отдельный credentials block в рабочем SQL workspace;
+   - при проблемах с credentials показывать только per-source warning/status и ссылку на экран настроек sources;
+   - не показывать значения credentials и имя credentials file в рабочем SQL workspace;
+6. source state messages показывать только когда они действительно важны:
+   - error;
+   - warning;
+   - explicit runtime result.
 
-Что сделано:
-
-1. добавлен отдельный local Kafka settings file-picker boundary в `ui-server`;
-2. Kafka settings route получил bounded `pick-file` path для supported TLS material fields;
-3. для `JKS` fields chooser возвращает raw absolute path;
-4. для `PEM` fields chooser возвращает config-ready `${file:/...}` placeholder;
-5. в Kafka settings UI добавлены `Выбрать файл` actions рядом с path-like TLS inputs;
-6. source of truth остался прежним:
-   - YAML сохраняет path values;
-   - browser не хранит отдельные uploaded secrets;
-7. добавлены targeted tests на picker/service/store/server contract.
-
-#### 17.6. Increase Kafka produce payload editor height
+#### 18.5. Execution controls and transaction state redesign
 
 Статус:
 
-- реализовано
+- запланировано
 
 Контекст:
 
-- после перестройки `Produce` tab payload editor остался слишком низким для реальной ручной работы;
-- при наборе или вставке JSON/message body приходится слишком рано скроллить внутри textarea;
-- это не требует изменения Kafka produce contract и относится только к ergonomics текущего editor shell.
+- action toolbar сейчас выглядит как набор маленьких карточек;
+- transaction/autocommit/safety state должен быть заметным, но не дробить рабочую область.
 
 Что нужно сделать:
 
-1. зафиксировать отдельный bounded follow-up в backlog;
-2. увеличить высоту payload textarea в `Produce` tab;
-3. не менять server/store produce contract и structured editor layout сверх необходимого минимума.
+1. сгруппировать execution actions в один compact toolbar;
+2. отделить primary actions от secondary actions;
+3. привести visual language кнопок к tool UI:
+   - меньше карточек;
+   - больше toolbar controls;
+   - понятные icon/text buttons только для реальных command actions;
+4. transaction state вынести в compact status strip или dedicated safety strip;
+5. не менять safety semantics manual transaction / commit / rollback.
 
-Что сделано:
-
-1. follow-up зафиксирован как отдельный backlog package;
-2. `Payload` textarea в Kafka `Produce` tab стала выше и удобнее для ручной вставки message body;
-3. produce contract, routing и structured form semantics не менялись.
-
-#### 17.7. Kafka message read execution summary and all-partitions latency hardening
+#### 18.6. Result pane and empty states densification
 
 Статус:
 
-- реализовано
+- запланировано
 
 Контекст:
 
-- после чтения сообщений `kafka-ui` показывает короткий execution summary вида:
-  - `DONE`;
-  - `3 ms`;
-  - `132 Bytes`;
-  - `5 messages consumed`;
-- в нашем Kafka screen такой summary сейчас отсутствует, хотя он полезен для наблюдаемости bounded read path;
-- дополнительно текущий `ALL_PARTITIONS` read path работает медленнее, чем должен:
-  - offsets и polls идут последовательно по partition;
-  - это особенно заметно на topic с несколькими partition и малым числом сообщений.
+- result pane уже стал лучше после предыдущей visual wave, но empty/result states еще выглядят как отдельные panels внутри panels;
+- SQL-консоли нужен более строгий data-grid/tool-window вид.
 
 Что нужно сделать:
 
-1. добавить в Kafka message-read response summary metadata:
-   - `status`;
-   - `durationMs`;
-   - `consumedBytes`;
-   - `consumedMessages`;
-2. вывести этот summary в `Messages` tab в стиле, близком к `kafka-ui`;
-3. не менять bounded read safety contract:
-   - `assign + seek`;
-   - no commit;
-   - explicit `selected partition / all partitions`;
-4. ускорить `ALL_PARTITIONS` path без перехода к background consumer session:
-   - уйти от последовательного per-partition read;
-   - читать все целевые partition через один short-lived assign/seek session;
-   - по возможности использовать bulk offset lookup вместо repeated single-partition calls;
-5. добавить targeted service/server coverage на response summary и optimized all-partitions path.
+1. уплотнить result toolbar и режимы просмотра:
+   - `Общий grid`;
+   - `По источникам`;
+   - `Diff`;
+2. сделать empty state компактным, без ощущения большой пустой card;
+3. убедиться, что combined grid / per-source grid / diff / status views имеют общий visual grammar;
+4. сохранить result navigator и per-source/per-statement semantics;
+5. отдельно проверить long result/table overflow;
+6. не удалить и не деградировать существующий diff режим.
+7. не заменить текущую таблицу результатов на упрощенную mock-table:
+   - сохранить feature parity текущего `SqlConsoleDataResultSections` / `SqlConsoleResultGridSupport`;
+   - redesign может менять shell/toolbar placement, но не должен терять wrap/nowrap, autosize, resize, copy cell/row/column, active selection, row index, pagination и horizontal scroll;
+   - если вводится combined grid, он должен использовать тот же table interaction model, добавляя только обязательную diagnostic column `source`;
+8. вернуть export actions в result pane:
+   - `Экспорт общий` -> single combined file with `source` column;
+   - `Экспорт по sources` -> separate file per source;
+   - финальный full-data export contract пока не реализовывать и не привязывать к текущему limited result snapshot;
+   - для empty/running state кнопки должны быть disabled или явно недоступны.
 
-Что сделано:
-
-1. Kafka message-read response расширен summary metadata:
-   - `status`;
-   - `durationMs`;
-   - `consumedBytes`;
-   - `consumedMessages`;
-2. `Messages` tab теперь показывает execution summary в формате, близком к `kafka-ui`;
-3. bounded read safety contract сохранен без background session и без commit offsets;
-4. `ALL_PARTITIONS` path переведен с последовательного per-partition read на единый short-lived assign/seek session с bulk offset lookup;
-5. добавлены targeted regressions на service/server response contract и optimized all-partitions flow.
-
-#### 17.8. Remove hidden Kafka message read cap and honor explicit UI limit
+#### 18.7. SQL-related screens consistency pass
 
 Статус:
 
-- реализовано
+- запланировано
 
 Контекст:
 
-- в текущем Kafka flow пользователь может указать `limit = 500`, но effective result все равно режется hidden server cap;
-- это противоречит ожидаемому UX:
-  - значение limit уже задается явно в интерфейсе;
-  - именно оно и должно определять размер bounded read;
-- hidden clamp делает поведение непредсказуемым и ломает ручную topic inspection.
+- SQL flow связан не только с `/sql-console`, но и с:
+  - `/sql-console-objects`;
+  - object inspector;
+  - SQL execution history;
+  - editor-native object navigation.
 
 Что нужно сделать:
 
-1. зафиксировать follow-up в backlog;
-2. убрать hidden clamp по `ui.kafka.maxRecordsPerRead` из message read service;
-3. оставить `ui.kafka.maxRecordsPerRead` только как default/fallback для initial read, а bounded size определять explicit `limit` из интерфейса;
-4. не запускать implicit reload и не менять semantics других read controls.
+1. проверить, что DB objects и inspector визуально сочетаются с новым SQL-console shell;
+2. сохранить inspector direct-load behavior;
+3. проверить SQL execution history screen:
+   - отдельный screen остается отдельным;
+   - он не возвращается на main workspace;
+   - list остается dense и readable;
+4. унифицировать copy и action labels между связанными SQL screens;
+5. не смешивать object catalog redesign с main workspace redesign без отдельного bounded package.
 
-Что сделано:
-
-1. follow-up зафиксирован как отдельный bounded package;
-2. hidden server-side clamp по `ui.kafka.maxRecordsPerRead` убран;
-3. `ui.kafka.maxRecordsPerRead` остался только default/fallback для initial read, а effective Kafka read limit теперь определяется значением из интерфейса;
-4. bounded read semantics и explicit reload model сохранены.
-
-#### 17.9. Keep last Kafka message result visible until explicit reload
+#### 18.8. SQL source catalog settings screen
 
 Статус:
 
-- реализовано
+- запланировано
 
 Контекст:
 
-- сейчас при изменении `Scope`, `Mode`, `Partition` и других draft controls текущий message result исчезает еще до нажатия `Читать сообщения`;
-- это создает ложное впечатление, что UI уже сделал reload, хотя фактически пользователь только меняет параметры следующего запроса;
-- message browser должен оставаться в модели `draft controls + last executed result`.
+- текущий SQL workspace позволяет выбирать уже настроенные sources, но не добавлять и не редактировать подключения;
+- source catalog сейчас приходит из `ui.sqlConsole.sourceCatalog` в редактируемом `ui-application.yml`;
+- source of truth для SQL sources должен остаться в `ui-application.yml`, а экран настроек должен быть редактором этого конфига;
+- после сохранения изменений SQL-консоль должна перечитать runtime catalog без рестарта приложения;
+- загрузку `credential.properties` как runtime-content через рабочий SQL screen нужно убрать;
+- credentials path и placeholder diagnostics должны жить на экране настроек sources;
+- выбор/загрузка файла `credential.properties` переносится на экран настроек sources, чтобы источник credentials управлялся там же, где редактируются подключения;
+- режим добавления source вручную без `credential.properties` нужен, но должен идти через secure secret provider:
+  - пользователь может ввести `jdbcUrl`, `username`, `password` руками;
+  - password по умолчанию маскируется в UI;
+  - допускается явный toggle `Показать пароль` только для текущего ввода;
+  - после сохранения password не возвращается обратно в browser response;
+  - в основном UI показывается человекочитаемый статус вроде `saved in System keychain`, а не `${secret:...}`;
+  - конкретный provider определяется платформой:
+    - macOS -> Keychain;
+    - Windows -> Credential Manager;
+    - Linux -> Secret Service / libsecret-compatible storage;
+  - если системный provider недоступен, UI должен явно показать unavailable-state и предложить fallback: `credential.properties`, session-only password или explicit restricted local secret store;
+  - secret key и config placeholder показываются только в technical details;
+  - в `ui-application.yml` сохраняется ссылка на secret, а не raw password.
 
 Что нужно сделать:
 
-1. перестать очищать `messages` в shared store при изменении draft controls для message read;
-2. перестать скрывать current results только потому, что draft `Scope/Mode/Partition` уже отличаются от последнего executed request;
-3. оставлять last successful result видимым до явного нажатия `Читать сообщения`;
-4. сохранить очистку результатов только при реальной смене topic/cluster или после explicit reload.
+1. добавить отдельный экран настроек sources, не смешивая его с рабочим SQL workspace;
+   - основной экран должен быть без обучающих подсказок и длинных explanatory note-блоков;
+   - показывать только поля, статусы, ошибки и действия;
+   - technical details держать свернутыми или переносить в help/docs;
+2. поддержать операции:
+   - добавить source;
+   - редактировать source;
+   - удалить source с проверкой references из groups;
+   - проверить подключение для одного source через явную кнопку `Тест подключения` в форме source;
+   - проверить все sources через явную кнопку на панели списка sources;
+3. поддержать редактирование groups:
+   - name;
+   - список sources;
+   - предупреждения по пустым/битым references;
+4. хранить изменения через отдельный server-side config persistence boundary, а не через route handler;
+5. поддержать настройку credentials file как config-backed path:
+   - разместить блок `credential.properties` на экране настроек sources, а не в рабочем SQL workspace;
+   - редактировать `ui.defaultCredentialsFile`;
+   - выбирать файл через local file chooser;
+   - дать явные действия `Выбрать файл` и `Проверить`;
+   - не дублировать credentials file status на рабочем SQL workspace;
+   - показывать required / resolved / missing placeholder keys;
+   - не показывать resolved secret values;
+6. не показывать raw password values:
+   - `jdbcUrl`, `username`, `password` должны поддерживать placeholders;
+   - UI может показывать placeholder name, но не resolved secret;
+7. после сохранения перечитывать SQL console info и обновлять source navigator без restart приложения:
+   - текущий draft SQL не теряется;
+   - active `RUNNING` / `PENDING_COMMIT` execution session не мутируется;
+   - удаленный выбранный source помечается как unavailable до явного выбора другого source;
+8. реализовать отдельный secure contract для режима `manual secret input` без `credential.properties`:
+   - в форме source должен быть явный selector `Credentials mode`:
+     - `System keychain` как default;
+     - `Placeholders`;
+   - набор credential fields меняется в зависимости от выбранного режима;
+   - одновременно показываются только поля выбранного режима, без preview-карточек остальных режимов;
+   - общими вне режима остаются только `name`, `driver` и `comment`;
+   - `jdbcUrl`, `username`, `password`, `provider` и placeholder-status принадлежат конкретному режиму и не должны рендериться для неактивных режимов;
+   - пользователь вводит `jdbcUrl`, `username`, `password` руками;
+   - password field по умолчанию masked;
+   - toggle `Показать пароль` влияет только на текущий draft input до сохранения;
+   - UI не должен возвращать сохраненный password обратно в браузер;
+   - source form после сохранения показывает только `password saved / missing / replace`, без значения;
+   - preferred storage: system keychain через platform-specific provider;
+   - поддержать provider abstraction:
+     - `macos-keychain`;
+     - `windows-credential-manager`;
+     - `linux-secret-service`;
+     - optional explicit fallback `restricted-local-secret-store`;
+   - в обычной форме показывать `Password storage: System keychain`, `Provider: <platform provider>` и `Secret key: sqlConsole.sources.<source>.password`;
+   - technical config value `${secret:...}` показывать только в collapsed advanced/details block;
+   - в `ui-application.yml` сохранять ссылку вида `${secret:sqlConsole.sources.<source>.password}`;
+   - raw password / plain-text credentials в `ui-application.yml` не поддерживать как UI-режим;
+9. добавить targeted server/store tests на config persistence, hot reload и validation.
 
-Что сделано:
-
-1. shared store больше не сбрасывает `messages` при изменении `Scope/Mode/Partition/Limit/Offset/Timestamp`;
-2. `Messages` tab рендерит last executed result для текущего topic, а не фильтрует его по live draft controls;
-3. результаты остаются видимыми до explicit read action;
-4. topic-level reload по-прежнему очищает stale results только там, где это реально нужно.
-
-#### 17.10. Clarify Kafka TLS settings UI semantics for certificate files and unspecified type
+#### 18.9. Restore targeted visual coverage after SQL redesign stabilizes
 
 Статус:
 
-- реализовано
+- запланировано
 
 Контекст:
 
-- Kafka settings UI уже поддерживает certificate/key file picking для JKS и PEM-backed fields;
-- технически certificate picker уже принимает `.crt`, `.cer` и `.pem`, но UI скрывает это за подписью `Выбрать PEM`;
-- пустое значение `ssl.truststore.type` / `ssl.keystore.type` рендерится как `default`, хотя по смыслу это не отдельный режим Kafka, а просто `type` не задан.
+- Playwright visual suite временно не используется как gate во время активной UI-перестройки;
+- после стабилизации SQL redesign нужны targeted baselines именно для SQL flow.
 
 Что нужно сделать:
 
-1. зафиксировать follow-up в backlog;
-2. убрать misleading label `default` из Kafka TLS settings UI и заменить его на явное `Не задано`;
-3. переименовать certificate/key picker buttons так, чтобы они отражали роль файла, а не внутренний формат placeholder;
-4. добавить helper text с допустимыми расширениями:
-   - сертификат: `.crt / .cer / .pem`;
-   - private key: `.key / .pem`;
-   - keystore: `.jks / .p12 / .pfx`;
-5. не менять backend `properties`-first contract и `${file:/...}` semantics без необходимости.
+1. вернуть targeted visual checks для:
+   - main SQL console shell;
+   - result pane empty/result state;
+   - DB objects inspector;
+   - SQL source catalog settings screen;
+   - SQL execution history screen;
+2. не обновлять snapshots на промежуточном нестабильном layout;
+3. добавить только те baselines, которые защищают реальные UI contracts;
+4. не использовать visual suite как блокер до завершения задач `18.2–18.8`.
 
-Что сделано:
-
-1. follow-up зафиксирован как отдельный bounded package;
-2. blank TLS type больше не рендерится как `default`, в UI используется `Не задано`;
-3. browse actions переименованы в role-based labels:
-   - `Выбрать truststore`;
-   - `Выбрать keystore`;
-   - `Выбрать CA сертификат`;
-   - `Выбрать client certificate`;
-   - `Выбрать private key`;
-4. для TLS path fields добавлены helper texts с допустимыми расширениями;
-5. backend contract не менялся:
-   - certificate fields по-прежнему сохраняются как `${file:/...}`;
-   - `.crt/.cer/.pem` для certificates и `.key/.pem` для private key остаются допустимыми.
-
-#### 17.11. Keep Kafka settings usable when cluster catalog is empty and refresh shell after save
+#### 18.10. SQL export full-data contract discussion
 
 Статус:
 
-- реализовано
+- отложено для отдельного обсуждения
 
 Контекст:
 
-- Kafka settings UI уже умеет добавлять и сохранять cluster drafts, но shell lifecycle остается неполным;
-- при пустом `info.clusters` page-level empty-state перекрывает settings flow и мешает нормальному first-cluster onboarding;
-- после сохранения нового cluster текущий shell может оставаться на stale `info.clusters`, из-за чего новый cluster не появляется в navigation до полного page reload.
+- отображение результата в SQL-консоли ограничено настройками вроде `maxRowsPerShard`;
+- пример: пользователь может поставить лимит `500` строк, но export должен выгружать полный набор данных;
+- текущий result snapshot не должен считаться достаточным source of truth для финального export contract;
+- вопрос нельзя решать как простую кнопку download в UI, потому что full export может быть long-running операцией с отдельными safety, timeout, streaming и file-size правилами.
 
-Что нужно сделать:
+Что нужно обсудить отдельно:
 
-1. зафиксировать bugfix в backlog;
-2. не блокировать Kafka settings screen global empty-state, если пользователь открывает `cluster-settings`;
-3. дать явный path в settings при `0` configured clusters;
-4. после save settings refresh-ить shell-level cluster catalog и selected cluster state;
-5. добавить regression coverage на first-cluster onboarding flow и post-save shell refresh.
+1. какие export modes нужны:
+   - full combined export with `source` column;
+   - full per-source export;
+   - export only displayed rows как отдельный secondary action, если он нужен;
+2. должен ли full export повторно выполнять SQL на сервере или использовать отдельный server-side cursor/streaming path;
+3. какие лимиты нужны для full export:
+   - timeout;
+   - max rows;
+   - max bytes;
+   - disk temp file lifecycle;
+4. как full export работает с manual transaction и safety mode;
+5. какие статусы показывать в UI для long-running export;
+6. какие server-side tests обязательны для больших результатов.
 
-Что сделано:
+До решения:
 
-1. bugfix зафиксирован как отдельный bounded package;
-2. `cluster-settings` screen больше не перекрывается global Kafka empty-state;
-3. при отсутствии configured clusters page показывает явный переход в settings;
-4. после save settings shell refresh-ит `info` и `selectedClusterId`, поэтому новый cluster появляется без full page reload;
-5. regression coverage добавлена на settings save/update flow.
-
-#### 17.12. Add JSON syntax highlighting in Kafka message details
-
-Статус:
-
-- реализовано
-
-Контекст:
-
-- после перехода messages на table-first layout details-pane все еще показывает JSON как plain text в темном `pre` block;
-- payload уже приходит как pretty-printed JSON, но без визуального разделения ключей, строк, чисел и literal values его тяжело читать на больших сообщениях;
-- это чисто web-level ergonomics follow-up и не требует изменения Kafka contracts, store semantics или server response shape.
-
-Что нужно сделать:
-
-1. зафиксировать follow-up в backlog;
-2. добавить локальный JSON syntax highlighting для Kafka message details pane;
-3. выделять хотя бы:
-   - object/array punctuation;
-   - property names;
-   - string values;
-   - numbers;
-   - booleans;
-   - `null`;
-4. сохранить plain-text fallback для non-JSON payload;
-5. не менять message browser server/store contract.
-
-Что сделано:
-
-1. follow-up зафиксирован как отдельный bounded package;
-2. для Kafka message details добавлен локальный JSON tokenizer и span-based syntax highlighting в web renderer;
-3. colored token rendering покрывает punctuation, keys, strings, numbers, booleans и `null`;
-4. non-JSON payload по-прежнему отображается как plain text;
-5. server/store contracts не менялись.
+- не считать current limited result snapshot финальной моделью export;
+- в UI redesign можно зарезервировать место для export actions, но не реализовывать новую full-data export semantics.
 
 ### 9. Операционная надежность long-running операций
 
@@ -509,112 +463,7 @@
 3. закрепить rollback / cleanup / recovery policy;
 4. усилить scenario-level и server-side проверки именно на long-running контрактах.
 
-#### 9.1. Write-through recovery interrupted FILES runs after restart
-
-Статус:
-
-- реализовано
-
-Контекст:
-
-- для FILES-run history уже есть recovery path `RUNNING -> FAILED` на старте UI;
-- сейчас этот recovery выполняется только в памяти через `RunStateStore.load()`;
-- `run-state.json` при этом может оставаться stale и продолжать хранить `RUNNING`, хотя текущий runtime уже показывает `FAILED`.
-
-Что нужно сделать:
-
-1. нормализовать `run-state.json` write-through после recovery interrupted runs;
-2. не оставлять stale persisted `RUNNING` snapshots как hidden second state;
-3. добавить regression coverage на сценарий `restart -> recovered FAILED -> run-state.json rewritten`;
-4. синхронизировать state-model contract.
-
-#### 9.2. Eager recovery orphan DB runs after restart
-
-Статус:
-
-- реализовано
-
-Контекст:
-
-- для DB-run history orphan recovery сейчас выполняется только лениво при следующем `startRun()` того же модуля;
-- после рестарта `ui-server` stale `RUNNING` записи в registry могут висеть бесконечно, если пользователь больше не стартует этот модуль;
-- это оставляет hidden second lifecycle state:
-  process-local active registry уже очищен, а persisted DB history все еще выглядит как живой run.
-
-Что нужно сделать:
-
-1. вынести orphan DB run recovery в отдельный reusable support вместо дублирования ad-hoc логики;
-2. выполнять eager recovery всех stale DB `RUNNING` runs на инициализации `DatabaseModuleRunService`;
-3. сохранить текущий bounded recovery при `startRun()` для stale runs того же модуля, но перевести его на тот же shared support;
-4. добавить regression coverage на сценарий `restart -> orphan DB run rewritten to FAILED before first manual action`;
-5. синхронизировать state-model contract для active DB run registry и DB run history.
-
-#### 9.3. Failure-side normalization DB run summary counters
-
-Статус:
-
-- реализовано
-
-Контекст:
-
-- в DB run-history failure path `module_run_source_result` уже нормализуется из `PENDING/RUNNING` в `FAILED`;
-- при этом aggregate counters в `module_run` (`successful_source_count`, `failed_source_count`, `skipped_source_count`) не пересчитываются;
-- из-за этого history list может показывать stale `0/0/0` или другие устаревшие значения для уже проваленного DB-run, хотя details/source results уже отражают фактический failure outcome.
-
-Что нужно сделать:
-
-1. нормализовать aggregate source counters в `module_run` внутри DB failure mutation path;
-2. не оставлять расхождение между DB history list и detailed source results после `markRunFailed`;
-3. добавить regression coverage на сценарий `markRunFailed -> sourceResults FAILED -> failedSourceCount updated`;
-4. при необходимости синхронизировать state-model contract для DB run history summary.
-
-#### 9.4. Server-level regression for startup recovery DB runs
-
-Статус:
-
-- реализовано
-
-Контекст:
-
-- пакеты `9.2–9.3` закрыли eager startup recovery orphan DB runs и нормализацию counters;
-- сейчас эти invariants защищены unit/store-level тестами, но не зафиксированы через реальный `/api/module-runs/database/*` server flow;
-- из-за этого route wiring или history adapter могут снова начать отдавать stale `RUNNING` status, даже если нижние support-слои уже нормализуют run.
-
-Что нужно сделать:
-
-1. добавить отдельный server-level regression test на сценарий `ui-server restart -> orphan DB run already visible as FAILED via module-runs API`;
-2. проверить через HTTP-слой и history adapter, что `activeRunId` уже `null`, а status/details не показывают stale `RUNNING`;
-3. вынести минимальный in-memory DB run test support в reusable test helper, чтобы не плодить ad-hoc дубли между server и run tests.
-
-Что сделано:
-
-1. добавлен отдельный [DatabaseModuleRunsRecoveryServerTest.kt](/Users/kwdev/DataPoolLoader/ui-server/src/test/kotlin/com/sbrf/lt/platform/ui/server/DatabaseModuleRunsRecoveryServerTest.kt) на реальный `/api/module-runs/database/*` flow;
-2. проверено, что после старта `ui-server` orphan DB run уже отдается как `FAILED`, а `activeRunId` равен `null`;
-3. общий in-memory support вынесен в [DatabaseModuleRunTestSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/test/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleRunTestSupport.kt) и переиспользуется run/server тестами.
-
-#### 9.5. Server-level regression for startup recovery FILES runs
-
-Статус:
-
-- реализовано
-
-Контекст:
-
-- после `9.1` FILES restart recovery уже write-through нормализует stale `RUNNING` snapshot в `FAILED`;
-- этот invariant пока зафиксирован только на `RunManager`/persisted-state уровне;
-- через реальный `/api/module-runs/files/*` flow отдельной регрессии пока нет, поэтому route wiring или history adapter могут снова начать показывать stale `RUNNING`, даже если state-store уже восстановил run.
-
-Что нужно сделать:
-
-1. добавить отдельный server-level regression test на сценарий `ui-server restart -> interrupted FILES run already visible as FAILED via module-runs API`;
-2. проверить через HTTP-слой, что `activeRunId` уже `null`, а history/details не показывают stale `RUNNING`;
-3. не раздувать existing giant [ServerTest.kt](/Users/kwdev/DataPoolLoader/ui-server/src/test/kotlin/com/sbrf/lt/platform/ui/server/ServerTest.kt): вынести сценарий в отдельный targeted test file.
-
-Что сделано:
-
-1. добавлен отдельный [FilesModuleRunsRecoveryServerTest.kt](/Users/kwdev/DataPoolLoader/ui-server/src/test/kotlin/com/sbrf/lt/platform/ui/server/FilesModuleRunsRecoveryServerTest.kt) на реальный `/api/module-runs/files/*` flow;
-2. проверено, что после старта `ui-server` interrupted FILES run уже отдается как `FAILED`, а `activeRunId` равен `null`;
-3. recovery message проверяется через HTTP-слой без раздувания [ServerTest.kt](/Users/kwdev/DataPoolLoader/ui-server/src/test/kotlin/com/sbrf/lt/platform/ui/server/ServerTest.kt), что выровняло FILES/DB restart-contract на уровне server regressions.
+История реализованных пакетов `9.1–9.5` вынесена в [BACKLOG_HISTORY.md](/Users/kwdev/DataPoolLoader/BACKLOG_HISTORY.md).
 
 ### 11. Зафиксировать и поддерживать repo-level архитектурную дисциплину
 

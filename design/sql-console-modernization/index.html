@@ -1,0 +1,1541 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SQL Console Modernization Mockups</title>
+  <style>
+    :root {
+      --bg: #eef2f5;
+      --surface: #ffffff;
+      --surface-soft: #f7f9fb;
+      --line: #d7dee7;
+      --line-strong: #aebbcc;
+      --text: #172033;
+      --muted: #647287;
+      --muted-2: #8a96a8;
+      --accent: #246bfe;
+      --accent-soft: #e8f0ff;
+      --green: #0f9f6e;
+      --green-soft: #e7f8f1;
+      --amber: #b87900;
+      --amber-soft: #fff4d8;
+      --red: #d63f3f;
+      --red-soft: #fff0f0;
+      --mono: "SFMono-Regular", "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+      --sans: "Inter", "Segoe UI", system-ui, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 14px;
+      letter-spacing: 0;
+    }
+
+    .review-shell {
+      width: 1440px;
+      margin: 0 auto;
+    }
+
+    .review-nav {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 16px;
+      align-items: center;
+      padding: 10px 18px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(238, 242, 245, 0.96);
+      backdrop-filter: blur(10px);
+    }
+
+    .review-title {
+      font-size: 12px;
+      font-weight: 760;
+      text-transform: uppercase;
+      color: #43536a;
+    }
+
+    .review-note {
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .review-links {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .review-link {
+      display: inline-flex;
+      align-items: center;
+      min-height: 30px;
+      padding: 7px 10px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--surface);
+      color: #334257;
+      font-size: 12px;
+      font-weight: 720;
+      text-decoration: none;
+    }
+
+    .review-link.active {
+      border-color: #1b2434;
+      background: #1b2434;
+      color: #fff;
+    }
+
+    .screen {
+      width: 1440px;
+      min-height: 960px;
+      padding: 18px;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.75), rgba(238,242,245,0.92)),
+        var(--bg);
+    }
+
+    .tool-header {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 16px;
+      align-items: center;
+      margin-bottom: 12px;
+      padding: 13px 14px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background:
+        linear-gradient(135deg, rgba(255,255,255,0.98), rgba(247,249,252,0.98)),
+        var(--surface);
+      box-shadow: 0 10px 28px rgba(23, 32, 51, 0.06);
+    }
+
+    .tool-identity {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      gap: 12px;
+      align-items: center;
+      min-width: 0;
+    }
+
+    .tool-icon {
+      width: 58px;
+      height: 58px;
+      border-radius: 16px;
+      display: grid;
+      place-items: center;
+      background:
+        radial-gradient(circle at 28% 18%, rgba(255,255,255,0.45), transparent 34%),
+        linear-gradient(145deg, #102033 0%, #1b64f2 58%, #12b886 100%);
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.25),
+        0 12px 26px rgba(24, 79, 184, 0.24);
+    }
+
+    .tool-icon svg {
+      width: 42px;
+      height: 42px;
+      overflow: visible;
+    }
+
+    .tool-copy {
+      min-width: 0;
+    }
+
+    .tool-header .crumbs {
+      margin-bottom: 7px;
+    }
+
+    .tool-header .crumb {
+      padding: 6px 9px;
+      font-size: 12px;
+    }
+
+    .tool-title-line {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .tool-title-line h1 {
+      font-size: 24px;
+      letter-spacing: -0.02em;
+    }
+
+    .tool-header .subtitle {
+      max-width: 860px;
+      margin-top: 4px;
+      overflow: hidden;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.35;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .crumbs {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .crumb,
+    .tab,
+    .btn,
+    .icon-btn,
+    .select-like,
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--surface);
+      color: var(--text);
+      font-size: 13px;
+      line-height: 1;
+      white-space: nowrap;
+    }
+
+    .crumb,
+    .tab {
+      padding: 7px 10px;
+    }
+
+    .crumb.active,
+    .tab.active,
+    .btn.primary {
+      border-color: #1b2434;
+      background: #1b2434;
+      color: #fff;
+    }
+
+    .title-row {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+    }
+
+    h1,
+    h2,
+    h3,
+    p {
+      margin: 0;
+    }
+
+    h1 {
+      font-size: 24px;
+      font-weight: 720;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .header-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .chip {
+      padding: 7px 9px;
+      color: var(--muted);
+      background: var(--surface-soft);
+    }
+
+    .chip.ok {
+      border-color: #b9e8d5;
+      background: var(--green-soft);
+      color: #116247;
+    }
+
+    .chip.warn {
+      border-color: #f1d28a;
+      background: var(--amber-soft);
+      color: #7a4e00;
+    }
+
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: var(--muted-2);
+    }
+
+    .dot.ok {
+      background: var(--green);
+    }
+
+    .dot.warn {
+      background: #f2a51a;
+    }
+
+    .sql-shell {
+      display: grid;
+      grid-template-columns: 286px minmax(0, 1fr) 252px;
+      gap: 12px;
+      align-items: start;
+    }
+
+    .sql-shell.wide {
+      grid-template-columns: 310px minmax(0, 1fr);
+    }
+
+    .pane {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+      overflow: hidden;
+    }
+
+    .pane-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      min-height: 42px;
+      padding: 9px 11px;
+      border-bottom: 1px solid var(--line);
+      background: #f5f7fa;
+    }
+
+    .pane-title {
+      font-size: 12px;
+      font-weight: 760;
+      text-transform: uppercase;
+      color: #43536a;
+    }
+
+    .pane-subtitle {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .pane-body {
+      padding: 10px;
+    }
+
+    .source-toolbar {
+      display: grid;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .credentials-card {
+      display: grid;
+      gap: 8px;
+      margin-bottom: 10px;
+      padding: 9px;
+      border: 1px solid #c8d7ee;
+      border-radius: 8px;
+      background:
+        linear-gradient(135deg, rgba(232, 240, 255, 0.82), rgba(255,255,255,0.96)),
+        #fff;
+    }
+
+    .credentials-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 12px;
+    }
+
+    .file-pill {
+      overflow: hidden;
+      padding: 7px 8px;
+      border: 1px solid #dce5f2;
+      border-radius: 6px;
+      background: #fff;
+      color: #31435a;
+      font-family: var(--mono);
+      font-size: 11px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .credentials-actions {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 6px;
+    }
+
+    .input,
+    .select-like {
+      min-height: 32px;
+      padding: 8px 9px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--text);
+    }
+
+    .source-tree {
+      display: grid;
+      gap: 2px;
+      font-size: 13px;
+    }
+
+    .tree-group,
+    .tree-source {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 8px;
+      min-height: 30px;
+      padding: 5px 7px;
+      border-radius: 5px;
+    }
+
+    .tree-group {
+      margin-top: 6px;
+      background: #f6f8fb;
+      font-weight: 720;
+    }
+
+    .tree-source {
+      margin-left: 16px;
+      color: #27364c;
+    }
+
+    .tree-source.selected,
+    .tree-group.selected {
+      background: var(--accent-soft);
+      color: #123d8c;
+    }
+
+    .count {
+      min-width: 20px;
+      padding: 3px 6px;
+      border-radius: 999px;
+      background: #e5ebf3;
+      color: #43536a;
+      text-align: center;
+      font-size: 11px;
+      font-weight: 720;
+    }
+
+    .main-workspace {
+      display: grid;
+      gap: 10px;
+    }
+
+    .editor-frame {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+      overflow: hidden;
+    }
+
+    .editor-topline {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--line);
+      background: #f5f7fa;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn,
+    .icon-btn {
+      min-height: 30px;
+      padding: 7px 10px;
+      font-weight: 620;
+    }
+
+    .icon-btn {
+      justify-content: center;
+      min-width: 32px;
+      padding: 7px;
+    }
+
+    .btn.ghost,
+    .icon-btn.ghost {
+      background: #f8fafc;
+      color: #42546b;
+    }
+
+    .btn:disabled {
+      cursor: not-allowed;
+      opacity: 0.48;
+    }
+
+    .btn.danger {
+      border-color: #e9b9b9;
+      background: var(--red-soft);
+      color: #9b2727;
+    }
+
+    .btn.success {
+      border-color: #b9e8d5;
+      background: var(--green-soft);
+      color: #116247;
+    }
+
+    .code {
+      display: grid;
+      grid-template-columns: 42px 1fr;
+      min-height: 292px;
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.65;
+      background: #fbfcfe;
+    }
+
+    .line-numbers {
+      padding: 12px 8px;
+      border-right: 1px solid #e4e9f0;
+      color: #94a0b3;
+      text-align: right;
+      user-select: none;
+    }
+
+    .code-lines {
+      padding: 12px 14px;
+      color: #14243a;
+      white-space: pre-wrap;
+    }
+
+    .kw { color: #175cd3; font-weight: 720; }
+    .fn { color: #7c3aed; }
+    .str { color: #0f8f61; }
+    .num { color: #b45309; }
+    .comment { color: #7e8ca1; }
+
+    .result-pane {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+      overflow: hidden;
+    }
+
+    .result-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--line);
+      background: #f5f7fa;
+    }
+
+    .result-head-main {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      min-width: 0;
+      flex: 1;
+    }
+
+    .result-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .tabs {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .tab {
+      padding: 7px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      text-decoration: none;
+    }
+
+    .status-line {
+      display: grid;
+      grid-template-columns: repeat(5, auto) minmax(0, 1fr);
+      gap: 6px;
+      align-items: center;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #f7f9fb;
+    }
+
+    .status-line .chip {
+      font-size: 12px;
+      padding: 6px 8px;
+    }
+
+    .result-empty {
+      display: flex;
+      align-items: center;
+      min-height: 96px;
+      padding: 14px;
+      color: var(--muted);
+      background: #fbfcfe;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    th,
+    td {
+      padding: 8px 9px;
+      border-bottom: 1px solid #e5ebf3;
+      text-align: left;
+    }
+
+    th {
+      background: #eef3f8;
+      color: #54657a;
+      font-size: 11px;
+      text-transform: uppercase;
+    }
+
+    td.mono {
+      font-family: var(--mono);
+      color: #26364c;
+    }
+
+    .result-meta {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .source-summary {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 6px;
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--line);
+      background: #fbfcfe;
+    }
+
+    .source-summary .compact-row {
+      min-height: 28px;
+      padding: 5px 7px;
+    }
+
+    .result-mode-note {
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--line);
+      background: #fbfcfe;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .result-grid-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--line);
+      background: #ffffff;
+    }
+
+    .result-grid-toolbar-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .result-grid-note {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .grid-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .grid-header-actions {
+      display: inline-flex;
+      gap: 3px;
+      color: #6d7d91;
+      font-size: 10px;
+      text-transform: none;
+    }
+
+    .grid-row-head {
+      width: 54px;
+      color: var(--muted);
+      font-family: var(--mono);
+    }
+
+    .grid-cell-active {
+      outline: 2px solid #9fc0ff;
+      outline-offset: -2px;
+      background: var(--accent-soft);
+    }
+
+    .split-view {
+      display: grid;
+      grid-template-columns: 210px minmax(0, 1fr);
+      min-height: 260px;
+    }
+
+    .source-picker {
+      display: grid;
+      align-content: start;
+      gap: 5px;
+      padding: 10px;
+      border-right: 1px solid var(--line);
+      background: #fbfcfe;
+    }
+
+    .source-picker .compact-row.active {
+      border-color: #9fc0ff;
+      background: var(--accent-soft);
+      color: #123d8c;
+    }
+
+    .split-table {
+      min-width: 0;
+    }
+
+    .diff-summary {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      padding: 10px;
+      border-bottom: 1px solid var(--line);
+      background: #fbfcfe;
+    }
+
+    .diff-card {
+      padding: 9px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: #fff;
+    }
+
+    .diff-card.warn {
+      border-color: #f1d28a;
+      background: var(--amber-soft);
+    }
+
+    .right-rail {
+      display: grid;
+      gap: 10px;
+    }
+
+    .compact-list {
+      display: grid;
+      gap: 5px;
+    }
+
+    .compact-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      min-height: 30px;
+      padding: 6px 7px;
+      border: 1px solid #e5ebf3;
+      border-radius: 6px;
+      background: #fbfcfe;
+      font-size: 12px;
+    }
+
+    .compact-row strong {
+      font-size: 12px;
+    }
+
+    .hint {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .safety-strip {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 9px 10px;
+      border: 1px solid #f1d28a;
+      border-radius: 8px;
+      background: var(--amber-soft);
+      color: #624200;
+    }
+
+    .object-shell,
+    .history-shell,
+    .settings-shell {
+      display: grid;
+      grid-template-columns: 360px minmax(0, 1fr);
+      gap: 12px;
+      align-items: start;
+    }
+
+    .object-list {
+      display: grid;
+      gap: 4px;
+      margin-top: 10px;
+    }
+
+    .object-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fbfcfe;
+    }
+
+    .object-row.active {
+      border-color: #9fc0ff;
+      background: var(--accent-soft);
+    }
+
+    .inspector-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .metric {
+      padding: 9px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: #fbfcfe;
+    }
+
+    .metric-label {
+      margin-bottom: 4px;
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+    }
+
+    .metric-value {
+      font-weight: 720;
+    }
+
+    .history-shell {
+      grid-template-columns: 290px minmax(0, 1fr);
+    }
+
+    .settings-shell {
+      grid-template-columns: 330px minmax(0, 1fr) 300px;
+    }
+
+    .settings-side {
+      display: grid;
+      gap: 12px;
+      align-content: start;
+    }
+
+    .settings-form {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .settings-form .wide {
+      grid-column: 1 / -1;
+    }
+
+    .mode-switch {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px;
+      padding: 4px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #eef2f7;
+    }
+
+    .mode-option {
+      padding: 8px;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 720;
+      text-align: center;
+      text-decoration: none;
+    }
+
+    .mode-option.active {
+      border-color: #b9c8dd;
+      background: #ffffff;
+      color: var(--ink);
+      box-shadow: 0 5px 14px rgba(24, 36, 56, 0.08);
+    }
+
+    .field {
+      display: grid;
+      gap: 5px;
+    }
+
+    .field label {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 720;
+      text-transform: uppercase;
+    }
+
+    .field .input {
+      min-height: 34px;
+      font-family: var(--mono);
+      font-size: 12px;
+    }
+
+    .danger-zone {
+      margin-top: 10px;
+      padding: 9px;
+      border: 1px solid #e9b9b9;
+      border-radius: 7px;
+      background: var(--red-soft);
+    }
+
+    .filter-stack {
+      display: grid;
+      gap: 8px;
+    }
+
+    .history-row td {
+      vertical-align: top;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 7px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 720;
+      background: #e8edf5;
+      color: #43536a;
+    }
+
+    .badge.ok {
+      background: var(--green-soft);
+      color: #116247;
+    }
+
+    .badge.warn {
+      background: var(--amber-soft);
+      color: #7a4e00;
+    }
+
+    .badge.fail {
+      background: var(--red-soft);
+      color: #9b2727;
+    }
+  </style>
+</head>
+<body>
+  <main id="root"></main>
+  <script>
+    const screens = {
+      workspace: renderWorkspace,
+      result: renderResult,
+      transaction: renderTransaction,
+      objects: renderObjects,
+      sources: renderSourceSettings,
+      history: renderHistory
+    };
+
+    const params = new URLSearchParams(location.search);
+    const screen = params.get("screen") || "workspace";
+    const resultView = params.get("view") || "combined";
+    const sourceCredentialsMode = ["keychain", "placeholders"].includes(params.get("credentials"))
+      ? params.get("credentials")
+      : "keychain";
+    document.getElementById("root").innerHTML = reviewShell(screen, (screens[screen] || renderWorkspace)());
+
+    function reviewShell(activeScreen, content) {
+      const links = [
+        ["workspace", "Workspace"],
+        ["result", "Результаты"],
+        ["transaction", "Транзакция"],
+        ["objects", "Инспектор"],
+        ["sources", "Источники"],
+        ["history", "История"]
+      ];
+      return `
+        <div class="review-shell">
+          <nav class="review-nav" aria-label="SQL console design review navigation">
+            <div>
+              <div class="review-title">SQL console design review · backlog 18.1</div>
+              <div class="review-note">Standalone HTML для согласования. Product UI не изменен.</div>
+            </div>
+            <div class="review-links">
+              ${links.map(([id, label]) => `<a class="review-link ${activeScreen === id ? "active" : ""}" href="?screen=${id}">${label}</a>`).join("")}
+            </div>
+          </nav>
+          ${content}
+        </div>
+      `;
+    }
+
+    function header(title, subtitle, extra = "") {
+      return `
+        <section class="tool-header">
+          <div class="tool-identity">
+            ${sqlToolIcon()}
+            <div class="tool-copy">
+              <div class="crumbs">
+                <span class="crumb">На главную</span>
+                <span class="crumb">Объекты БД</span>
+                <span class="crumb active">SQL-консоль</span>
+              </div>
+              <div class="tool-title-line">
+                <h1>${title}</h1>
+                <span class="chip ok"><span class="dot ok"></span>5 источников выбрано</span>
+              </div>
+              <p class="subtitle">${subtitle}</p>
+            </div>
+          </div>
+          <div class="header-status">
+            <span class="chip">Workspace ws-local-01</span>
+            <span class="chip">Autocommit</span>
+            <span class="chip ok">PostgreSQL доступен</span>
+            ${extra}
+          </div>
+        </section>
+      `;
+    }
+
+    function sqlToolIcon() {
+      return `
+        <div class="tool-icon" aria-hidden="true">
+          <svg viewBox="0 0 48 48" role="img">
+            <path d="M10 12c0-4.2 7.4-7.5 16.5-7.5S43 7.8 43 12v18.8c0 4.2-7.4 7.6-16.5 7.6S10 35 10 30.8V12Z" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.82)" stroke-width="2"/>
+            <ellipse cx="26.5" cy="12" rx="16.5" ry="7.5" fill="rgba(255,255,255,0.18)" stroke="rgba(255,255,255,0.92)" stroke-width="2"/>
+            <path d="M10 21.3c0 4.2 7.4 7.5 16.5 7.5S43 25.5 43 21.3" fill="none" stroke="rgba(255,255,255,0.58)" stroke-width="2"/>
+            <path d="M10 30.5c0 4.2 7.4 7.5 16.5 7.5S43 34.7 43 30.5" fill="none" stroke="rgba(255,255,255,0.48)" stroke-width="2"/>
+            <path d="M5 17.5h11.5l4.8 6.5-4.8 6.5H5l4.9-6.5L5 17.5Z" fill="#ffffff" opacity="0.95"/>
+            <path d="M12.2 21.2h3.6M10.7 24h6.8M12.2 26.8h3.6" stroke="#1b64f2" stroke-width="1.7" stroke-linecap="round"/>
+            <path d="M30.5 17.2 35 24l-4.5 6.8M35 24H20.8" fill="none" stroke="#b7ffe8" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="36.4" cy="24" r="2.8" fill="#b7ffe8"/>
+          </svg>
+        </div>
+      `;
+    }
+
+    function sourcePane() {
+      return `
+        <aside class="pane">
+          <div class="pane-header">
+            <div>
+              <div class="pane-title">Источники</div>
+              <div class="pane-subtitle">5 выбрано из 5</div>
+            </div>
+            <button class="icon-btn ghost">⟳</button>
+          </div>
+          <div class="pane-body">
+            <div class="source-toolbar">
+              <button class="btn ghost">Проверить подключения</button>
+              <div class="input">Лимит строк: 2000</div>
+              <div class="input">Timeout: 60 сек</div>
+            </div>
+            <div class="source-tree">
+              ${group("dev", 2, true)}
+              ${source("db1", "готов", true)}
+              ${source("db2", "готов", true)}
+              ${group("ift", 3, true)}
+              ${source("db2", "готов", true)}
+              ${source("db3", "готов", true)}
+              ${source("db4", "готов", true)}
+              ${group("lt", 2, false)}
+              ${source("db4", "не выбран", false)}
+              ${source("db5", "не выбран", false)}
+            </div>
+          </div>
+        </aside>
+      `;
+    }
+
+    function group(name, count, selected) {
+      return `<div class="tree-group ${selected ? "selected" : ""}"><span>${selected ? "☑" : "☐"}</span><span>${name}</span><span class="count">${count}</span></div>`;
+    }
+
+    function source(name, state, selected) {
+      return `<div class="tree-source ${selected ? "selected" : ""}"><span>${selected ? "☑" : "☐"}</span><span>${name}</span><span class="hint">${state}</span></div>`;
+    }
+
+    function editor(sql, manual = false) {
+      return `
+        <section class="editor-frame">
+          <div class="editor-topline">
+            <div class="toolbar">
+              <button class="btn primary">▶ Выполнить</button>
+              <button class="btn ghost">Explain</button>
+              <button class="btn ghost">Проверить</button>
+              <button class="btn ghost">Форматировать</button>
+            </div>
+            <div class="toolbar">
+              <span class="chip ${manual ? "warn" : ""}">${manual ? "Manual transaction" : "Autocommit"}</span>
+              <span class="chip">Read-only: выкл</span>
+              <span class="chip">50 строк</span>
+            </div>
+          </div>
+          <div class="code">
+            <div class="line-numbers">1<br>2<br>3<br>4<br>5<br>6<br>7</div>
+            <div class="code-lines">${sql}</div>
+          </div>
+        </section>
+      `;
+    }
+
+    function rightRail() {
+      return `
+        <aside class="right-rail">
+          <section class="pane">
+            <div class="pane-header">
+              <div class="pane-title">Запросы</div>
+              <button class="btn ghost">Открыть</button>
+            </div>
+            <div class="pane-body compact-list">
+              <div class="compact-row"><strong>Последние</strong><span class="count">10</span></div>
+              <div class="compact-row"><strong>Избранные</strong><span class="count">0</span></div>
+              <div class="compact-row"><strong>Объекты</strong><span class="count">3</span></div>
+            </div>
+          </section>
+          <section class="pane">
+            <div class="pane-header"><div class="pane-title">Быстрые действия</div></div>
+            <div class="pane-body compact-list">
+              <button class="btn ghost">SELECT template</button>
+              <button class="btn ghost">INSERT template</button>
+              <button class="btn ghost">Открыть историю</button>
+            </div>
+          </section>
+        </aside>
+      `;
+    }
+
+    function resultEmpty() {
+      return `
+        <section class="result-pane">
+          <div class="result-head">
+            <div class="result-head-main">
+              <div class="tabs"><span class="tab active">Данные</span><span class="tab">Статусы</span><span class="tab">Diff</span></div>
+              <div class="result-meta"><span class="chip">ожидание</span></div>
+            </div>
+            ${resultExportActions(true)}
+          </div>
+          <div class="result-empty">Запрос еще не выполнялся. Результаты появятся здесь без переключения контекста.</div>
+        </section>
+      `;
+    }
+
+    function statusLine(manual = false) {
+      return `<div class="status-line">
+        <span class="chip">sources 5</span>
+        <span class="chip ${manual ? "warn" : ""}">${manual ? "pending commit" : "autocommit"}</span>
+        <span class="chip">grid</span>
+        <span class="chip">statement 1</span>
+        <span class="chip ok">ready</span>
+      </div>`;
+    }
+
+    function renderWorkspace() {
+      return `<div class="screen">
+        ${header("SQL-консоль по источникам", "Проверяй доступность sources, выполняй один SQL или SQL-скрипт по выбранным подключениям и сравнивай результат по каждому statement и source.")}
+        <div class="sql-shell">
+          ${sourcePane()}
+          <section class="main-workspace">
+            ${editor('<span class="kw">select</span> 1 <span class="kw">as</span> check_value\\n<span class="kw">from</span> pg_catalog.pg_database\\n<span class="kw">limit</span> <span class="num">20</span>;')}
+            ${resultEmpty()}
+            ${statusLine()}
+          </section>
+          ${rightRail()}
+        </div>
+      </div>`;
+    }
+
+    function renderResult() {
+      const view = ["combined", "split", "diff"].includes(resultView) ? resultView : "combined";
+      return `<div class="screen">
+        ${header("SQL-консоль по источникам", "Проверяй доступность sources, выполняй один SQL или SQL-скрипт по выбранным подключениям и сравнивай результат по каждому statement и source.")}
+        <div class="sql-shell">
+          ${sourcePane()}
+          <section class="main-workspace">
+            ${editor('<span class="kw">select</span> customer_id, status, amount, created_at\\n<span class="kw">from</span> orders.payment_event\\n<span class="kw">where</span> created_at &gt; now() - interval <span class="str">&apos;1 day&apos;</span>\\n<span class="kw">order by</span> created_at <span class="kw">desc</span>\\n<span class="kw">limit</span> <span class="num">50</span>;')}
+            <section class="result-pane">
+              <div class="result-head">
+                <div class="result-head-main">
+                  ${resultModeTabs(view)}
+                  <div class="result-meta"><span class="chip ok">DONE</span><span class="chip">42 ms</span><span class="chip">50 rows</span><span class="chip">${resultViewLabel(view)}</span></div>
+                </div>
+                ${resultExportActions()}
+              </div>
+              ${resultModeContent(view)}
+            </section>
+            ${statusLine()}
+          </section>
+          ${rightRail()}
+        </div>
+      </div>`;
+    }
+
+    function resultExportActions(disabled = false) {
+      const disabledAttr = disabled ? " disabled" : "";
+      return `<div class="result-actions">
+        <button class="btn ghost"${disabledAttr}>Экспорт общий</button>
+        <button class="btn ghost"${disabledAttr}>Экспорт по sources</button>
+      </div>`;
+    }
+
+    function resultModeTabs(activeView) {
+      return `<div class="tabs">
+        <a class="tab ${activeView === "combined" ? "active" : ""}" href="?screen=result&view=combined">Общий grid</a>
+        <a class="tab ${activeView === "split" ? "active" : ""}" href="?screen=result&view=split">По источникам</a>
+        <a class="tab ${activeView === "diff" ? "active" : ""}" href="?screen=result&view=diff">Diff</a>
+        <span class="tab">Статусы</span>
+      </div>`;
+    }
+
+    function resultViewLabel(activeView) {
+      if (activeView === "split") return "source: db1";
+      if (activeView === "diff") return "baseline: db1";
+      return "source: all";
+    }
+
+    function sourceSummary() {
+      return `<div class="source-summary">
+        <div class="compact-row"><strong>db1</strong><span class="badge ok">12 rows</span></div>
+        <div class="compact-row"><strong>db2</strong><span class="badge ok">11 rows</span></div>
+        <div class="compact-row"><strong>db3</strong><span class="badge warn">10 rows</span></div>
+        <div class="compact-row"><strong>db4</strong><span class="badge ok">9 rows</span></div>
+        <div class="compact-row"><strong>db5</strong><span class="badge ok">8 rows</span></div>
+      </div>`;
+    }
+
+    function resultModeContent(activeView) {
+      if (activeView === "split") return splitResultContent();
+      if (activeView === "diff") return diffResultContent();
+      return combinedResultContent();
+    }
+
+    function combinedResultContent() {
+      return `
+        ${sourceSummary()}
+        <div class="result-mode-note">Общий режим объединяет строки всех выбранных источников в одну таблицу. Колонка source обязательна и остается первой диагностической колонкой.</div>
+        ${resultGridToolbar("Активная ячейка: строка 1, колонка customer_id • C-9180")}
+        <table>
+          <thead><tr><th class="grid-row-head">#</th>${gridHeader("source")}${gridHeader("customer_id")}${gridHeader("status")}${gridHeader("amount")}${gridHeader("created_at")}</tr></thead>
+          <tbody>
+            ${Array.from({length: 9}).map((_, i) => `<tr><td class="grid-row-head">⧉ ${i + 1}</td><td class="mono">db${(i % 5) + 1}</td><td class="mono ${i === 0 ? "grid-cell-active" : ""}">C-${9180 + i}</td><td><span class="badge ok">CONFIRMED</span></td><td class="mono">${(1200 + i * 75).toFixed(2)}</td><td class="mono">2026-04-24 18:${10 + i}:03</td></tr>`).join("")}
+          </tbody>
+        </table>
+      `;
+    }
+
+    function resultGridToolbar(note) {
+      return `<div class="result-grid-toolbar">
+        <div class="result-grid-toolbar-actions">
+          <button class="btn ghost">Wrap</button>
+          <button class="btn ghost">Autosize</button>
+          <button class="btn ghost">Copy cell</button>
+          <button class="btn ghost">Copy row</button>
+          <button class="btn ghost">Copy column</button>
+        </div>
+        <div class="result-grid-note">${note}</div>
+      </div>`;
+    }
+
+    function gridHeader(name) {
+      return `<th><div class="grid-header"><span>${name}</span><span class="grid-header-actions">⧉ ↔ − +</span></div></th>`;
+    }
+
+    function splitResultContent() {
+      return `
+        ${sourceSummary()}
+        <div class="result-mode-note">Раздельный режим показывает один выбранный source без смешивания строк. Переключение source не запускает запрос повторно.</div>
+        <div class="split-view">
+          <div class="source-picker">
+            <div class="compact-row active"><strong>db1</strong><span class="badge ok">12</span></div>
+            <div class="compact-row"><strong>db2</strong><span class="badge ok">11</span></div>
+            <div class="compact-row"><strong>db3</strong><span class="badge warn">10</span></div>
+            <div class="compact-row"><strong>db4</strong><span class="badge ok">9</span></div>
+            <div class="compact-row"><strong>db5</strong><span class="badge ok">8</span></div>
+          </div>
+          <div class="split-table">
+            ${resultGridToolbar("Активируй ячейку или колонку, чтобы выполнять copy-действия и видеть фокус grid.")}
+            <table>
+              <thead><tr><th class="grid-row-head">#</th>${gridHeader("customer_id")}${gridHeader("status")}${gridHeader("amount")}${gridHeader("created_at")}</tr></thead>
+              <tbody>
+                ${Array.from({length: 7}).map((_, i) => `<tr><td class="grid-row-head">⧉ ${i + 1}</td><td class="mono ${i === 0 ? "grid-cell-active" : ""}">C-${9180 + i}</td><td><span class="badge ok">CONFIRMED</span></td><td class="mono">${(1200 + i * 75).toFixed(2)}</td><td class="mono">2026-04-24 18:${10 + i}:03</td></tr>`).join("")}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    function diffResultContent() {
+      return `
+        <div class="diff-summary">
+          <div class="diff-card"><div class="metric-label">Baseline</div><div class="metric-value">db1</div></div>
+          <div class="diff-card"><div class="metric-label">Same</div><div class="metric-value">db2, db4</div></div>
+          <div class="diff-card warn"><div class="metric-label">Diff</div><div class="metric-value">db3 · 3 значения</div></div>
+          <div class="diff-card"><div class="metric-label">Missing</div><div class="metric-value">db5 · 1 строка</div></div>
+        </div>
+        <div class="result-mode-note">Diff сравнивает источники относительно baseline и не смешивается с обычным grid. Это отдельный compare-view для поиска расхождений.</div>
+        <table>
+          <thead><tr><th>source</th><th>kind</th><th>row key</th><th>column</th><th>baseline db1</th><th>source value</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">db3</td><td><span class="badge warn">value changed</span></td><td class="mono">C-9183</td><td>status</td><td>CONFIRMED</td><td>RECHECK</td></tr>
+            <tr><td class="mono">db3</td><td><span class="badge warn">value changed</span></td><td class="mono">C-9184</td><td>amount</td><td>1500.00</td><td>1575.00</td></tr>
+            <tr><td class="mono">db5</td><td><span class="badge fail">missing row</span></td><td class="mono">C-9187</td><td>*</td><td>present</td><td>missing</td></tr>
+          </tbody>
+        </table>
+      `;
+    }
+
+    function renderTransaction() {
+      return `<div class="screen">
+        ${header("SQL-консоль по источникам", "Проверяй доступность sources, выполняй один SQL или SQL-скрипт по выбранным подключениям и сравнивай результат по каждому statement и source.", '<span class="chip warn">PENDING COMMIT</span>')}
+        <div class="sql-shell">
+          ${sourcePane()}
+          <section class="main-workspace">
+            <div class="safety-strip">
+              <div><strong>Ожидается подтверждение транзакции.</strong> Сессия удерживается владельцем workspace, hard TTL: 04:58.</div>
+              <div class="toolbar"><button class="btn success">Commit</button><button class="btn danger">Rollback</button></div>
+            </div>
+            ${editor('<span class="kw">update</span> orders.payment_event\\n<span class="kw">set</span> status = <span class="str">&apos;RECHECK&apos;</span>\\n<span class="kw">where</span> status = <span class="str">&apos;UNKNOWN&apos;</span>\\n  <span class="kw">and</span> created_at &gt; now() - interval <span class="str">&apos;10 minutes&apos;</span>\\n<span class="kw">returning</span> id, status;', true)}
+            <section class="result-pane">
+              <div class="result-head">
+                <div class="tabs"><span class="tab active">Статусы</span><span class="tab">Данные</span></div>
+                <div class="result-meta"><span class="chip warn">PENDING COMMIT</span><span class="chip">5 sources</span></div>
+              </div>
+              <table>
+                <thead><tr><th>source</th><th>status</th><th>rows affected</th><th>transaction</th><th>note</th></tr></thead>
+                <tbody>
+                  <tr><td class="mono">db1</td><td><span class="badge warn">pending</span></td><td>12</td><td>manual</td><td>waiting for owner confirmation</td></tr>
+                  <tr><td class="mono">db2</td><td><span class="badge warn">pending</span></td><td>9</td><td>manual</td><td>waiting for owner confirmation</td></tr>
+                  <tr><td class="mono">db3</td><td><span class="badge warn">pending</span></td><td>0</td><td>manual</td><td>no rows matched</td></tr>
+                </tbody>
+              </table>
+            </section>
+            ${statusLine(true)}
+          </section>
+          ${rightRail()}
+        </div>
+      </div>`;
+    }
+
+    function renderObjects() {
+      return `<div class="screen">
+        ${header("Объекты БД", "Связанный SQL-экран: search-first catalog и inspector без перегруза основного workspace.")}
+        <div class="object-shell">
+          <section class="pane">
+            <div class="pane-header"><div><div class="pane-title">Каталог объектов</div><div class="pane-subtitle">search-first</div></div></div>
+            <div class="pane-body">
+              <div class="input">orders.payment</div>
+              <div class="object-list">
+                <div class="object-row active"><div><strong>orders.payment_event</strong><div class="hint">table · db1/db2/db3</div></div><span class="badge ok">table</span></div>
+                <div class="object-row"><div><strong>orders.payment_index</strong><div class="hint">index · db1/db2</div></div><span class="badge">index</span></div>
+                <div class="object-row"><div><strong>orders.payment_view</strong><div class="hint">view · db1</div></div><span class="badge">view</span></div>
+              </div>
+            </div>
+          </section>
+          <section class="pane">
+            <div class="pane-header">
+              <div><div class="pane-title">Inspector</div><div class="pane-subtitle">orders.payment_event</div></div>
+              <div class="toolbar"><button class="btn primary">Открыть SELECT</button><button class="btn ghost">В избранное</button></div>
+            </div>
+            <div class="pane-body">
+              <div class="inspector-grid">
+                <div class="metric"><div class="metric-label">Тип</div><div class="metric-value">Table</div></div>
+                <div class="metric"><div class="metric-label">Схема</div><div class="metric-value">orders</div></div>
+                <div class="metric"><div class="metric-label">Колонки</div><div class="metric-value">14</div></div>
+                <div class="metric"><div class="metric-label">Источники</div><div class="metric-value">3</div></div>
+              </div>
+              <div class="tabs" style="margin-bottom:8px"><span class="tab active">Колонки</span><span class="tab">Индексы</span><span class="tab">DDL</span></div>
+              <table>
+                <thead><tr><th>name</th><th>type</th><th>nullable</th><th>default</th><th>comment</th></tr></thead>
+                <tbody>
+                  <tr><td class="mono">id</td><td>bigint</td><td>no</td><td>nextval</td><td>primary key</td></tr>
+                  <tr><td class="mono">customer_id</td><td>varchar(64)</td><td>no</td><td></td><td>client reference</td></tr>
+                  <tr><td class="mono">status</td><td>varchar(32)</td><td>no</td><td>'NEW'</td><td>payment state</td></tr>
+                  <tr><td class="mono">payload</td><td>jsonb</td><td>yes</td><td></td><td>raw event body</td></tr>
+                  <tr><td class="mono">created_at</td><td>timestamp</td><td>no</td><td>now()</td><td></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+      </div>`;
+    }
+
+    function sourceCredentialsModeSwitch(activeMode) {
+      const modes = [
+        ["keychain", "System keychain"],
+        ["placeholders", "Placeholders"]
+      ];
+      return `<div class="mode-switch">
+        ${modes.map(([id, label]) => `<a class="mode-option ${activeMode === id ? "active" : ""}" href="?screen=sources&credentials=${id}">${label}</a>`).join("")}
+      </div>`;
+    }
+
+    function renderSourceCredentialFields(activeMode) {
+      if (activeMode === "placeholders") {
+        return `
+          <div class="field wide"><label>jdbcUrl placeholder</label><div class="input">${"${PAYMENTS_DB_JDBC_URL}"} <span class="badge ok">resolved</span></div></div>
+          <div class="field"><label>username placeholder</label><div class="input">${"${PAYMENTS_DB_USERNAME}"} <span class="badge ok">resolved</span></div></div>
+          <div class="field"><label>password placeholder</label><div class="input">${"${PAYMENTS_DB_PASSWORD}"} <span class="badge warn">missing</span></div></div>
+        `;
+      }
+      return `
+        <div class="field wide"><label>jdbcUrl</label><div class="input">jdbc:postgresql://ift-db03:5432/payments</div></div>
+        <div class="field"><label>username</label><div class="input">payments_ro</div></div>
+        <div class="field"><label>password</label><div class="input">saved in System keychain <span class="badge ok">saved</span></div></div>
+        <div class="field"><label>provider</label><div class="input">macOS Keychain</div></div>
+        <div class="field wide"><label>replace password</label><div class="input">•••••••••••• <span class="hint">Показать пароль □</span></div></div>
+      `;
+    }
+
+    function renderSourceTechnicalDetails(activeMode) {
+      if (activeMode === "keychain") {
+        return `<details class="result-mode-note" style="margin-top:10px;border:1px solid var(--line);border-radius:7px">
+          <summary>Technical details</summary>
+          <div style="margin-top:8px" class="mono">secret key: sqlConsole.sources.db3.password</div>
+          <div style="margin-top:6px" class="mono">password: ${"${secret:sqlConsole.sources.db3.password}"}</div>
+        </details>`;
+      }
+      return "";
+    }
+
+    function renderSourceSettings() {
+      return `<div class="screen">
+        ${header("Настройки источников SQL", "Отдельный экран для добавления и редактирования source catalog. Выполнение SQL остается в рабочем workspace.")}
+        <div class="settings-shell">
+          <section class="pane">
+            <div class="pane-header">
+              <div><div class="pane-title">Sources</div><div class="pane-subtitle">ui.sqlConsole.sourceCatalog</div></div>
+              <div class="toolbar"><button class="btn ghost">Тест всех</button><button class="btn primary">+ Source</button></div>
+            </div>
+            <div class="pane-body compact-list">
+              <div class="compact-row"><strong>db1</strong><span class="badge ok">OK</span></div>
+              <div class="compact-row"><strong>db2</strong><span class="badge ok">OK</span></div>
+              <div class="compact-row"><strong>db3</strong><span class="badge warn">warning</span></div>
+              <div class="compact-row"><strong>db4</strong><span class="badge">not checked</span></div>
+              <div class="compact-row"><strong>db5</strong><span class="badge fail">failed</span></div>
+            </div>
+          </section>
+          <section class="pane">
+            <div class="pane-header">
+              <div><div class="pane-title">Редактирование source</div><div class="pane-subtitle">db3</div></div>
+              <div class="toolbar"><button class="btn ghost">Тест подключения</button><button class="btn primary">Сохранить</button></div>
+            </div>
+            <div class="pane-body">
+              <div class="settings-form">
+                <div class="field"><label>name</label><div class="input">db3</div></div>
+                <div class="field"><label>driver</label><div class="input">PostgreSQL / JDBC</div></div>
+                <div class="field wide">
+                  <label>credentials mode</label>
+                  ${sourceCredentialsModeSwitch(sourceCredentialsMode)}
+                </div>
+                ${renderSourceCredentialFields(sourceCredentialsMode)}
+                <div class="field wide"><label>Комментарий</label><div class="input">IFT shard for payment checks</div></div>
+              </div>
+              ${renderSourceTechnicalDetails(sourceCredentialsMode)}
+              <div class="result-mode-note" style="margin-top:10px;border:1px solid var(--line);border-radius:7px">
+                Последний тест: <strong>OK</strong>, 38 ms, PostgreSQL 15.3.
+              </div>
+              <div class="danger-zone">
+                <div class="credentials-head"><strong>Удаление source</strong><span class="badge warn">2 groups reference this source</span></div>
+                <div class="hint" style="margin-top:5px">Удаление должно проверить группы и выбранные workspace sources до записи конфига.</div>
+              </div>
+            </div>
+          </section>
+          <div class="settings-side">
+            <section class="pane">
+              <div class="pane-header">
+                <div><div class="pane-title">credential.properties</div><div class="pane-subtitle">ui.defaultCredentialsFile</div></div>
+                <div class="toolbar"><button class="btn ghost">Выбрать файл</button><button class="btn ghost">Проверить</button></div>
+              </div>
+              <div class="pane-body">
+                <div class="file-pill">~/DataPoolLoader/credential.properties</div>
+                <div class="compact-list" style="margin-top:10px">
+                  <div class="compact-row"><strong>file</strong><span class="badge ok">loaded</span></div>
+                  <div class="compact-row"><strong>PAYMENTS_DB_JDBC_URL</strong><span class="badge ok">resolved</span></div>
+                  <div class="compact-row"><strong>PAYMENTS_DB_USERNAME</strong><span class="badge ok">resolved</span></div>
+                  <div class="compact-row"><strong>PAYMENTS_DB_PASSWORD</strong><span class="badge warn">missing</span></div>
+                </div>
+              </div>
+            </section>
+            <section class="pane">
+              <div class="pane-header"><div><div class="pane-title">Groups</div><div class="pane-subtitle">sourceGroups</div></div><button class="btn ghost">+ Group</button></div>
+              <div class="pane-body compact-list">
+                <div class="compact-row"><strong>dev</strong><span class="hint">db1, db2</span></div>
+                <div class="compact-row"><strong>ift</strong><span class="hint">db2, db3, db4</span></div>
+                <div class="compact-row"><strong>lt</strong><span class="hint">db4, db5</span></div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>`;
+    }
+
+    function renderHistory() {
+      return `<div class="screen">
+        ${header("История запусков SQL", "Отдельный экран истории остается плотным журналом, не частью основного workspace.")}
+        <div class="history-shell">
+          <section class="pane">
+            <div class="pane-header"><div class="pane-title">Фильтры</div></div>
+            <div class="pane-body filter-stack">
+              <div class="input">workspace: current</div>
+              <div class="input">status: all</div>
+              <div class="input">source: any</div>
+              <button class="btn ghost">Сбросить</button>
+            </div>
+          </section>
+          <section class="pane">
+            <div class="pane-header">
+              <div><div class="pane-title">Execution log</div><div class="pane-subtitle">последние 50 запусков</div></div>
+              <button class="btn ghost">Обновить</button>
+            </div>
+            <table>
+              <thead><tr><th>time</th><th>status</th><th>duration</th><th>sources</th><th>transaction</th><th>sql</th><th>actions</th></tr></thead>
+              <tbody>
+                <tr class="history-row"><td class="mono">18:24:03</td><td><span class="badge ok">DONE</span></td><td>42 ms</td><td>5</td><td>autocommit</td><td class="mono">select customer_id, status...</td><td><button class="btn ghost">Подставить</button></td></tr>
+                <tr class="history-row"><td class="mono">18:19:44</td><td><span class="badge warn">ROLLBACK</span></td><td>1.2 s</td><td>3</td><td>manual</td><td class="mono">update orders.payment_event...</td><td><button class="btn ghost">Повторить</button></td></tr>
+                <tr class="history-row"><td class="mono">18:10:11</td><td><span class="badge fail">FAILED</span></td><td>88 ms</td><td>1</td><td>autocommit</td><td class="mono">select * from missing_table</td><td><button class="btn ghost">Подставить</button></td></tr>
+                <tr class="history-row"><td class="mono">17:58:02</td><td><span class="badge ok">DONE</span></td><td>9 ms</td><td>5</td><td>autocommit</td><td class="mono">select 1 as check_value</td><td><button class="btn ghost">Повторить</button></td></tr>
+              </tbody>
+            </table>
+          </section>
+        </div>
+      </div>`;
+    }
+  </script>
+</body>
+</html>
