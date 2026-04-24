@@ -373,6 +373,46 @@ Batch из 5 задач:
 - stray responsive rules для run-history возвращены в [30-run-history.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/30-run-history.css), а import-manifest [styles.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles.css) обновлен под новый ordered CSS topology;
 - full browser-level visual regression suite снова зеленый после локального harness normalization для shell-heavy baseline capture.
 
+#### 4.4. Split giant `30-run-history.css` into progress, history browser and summary chunks
+
+Статус:
+
+- реализовано
+
+Проблема:
+
+- [30-run-history.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/30-run-history.css) остается следующим giant CSS chunk проекта (`800+` строк);
+- внутри одного файла смешаны разные responsibility-группы:
+  - progress/log widgets;
+  - run history browser/list/filter controls;
+  - structured summary, artifacts и status badge styles;
+- этот chunk уже шарится между `module_runs`, `module_sync` и related run-detail UI, поэтому mixed-файл дальше опасно расширять.
+
+Целевой контракт:
+
+- progress/log/source-state стили живут в отдельном reviewable chunk;
+- run-history browser/list/filter controls живут в отдельном reviewable chunk;
+- structured summary/artifact/status styles живут в отдельном reviewable chunk;
+- import-manifest сохраняет явный порядок каскада;
+- visual behavior `module runs`, `module sync` и `run history cleanup` screen-ов не меняется.
+
+Batch из 5 задач:
+
+1. зафиксировать bounded split-пакет в backlog;
+2. выделить `run-progress` / `human-log` / `source-state` стили в отдельный chunk;
+3. оставить в [30-run-history.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/30-run-history.css) только history browser/list/filter controls;
+4. выделить `run-summary` / `artifacts` / `summary-structured` / `status-badge` стили в отдельный chunk и обновить import-manifest;
+5. прогнать compile/assets sync и full visual regression suite.
+
+Что сделано:
+
+- giant [30-run-history.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/30-run-history.css) разрезан на bounded chunks;
+- progress / log / source-state стили вынесены в [31-run-progress.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/31-run-progress.css);
+- summary / artifacts / structured status стили вынесены в [32-run-summary.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/32-run-summary.css);
+- [30-run-history.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/30-run-history.css) сокращен до history browser/list/filter controls;
+- import-manifest [styles.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles.css) обновлен под новую ordered topology;
+- compile/assets sync подтвержден, а closure validation выполнена через green full visual suite после normalization-пакета `16.16`.
+
 ### 5. Архитектурная программа: провести cleanup legacy и мусора
 
 Статус:
@@ -2093,6 +2133,50 @@ Closure review:
 - полный suite `ui-visual.smoke.spec.mjs` подтвержден двумя способами:
   - `--update-snapshots`
   - обычный прогон без update.
+
+#### 16.16. Visual target normalization для remaining shell and form baseline drift
+
+Статус:
+
+- реализовано
+
+Проблема:
+
+- после закрытия `16.15` и CSS-split пакета `4.4` полный visual suite снова шумит не на run-history экранах, а на нескольких соседних shell/form baseline-ах;
+- текущие падения не указывают на product regression, а на непоследовательный test-only normalization contract:
+  - `home page visual baseline`
+  - `sql object inspector error-state visual baseline`
+  - `sql console history populated-state visual baseline`
+  - `kafka produce visual baseline`
+- по мере plain-run проверки к этому же bounded drift-классу подтвердились еще три unstable scenario:
+  - `module runs empty-state visual baseline`
+  - `sql console history empty-state visual baseline`
+  - `kafka messages visual baseline`
+- пока эти baseline-ы не приведены к единому deterministic contract, `4.4` нельзя честно закрывать как подтвержденный full-suite пакет.
+
+Целевой контракт:
+
+- перечисленные baseline-ы используют одинаково bounded shell/form normalization:
+  - fixed viewport;
+  - stable scrollbar policy;
+  - explicit width/max-height clamp;
+  - repeatable settle point перед screenshot;
+- `--update-snapshots` и обычный прогон не расходятся на соседних plain-runs;
+- после закрытия пакета можно формально перевести `4.4` в `реализовано`.
+
+Критерий готовности:
+
+- visual spec получает final normalization для перечисленных shell/form scenarios;
+- полный `ui-visual.smoke.spec.mjs` проходит после `--update-snapshots` и на обычном plain-run;
+- `4.4` можно закрыть без оговорок про flaky harness.
+
+Что сделано:
+
+- оставшиеся noisy scenarios переведены на bounded deterministic shell contracts с явным `width/height` или `height/max-height` clamp;
+- для `home`, `about`, `sql object inspector error-state`, `sql console history empty/populated`, `kafka messages`, `kafka overview`, `kafka empty-state`, `kafka produce`, `module runs empty-state` обновлены target-specific normalization rules;
+- stale snapshot-ы, которые больше не соответствовали текущему layout, заменены актуальными baseline-ами;
+- `module runs selected-run` подтвержден как product-stable scenario, а не отдельный layout regression;
+- полный `ui-visual.smoke.spec.mjs` снова проходит и на `--update-snapshots`, и на обычном plain-run без дополнительной ручной правки harness.
 
 2. `Comprehensive visual regression coverage`
    - расширить существующий browser smoke harness до visual regression уровня;

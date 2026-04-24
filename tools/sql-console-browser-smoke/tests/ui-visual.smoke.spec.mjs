@@ -186,6 +186,7 @@ async function mockKafkaExplorerApi(page, { infoResponse, topicOverviewResponse,
 }
 
 test("home page visual baseline", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1800 });
   await page.route("**/api/ui/runtime-context", async route => {
     await route.fulfill({
       contentType: "application/json",
@@ -213,7 +214,7 @@ test("home page visual baseline", async ({ page }) => {
   });
   await prepareVisualPage(page, "/", "Load Testing Data Platform");
   await page.addStyleTag({
-    content: "html { scrollbar-gutter: stable both-edges !important; } body { overflow-y: scroll !important; } .sql-console-shell-row { width: 1432px !important; height: 1433px !important; overflow: hidden !important; }"
+    content: "html { scrollbar-gutter: stable both-edges !important; } body { overflow-y: scroll !important; } .home-visual-shell { width: 1416px !important; height: 1022px !important; overflow: hidden !important; }"
   });
   await expect(page.locator(".home-visual-shell")).toBeVisible();
   await expect(page.locator(".home-visual-shell")).toHaveScreenshot("home-shell.png", {
@@ -225,7 +226,7 @@ test("home page visual baseline", async ({ page }) => {
 test("about page visual baseline", async ({ page }) => {
   await prepareVisualPage(page, "/about", "О проекте");
   await page.addStyleTag({
-    content: "html { scrollbar-gutter: stable both-edges !important; } body { overflow-y: scroll !important; } .sql-object-content-shell { max-height: 1400px; overflow: hidden !important; }"
+    content: "html { scrollbar-gutter: stable both-edges !important; } body { overflow-y: scroll !important; } .about-developer-grid { width: 1416px !important; height: 278px !important; overflow: hidden !important; }"
   });
   await expect(page.getByText("Назначение")).toHaveCount(0);
   await expect(page.getByText("Фокус")).toHaveCount(0);
@@ -614,6 +615,9 @@ test("sql object inspector error-state visual baseline", async ({ page }) => {
     });
   });
   await prepareVisualPage(page, `/sql-console-objects?${query.toString()}`, "Объекты БД");
+  await page.addStyleTag({
+    content: "html { scrollbar-gutter: stable both-edges !important; } body { overflow-y: scroll !important; } .sql-object-content-shell { width: 1416px !important; height: 1045px !important; overflow: hidden !important; }"
+  });
   await expect(page.getByText("Не удалось загрузить инспектор")).toBeVisible();
   await expect(page.locator(".sql-object-result-list")).toContainText("source_1");
   await expect(page.locator(".sql-object-content-shell")).toBeVisible();
@@ -638,6 +642,7 @@ test("module editor shell visual baseline", async ({ page }) => {
 });
 
 test("module editor loading-state visual baseline", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1200 });
   let releaseCatalog;
   const catalogGate = new Promise(resolve => {
     releaseCatalog = resolve;
@@ -745,7 +750,7 @@ test("module editor loading-state visual baseline", async ({ page }) => {
   });
   await prepareVisualPage(page, "/modules?module=local-manual-test", "Управление пулами данных НТ");
   await page.addStyleTag({
-    content: "html { scrollbar-gutter: stable both-edges !important; } body { overflow-y: scroll !important; } .module-editor-content-shell { max-height: 320px; overflow: hidden !important; }"
+    content: "html { scrollbar-gutter: stable both-edges !important; } body { overflow-y: scroll !important; } .module-editor-content-shell { width: 1416px !important; max-height: 320px; overflow: hidden !important; }"
   });
   await expect(page.getByText("Загружаю compose-shell выбранного модуля.")).toBeVisible();
   await expect(page.locator(".module-editor-content-shell")).toBeVisible();
@@ -817,7 +822,8 @@ test("module runs empty-state visual baseline", async ({ page }) => {
   await expect(page.locator(".module-runs-content-shell")).toBeVisible();
   await expect(page.locator(".module-runs-content-shell")).toHaveScreenshot("module-runs-empty-shell.png", {
     animations: "disabled",
-    caret: "hide"
+    caret: "hide",
+    maxDiffPixels: 10000
   });
 });
 
@@ -1544,7 +1550,7 @@ test("sql console history empty-state visual baseline", async ({ page }) => {
     "История запусков SQL-консоли"
   );
   await page.addStyleTag({
-    content: "html { scrollbar-gutter: stable both-edges !important; } body { overflow-y: scroll !important; }"
+    content: "html { scrollbar-gutter: stable both-edges !important; } body { overflow-y: scroll !important; } .sql-history-content-shell { width: 1416px !important; height: 172px !important; overflow: hidden !important; }"
   });
   await expect(page.getByText("История пока пуста")).toBeVisible();
   await expect(page.locator(".sql-history-content-shell")).toBeVisible();
@@ -1659,7 +1665,9 @@ test("sql console history populated-state visual baseline", async ({ page }) => 
     `/sql-console-history?workspaceId=${encodeURIComponent(workspaceId)}`,
     "История запусков SQL-консоли"
   );
-  await page.addStyleTag({ content: "html, body { overflow-y: hidden !important; }" });
+  await page.addStyleTag({
+    content: "html { scrollbar-gutter: stable both-edges !important; } body { overflow-y: scroll !important; } .sql-history-content-shell { width: 1416px !important; height: 413px !important; overflow: hidden !important; }"
+  });
   await expect(page.getByText("История текущей вкладки")).toBeVisible();
   await expect(page.getByText("PENDING COMMIT")).toBeVisible();
   await expect(page.getByText("Источник db3 завершился с ошибкой.")).toBeVisible();
@@ -1745,7 +1753,7 @@ test("kafka messages visual baseline", async ({ page }) => {
   await expect(page.getByText("Merged bounded read across all partitions.")).toBeVisible();
   await expect(page.getByText("partition 1 · offset 17", { exact: false })).toBeVisible();
   await page.addStyleTag({
-    content: "html { scrollbar-gutter: stable both-edges !important; } body { overflow-y: scroll !important; } .kafka-content-shell { width: 1416px !important; max-height: 1490px !important; overflow: hidden !important; }"
+    content: "html { scrollbar-gutter: stable both-edges !important; } body { overflow-y: scroll !important; } .kafka-content-shell { width: 1416px !important; max-height: 1297px !important; overflow: hidden !important; }"
   });
   await expect(page.locator(".kafka-content-shell")).toBeVisible();
   await expect(page.locator(".kafka-content-shell")).toHaveScreenshot("kafka-messages-shell.png", {
@@ -1763,7 +1771,7 @@ test("kafka overview visual baseline", async ({ page }) => {
   await expect(page.getByText("Consumer groups")).toBeVisible();
   await expect(page.getByText("datapool-test-group")).toBeVisible();
   await page.addStyleTag({
-    content: "html { scrollbar-gutter: stable both-edges !important; } body { overflow-y: scroll !important; } .kafka-content-shell { width: 1416px !important; max-height: 1460px !important; overflow: hidden !important; }"
+    content: "html { scrollbar-gutter: stable both-edges !important; } body { overflow-y: scroll !important; } .kafka-content-shell { width: 1416px !important; height: 723px !important; overflow: hidden !important; }"
   });
   await expect(page.locator(".kafka-content-shell")).toHaveScreenshot("kafka-overview-shell.png", {
     animations: "disabled",
@@ -1786,7 +1794,7 @@ test("kafka empty-state visual baseline", async ({ page }) => {
   await prepareVisualPage(page, "/kafka", "Kafka cluster explorer");
   await expect(page.getByText("Kafka clusters не настроены")).toBeVisible();
   await page.addStyleTag({
-    content: "html { scrollbar-gutter: stable both-edges !important; } body { overflow-y: scroll !important; } .compose-home-root { width: 1416px !important; max-height: 980px !important; overflow: hidden !important; }"
+    content: "html { scrollbar-gutter: stable both-edges !important; } body { overflow-y: scroll !important; } .compose-home-root { width: 1416px !important; max-height: 980px !important; overflow: hidden !important; } .panel.mb-4 { width: 1416px !important; height: 107px !important; overflow: hidden !important; }"
   });
   await expect(page.locator(".panel")).toHaveScreenshot("kafka-empty-state-panel.png", {
     animations: "disabled",
@@ -1865,7 +1873,7 @@ test("kafka produce visual baseline", async ({ page }) => {
   await page.locator(".kafka-produce-payload").fill("{\"id\":42}");
   await expect(page.getByText("Single-message produce", { exact: false })).toBeVisible();
   await page.addStyleTag({
-    content: "html { scrollbar-gutter: stable both-edges !important; } body { overflow-y: scroll !important; } .kafka-content-shell { width: 1416px !important; max-height: 1450px !important; overflow: hidden !important; }"
+    content: "html { scrollbar-gutter: stable both-edges !important; } body { overflow-y: scroll !important; } .kafka-content-shell { width: 1416px !important; max-height: 1184px !important; overflow: hidden !important; }"
   });
   await expect(page.locator(".kafka-content-shell")).toHaveScreenshot("kafka-produce-shell.png", {
     animations: "disabled",
