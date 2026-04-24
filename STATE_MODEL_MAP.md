@@ -61,6 +61,8 @@
 
 - тип: `operational config`
 - source of truth: внешний `ui-application.yml` или classpath `application.yml`
+- что включает:
+  `moduleStore`, `sqlConsole`, `kafka` cluster catalog и Kafka operation limits
 - recovery: на каждом старте конфиг перечитывается заново
 - cleanup: только через явное изменение config-файла; не должен смешиваться с JSON state-файлами
 

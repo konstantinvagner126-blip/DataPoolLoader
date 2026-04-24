@@ -23,6 +23,7 @@ data class UiAppConfig(
     val showRawSummaryJson: Boolean = false,
     val defaultCredentialsFile: String? = null,
     val sqlConsole: SqlConsoleConfig = SqlConsoleConfig(),
+    val kafka: UiKafkaConfig = UiKafkaConfig(),
     @JsonIgnore val configBaseDir: String? = null,
 )
 

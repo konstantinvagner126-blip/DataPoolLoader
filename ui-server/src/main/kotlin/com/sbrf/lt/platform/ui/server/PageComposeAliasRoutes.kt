@@ -4,6 +4,11 @@ import io.ktor.server.routing.Route
 
 internal fun Route.registerPageComposeAliasRoutes() {
     registerComposeRedirect(
+        "/compose-kafka",
+        "screen" to "kafka",
+        forwardedParams = listOf("clusterId", "topic"),
+    )
+    registerComposeRedirect(
         "/compose-runs",
         "screen" to "module-runs",
         forwardedParams = listOf("storage", "module"),

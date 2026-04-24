@@ -351,8 +351,9 @@
 
 Текущий наивысший приоритет внутри `P1`:
 
-- [13. SQL-консоль: visual IDE refinement](/Users/kwdev/DataPoolLoader/BACKLOG.md);
-- до завершения первых пакетов `13.0` и `13.1` не размывать активную работу новыми SQL-console фичами, если они не снимают явный safety, runtime или visual defect.
+- [15. Kafka-инструмент: локальный cluster explorer и topic operations](/Users/kwdev/DataPoolLoader/BACKLOG.md);
+- после фиксации контрактов `15.0` и `15.1` не размывать Kafka-stream вне backlog:
+  сначала metadata/consumers/messages/produce baseline, потом только дополнительные integrations.
 
 ### 9. Операционная надежность long-running операций
 
@@ -949,6 +950,381 @@
 - основной content страницы теперь состоит только из карточек разработчиков;
 - hero/subtitle и навигационные действия упрощены, чтобы shell страницы не спорил с основным контентом;
 - удалены мертвые `about-*` стили, которые больше не используются после минимизации страницы.
+
+### 15. Kafka-инструмент: локальный cluster explorer и topic operations
+
+Статус:
+
+- частично реализовано
+
+Цель:
+
+- добавить в платформу отдельный локальный инструмент для работы с Kafka-кластерами из конфига;
+- покрыть основные инженерные сценарии:
+  - обзор кластеров и топиков;
+  - metadata по топику;
+  - связанные consumer groups, member count и lag;
+  - bounded reading сообщений;
+  - controlled producing сообщений в топик;
+- вести Kafka-инструмент как самостоятельную подсистему, а не как “еще одну карточку” на главной странице.
+
+Проблема:
+
+- сейчас платформа уже покрывает файловые/DB модули, SQL-консоль и maintenance flow, но не дает отдельного локального инструмента для Kafka;
+- при этом сценарии Kafka отличаются от SQL-консоли:
+  - источник подключения должен идти только из конфига;
+  - читать нужно не просто “список сообщений”, а topic/partition/group metadata;
+  - “количество консюмеров” и “consumer lag” честно моделируются как информация по consumer groups, а не как одно абстрактное число;
+  - transport/auth contract должен покрывать реальные варианты подключения платформы:
+    `PLAINTEXT` и `TLS/mTLS`, причем как через `JKS`, так и через `PEM`;
+  - нельзя тащить в первый этап destructive admin-операции ради похожести на полноценный web-product.
+
+Архитектурный контракт:
+
+- Kafka-инструмент проектируется как отдельная подсистема по слоям:
+  - `core`: Kafka models, contracts, topic/group/message operations;
+  - `ui-server`: config resolution, orchestration, persisted local state только там, где он действительно нужен;
+  - `ui-compose-shared`: screen/store/models/contracts;
+  - `ui-compose-web`: page composition, browser glue, visual layout.
+- подключение к Kafka идет только через UI config (`ui-application.yml` / внешний `application.yml`), без ad-hoc connection form в UI;
+- config contract должен выглядеть максимально близко к стандартному Kafka client config:
+  - `properties`-first;
+  - реальные Kafka property names (`bootstrap.servers`, `security.protocol`, `ssl.*`);
+  - без глубокого custom security DSL там, где хватает стандартных свойств клиента;
+- secrets и auth material не живут в UI state и должны поддерживать тот же placeholder-resolution contract, что уже используется для SQL-консоли;
+- первый auth/transport baseline Kafka подсистемы:
+  - `PLAINTEXT`;
+  - `TLS` c server certificate validation;
+  - `mTLS`;
+  - trust/identity material в форматах `JKS` и `PEM`;
+- первый этап делается route-driven, а не через новый `workspaceId`-контур:
+  - URL и screen state должны определять `cluster/topic/tab/filter`;
+  - не копировать SQL-console multi-tab model без реальной необходимости.
+
+Ограничения первого этапа:
+
+- не добавлять create/delete topic, reset offsets, ACL management и другие destructive admin actions;
+- не делать live tailing, бесконечный streaming consumer и implicit offset commit;
+- не тянуть schema registry, protobuf/avro-specific tooling и cross-cluster diff до закрытия baseline;
+- не тащить в первый auth-baseline `SASL_*`, пока не будет отдельного подтвержденного требования;
+- не смешивать Kafka-tool state с SQL-console state и history.
+
+Целевая экранная модель:
+
+- основной route `/kafka`;
+- структура ближе к `Kafka UI`, но упрощенная под локальное приложение:
+  - выбор кластера;
+  - список топиков;
+  - экран топика с вкладками `Overview / Consumers / Messages / Produce`;
+  - без лишних dashboard-плашек и без тяжелого multi-user chrome.
+
+Ключевые зоны будущего изменения:
+
+- [UiConfig.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/config/UiConfig.kt)
+- [UiRuntimeConfigResolver.kt](/Users/kwdev/DataPoolLoader/ui-server/src/main/kotlin/com/sbrf/lt/platform/ui/config/UiRuntimeConfigResolver.kt)
+- [HomePage.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/home/HomePage.kt)
+- [HomePageSections.kt](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/kotlin/com/sbrf/lt/platform/composeui/home/HomePageSections.kt)
+- новые feature-пакеты `core/ui-server/ui-compose-shared/ui-compose-web` для Kafka boundary.
+
+#### 15.0. Зафиксировать Kafka config contract и subsystem docs
+
+Статус:
+
+- реализовано
+
+Что нужно сделать:
+
+1. ввести новый config-block `ui.kafka`;
+2. зафиксировать каталог кластеров без группировки по аналогии с SQL-console sources, если реальная потребность в cluster-groups не доказана;
+3. поддержать placeholder-resolution для Kafka credentials через текущий runtime-config path;
+4. ввести dependency baseline на Kafka client и спрятать concrete client creation за отдельным boundary/factory;
+5. перейти на standard-looking `properties` contract для cluster connection:
+   - обязательный thin shell только для `id / name / readOnly`;
+   - connection properties хранить как стандартные Kafka keys;
+   - не вводить свой отдельный nested DSL для `security`, если без него можно обойтись;
+6. зафиксировать явную transport/security model:
+   - `PLAINTEXT`;
+   - `TLS`;
+   - `mTLS`;
+   - trust material в `JKS` и `PEM`;
+   - client identity в `JKS` и `PEM`;
+   - для `JKS` использовать стандартные Kafka SSL properties напрямую;
+   - для `PEM` использовать стандартные Kafka property names, но разрешить file-backed values через placeholder resolution:
+     - `ssl.truststore.certificates: "${file:/path/to/ca.crt}"`;
+     - `ssl.keystore.certificate.chain: "${file:/path/to/client.crt}"`;
+     - `ssl.keystore.key: "${file:/path/to/client.key}"`;
+     - `ssl.key.password: "${KAFKA_CLIENT_KEY_PASSWORD}"`;
+   - `ssl.truststore.location` / `ssl.keystore.location` оставлять стандартным путем для `JKS` и для тех PEM-случаев, где Kafka client действительно может читать file-based store напрямую;
+   - запретить невалидные комбинации transport/material settings;
+7. определить явные read/produce limits в конфиге:
+   - `maxRecordsPerRead`;
+   - `pollTimeoutMs`;
+   - `adminTimeoutMs`;
+   - `maxPayloadBytes`;
+   - при необходимости default topic page size;
+8. добавить отдельный reference/safety документ для Kafka subsystem с failure scenarios и scope boundaries.
+
+Что сделано:
+
+1. в `UiAppConfig` введен новый config-block `ui.kafka` с limits и catalog `clusters`;
+2. Kafka cluster contract зафиксирован как `properties`-first:
+   - thin shell `id / name / readOnly`;
+   - connection settings как стандартные Kafka keys;
+3. runtime resolver теперь умеет:
+   - обычные `${KEY}` placeholders;
+   - file-backed `${file:/path}` placeholders для PEM material;
+4. добавлен validation support:
+   - structural load validation для limits и cluster ids;
+   - runtime validation для `PLAINTEXT / SSL`, `JKS / PEM` и недопустимых SSL-комбинаций;
+5. добавлен Kafka client boundary в `ui-server`:
+   - `UiKafkaClientPropertiesFactory`;
+   - `UiKafkaClientFactory`;
+   - concrete `kafka-clients` creation теперь спрятан за отдельным factory layer;
+6. classpath `application.yml` и packaged `ui-application.example.yml` синхронизированы под новый `ui.kafka` contract;
+7. добавлен reference/safety документ [KAFKA_FAILURE_SCENARIOS.md](/Users/kwdev/DataPoolLoader/KAFKA_FAILURE_SCENARIOS.md);
+8. обновлены [STATE_MODEL_MAP.md](/Users/kwdev/DataPoolLoader/STATE_MODEL_MAP.md) и [AGENTS.md](/Users/kwdev/DataPoolLoader/AGENTS.md), чтобы Kafka config и Kafka safety doc стали частью явной архитектурной карты.
+
+Целевой YAML-скелет:
+
+```yaml
+ui:
+  kafka:
+    maxRecordsPerRead: 100
+    pollTimeoutMs: 3000
+    adminTimeoutMs: 5000
+    maxPayloadBytes: 1048576
+    clusters:
+      - id: "dev"
+        name: "DEV Kafka"
+        readOnly: false
+        properties:
+          bootstrap.servers: "host1:9092,host2:9092"
+          client.id: "datapool-loader"
+          security.protocol: "SSL"
+          ssl.truststore.type: "JKS"
+          ssl.truststore.location: "/path/to/truststore.jks"
+          ssl.truststore.password: "${KAFKA_TRUSTSTORE_PASSWORD}"
+          ssl.keystore.type: "JKS"
+          ssl.keystore.location: "/path/to/keystore.jks"
+          ssl.keystore.password: "${KAFKA_KEYSTORE_PASSWORD}"
+          ssl.key.password: "${KAFKA_KEY_PASSWORD}"
+      - id: "dev-mtls-pem"
+        name: "DEV Kafka mTLS PEM"
+        readOnly: false
+        properties:
+          bootstrap.servers: "host1:9092,host2:9092"
+          client.id: "datapool-loader"
+          security.protocol: "SSL"
+          ssl.truststore.type: "PEM"
+          ssl.truststore.certificates: "${file:/path/to/ca.crt}"
+          ssl.keystore.type: "PEM"
+          ssl.keystore.certificate.chain: "${file:/path/to/client.crt}"
+          ssl.keystore.key: "${file:/path/to/client.key}"
+          ssl.key.password: "${KAFKA_CLIENT_KEY_PASSWORD}"
+```
+
+#### 15.1. Перегруппировать карточки главной страницы под новый инструмент
+
+Статус:
+
+- реализовано
+
+Что нужно сделать:
+
+1. разместить карточку Kafka в одном блоке с SQL-консолью как единый раздел ручной инженерной работы с источниками;
+2. объединить `Справка` и `О проекте` в общий secondary-block;
+3. не смешивать этот блок с модульными/maintenance потоками;
+4. не превращать главную страницу в новый dashboard ради добавления Kafka.
+
+Что сделано:
+
+1. главная страница теперь держит три явных зоны:
+   - модульный/maintenance поток;
+   - manual tools block `SQL и Kafka`;
+   - secondary info block `Справка и проект`;
+2. `SQL-консоль` больше не висит отдельной карточкой вне смыслового блока, а собрана вместе с Kafka как единый раздел ручной инженерной работы;
+3. `Справка` и `О проекте` объединены в общий info-block и больше не конкурируют с основными рабочими инструментами;
+4. Kafka отражена на home-screen как полноценный primary tool платформы и ведет на отдельный `/kafka` screen;
+5. текст карточки `О проекте` синхронизирован с фактическим экраном и больше не обещает лишний explanatory content.
+
+#### 15.2. Metadata baseline: clusters, topics, topic overview
+
+Статус:
+
+- реализовано
+
+Что нужно сделать:
+
+1. добавить metadata-service/boundary для:
+   - списка кластеров;
+   - списка топиков;
+   - topic overview;
+   - partition summary;
+   - retention/replication/basic config, если доступно без перегруза;
+2. сделать основной topic list screen с filter/search;
+3. добавить route/API contracts для cluster/topic navigation;
+4. покрыть server-side metadata path тестами.
+
+Что сделано:
+
+1. в `core` добавлен явный contract `KafkaMetadataOperations` с моделями:
+   - `KafkaToolInfo`;
+   - `KafkaTopicsCatalog`;
+   - `KafkaTopicOverview`;
+   - `KafkaTopicPartitionSummary`;
+2. в `ui-server` реализован config-backed metadata service поверх `AdminClient`, но concrete client вызовы спрятаны за отдельным admin facade;
+3. добавлены API-routes:
+   - `GET /api/kafka/info`;
+   - `GET /api/kafka/topics?clusterId=...&query=...`;
+   - `GET /api/kafka/topic-overview?clusterId=...&topic=...`;
+4. добавлен page route `/kafka` и compose alias `/compose-kafka` c route params `clusterId/topic`;
+5. в `ui-compose-web` появился основной Kafka screen:
+   - cluster strip;
+   - topic list с filter/search;
+   - topic overview с partition summary и basic retention/cleanup metadata;
+6. home Kafka-card активирована и ведет на `/kafka`, поэтому новый инструмент больше не висит placeholder-state;
+7. metadata path покрыт server-side тестами:
+   - unit test для config-backed metadata service;
+   - route test для `/kafka` redirects и `/api/kafka/*`.
+
+#### 15.3. Consumer groups, member count и lag по topic scope
+
+Статус:
+
+- запланировано
+
+Что нужно сделать:
+
+1. для выбранного топика показывать связанные consumer groups;
+2. для каждой group показывать:
+   - member count;
+   - total lag;
+   - lag по partition при drill-down;
+3. не сводить это к одному “числу консюмеров”, которое теряет смысл;
+4. отдельно обработать состояния:
+   - group metadata unavailable;
+   - topic exists, но consumers нет;
+   - timeout/authorization failure.
+
+#### 15.4. Bounded message browser
+
+Статус:
+
+- запланировано
+
+Что нужно сделать:
+
+1. добавить bounded reading сообщений:
+   - latest records;
+   - read from explicit offset;
+   - read from timestamp, если это не усложняет baseline непропорционально;
+2. сделать partition-aware UX;
+3. не коммитить offsets и не держать background consumer session;
+4. явно ограничить объем чтения и payload rendering;
+5. продумать message value presentation:
+   - raw text;
+   - JSON pretty-print best-effort;
+   - headers / key / timestamp / partition / offset.
+
+#### 15.5. Controlled produce flow
+
+Статус:
+
+- запланировано
+
+Что нужно сделать:
+
+1. добавить отправку одного сообщения в topic;
+2. поддержать key, headers, partition override и payload text;
+3. валидировать size/empty/error states до отправки;
+4. возвращать честный delivery result:
+   - topic;
+   - partition;
+   - offset;
+   - timestamp, если доступен;
+5. не делать batch produce и file-import в baseline.
+
+#### 15.6. Kafka UI state, route model и local persistence
+
+Статус:
+
+- запланировано
+
+Что нужно сделать:
+
+1. определить минимальный state contract:
+   - что идет в URL;
+   - что живет только в screen state;
+   - что при необходимости можно локально persist;
+2. не повторять SQL-console `workspace` model без доказанной пользы;
+3. если появляется persisted local state, отдельно классифицировать его в [STATE_MODEL_MAP.md](/Users/kwdev/DataPoolLoader/STATE_MODEL_MAP.md);
+4. явно определить recovery после refresh/reopen.
+
+#### 15.7. Regression coverage и visual baseline для Kafka subsystem
+
+Статус:
+
+- запланировано
+
+Что нужно сделать:
+
+1. добавить server-side tests на metadata/read/produce boundaries;
+2. добавить shared/store tests на route/state behavior;
+3. добавить browser smoke и visual baseline минимум для:
+   - cluster/topic shell;
+   - topic overview;
+   - empty/error states;
+   - message browser;
+   - produce dialog/pane.
+
+#### 15.8. Kafka config settings UI для cluster connection editing
+
+Статус:
+
+- запланировано
+
+Что нужно сделать:
+
+1. добавить отдельный UI для редактирования Kafka cluster catalog в управляемом `ui-application.yml`;
+2. scope первого settings-экрана сделать узким и практичным:
+   - add/edit/remove cluster;
+   - `id / name / readOnly`;
+   - `bootstrap.servers`;
+   - SSL/TLS transport properties;
+   - пути к `JKS`;
+   - file-backed PEM paths через `${file:/...}` contract;
+3. не превращать этот экран в generic editor всех Kafka properties;
+4. сохранить `properties`-first модель:
+   - UI редактирует поддерживаемый поднабор стандартных Kafka keys;
+   - неизвестные/advanced properties не должны молча теряться при сохранении;
+5. использовать существующую infrastructure сохранения внешнего `ui-application.yml`, а не писать отдельный ad-hoc persistence path;
+6. добавить path validation для локального режима:
+   - существование файлов truststore/keystore/cert/key;
+   - внятные ошибки для отсутствующих путей;
+   - без проверки секретов по месту, если они заданы через `${...}`;
+7. отдельно определить UX для секретов:
+   - placeholder strings должны сохраняться как есть;
+   - UI не должен раскрывать содержимое секретов из runtime-resolved config обратно в editable form;
+8. добавить connection test из settings-экрана до сохранения или сразу после сохранения;
+9. покрыть server/store/browser tests на сценарии:
+   - update broker hosts;
+   - update JKS paths;
+   - update PEM file paths;
+   - invalid path;
+   - сохранение placeholder-based secret values.
+
+Критерий завершения:
+
+- в платформе есть отдельный локальный Kafka-инструмент с config-driven cluster catalog;
+- пользователь может безопасно пройти базовый цикл:
+  - выбрать cluster;
+  - открыть topic;
+  - посмотреть overview;
+  - увидеть consumer groups/member count/lag;
+  - прочитать bounded набор сообщений;
+  - отправить одно сообщение в topic;
+- при необходимости пользователь может через UI поменять broker hosts и пути к `JKS/PEM` без ручного редактирования YAML;
+- home screen отражает Kafka как один из основных инженерных инструментов платформы.
 
 ## P2
 

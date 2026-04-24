@@ -16,23 +16,32 @@ import java.io.StringReader
 open class UiRuntimeConfigResolver(
     private val credentialsProvider: UiCredentialsProvider? = null,
 ) {
+    private val placeholderResolutionSupport = UiConfigPlaceholderResolutionSupport()
+    private val kafkaValidationSupport = UiKafkaConfigValidationSupport()
+
     open fun resolve(uiConfig: UiAppConfig): UiAppConfig {
         val properties = credentialsProvider?.currentProperties()
             ?.takeIf { it.isNotEmpty() }
             ?: loadFallbackProperties(uiConfig.defaultCredentialsPath())
+        val resolvedKafka = uiConfig.kafka.resolvePlaceholders(
+            properties = properties,
+            baseDir = uiConfig.configBaseDir?.let { Path.of(it) },
+        )
+        kafkaValidationSupport.validateForRuntime(resolvedKafka)
         return uiConfig.copy(
             moduleStore = uiConfig.moduleStore.copy(
                 postgres = uiConfig.moduleStore.postgres.resolvePlaceholders(properties),
             ),
             sqlConsole = uiConfig.sqlConsole.resolvePlaceholders(properties),
+            kafka = resolvedKafka,
         )
     }
 
     private fun UiModuleStorePostgresConfig.resolvePlaceholders(properties: Map<String, String>): UiModuleStorePostgresConfig =
         copy(
-            jdbcUrl = jdbcUrl?.let { resolveIfPossible(it, properties) },
-            username = username?.let { resolveIfPossible(it, properties) },
-            password = password?.let { resolveIfPossible(it, properties) },
+            jdbcUrl = jdbcUrl?.let { placeholderResolutionSupport.resolveIfPossible(it, properties) },
+            username = username?.let { placeholderResolutionSupport.resolveIfPossible(it, properties) },
+            password = password?.let { placeholderResolutionSupport.resolveIfPossible(it, properties) },
         )
 
     private fun SqlConsoleConfig.resolvePlaceholders(properties: Map<String, String>): SqlConsoleConfig =
@@ -42,20 +51,26 @@ open class UiRuntimeConfigResolver(
 
     private fun SqlConsoleSourceConfig.resolvePlaceholders(properties: Map<String, String>): SqlConsoleSourceConfig =
         copy(
-            jdbcUrl = resolveIfPossible(jdbcUrl, properties),
-            username = resolveIfPossible(username, properties),
-            password = resolveIfPossible(password, properties),
+            jdbcUrl = placeholderResolutionSupport.resolveIfPossible(jdbcUrl, properties),
+            username = placeholderResolutionSupport.resolveIfPossible(username, properties),
+            password = placeholderResolutionSupport.resolveIfPossible(password, properties),
         )
 
-    private fun resolveIfPossible(rawValue: String, properties: Map<String, String>): String {
-        val trimmed = rawValue.trim()
-        val match = PLACEHOLDER_PATTERN.matchEntire(trimmed) ?: return rawValue
-        val key = match.groupValues[1]
-        return properties[key]
-            ?: System.getenv(key)
-            ?: System.getProperty(key)
-            ?: rawValue
-    }
+    private fun UiKafkaConfig.resolvePlaceholders(
+        properties: Map<String, String>,
+        baseDir: Path?,
+    ): UiKafkaConfig = copy(
+        clusters = clusters.map { it.resolvePlaceholders(properties, baseDir) },
+    )
+
+    private fun UiKafkaClusterConfig.resolvePlaceholders(
+        properties: Map<String, String>,
+        baseDir: Path?,
+    ): UiKafkaClusterConfig = copy(
+        properties = this.properties.mapValues { (_, value) ->
+            placeholderResolutionSupport.resolveIfPossible(value, properties, baseDir)
+        },
+    )
 
     private fun loadFallbackProperties(path: Path?): Map<String, String> {
         if (path == null || !path.exists()) {
@@ -66,9 +81,5 @@ open class UiRuntimeConfigResolver(
             props.load(StringReader(path.readText().removePrefix("\uFEFF")))
             props.stringPropertyNames().associateWith { props.getProperty(it) }
         }.getOrDefault(emptyMap())
-    }
-
-    private companion object {
-        val PLACEHOLDER_PATTERN = Regex("^\\$\\{([A-Za-z0-9_.-]+)}$")
     }
 }

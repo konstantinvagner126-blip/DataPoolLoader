@@ -431,6 +431,35 @@
   gap: 1rem;
 }
 
+.home-section-card {
+  grid-column: auto;
+  padding: 1.2rem;
+  border-radius: 22px;
+}
+
+.home-section-card .home-group-header {
+  margin-bottom: 0.9rem;
+}
+
+.home-section-card .home-group-title {
+  font-size: 1.22rem;
+}
+
+.home-section-card .home-group-text {
+  max-width: none;
+  font-size: 0.94rem;
+}
+
+.home-section-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 0.9rem;
+}
+
+.home-section-grid .home-card {
+  min-height: 100%;
+}
+
 .home-mode-card {
   min-height: 100%;
 }

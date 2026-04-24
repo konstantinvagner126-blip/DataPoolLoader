@@ -8,6 +8,8 @@ import java.nio.file.Path
 internal class UiConfigLoadSupport(
     private val configLoader: ConfigLoader,
 ) {
+    private val kafkaValidationSupport = UiKafkaConfigValidationSupport()
+
     fun load(
         externalConfig: Path?,
         classpathStream: InputStream?,
@@ -16,12 +18,16 @@ internal class UiConfigLoadSupport(
             require(Files.exists(externalConfig)) {
                 "UI-конфиг не найден: $externalConfig"
             }
-            return readUiConfigFileWithBaseDir(externalConfig, configLoader)
+            return readUiConfigFileWithBaseDir(externalConfig, configLoader).also(::validate)
         }
 
         val stream = classpathStream ?: return UiAppConfig()
         return stream.bufferedReader().use {
             configLoader.objectMapper().readValue(it, UiRootConfig::class.java).ui
-        }
+        }.also(::validate)
+    }
+
+    private fun validate(uiConfig: UiAppConfig) {
+        kafkaValidationSupport.validateForLoad(uiConfig.kafka)
     }
 }

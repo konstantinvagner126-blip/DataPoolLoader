@@ -80,6 +80,28 @@ internal fun ModeCard(
 }
 
 @Composable
+internal fun HomeSectionCard(
+    label: String,
+    title: String,
+    text: String,
+    vararg extraClasses: String,
+    content: @Composable () -> Unit,
+) {
+    Div({
+        classes("home-group-card", "home-section-card", *extraClasses)
+    }) {
+        Div({ classes("home-group-header") }) {
+            Div({ classes("home-group-header-main") }) {
+                Div({ classes("home-card-label") }) { Text(label) }
+                Div({ classes("home-group-title") }) { Text(title) }
+                Div({ classes("home-group-text") }) { Text(text) }
+            }
+        }
+        content()
+    }
+}
+
+@Composable
 internal fun SimpleCard(
     label: String,
     title: String,

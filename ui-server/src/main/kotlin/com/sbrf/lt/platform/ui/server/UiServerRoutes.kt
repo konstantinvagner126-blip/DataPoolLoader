@@ -8,5 +8,6 @@ internal fun Route.registerUiRoutes(context: UiServerContext, mapper: ObjectMapp
     registerModuleRunRoutes(context)
     registerDatabaseRoutes(context, mapper)
     registerCommonRoutes(context, mapper)
+    registerKafkaRoutes(context)
     registerSqlConsoleRoutes(context)
 }

@@ -21,6 +21,10 @@
 - [SQL_CONSOLE_FAILURE_SCENARIOS.md](/Users/kwdev/DataPoolLoader/SQL_CONSOLE_FAILURE_SCENARIOS.md)
 - [SQL_CONSOLE_MONACO_AUTOCOMPLETE.md](/Users/kwdev/DataPoolLoader/SQL_CONSOLE_MONACO_AUTOCOMPLETE.md)
 
+Если изменение затрагивает Kafka-инструмент, дополнительно обязательно читать:
+
+- [KAFKA_FAILURE_SCENARIOS.md](/Users/kwdev/DataPoolLoader/KAFKA_FAILURE_SCENARIOS.md)
+
 ## Базовый контекст проекта
 
 Проект рассматривается как локальное инженерное приложение:

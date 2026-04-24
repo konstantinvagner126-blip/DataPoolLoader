@@ -2,6 +2,7 @@ package com.sbrf.lt.platform.ui.server
 
 import com.sbrf.lt.datapool.module.sync.ModuleSyncService
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleOperations
+import com.sbrf.lt.datapool.kafka.KafkaMetadataOperations
 import com.sbrf.lt.platform.ui.config.UiAppConfig
 import com.sbrf.lt.platform.ui.config.UiConfigLoader
 import com.sbrf.lt.platform.ui.config.UiConfigPersistenceService
@@ -44,6 +45,7 @@ internal fun buildUiServerModuleContextDependencies(
     sqlConsoleExportService: SqlConsoleExportService? = null,
     sqlConsoleExecutionHistoryService: SqlConsoleExecutionHistoryService? = null,
     sqlConsoleStateService: SqlConsoleStateService? = null,
+    kafkaMetadataService: KafkaMetadataOperations? = null,
     uiConfigPersistenceService: UiConfigPersistenceService? = null,
     moduleSyncService: ModuleSyncService?,
     databaseModuleRunService: DatabaseModuleRunOperations?,
@@ -80,6 +82,7 @@ internal fun buildUiServerModuleContextDependencies(
         uiConfig = uiConfig,
         workspaceRetentionService = resolvedSqlConsoleWorkspaceRetentionService,
     )
+    val resolvedKafkaMetadataService = kafkaMetadataService ?: defaultKafkaMetadataService(resolvedRuntimeUiConfig)
     val resolvedUiConfigPersistenceService = uiConfigPersistenceService ?: UiConfigPersistenceService()
     val resolvedDatabaseModuleActiveRunRegistry =
         databaseModuleActiveRunRegistry ?: DatabaseModuleActiveRunRegistry()
@@ -104,6 +107,7 @@ internal fun buildUiServerModuleContextDependencies(
         sqlConsoleExportService = resolvedSqlConsoleExportService,
         sqlConsoleExecutionHistoryService = resolvedSqlConsoleExecutionHistoryService,
         sqlConsoleStateService = resolvedSqlConsoleStateService,
+        kafkaMetadataService = resolvedKafkaMetadataService,
         uiConfigPersistenceService = resolvedUiConfigPersistenceService,
         moduleSyncService = moduleSyncService,
         databaseModuleRunService = databaseModuleRunService,

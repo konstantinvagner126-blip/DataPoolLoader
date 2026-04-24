@@ -23,6 +23,7 @@ import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleAsyncQueryOperations
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleExecutionHistoryService
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleExportService
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleStateService
+import com.sbrf.lt.datapool.kafka.KafkaMetadataOperations
 
 internal data class UiServerContextDependencies(
     val uiConfig: UiAppConfig,
@@ -42,6 +43,7 @@ internal data class UiServerContextDependencies(
     val sqlConsoleExportService: SqlConsoleExportService,
     val sqlConsoleExecutionHistoryService: SqlConsoleExecutionHistoryService,
     val sqlConsoleStateService: SqlConsoleStateService,
+    val kafkaMetadataService: KafkaMetadataOperations,
     val uiConfigPersistenceService: UiConfigPersistenceService,
     val moduleSyncService: ModuleSyncService?,
     val databaseModuleRunService: DatabaseModuleRunOperations?,

@@ -12,6 +12,12 @@ ui:
   showTechnicalDiagnostics: false
   showRawSummaryJson: false
   defaultCredentialsFile: null
+  kafka:
+    maxRecordsPerRead: 100
+    pollTimeoutMs: 3000
+    adminTimeoutMs: 5000
+    maxPayloadBytes: 1048576
+    clusters: []
   sqlConsole:
     fetchSize: 1000
     maxRowsPerShard: 200

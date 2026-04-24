@@ -153,29 +153,53 @@ fun ComposeHomePage(
                     }
                 }
 
-                SimpleCard(
-                    label = "SQL",
-                    title = "SQL-консоль",
-                    text = "Ручное выполнение SQL по выбранным источникам, просмотр результатов по shard/source и служебные операции.",
-                    action = "Открыть SQL-консоль",
-                    href = "/sql-console",
-                )
+                HomeSectionCard(
+                    label = "Ручная инженерная работа",
+                    title = "SQL и Kafka",
+                    text = "Инструменты ручной работы с источниками и брокерами: SQL-операции, Kafka metadata, topic browsing и controlled message actions.",
+                ) {
+                    Div({ classes("home-section-grid") }) {
+                        SimpleCard(
+                            label = "SQL",
+                            title = "SQL-консоль",
+                            text = "Ручное выполнение SQL по выбранным источникам, просмотр результатов по shard/source и служебные операции.",
+                            action = "Открыть SQL-консоль",
+                            href = "/sql-console",
+                        )
 
-                SimpleCard(
-                    label = "Справка",
-                    title = "Справка",
-                    text = "Подробные инструкции по каждому модулю, рекомендации по запуску и пояснения по ключевым параметрам конфигурации.",
-                    action = "Открыть справку",
-                    href = "/help",
-                )
+                        SimpleCard(
+                            label = "Kafka",
+                            title = "Kafka-инструмент",
+                            text = "Локальный explorer по кластерам из конфига: топики, consumer groups, lag, bounded read и controlled produce.",
+                            action = "Открыть Kafka-инструмент",
+                            href = "/kafka",
+                        )
+                    }
+                }
 
-                SimpleCard(
-                    label = "Команда",
-                    title = "О проекте",
-                    text = "Краткое описание Load Testing Data Platform, список разработчиков и отдельная информационная страница проекта.",
-                    action = "Открыть страницу проекта",
-                    href = "/about",
-                )
+                HomeSectionCard(
+                    label = "Информация",
+                    title = "Справка и проект",
+                    text = "Документация по рабочим экранам, рекомендации по использованию и краткая информация о платформе и команде.",
+                ) {
+                    Div({ classes("home-section-grid") }) {
+                        SimpleCard(
+                            label = "Справка",
+                            title = "Справка",
+                            text = "Подробные инструкции по каждому модулю, рекомендации по запуску и пояснения по ключевым параметрам конфигурации.",
+                            action = "Открыть справку",
+                            href = "/help",
+                        )
+
+                        SimpleCard(
+                            label = "Команда",
+                            title = "О проекте",
+                            text = "Карточки разработчиков и минимальная информация о платформе без лишнего explanatory content.",
+                            action = "Открыть страницу проекта",
+                            href = "/about",
+                        )
+                    }
+                }
             }
         }
 

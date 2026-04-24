@@ -19,6 +19,7 @@ import com.sbrf.lt.platform.ui.run.RunManager
 import com.sbrf.lt.platform.ui.run.UiCredentialsService
 import com.sbrf.lt.platform.ui.run.history.FilesModuleRunHistoryService
 import com.sbrf.lt.platform.ui.run.history.ModuleRunHistoryService
+import com.sbrf.lt.datapool.kafka.KafkaMetadataOperations
 import com.sbrf.lt.datapool.module.sync.ModuleSyncService
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleAsyncQueryOperations
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleExecutionHistoryService
@@ -46,6 +47,7 @@ internal fun Application.uiModule(
     sqlConsoleExportService: SqlConsoleExportService? = null,
     sqlConsoleExecutionHistoryService: SqlConsoleExecutionHistoryService? = null,
     sqlConsoleStateService: SqlConsoleStateService? = null,
+    kafkaMetadataService: KafkaMetadataOperations? = null,
     uiConfigPersistenceService: UiConfigPersistenceService? = null,
     moduleSyncService: ModuleSyncService? = null,
     databaseModuleRunService: DatabaseModuleRunOperations? = null,
@@ -75,6 +77,7 @@ internal fun Application.uiModule(
             sqlConsoleExportService = sqlConsoleExportService,
             sqlConsoleExecutionHistoryService = sqlConsoleExecutionHistoryService,
             sqlConsoleStateService = sqlConsoleStateService,
+            kafkaMetadataService = kafkaMetadataService,
             uiConfigPersistenceService = uiConfigPersistenceService,
             moduleSyncService = moduleSyncService,
             databaseModuleRunService = databaseModuleRunService,

@@ -20,6 +20,7 @@ internal fun buildUiServerContext(deps: UiServerContextDependencies): UiServerCo
         sqlConsoleExportService = deps.sqlConsoleExportService,
         sqlConsoleExecutionHistoryService = deps.sqlConsoleExecutionHistoryService,
         sqlConsoleStateService = deps.sqlConsoleStateService,
+        kafkaMetadataService = deps.kafkaMetadataService,
         uiConfigPersistenceService = deps.uiConfigPersistenceService,
         moduleSyncService = deps.moduleSyncService,
         databaseModuleRunService = deps.databaseModuleRunService,

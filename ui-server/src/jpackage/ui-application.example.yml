@@ -12,6 +12,32 @@ ui:
   showTechnicalDiagnostics: false
   showRawSummaryJson: false
   defaultCredentialsFile: credential.properties
+  kafka:
+    maxRecordsPerRead: 100
+    pollTimeoutMs: 3000
+    adminTimeoutMs: 5000
+    maxPayloadBytes: 1048576
+    clusters: []
+      # - id: local-plain
+      #   name: Local Kafka PLAINTEXT
+      #   readOnly: false
+      #   properties:
+      #     bootstrap.servers: localhost:19092
+      #     client.id: datapool-loader
+      #     security.protocol: PLAINTEXT
+      # - id: dev-mtls-pem
+      #   name: DEV Kafka mTLS PEM
+      #   readOnly: true
+      #   properties:
+      #     bootstrap.servers: host1:9092,host2:9092
+      #     client.id: datapool-loader
+      #     security.protocol: SSL
+      #     ssl.truststore.type: PEM
+      #     ssl.truststore.certificates: ${file:/path/to/ca.crt}
+      #     ssl.keystore.type: PEM
+      #     ssl.keystore.certificate.chain: ${file:/path/to/client.crt}
+      #     ssl.keystore.key: ${file:/path/to/client.key}
+      #     ssl.key.password: ${KAFKA_CLIENT_KEY_PASSWORD}
   sqlConsole:
     fetchSize: 1000
     maxRowsPerShard: 200

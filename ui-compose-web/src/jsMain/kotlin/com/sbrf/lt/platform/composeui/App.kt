@@ -4,6 +4,8 @@ import androidx.compose.runtime.Composable
 import com.sbrf.lt.platform.composeui.about.ComposeAboutPage
 import com.sbrf.lt.platform.composeui.foundation.navigation.currentComposeRoute
 import com.sbrf.lt.platform.composeui.home.ComposeHomePage
+import com.sbrf.lt.platform.composeui.kafka.ComposeKafkaPage
+import com.sbrf.lt.platform.composeui.kafka.parseKafkaRoute
 import com.sbrf.lt.platform.composeui.module_editor.ComposeModuleEditorPage
 import com.sbrf.lt.platform.composeui.module_editor.parseModuleEditorRoute
 import com.sbrf.lt.platform.composeui.module_sync.ComposeModuleSyncPage
@@ -25,6 +27,7 @@ fun ComposeSpikeApp() {
         "module-runs" -> parseModuleRunsRoute(route.params)?.let {
             ComposeModuleRunsPage(it)
         } ?: ComposeHomePage()
+        "kafka" -> ComposeKafkaPage(parseKafkaRoute(route.params))
         "run-history-cleanup" -> ComposeRunHistoryCleanupPage()
         "about" -> ComposeAboutPage()
         "sql-console" -> ComposeSqlConsolePage()

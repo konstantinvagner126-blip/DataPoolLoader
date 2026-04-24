@@ -1,0 +1,120 @@
+.kafka-content-shell {
+  display: grid;
+  gap: 1rem;
+}
+
+.kafka-cluster-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 0.9rem;
+}
+
+.kafka-cluster-link {
+  display: block;
+  padding: 1rem;
+  border-radius: 16px;
+  border: 1px solid rgba(19, 34, 56, 0.1);
+  text-decoration: none;
+  color: inherit;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(244, 247, 251, 0.94));
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.kafka-cluster-link:hover {
+  transform: translateY(-1px);
+  border-color: rgba(29, 111, 216, 0.22);
+  box-shadow: 0 18px 40px rgba(19, 34, 56, 0.08);
+}
+
+.kafka-cluster-link-active {
+  border-color: rgba(29, 111, 216, 0.35);
+  box-shadow: 0 20px 44px rgba(29, 111, 216, 0.12);
+}
+
+.kafka-cluster-link-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.kafka-cluster-name {
+  font-weight: 700;
+  color: #132238;
+}
+
+.kafka-cluster-protocol,
+.kafka-cluster-mode,
+.kafka-topic-meta,
+.kafka-topic-summary-label {
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #607289;
+}
+
+.kafka-cluster-bootstrap {
+  margin-top: 0.55rem;
+  font-size: 0.92rem;
+  color: #41556e;
+  word-break: break-word;
+}
+
+.kafka-cluster-mode {
+  margin-top: 0.65rem;
+}
+
+.kafka-topic-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.kafka-topic-table-wrap {
+  max-height: 640px;
+}
+
+.kafka-topic-table th,
+.kafka-topic-table td,
+.kafka-partition-table th,
+.kafka-partition-table td {
+  vertical-align: middle;
+}
+
+.kafka-topic-link {
+  font-weight: 600;
+  color: #132238;
+  text-decoration: none;
+}
+
+.kafka-topic-row-active td {
+  background: rgba(29, 111, 216, 0.08);
+}
+
+.kafka-topic-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.85rem;
+}
+
+.kafka-topic-summary-item {
+  border: 1px solid rgba(19, 34, 56, 0.08);
+  border-radius: 14px;
+  padding: 0.85rem 0.95rem;
+  background: rgba(248, 250, 252, 0.92);
+}
+
+.kafka-topic-summary-value {
+  margin-top: 0.45rem;
+  font-size: 1.02rem;
+  font-weight: 700;
+  color: #132238;
+}
+
+@media (max-width: 768px) {
+  .kafka-topic-filter-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

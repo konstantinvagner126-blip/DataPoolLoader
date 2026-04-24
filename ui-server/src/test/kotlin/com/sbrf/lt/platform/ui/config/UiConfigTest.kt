@@ -23,6 +23,8 @@ class UiConfigTest {
         assertEquals(UiModuleStorePostgresConfig.DEFAULT_SCHEMA, config.moduleStore.postgres.schemaName())
         assertEquals(1000, config.sqlConsole.fetchSize)
         assertEquals(200, config.sqlConsole.maxRowsPerShard)
+        assertEquals(UiKafkaConfig.DEFAULT_MAX_RECORDS_PER_READ, config.kafka.maxRecordsPerRead)
+        assertTrue(config.kafka.clusters.isEmpty())
         assertEquals(listOf("dev", "ift", "lt"), config.sqlConsole.groups.map { it.name })
         assertEquals(listOf("db2", "db3", "db4"), config.sqlConsole.groups.first { it.name == "ift" }.sources)
         assertEquals("\${LOCAL_MANUAL_DB_JDBC_URL}", config.moduleStore.postgres.jdbcUrl)
@@ -149,6 +151,56 @@ class UiConfigTest {
 
         assertEquals(listOf("dev", "ift"), config.sqlConsole.groups.map { it.name })
         assertEquals(listOf("db1", "db2"), config.sqlConsole.groups.first().sources)
+    }
+
+    @Test
+    fun `loads kafka clusters from external file`() {
+        val configFile = Files.createTempDirectory("ui-kafka-config")
+            .resolve("application.yml")
+            .apply {
+                parent?.toFile()?.mkdirs()
+                writeText(
+                    """
+                    ui:
+                      kafka:
+                        maxRecordsPerRead: 250
+                        pollTimeoutMs: 4000
+                        adminTimeoutMs: 7000
+                        maxPayloadBytes: 2097152
+                        clusters:
+                          - id: local
+                            name: Local Kafka
+                            readOnly: false
+                            properties:
+                              bootstrap.servers: localhost:19092
+                              client.id: datapool-loader
+                              security.protocol: PLAINTEXT
+                          - id: dev-mtls
+                            name: DEV Kafka mTLS
+                            readOnly: true
+                            properties:
+                              bootstrap.servers: host1:9092,host2:9092
+                              security.protocol: SSL
+                              ssl.truststore.type: PEM
+                              ssl.truststore.certificates: ${'$'}{file:/path/to/ca.crt}
+                              ssl.keystore.type: PEM
+                              ssl.keystore.certificate.chain: ${'$'}{file:/path/to/client.crt}
+                              ssl.keystore.key: ${'$'}{file:/path/to/client.key}
+                    """.trimIndent()
+                )
+            }
+
+        val config = object : UiConfigLoader() {
+            override fun resolveExternalConfigPath() = configFile
+        }.load()
+
+        assertEquals(250, config.kafka.maxRecordsPerRead)
+        assertEquals(4000, config.kafka.pollTimeoutMs)
+        assertEquals(7000, config.kafka.adminTimeoutMs)
+        assertEquals(2097152, config.kafka.maxPayloadBytes)
+        assertEquals(listOf("local", "dev-mtls"), config.kafka.clusters.map { it.id })
+        assertEquals("localhost:19092", config.kafka.clusters.first().properties["bootstrap.servers"])
+        assertEquals("\${file:/path/to/ca.crt}", config.kafka.clusters.last().properties["ssl.truststore.certificates"])
     }
 
     @Test
