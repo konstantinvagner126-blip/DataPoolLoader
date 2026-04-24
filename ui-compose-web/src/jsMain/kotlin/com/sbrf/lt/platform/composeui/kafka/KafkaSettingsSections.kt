@@ -26,6 +26,7 @@ internal fun KafkaSettingsSection(
     onAddSettingsCluster: () -> Unit,
     onRemoveSettingsCluster: (Int) -> Unit,
     onSettingsClusterChange: (Int, KafkaEditableClusterResponse) -> Unit,
+    onPickSettingsFile: (Int, String) -> Unit,
     onTestSettingsConnection: (Int) -> Unit,
     onSaveSettings: () -> Unit,
 ) {
@@ -91,7 +92,13 @@ internal fun KafkaSettingsSection(
                 } else {
                     null
                 },
+                filePickTargetProperty = if (state.settingsFilePickClusterIndex == index) {
+                    state.settingsFilePickTargetProperty
+                } else {
+                    null
+                },
                 onClusterChange = { updated -> onSettingsClusterChange(index, updated) },
+                onPickFile = { property -> onPickSettingsFile(index, property) },
                 onRemove = { onRemoveSettingsCluster(index) },
                 onTestConnection = { onTestSettingsConnection(index) },
             )
@@ -104,7 +111,9 @@ internal fun KafkaSettingsClusterCard(
     cluster: KafkaEditableClusterResponse,
     busy: Boolean,
     connectionResult: KafkaSettingsConnectionTestResponse?,
+    filePickTargetProperty: String?,
     onClusterChange: (KafkaEditableClusterResponse) -> Unit,
+    onPickFile: (String) -> Unit,
     onRemove: () -> Unit,
     onTestConnection: () -> Unit,
 ) {
@@ -191,14 +200,27 @@ internal fun KafkaSettingsClusterCard(
                     options = listOf("", "JKS", "PEM"),
                     disabled = busy,
                 ) { onClusterChange(cluster.copy(truststoreType = it)) }
-                KafkaSettingsTextField("ssl.truststore.location", cluster.truststoreLocation, "path to truststore", busy) {
+                KafkaSettingsPathField(
+                    label = "ssl.truststore.location",
+                    value = cluster.truststoreLocation,
+                    placeholderText = "path to truststore",
+                    disabled = busy,
+                    browseLabel = "Выбрать JKS",
+                    browseEnabled = cluster.truststoreType == "JKS",
+                    browseBusy = filePickTargetProperty == "ssl.truststore.location",
+                    onBrowse = { onPickFile("ssl.truststore.location") },
+                ) {
                     onClusterChange(cluster.copy(truststoreLocation = it))
                 }
-                KafkaSettingsTextField(
+                KafkaSettingsPathField(
                     "ssl.truststore.certificates",
-                    cluster.truststoreCertificates,
-                    "\${file:/path/to/ca.crt}",
-                    busy,
+                    value = cluster.truststoreCertificates,
+                    placeholderText = "\${file:/path/to/ca.crt}",
+                    disabled = busy,
+                    browseLabel = "Выбрать PEM",
+                    browseEnabled = cluster.truststoreType == "PEM",
+                    browseBusy = filePickTargetProperty == "ssl.truststore.certificates",
+                    onBrowse = { onPickFile("ssl.truststore.certificates") },
                 ) {
                     onClusterChange(cluster.copy(truststoreCertificates = it))
                 }
@@ -209,22 +231,39 @@ internal fun KafkaSettingsClusterCard(
                     options = listOf("", "JKS", "PEM"),
                     disabled = busy,
                 ) { onClusterChange(cluster.copy(keystoreType = it)) }
-                KafkaSettingsTextField("ssl.keystore.location", cluster.keystoreLocation, "path to keystore", busy) {
+                KafkaSettingsPathField(
+                    label = "ssl.keystore.location",
+                    value = cluster.keystoreLocation,
+                    placeholderText = "path to keystore",
+                    disabled = busy,
+                    browseLabel = "Выбрать JKS",
+                    browseEnabled = cluster.keystoreType == "JKS",
+                    browseBusy = filePickTargetProperty == "ssl.keystore.location",
+                    onBrowse = { onPickFile("ssl.keystore.location") },
+                ) {
                     onClusterChange(cluster.copy(keystoreLocation = it))
                 }
-                KafkaSettingsTextField(
+                KafkaSettingsPathField(
                     "ssl.keystore.certificate.chain",
-                    cluster.keystoreCertificateChain,
-                    "\${file:/path/to/client.crt}",
-                    busy,
+                    value = cluster.keystoreCertificateChain,
+                    placeholderText = "\${file:/path/to/client.crt}",
+                    disabled = busy,
+                    browseLabel = "Выбрать PEM",
+                    browseEnabled = cluster.keystoreType == "PEM",
+                    browseBusy = filePickTargetProperty == "ssl.keystore.certificate.chain",
+                    onBrowse = { onPickFile("ssl.keystore.certificate.chain") },
                 ) {
                     onClusterChange(cluster.copy(keystoreCertificateChain = it))
                 }
-                KafkaSettingsTextField(
+                KafkaSettingsPathField(
                     "ssl.keystore.key",
-                    cluster.keystoreKey,
-                    "\${file:/path/to/client.key}",
-                    busy,
+                    value = cluster.keystoreKey,
+                    placeholderText = "\${file:/path/to/client.key}",
+                    disabled = busy,
+                    browseLabel = "Выбрать ключ",
+                    browseEnabled = cluster.keystoreType == "PEM",
+                    browseBusy = filePickTargetProperty == "ssl.keystore.key",
+                    onBrowse = { onPickFile("ssl.keystore.key") },
                 ) {
                     onClusterChange(cluster.copy(keystoreKey = it))
                 }
@@ -267,6 +306,44 @@ internal fun KafkaSettingsTextField(
             if (disabled) disabled()
             onInput { onChange(it.value) }
         })
+    }
+}
+
+@Composable
+internal fun KafkaSettingsPathField(
+    label: String,
+    value: String,
+    placeholderText: String,
+    disabled: Boolean,
+    browseLabel: String,
+    browseEnabled: Boolean,
+    browseBusy: Boolean,
+    onBrowse: () -> Unit,
+    onChange: (String) -> Unit,
+) {
+    Div({ classes("kafka-settings-field") }) {
+        P({ classes("kafka-message-control-label") }) { Text(label) }
+        Div({ classes("kafka-settings-path-field") }) {
+            Input(type = InputType.Text, attrs = {
+                classes("form-control")
+                value(value)
+                if (placeholderText.isNotBlank()) {
+                    placeholder(placeholderText)
+                }
+                if (disabled) disabled()
+                onInput { onChange(it.value) }
+            })
+            if (browseEnabled) {
+                Button(attrs = {
+                    classes("btn", "btn-outline-secondary", "btn-sm", "kafka-settings-path-button")
+                    attr("type", "button")
+                    if (disabled || browseBusy) disabled()
+                    onClick { onBrowse() }
+                }) {
+                    Text(if (browseBusy) "Выбираю..." else browseLabel)
+                }
+            }
+        }
     }
 }
 

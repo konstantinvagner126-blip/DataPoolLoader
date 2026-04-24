@@ -10,6 +10,8 @@ import com.sbrf.lt.platform.ui.model.KafkaEditableClusterRequestPayload
 import com.sbrf.lt.platform.ui.model.KafkaEditableClusterResponse
 import com.sbrf.lt.platform.ui.model.KafkaSettingsConnectionTestRequestPayload
 import com.sbrf.lt.platform.ui.model.KafkaSettingsConnectionTestResponse
+import com.sbrf.lt.platform.ui.model.KafkaSettingsFilePickRequestPayload
+import com.sbrf.lt.platform.ui.model.KafkaSettingsFilePickResponse
 import com.sbrf.lt.platform.ui.model.KafkaSettingsResponse
 import com.sbrf.lt.platform.ui.model.KafkaSettingsUpdateRequestPayload
 import java.nio.file.Files
@@ -27,6 +29,11 @@ internal interface UiKafkaSettingsOperations {
         request: KafkaSettingsConnectionTestRequestPayload,
         currentUiConfig: UiAppConfig,
     ): KafkaSettingsConnectionTestResponse
+
+    fun pickFile(
+        request: KafkaSettingsFilePickRequestPayload,
+        currentUiConfig: UiAppConfig,
+    ): KafkaSettingsFilePickResponse
 }
 
 internal open class UiKafkaSettingsService(
@@ -34,6 +41,7 @@ internal open class UiKafkaSettingsService(
     private val runtimeConfigResolver: UiRuntimeConfigResolver,
     private val kafkaValidationSupport: UiKafkaConfigValidationSupport = UiKafkaConfigValidationSupport(),
     private val adminFacadeFactory: UiKafkaAdminFacadeFactory = DefaultUiKafkaAdminFacadeFactory(),
+    private val filePicker: UiKafkaSettingsFilePickerOperations = DesktopUiKafkaSettingsFilePicker(),
 ) : UiKafkaSettingsOperations {
     override fun loadSettings(uiConfig: UiAppConfig): KafkaSettingsResponse =
         KafkaSettingsResponse(
@@ -83,6 +91,16 @@ internal open class UiKafkaSettingsService(
         }
     }
 
+    override fun pickFile(
+        request: KafkaSettingsFilePickRequestPayload,
+        currentUiConfig: UiAppConfig,
+    ): KafkaSettingsFilePickResponse =
+        filePicker.pickFile(
+            targetProperty = request.targetProperty.trim(),
+            currentValue = request.currentValue,
+            configBaseDir = currentUiConfig.configBaseDir?.let { Path.of(it) },
+        )
+
     private fun validateEditableCluster(
         cluster: UiKafkaClusterConfig,
         configBaseDir: Path?,
@@ -107,34 +125,11 @@ internal open class UiKafkaSettingsService(
             if (rawValue.isBlank()) {
                 return@forEach
             }
-            resolveFileBackedPath(rawValue, configBaseDir)?.let { resolvedPath ->
+            resolveKafkaSettingsPath(rawValue, configBaseDir)?.let { resolvedPath ->
                 require(Files.exists(resolvedPath)) {
                     "Kafka cluster '${cluster.id}' с $key ссылается на несуществующий путь: $resolvedPath"
                 }
             }
-        }
-    }
-
-    private fun resolveFileBackedPath(
-        rawValue: String,
-        configBaseDir: Path?,
-    ): Path? {
-        val trimmed = rawValue.trim()
-        val filePlaceholderPrefix = "\${file:"
-        val rawPath = when {
-            trimmed.startsWith(filePlaceholderPrefix) && trimmed.endsWith("}") ->
-                trimmed.removePrefix(filePlaceholderPrefix).removeSuffix("}")
-            trimmed.startsWith("\${") -> return null
-            else -> trimmed
-        }
-        if (rawPath.isBlank()) {
-            return null
-        }
-        val path = Path.of(rawPath)
-        return if (path.isAbsolute) {
-            path.normalize()
-        } else {
-            configBaseDir?.resolve(path)?.normalize() ?: path.normalize()
         }
     }
 }

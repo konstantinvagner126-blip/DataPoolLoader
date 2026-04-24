@@ -182,6 +182,103 @@
    - payload size guard;
 5. regression coverage расширена на shared store mapping produce headers и server route/produce path.
 
+#### 17.4. Fix DOMTokenList runtime error in Kafka all-partitions message browser
+
+Статус:
+
+- реализовано
+
+Контекст:
+
+- при чтении Kafka messages в режиме `ALL_PARTITIONS` UI получал browser-side runtime error:
+  - `SyntaxError: The string did not match the expected pattern`;
+- фактическая причина была в рендере CSS-классов:
+  - в message rows и broker badges в `classes(...)` передавался пустой токен через `if (...) "..." else ""`;
+- ошибка проявлялась на message results render и ломала normal message browser flow, хотя server response уже был корректным.
+
+Что нужно сделать:
+
+1. убрать передачу пустых CSS-class token в Kafka web sections;
+2. починить `Messages` tab для режима `ALL_PARTITIONS`, не меняя server/store contract;
+3. убрать такой же latent defect из `Brokers` screen;
+4. добавить targeted browser regression, который проверяет:
+   - `ALL_PARTITIONS` read completes;
+   - results render;
+   - page errors отсутствуют.
+
+Что сделано:
+
+1. пустые CSS-class token убраны из Kafka message rows и broker role badge rendering;
+2. `Messages` tab в режиме `ALL_PARTITIONS` больше не падает на DOMTokenList error;
+3. latent broker-screen defect устранен тем же safe class rendering pattern;
+4. добавлен targeted Playwright smoke regression на `ALL_PARTITIONS` message read без page errors.
+
+#### 17.5. Local file chooser for Kafka TLS material paths in settings UI
+
+Статус:
+
+- реализовано
+
+Контекст:
+
+- Kafka settings UI уже умеет редактировать `JKS` и `PEM` path-like поля, но сейчас только как raw text inputs;
+- для локального инструмента этого недостаточно:
+  - при добавлении нового cluster пользователь должен иметь возможность выбрать certificate / keystore files из системы;
+- browser `input type=file` здесь не подходит как source of truth, потому что Kafka config хранит path values, а не uploaded file content.
+
+Что нужно сделать:
+
+1. добавить local-only file chooser path через `ui-server`, а не через browser upload;
+2. поддержать выбор файлов для Kafka TLS material полей:
+   - `ssl.truststore.location`;
+   - `ssl.truststore.certificates`;
+   - `ssl.keystore.location`;
+   - `ssl.keystore.certificate.chain`;
+   - `ssl.keystore.key`;
+3. для `JKS` полей возвращать обычный filesystem path;
+4. для `PEM` полей возвращать config-ready placeholder вида `${file:/abs/path/to/file}`;
+5. встроить `Browse` actions в Kafka settings UI рядом с соответствующими path fields;
+6. сохранить текущий `ui.kafka` config contract:
+   - source of truth остается `ui-application.yml`;
+   - browser local state не становится вторым config source;
+7. добавить targeted service/store/server coverage.
+
+Что сделано:
+
+1. добавлен отдельный local Kafka settings file-picker boundary в `ui-server`;
+2. Kafka settings route получил bounded `pick-file` path для supported TLS material fields;
+3. для `JKS` fields chooser возвращает raw absolute path;
+4. для `PEM` fields chooser возвращает config-ready `${file:/...}` placeholder;
+5. в Kafka settings UI добавлены `Выбрать файл` actions рядом с path-like TLS inputs;
+6. source of truth остался прежним:
+   - YAML сохраняет path values;
+   - browser не хранит отдельные uploaded secrets;
+7. добавлены targeted tests на picker/service/store/server contract.
+
+#### 17.6. Increase Kafka produce payload editor height
+
+Статус:
+
+- реализовано
+
+Контекст:
+
+- после перестройки `Produce` tab payload editor остался слишком низким для реальной ручной работы;
+- при наборе или вставке JSON/message body приходится слишком рано скроллить внутри textarea;
+- это не требует изменения Kafka produce contract и относится только к ergonomics текущего editor shell.
+
+Что нужно сделать:
+
+1. зафиксировать отдельный bounded follow-up в backlog;
+2. увеличить высоту payload textarea в `Produce` tab;
+3. не менять server/store produce contract и structured editor layout сверх необходимого минимума.
+
+Что сделано:
+
+1. follow-up зафиксирован как отдельный backlog package;
+2. `Payload` textarea в Kafka `Produce` tab стала выше и удобнее для ручной вставки message body;
+3. produce contract, routing и structured form semantics не менялись.
+
 ### 9. Операционная надежность long-running операций
 
 Статус:

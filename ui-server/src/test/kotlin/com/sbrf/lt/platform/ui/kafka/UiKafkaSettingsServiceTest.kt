@@ -7,6 +7,7 @@ import com.sbrf.lt.platform.ui.config.UiKafkaConfig
 import com.sbrf.lt.platform.ui.config.UiRuntimeConfigResolver
 import com.sbrf.lt.platform.ui.model.KafkaEditableClusterRequestPayload
 import com.sbrf.lt.platform.ui.model.KafkaSettingsConnectionTestRequestPayload
+import com.sbrf.lt.platform.ui.model.KafkaSettingsFilePickRequestPayload
 import com.sbrf.lt.platform.ui.model.KafkaSettingsUpdateRequestPayload
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -206,6 +207,66 @@ class UiKafkaSettingsServiceTest {
 
         assertFalse(response.success)
         assertTrue(response.message.contains("не ответил вовремя"))
+    }
+
+    @Test
+    fun `pickFile returns raw path for JKS target and placeholder for PEM target`() {
+        val service = UiKafkaSettingsService(
+            uiConfigPersistenceService = UiConfigPersistenceService(),
+            runtimeConfigResolver = UiRuntimeConfigResolver(),
+            filePicker = object : UiKafkaSettingsFilePickerOperations {
+                override fun pickFile(
+                    targetProperty: String,
+                    currentValue: String,
+                    configBaseDir: java.nio.file.Path?,
+                ) = com.sbrf.lt.platform.ui.model.KafkaSettingsFilePickResponse(
+                    targetProperty = targetProperty,
+                    cancelled = false,
+                    selectedPath = "/tmp/material",
+                    configValue = when (targetProperty) {
+                        "ssl.truststore.location" -> "/tmp/truststore.jks"
+                        else -> "\${file:/tmp/client.crt}"
+                    },
+                )
+            },
+        )
+
+        val jks = service.pickFile(
+            request = KafkaSettingsFilePickRequestPayload(
+                targetProperty = "ssl.truststore.location",
+            ),
+            currentUiConfig = uiConfig(),
+        )
+        val pem = service.pickFile(
+            request = KafkaSettingsFilePickRequestPayload(
+                targetProperty = "ssl.keystore.certificate.chain",
+            ),
+            currentUiConfig = uiConfig(),
+        )
+
+        assertEquals("/tmp/truststore.jks", jks.configValue)
+        assertEquals("\${file:/tmp/client.crt}", pem.configValue)
+    }
+
+    @Test
+    fun `pickFile rejects unsupported target property`() {
+        val service = UiKafkaSettingsService(
+            uiConfigPersistenceService = UiConfigPersistenceService(),
+            runtimeConfigResolver = UiRuntimeConfigResolver(),
+            filePicker = DesktopUiKafkaSettingsFilePicker(),
+        )
+
+        val error = runCatching {
+            service.pickFile(
+                request = KafkaSettingsFilePickRequestPayload(
+                    targetProperty = "ssl.key.password",
+                ),
+                currentUiConfig = uiConfig(),
+            )
+        }.exceptionOrNull()
+
+        assertTrue(error is IllegalArgumentException)
+        assertTrue(error?.message?.contains("не поддерживает поле") == true)
     }
 }
 

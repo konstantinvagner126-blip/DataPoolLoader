@@ -46,4 +46,8 @@ interface KafkaApi {
     suspend fun testSettingsConnection(
         request: KafkaSettingsConnectionTestRequestPayload,
     ): KafkaSettingsConnectionTestResponse
+
+    suspend fun pickSettingsFile(
+        request: KafkaSettingsFilePickRequestPayload,
+    ): KafkaSettingsFilePickResponse
 }

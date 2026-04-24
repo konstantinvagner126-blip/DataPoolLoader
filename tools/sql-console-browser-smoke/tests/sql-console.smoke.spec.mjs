@@ -35,6 +35,18 @@ async function gotoSqlConsoleHistory(page, workspaceId) {
   await expect(page.getByRole("heading", { name: "История запусков SQL-консоли" })).toBeVisible();
 }
 
+async function gotoKafkaMessages(page, params = {}) {
+  const query = new URLSearchParams({
+    clusterId: "local-docker",
+    topic: "datapool-test",
+    pane: "messages",
+    ...params
+  });
+  await page.goto(`/kafka?${query.toString()}`);
+  await expect(page.getByRole("heading", { name: "Kafka" })).toBeVisible();
+  await expect(page.getByText("Bounded чтение через assign + seek без commit offsets и без background consumer session.")).toBeVisible();
+}
+
 async function setEditorValue(page, value) {
   const success = await page.evaluate(nextValue => window.ComposeMonaco.setEditorValue(nextValue), value);
   expect(success).toBe(true);
@@ -178,6 +190,20 @@ test("result navigator switches between Grid and Diff views", async ({ page }) =
 
   await page.getByRole("button", { name: "Grid" }).click();
   await expect(page.getByRole("button", { name: "Diff" })).toBeVisible();
+
+  expect(pageErrors).toEqual([]);
+});
+
+test("kafka message browser reads all partitions without browser runtime errors", async ({ page }) => {
+  const pageErrors = trackPageErrors(page);
+  await gotoKafkaMessages(page);
+
+  await page.locator("select").nth(0).selectOption("ALL_PARTITIONS");
+  await page.getByRole("button", { name: "Читать сообщения" }).click();
+
+  await expect(page.getByText("Результат собран по всем partition и отсортирован по timestamp.")).toBeVisible();
+  await expect(page.locator(".kafka-message-detail-shell")).toBeVisible();
+  await expect(page.locator(".kafka-message-row")).toHaveCount(5);
 
   expect(pageErrors).toEqual([]);
 });

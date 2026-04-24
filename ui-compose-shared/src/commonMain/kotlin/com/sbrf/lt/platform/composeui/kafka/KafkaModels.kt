@@ -279,6 +279,20 @@ data class KafkaSettingsConnectionTestResponse(
 )
 
 @Serializable
+data class KafkaSettingsFilePickRequestPayload(
+    val targetProperty: String,
+    val currentValue: String = "",
+)
+
+@Serializable
+data class KafkaSettingsFilePickResponse(
+    val targetProperty: String,
+    val cancelled: Boolean,
+    val selectedPath: String? = null,
+    val configValue: String? = null,
+)
+
+@Serializable
 data class KafkaTopicMessageHeaderResponse(
     val name: String,
     val value: KafkaRenderedBytesResponse? = null,
@@ -344,4 +358,6 @@ data class KafkaPageState(
     val settingsStatusMessage: String? = null,
     val settingsConnectionTestClusterIndex: Int? = null,
     val settingsConnectionResult: KafkaSettingsConnectionTestResponse? = null,
+    val settingsFilePickClusterIndex: Int? = null,
+    val settingsFilePickTargetProperty: String? = null,
 )

@@ -244,6 +244,20 @@ class KafkaStore(
     ): KafkaPageState =
         settingsSupport.testSettingsConnection(current, clusterIndex)
 
+    fun startSettingsFilePick(
+        current: KafkaPageState,
+        clusterIndex: Int,
+        targetProperty: String,
+    ): KafkaPageState =
+        settingsSupport.startSettingsFilePick(current, clusterIndex, targetProperty)
+
+    suspend fun pickSettingsFile(
+        current: KafkaPageState,
+        clusterIndex: Int,
+        targetProperty: String,
+    ): KafkaPageState =
+        settingsSupport.pickSettingsFile(current, clusterIndex, targetProperty)
+
     fun startSettingsSave(current: KafkaPageState): KafkaPageState =
         settingsSupport.startSettingsSave(current)
 

@@ -242,6 +242,18 @@ data class KafkaSettingsConnectionTestResponse(
     val nodeCount: Int? = null,
 )
 
+data class KafkaSettingsFilePickRequestPayload(
+    val targetProperty: String,
+    val currentValue: String = "",
+)
+
+data class KafkaSettingsFilePickResponse(
+    val targetProperty: String,
+    val cancelled: Boolean,
+    val selectedPath: String? = null,
+    val configValue: String? = null,
+)
+
 data class KafkaTopicMessageHeaderResponse(
     val name: String,
     val value: KafkaRenderedBytesResponse? = null,

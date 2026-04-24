@@ -55,6 +55,12 @@ Kafka credentials и TLS material не должны жить в:
 - `${KEY}` placeholders для secret values;
 - `${file:/path/to/file}` placeholders для PEM material.
 
+Для локального settings UI дополнительно допустим bounded server-side file chooser path:
+
+- `JKS` fields сохраняются как filesystem path;
+- `PEM` fields сохраняются как `${file:/abs/path}` placeholder;
+- browser upload не становится вторым source of truth для TLS material.
+
 ## 3. Supported transport/security model
 
 Поддерживаются только:

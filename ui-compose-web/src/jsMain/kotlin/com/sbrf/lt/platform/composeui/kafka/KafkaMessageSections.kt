@@ -197,11 +197,13 @@ internal fun KafkaMessageBrowserSection(
                             Tbody {
                                 messages.records.forEach { record ->
                                     val recordKey = kafkaMessageRecordKey(record)
+                                    val rowClasses = if (recordKey == kafkaMessageRecordKey(selectedRecord)) {
+                                        arrayOf("kafka-message-row", "kafka-message-row-active")
+                                    } else {
+                                        arrayOf("kafka-message-row")
+                                    }
                                     Tr(attrs = {
-                                        classes(
-                                            "kafka-message-row",
-                                            if (recordKey == kafkaMessageRecordKey(selectedRecord)) "kafka-message-row-active" else "",
-                                        )
+                                        classes(*rowClasses)
                                         onClick { selectedRecordKey = recordKey }
                                     }) {
                                         Td({ classes("kafka-message-cell-mono") }) { Text(record.offset.toString()) }

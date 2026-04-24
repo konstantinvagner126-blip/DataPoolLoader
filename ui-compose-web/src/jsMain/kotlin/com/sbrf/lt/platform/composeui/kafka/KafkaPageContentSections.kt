@@ -45,6 +45,7 @@ internal fun KafkaPageContent(
     onAddSettingsCluster: () -> Unit,
     onRemoveSettingsCluster: (Int) -> Unit,
     onSettingsClusterChange: (Int, KafkaEditableClusterResponse) -> Unit,
+    onPickSettingsFile: (Int, String) -> Unit,
     onTestSettingsConnection: (Int) -> Unit,
     onSaveSettings: () -> Unit,
 ) {
@@ -91,6 +92,7 @@ internal fun KafkaPageContent(
                             onAddSettingsCluster = onAddSettingsCluster,
                             onRemoveSettingsCluster = onRemoveSettingsCluster,
                             onSettingsClusterChange = onSettingsClusterChange,
+                            onPickSettingsFile = onPickSettingsFile,
                             onTestSettingsConnection = onTestSettingsConnection,
                             onSaveSettings = onSaveSettings,
                         )

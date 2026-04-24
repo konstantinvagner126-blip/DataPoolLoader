@@ -6,6 +6,7 @@ import com.sbrf.lt.datapool.kafka.KafkaTopicNotFoundException
 import com.sbrf.lt.platform.ui.model.KafkaTopicMessageReadRequestPayload
 import com.sbrf.lt.platform.ui.model.KafkaTopicCreateRequestPayload
 import com.sbrf.lt.platform.ui.model.KafkaSettingsConnectionTestRequestPayload
+import com.sbrf.lt.platform.ui.model.KafkaSettingsFilePickRequestPayload
 import com.sbrf.lt.platform.ui.model.KafkaSettingsUpdateRequestPayload
 import com.sbrf.lt.platform.ui.model.KafkaTopicProduceRequestPayload
 import com.sbrf.lt.platform.ui.model.toCoreRequest
@@ -215,6 +216,25 @@ internal fun Route.registerKafkaRoutes(context: UiServerContext) {
             )
         } catch (e: IllegalArgumentException) {
             call.respond(HttpStatusCode.BadRequest, e.message.orEmpty())
+        }
+    }
+
+    post("/api/kafka/settings/pick-file") {
+        val payload = runCatching { call.receive<KafkaSettingsFilePickRequestPayload>() }.getOrElse { error ->
+            call.respond(HttpStatusCode.BadRequest, error.message.orEmpty())
+            return@post
+        }
+        try {
+            call.respond(
+                context.kafkaSettingsService.pickFile(
+                    request = payload,
+                    currentUiConfig = context.currentUiConfig(),
+                ),
+            )
+        } catch (e: IllegalArgumentException) {
+            call.respond(HttpStatusCode.BadRequest, e.message.orEmpty())
+        } catch (e: IllegalStateException) {
+            call.respond(HttpStatusCode.Conflict, e.message.orEmpty())
         }
     }
 }

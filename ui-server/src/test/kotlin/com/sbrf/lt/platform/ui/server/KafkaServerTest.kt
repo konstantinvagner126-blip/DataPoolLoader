@@ -172,6 +172,18 @@ class KafkaServerTest {
         assertTrue(connectionTest.contains("\"success\":true"))
         assertTrue(connectionTest.contains("\"nodeCount\":1"))
 
+        val pickFile = client.post("/api/kafka/settings/pick-file") {
+            header(HttpHeaders.ContentType, "application/json")
+            setBody(
+                """
+                {"targetProperty":"ssl.keystore.key","currentValue":""}
+                """.trimIndent(),
+            )
+        }.bodyAsText()
+        assertTrue(pickFile.contains("\"targetProperty\":\"ssl.keystore.key\""))
+        assertTrue(pickFile.contains("\"cancelled\":false"))
+        assertTrue(pickFile.contains("\${file:/tmp/client.key}"))
+
         val missingCluster = client.get("/api/kafka/topics?clusterId=missing")
         assertEquals(HttpStatusCode.NotFound, missingCluster.status)
         assertTrue(missingCluster.bodyAsText().contains("Kafka cluster 'missing'"))
@@ -486,5 +498,15 @@ private class FakeKafkaSettingsOperations : UiKafkaSettingsOperations {
         success = true,
         message = "Подключение успешно. Доступно broker nodes: 1.",
         nodeCount = 1,
+    )
+
+    override fun pickFile(
+        request: com.sbrf.lt.platform.ui.model.KafkaSettingsFilePickRequestPayload,
+        currentUiConfig: UiAppConfig,
+    ) = com.sbrf.lt.platform.ui.model.KafkaSettingsFilePickResponse(
+        targetProperty = request.targetProperty,
+        cancelled = false,
+        selectedPath = "/tmp/client.key",
+        configValue = "\${file:/tmp/client.key}",
     )
 }

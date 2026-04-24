@@ -31,4 +31,42 @@ class KafkaStoreSettingsSupportTest {
         assertNull(updated.settingsConnectionTestClusterIndex)
         assertNull(updated.settingsConnectionResult)
     }
+
+    @Test
+    fun `pickSettingsFile applies config ready value to target cluster field`() {
+        val support = KafkaStoreSettingsSupport(
+            api = StubKafkaApi(
+                pickSettingsFileHandler = {
+                    KafkaSettingsFilePickResponse(
+                        targetProperty = "ssl.keystore.key",
+                        cancelled = false,
+                        selectedPath = "/tmp/client.key",
+                        configValue = "\${file:/tmp/client.key}",
+                    )
+                },
+            ),
+        )
+        val current = KafkaPageState(
+            settings = KafkaSettingsResponse(
+                clusters = listOf(
+                    KafkaEditableClusterResponse(
+                        id = "local",
+                        name = "Local Kafka",
+                        readOnly = false,
+                        securityProtocol = "SSL",
+                        keystoreType = "PEM",
+                    ),
+                ),
+            ),
+        )
+
+        val prepared = support.startSettingsFilePick(current, 0, "ssl.keystore.key")
+        val updated = runKafkaSuspend {
+            support.pickSettingsFile(prepared, 0, "ssl.keystore.key")
+        }
+
+        assertEquals("\${file:/tmp/client.key}", updated.settings?.clusters?.single()?.keystoreKey)
+        assertNull(updated.settingsFilePickClusterIndex)
+        assertNull(updated.settingsFilePickTargetProperty)
+    }
 }

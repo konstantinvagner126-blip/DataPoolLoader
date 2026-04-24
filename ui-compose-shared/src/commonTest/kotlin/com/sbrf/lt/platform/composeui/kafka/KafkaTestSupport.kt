@@ -169,6 +169,9 @@ internal class StubKafkaApi(
     private val testSettingsConnectionHandler: suspend (KafkaSettingsConnectionTestRequestPayload) -> KafkaSettingsConnectionTestResponse = {
         error("testSettingsConnection not configured")
     },
+    private val pickSettingsFileHandler: suspend (KafkaSettingsFilePickRequestPayload) -> KafkaSettingsFilePickResponse = {
+        error("pickSettingsFile not configured")
+    },
 ) : KafkaApi {
     override suspend fun loadRuntimeContext(): RuntimeContext = runtimeContextHandler()
 
@@ -213,6 +216,10 @@ internal class StubKafkaApi(
     override suspend fun testSettingsConnection(
         request: KafkaSettingsConnectionTestRequestPayload,
     ): KafkaSettingsConnectionTestResponse = testSettingsConnectionHandler(request)
+
+    override suspend fun pickSettingsFile(
+        request: KafkaSettingsFilePickRequestPayload,
+    ): KafkaSettingsFilePickResponse = pickSettingsFileHandler(request)
 }
 
 internal fun <T> runKafkaSuspend(block: suspend () -> T): T {

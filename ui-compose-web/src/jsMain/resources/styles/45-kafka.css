@@ -540,6 +540,20 @@
   min-width: 0;
 }
 
+.kafka-settings-path-field {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+}
+
+.kafka-settings-path-field .form-control {
+  min-width: 0;
+}
+
+.kafka-settings-path-button {
+  white-space: nowrap;
+}
+
 .kafka-settings-boolean-field {
   display: flex;
   flex-direction: column;
@@ -615,7 +629,7 @@
 }
 
 .kafka-produce-payload {
-  min-height: 300px;
+  min-height: 440px;
   font-family: "SFMono-Regular", "JetBrains Mono", "Fira Code", monospace;
   font-size: 0.88rem;
 }
@@ -787,6 +801,10 @@
   }
 
   .kafka-settings-cluster-header {
+    flex-direction: column;
+  }
+
+  .kafka-settings-path-field {
     flex-direction: column;
   }
 

@@ -359,6 +359,20 @@ fun ComposeKafkaPage(
                 onSettingsClusterChange = { clusterIndex, cluster ->
                     state = store.updateSettingsCluster(state, clusterIndex) { cluster }
                 },
+                onPickSettingsFile = { clusterIndex, targetProperty ->
+                    scope.launch {
+                        state = store.startSettingsFilePick(state, clusterIndex, targetProperty)
+                        state = runCatching {
+                            store.pickSettingsFile(state, clusterIndex, targetProperty)
+                        }.getOrElse { error ->
+                            state.copy(
+                                settingsFilePickClusterIndex = null,
+                                settingsFilePickTargetProperty = null,
+                                settingsError = error.message ?: "Не удалось выбрать локальный файл для Kafka cluster.",
+                            )
+                        }
+                    }
+                },
                 onTestSettingsConnection = { clusterIndex ->
                     scope.launch {
                         state = store.startSettingsConnectionTest(state)

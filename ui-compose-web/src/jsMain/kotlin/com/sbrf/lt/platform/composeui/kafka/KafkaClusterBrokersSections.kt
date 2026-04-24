@@ -93,6 +93,11 @@ internal fun KafkaClusterBrokersSection(
                             }
                             Tbody {
                                 brokers.brokers.forEach { broker ->
+                                    val roleClasses = if (broker.controller) {
+                                        arrayOf("kafka-broker-role", "kafka-broker-role-controller")
+                                    } else {
+                                        arrayOf("kafka-broker-role")
+                                    }
                                     Tr {
                                         Td { Text(broker.brokerId.toString()) }
                                         Td {
@@ -102,10 +107,7 @@ internal fun KafkaClusterBrokersSection(
                                         }
                                         Td {
                                             Span({
-                                                classes(
-                                                    "kafka-broker-role",
-                                                    if (broker.controller) "kafka-broker-role-controller" else "",
-                                                )
+                                                classes(*roleClasses)
                                             }) {
                                                 Text(if (broker.controller) "Controller" else "Follower")
                                             }

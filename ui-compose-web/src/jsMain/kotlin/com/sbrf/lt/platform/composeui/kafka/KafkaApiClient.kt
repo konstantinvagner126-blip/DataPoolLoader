@@ -98,4 +98,14 @@ class KafkaApiClient(
             serializer = KafkaSettingsConnectionTestRequestPayload.serializer(),
             deserializer = KafkaSettingsConnectionTestResponse.serializer(),
         )
+
+    override suspend fun pickSettingsFile(
+        request: KafkaSettingsFilePickRequestPayload,
+    ): KafkaSettingsFilePickResponse =
+        httpClient.postJson(
+            path = "/api/kafka/settings/pick-file",
+            payload = request,
+            serializer = KafkaSettingsFilePickRequestPayload.serializer(),
+            deserializer = KafkaSettingsFilePickResponse.serializer(),
+        )
 }

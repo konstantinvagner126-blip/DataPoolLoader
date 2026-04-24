@@ -19,6 +19,8 @@ internal class KafkaStoreSettingsSupport(
             settingsStatusMessage = null,
             settingsConnectionTestClusterIndex = null,
             settingsConnectionResult = null,
+            settingsFilePickClusterIndex = null,
+            settingsFilePickTargetProperty = null,
         )
     }
 
@@ -36,6 +38,8 @@ internal class KafkaStoreSettingsSupport(
             settingsStatusMessage = null,
             settingsConnectionTestClusterIndex = null,
             settingsConnectionResult = null,
+            settingsFilePickClusterIndex = null,
+            settingsFilePickTargetProperty = null,
         )
     }
 
@@ -55,6 +59,8 @@ internal class KafkaStoreSettingsSupport(
             settingsStatusMessage = null,
             settingsConnectionTestClusterIndex = null,
             settingsConnectionResult = null,
+            settingsFilePickClusterIndex = null,
+            settingsFilePickTargetProperty = null,
         )
     }
 
@@ -76,6 +82,8 @@ internal class KafkaStoreSettingsSupport(
             settingsStatusMessage = null,
             settingsConnectionTestClusterIndex = null,
             settingsConnectionResult = null,
+            settingsFilePickClusterIndex = null,
+            settingsFilePickTargetProperty = null,
         )
     }
 
@@ -107,6 +115,51 @@ internal class KafkaStoreSettingsSupport(
         )
     }
 
+    fun startSettingsFilePick(
+        current: KafkaPageState,
+        clusterIndex: Int,
+        targetProperty: String,
+    ): KafkaPageState =
+        current.copy(
+            settingsError = null,
+            settingsStatusMessage = null,
+            settingsFilePickClusterIndex = clusterIndex,
+            settingsFilePickTargetProperty = targetProperty,
+        )
+
+    suspend fun pickSettingsFile(
+        current: KafkaPageState,
+        clusterIndex: Int,
+        targetProperty: String,
+    ): KafkaPageState {
+        val settings = current.settings ?: return current.copy(
+            settingsFilePickClusterIndex = null,
+            settingsFilePickTargetProperty = null,
+        )
+        val cluster = settings.clusters.getOrNull(clusterIndex) ?: return current.copy(
+            settingsFilePickClusterIndex = null,
+            settingsFilePickTargetProperty = null,
+        )
+        val result = api.pickSettingsFile(
+            KafkaSettingsFilePickRequestPayload(
+                targetProperty = targetProperty,
+                currentValue = cluster.propertyValue(targetProperty),
+            ),
+        )
+        if (result.cancelled || result.configValue.isNullOrBlank()) {
+            return current.copy(
+                settingsFilePickClusterIndex = null,
+                settingsFilePickTargetProperty = null,
+            )
+        }
+        return updateSettingsCluster(current, clusterIndex) {
+            it.withUpdatedPropertyValue(targetProperty, result.configValue!!)
+        }.copy(
+            settingsFilePickClusterIndex = null,
+            settingsFilePickTargetProperty = null,
+        )
+    }
+
     fun startSettingsSave(current: KafkaPageState): KafkaPageState =
         current.copy(
             settingsLoading = true,
@@ -127,8 +180,33 @@ internal class KafkaStoreSettingsSupport(
             settingsStatusMessage = "Настройки Kafka сохранены.",
             settingsConnectionTestClusterIndex = null,
             settingsConnectionResult = null,
+            settingsFilePickClusterIndex = null,
+            settingsFilePickTargetProperty = null,
         )
     }
+
+    private fun KafkaEditableClusterResponse.propertyValue(targetProperty: String): String =
+        when (targetProperty) {
+            "ssl.truststore.location" -> truststoreLocation
+            "ssl.truststore.certificates" -> truststoreCertificates
+            "ssl.keystore.location" -> keystoreLocation
+            "ssl.keystore.certificate.chain" -> keystoreCertificateChain
+            "ssl.keystore.key" -> keystoreKey
+            else -> ""
+        }
+
+    private fun KafkaEditableClusterResponse.withUpdatedPropertyValue(
+        targetProperty: String,
+        value: String,
+    ): KafkaEditableClusterResponse =
+        when (targetProperty) {
+            "ssl.truststore.location" -> copy(truststoreLocation = value)
+            "ssl.truststore.certificates" -> copy(truststoreCertificates = value)
+            "ssl.keystore.location" -> copy(keystoreLocation = value)
+            "ssl.keystore.certificate.chain" -> copy(keystoreCertificateChain = value)
+            "ssl.keystore.key" -> copy(keystoreKey = value)
+            else -> this
+        }
 
     private fun KafkaEditableClusterResponse.toRequestPayload(): KafkaEditableClusterRequestPayload =
         KafkaEditableClusterRequestPayload(
