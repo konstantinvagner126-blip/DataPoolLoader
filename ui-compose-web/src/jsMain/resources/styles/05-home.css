@@ -24,6 +24,11 @@
   margin-bottom: 1rem;
 }
 
+.home-group-header .db-mode-indicator {
+  margin-bottom: 0;
+  flex: 0 0 auto;
+}
+
 .home-group-header-main {
   flex: 1 1 auto;
   min-width: 0;

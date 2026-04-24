@@ -731,3 +731,10 @@ body {
   background: #94a3b8;
   box-shadow: 0 0 0 0.18rem rgba(148, 163, 184, 0.12);
 }
+
+.footer-note {
+  color: #607289;
+  font-size: 0.9rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}

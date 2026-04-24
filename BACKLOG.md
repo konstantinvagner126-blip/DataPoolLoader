@@ -211,12 +211,19 @@
 - giant [styles.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles.css) переведен в import-manifest;
 - порядок каскада сохранен через ordered CSS-chunks:
   - [00-foundation.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/00-foundation.css)
-  - [05-home-help.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/05-home-help.css)
+  - [05-home.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/05-home.css)
+  - [06-about.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/06-about.css)
+  - [07-help-api.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/07-help-api.css)
   - [10-config-editor.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/10-config-editor.css)
   - [20-sql-console.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/20-sql-console.css)
   - [30-run-history.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/30-run-history.css)
   - [35-sync-maintenance.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/35-sync-maintenance.css)
-  - [40-sql-results.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/40-sql-results.css);
+  - [40-sql-sources.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/40-sql-sources.css)
+  - [41-sql-result-pane.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/41-sql-result-pane.css)
+  - [42-runtime-mode.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/42-runtime-mode.css)
+  - [43-module-metadata.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/43-module-metadata.css)
+  - [44-sql-objects.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/44-sql-objects.css)
+  - [45-kafka.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/45-kafka.css);
 - первые дубли селекторов и нелогичные cross-feature зависимости уже убраны;
 - ресурсы проходят packaging и попадают в `ui-server` bundle.
 
@@ -273,6 +280,55 @@ Batch из 5 задач:
   - `home page visual baseline`
   - `about page visual baseline`
   - плюс полный `ui-visual.smoke.spec.mjs` без regressions на соседних экранах.
+
+#### 4.2. Split giant `40-sql-results.css` into subsystem chunks
+
+Статус:
+
+- реализовано
+
+Проблема:
+
+- [40-sql-results.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/40-sql-results.css) остается самым большим CSS chunk проекта (`1400+` строк);
+- внутри одного файла смешаны разные подсистемы:
+  - `sql-source-*` и source selection;
+  - `sql-result-*`, `sql-diff-*`, `sql-status-*`;
+  - `sql-object-*`, `sql-favorite-*`;
+  - `db-mode-*`, `runtime-mode-*`;
+  - `module-metadata-*`, `source-kind-*`;
+- такой chunk уже плохо ревьюить и он снова становится точкой концентрации UI-долга.
+
+Целевой контракт:
+
+- source selection, result pane, object browser, runtime/db-mode chrome и module metadata живут в отдельных reviewable CSS files;
+- import-manifest сохраняет явный порядок каскада;
+- визуальное поведение SQL-консоли, object inspector и module metadata не меняется;
+- старый giant chunk удаляется, а не остается как legacy-дубликат.
+
+Batch из 5 задач:
+
+1. зафиксировать bounded split-пакет в backlog;
+2. выделить `sql-source` / source-selection стили в отдельный chunk;
+3. выделить `sql-result` / `sql-diff` / `sql-status` стили в отдельный chunk;
+4. выделить `sql-object`, `db-mode/runtime`, `module-metadata` стили в отдельные chunks и обновить import-manifest;
+5. прогнать compile/assets sync и full visual regression suite.
+
+Что сделано:
+
+- giant [40-sql-results.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/40-sql-results.css) удален как mixed SQL/runtime/object CSS-cluster;
+- стили разнесены в reviewable CSS files:
+  - [40-sql-sources.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/40-sql-sources.css)
+  - [41-sql-result-pane.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/41-sql-result-pane.css)
+  - [42-runtime-mode.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/42-runtime-mode.css)
+  - [43-module-metadata.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/43-module-metadata.css)
+  - [44-sql-objects.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/44-sql-objects.css);
+- global `footer-note` вынесен в [00-foundation.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/00-foundation.css), а не остается привязанным к SQL/results chunk;
+- stray responsive rules вернулись в owning subsystem CSS:
+  - [05-home.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/05-home.css)
+  - [10-config-editor.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/10-config-editor.css)
+  - [20-sql-console.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/20-sql-console.css)
+  - [30-run-history.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/30-run-history.css);
+- import-manifest [styles.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles.css) обновлен под новый ordered CSS topology без legacy mixed chunks.
 
 ### 5. Архитектурная программа: провести cleanup legacy и мусора
 

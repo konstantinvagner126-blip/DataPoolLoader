@@ -932,3 +932,17 @@
     grid-template-columns: 1fr;
   }
 }
+
+@media (max-width: 767px) {
+  .sql-console-hero {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .sql-console-stage {
+    width: 100%;
+    max-width: 360px;
+    transform-origin: left top;
+    transform: scale(0.9);
+  }
+}

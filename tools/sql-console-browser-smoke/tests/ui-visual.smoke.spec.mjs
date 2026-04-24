@@ -326,6 +326,12 @@ test("sql console shell visual baseline", async ({ page }) => {
   await prepareVisualPage(page, `/sql-console?workspaceId=${encodeURIComponent(workspaceId)}`, "SQL-консоль по источникам");
   await waitForSqlConsoleEditor(page);
   await page.waitForTimeout(750);
+  await page.waitForFunction(() => {
+    const row = document.querySelector(".sql-console-shell-row");
+    return row instanceof HTMLElement &&
+      getComputedStyle(document.body).marginTop === "0px" &&
+      getComputedStyle(row).display === "flex";
+  });
   await page.addStyleTag({ content: "html, body { overflow-y: hidden !important; }" });
   await page.getByRole("heading", { name: "SQL-консоль по источникам" }).click();
   await expect(page.getByText("История выполнения этой вкладки")).toHaveCount(0);
@@ -1321,6 +1327,10 @@ test("run history cleanup shell visual baseline", async ({ page }) => {
     });
   });
   await prepareVisualPage(page, "/run-history-cleanup", "Обслуживание запусков");
+  await page.waitForFunction(() => {
+    const actions = document.querySelector(".hero-actions");
+    return actions instanceof HTMLElement && parseFloat(getComputedStyle(actions).marginBottom || "0") > 0;
+  });
   await page.addStyleTag({ content: "html, body { overflow-y: hidden !important; }" });
   await page.waitForTimeout(750);
   await expect(page.getByText("Retention output-каталогов", { exact: true })).toBeVisible();
@@ -1445,6 +1455,10 @@ test("run history cleanup runtime-fallback visual baseline", async ({ page }) =>
     });
   });
   await prepareVisualPage(page, "/run-history-cleanup", "Обслуживание запусков");
+  await page.waitForFunction(() => {
+    const actions = document.querySelector(".hero-actions");
+    return actions instanceof HTMLElement && parseFloat(getComputedStyle(actions).marginBottom || "0") > 0;
+  });
   await page.addStyleTag({
     content: "html { scrollbar-gutter: stable both-edges !important; } body { overflow-y: scroll !important; } .run-history-cleanup-panels-shell { width: 1416px !important; height: 1347px !important; overflow: hidden !important; }"
   });

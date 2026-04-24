@@ -801,3 +801,9 @@
   background: rgba(100, 116, 139, 0.12);
   color: #475569;
 }
+
+@media (max-width: 767px) {
+  .run-summary-metrics {
+    grid-template-columns: 1fr;
+  }
+}

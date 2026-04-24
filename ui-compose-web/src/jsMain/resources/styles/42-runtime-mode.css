@@ -1,0 +1,124 @@
+.db-mode-indicator {
+  border-radius: 14px;
+  padding: 0.75rem 1rem;
+  background: rgba(15, 23, 42, 0.04);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  margin-bottom: 1rem;
+}
+
+.db-mode-indicator-inner {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.db-mode-indicator-dot {
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 999px;
+  flex: 0 0 auto;
+}
+
+.db-mode-active {
+  background: #10b981;
+  box-shadow: 0 0 0 0.2rem rgba(16, 185, 129, 0.15);
+}
+
+.db-mode-inactive {
+  background: #94a3b8;
+  box-shadow: 0 0 0 0.18rem rgba(148, 163, 184, 0.12);
+}
+
+.db-mode-toggle-btn {
+  margin-left: auto;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.db-mode-toggle-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.db-mode-status {
+  color: #64748b;
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+
+.runtime-mode-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-left: auto;
+  user-select: none;
+}
+
+.runtime-mode-switch-label {
+  font-size: 0.73rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.runtime-mode-switch input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.runtime-mode-switch-track {
+  position: relative;
+  width: 3rem;
+  height: 1.6rem;
+  border-radius: 999px;
+  background: #cbd5e1;
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.08);
+  transition: background 0.2s ease, opacity 0.2s ease;
+  cursor: pointer;
+}
+
+.runtime-mode-switch-track::after {
+  content: "";
+  position: absolute;
+  top: 0.2rem;
+  left: 0.2rem;
+  width: 1.2rem;
+  height: 1.2rem;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.18);
+  transition: transform 0.2s ease;
+}
+
+.runtime-mode-switch input:checked + .runtime-mode-switch-track {
+  background: #10b981;
+}
+
+.runtime-mode-switch input:checked + .runtime-mode-switch-track::after {
+  transform: translateX(1.4rem);
+}
+
+.runtime-mode-switch input:disabled + .runtime-mode-switch-track {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.db-mode-action-link {
+  text-decoration: none;
+  font-weight: 600;
+}
+
+@media (max-width: 768px) {
+  .db-mode-indicator-inner {
+    align-items: flex-start;
+  }
+
+  .runtime-mode-switch {
+    margin-left: 0;
+  }
+}

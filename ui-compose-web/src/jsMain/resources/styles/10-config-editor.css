@@ -238,3 +238,22 @@
   max-width: 640px;
 }
 
+@media (max-width: 768px) {
+  .module-editor-toolbar {
+    align-items: stretch;
+    width: 100%;
+  }
+
+  .module-editor-toolbar-row {
+    justify-content: stretch;
+  }
+
+  .module-editor-toolbar-group {
+    width: 100%;
+  }
+
+  .module-editor-toolbar-group .btn {
+    width: 100%;
+    min-width: 0;
+  }
+}
