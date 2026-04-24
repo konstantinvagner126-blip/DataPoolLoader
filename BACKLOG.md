@@ -1315,6 +1315,159 @@
 - committed snapshot `run-history-cleanup-runtime-fallback-shell` добавлен в regression suite;
 - для visual-suite введен стабильный inner target `run-history-cleanup-panels-shell`, чтобы banner и panel hierarchy проверялись раздельно и не зависели от outer shell drift.
 
+#### 16.12. Visual baseline для module runs selected-run state
+
+Статус:
+
+- реализовано
+
+Проблема:
+
+- visual suite сейчас держит только `module runs empty-state`, но не покрывает основной рабочий двухпанельный сценарий;
+- именно `selected/active pane` указан в общей цели секции `16` как отдельный обязательный тип UI-состояния;
+- если сломаются active-row highlight, split layout или details-pane, текущий suite этого не заметит.
+
+Целевой контракт:
+
+- visual suite получает screenshot-baseline для `module runs` в состоянии, где выбран конкретный запуск и загружены его детали;
+- state должен воспроизводиться детерминированно через browser intercept для session/history/details payload-ов;
+- regression guard должен ловить:
+  - поломку active-state в левой history-pane;
+  - деградацию split layout `history -> details`;
+  - потерю ключевых detail blocks в правой pane.
+
+Критерий готовности:
+
+- visual spec расширен сценарием `module runs selected-run state`;
+- committed snapshot `module-runs-selected-shell` добавлен в regression suite.
+
+Что сделано:
+
+- visual spec расширен browser-level сценарием `module runs selected-run state`;
+- selected/active pane воспроизводится детерминированно через Playwright intercept для `runtime-context`, session, history и details payload-ов;
+- committed snapshot `module-runs-selected-shell` добавлен в regression suite;
+- заодно стабилизированы flaky baselines `sql console shell` и `module sync runtime-fallback`, чтобы suite не дрейфовал из-за viewport/scrollbar и live runs history.
+
+#### 16.13. Visual baseline для module editor loading-state
+
+Статус:
+
+- реализовано
+
+Проблема:
+
+- visual suite сейчас держит только стабильный shell `module editor`, но не страхует его initial loading-path;
+- `loading` явно указан в общей цели секции `16`, и для центрального рабочего экрана это один из самых дорогих пропусков;
+- если сломаются initial shell hierarchy, loading card или ранний split layout, текущий suite этого не заметит.
+
+Целевой контракт:
+
+- visual suite получает screenshot-baseline для `module editor` в initial loading-state;
+- loading-state воспроизводится детерминированно через browser intercept с удержанием initial catalog/session request, а не через случайную медленную среду;
+- regression guard должен ловить:
+  - потерю `LoadingStateCard` в правой editor-pane;
+  - деградацию `module-editor-content-shell` во время initial load;
+  - поломку ранней sidebar/editor hierarchy до прихода session payload.
+
+Критерий готовности:
+
+- visual spec расширен сценарием `module editor loading-state`;
+- committed snapshot `module-editor-loading-shell` добавлен в regression suite.
+
+Что сделано:
+
+- visual spec расширен сценарием `module editor loading-state`;
+- loading-state воспроизводится детерминированно через browser intercept с удержанием initial `modules/catalog` request;
+- committed snapshot `module-editor-loading-shell` добавлен в regression suite;
+- заодно нормализован baseline `sql object inspector shell`: normal inspector теперь использует deterministic `search/inspect` payload и больше не зависит от live metadata response;
+- полный visual suite подтвержден обычным прогоном без `--update-snapshots`.
+
+#### 16.14. Visual baseline для SQL console history populated-state
+
+Статус:
+
+- реализовано
+
+Проблема:
+
+- visual suite сейчас покрывает только `sql-console-history` empty-state, но не держит основной action-ready сценарий с реальными execution entries;
+- если деградируют row layout, status chips, source summary или action-кнопки `Подставить / Повторить`, current baseline этого не заметит;
+- отдельный экран истории уже стал частью product flow и должен быть защищен не только в пустом workspace.
+
+Целевой контракт:
+
+- visual suite получает screenshot-baseline для `sql-console-history` в populated workspace-scoped state;
+- state воспроизводится детерминированно через browser intercept для `executionHistory`, без зависимости от локального persisted storage;
+- regression guard должен ловить:
+  - поломку row-based list layout;
+  - деградацию status/meta/source summary в history entry;
+  - потерю action affordance `Подставить / Повторить`.
+
+Критерий готовности:
+
+- visual spec расширен сценарием `sql console history populated-state`;
+- committed snapshot `sql-console-history-populated-shell` добавлен в regression suite.
+
+Что сделано сейчас:
+
+- visual spec расширен сценарием `sql console history populated-state`;
+- history populated-state воспроизводится детерминированно через browser intercept для `runtime-context`, `sql-console/info`, `state` и `execution history`;
+- empty/populated history screen переведены на фиксированные `workspaceId`, чтобы summary chip не дрейфовал между прогонами;
+- часть shell-heavy baseline-ов дополнительно нормализована test-only gutter/overflow sizing.
+
+Открытый блокер:
+
+- блокер снят: после дополнительной normalizing-волны full visual suite проходит и на `--update-snapshots`, и на обычном прогоне.
+
+Что сделано финально:
+
+- committed snapshot `sql-console-history-populated-shell` добавлен в regression suite;
+- empty/populated history screen переведены на fixed `workspaceId`, чтобы summary chip не ломал baseline;
+- populated history scenario подтвержден в составе полного visual suite.
+
+#### 16.15. Visual target normalization для shell-heavy baseline
+
+Статус:
+
+- реализовано
+
+Проблема:
+
+- несколько screenshot-baseline все еще зависят от слишком крупного shell target, случайного scroll growth и viewport-sensitive layout;
+- из-за этого `--update-snapshots` проходит, а обычный прогон затем может падать на соседних экранах без product change;
+- пока это не исправлено, visual suite нельзя считать надежным regression guard.
+
+Целевой контракт:
+
+- shell-heavy baseline-ы переводятся на действительно bounded и repeatable target normalization;
+- обычный прогон `ui-visual.smoke.spec.mjs` проходит после `--update-snapshots` без дрейфа snapshot-ов;
+- стабилизируются как минимум:
+  - `sql console shell`
+  - `module runs empty-state`
+  - `run history cleanup runtime-fallback`
+
+Критерий готовности:
+
+- visual spec получает final normalization для перечисленных unstable shell scenarios;
+- полный suite проходит и на `--update-snapshots`, и на обычном прогоне.
+
+Что сделано:
+
+- shell-heavy baseline-ы переведены на более жесткий deterministic contract:
+  - fixed payload где это было нужно;
+  - fixed `workspaceId` для history screen;
+  - test-only `scrollbar-gutter`, bounded `width/height` и `overflow` для крупных shell-target-ов;
+  - explicit settle-wait для сценариев, где layout добирался после раннего render-phase;
+- `sql object inspector error-state` больше не опирается на browser-level `route.abort("failed")`, а использует явный synthetic `500` response;
+- normalizing-пакет закрыл дрейфующие baseline-ы:
+  - `sql console shell`
+  - `module runs empty-state`
+  - `run history cleanup runtime-fallback`
+  - соседние shell/error/history scenarios, которые цеплялись за те же visual timing issues;
+- полный suite `ui-visual.smoke.spec.mjs` подтвержден двумя способами:
+  - `--update-snapshots`
+  - обычный прогон без update.
+
 2. `Comprehensive visual regression coverage`
    - расширить существующий browser smoke harness до visual regression уровня;
    - покрыть как минимум:
