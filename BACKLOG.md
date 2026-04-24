@@ -229,6 +229,51 @@
 - стили проекта разбиты по подсистемам;
 - giant CSS-файл больше не является точкой концентрации UI-долга.
 
+#### 4.1. Split giant `05-home-help.css` into feature-local chunks
+
+Статус:
+
+- реализовано
+
+Проблема:
+
+- [05-home-help.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/05-home-help.css) уже не общий manifest-файл, но сам стал новым giant CSS-cluster на `1000+` строк;
+- внутри него вперемешку живут:
+  - `home-*`;
+  - `about-*`;
+  - `help-*`;
+  - `api-*`;
+  - `platform-*` / `packet-*`;
+- такой chunk уже плохо ревьюить и дальше опасно расширять.
+
+Целевой контракт:
+
+- `home`, `about`, `help/api` стили живут в отдельных reviewable CSS files;
+- import-manifest [styles.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles.css) сохраняет явный порядок каскада;
+- визуальное поведение home/about экранов не меняется;
+- старый mixed chunk удаляется, а не остается как legacy-дубликат.
+
+Batch из 5 задач:
+
+1. зафиксировать bounded split-пакет в backlog;
+2. выделить `home + platform` стили в отдельный chunk;
+3. выделить `about` стили в отдельный chunk;
+4. выделить `help/api` стили в отдельный chunk и обновить import-manifest;
+5. прогнать compile/assets sync и visual baseline для `home` и `about`.
+
+Что сделано:
+
+- giant [05-home-help.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/05-home-help.css) удален как mixed feature-cluster;
+- стили разнесены в отдельные feature-local chunks:
+  - [05-home.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/05-home.css)
+  - [06-about.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/06-about.css)
+  - [07-help-api.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles/07-help-api.css)
+- import-manifest [styles.css](/Users/kwdev/DataPoolLoader/ui-compose-web/src/jsMain/resources/styles.css) обновлен под новый порядок каскада;
+- visual result подтвержден не локально, а полным browser-level suite:
+  - `home page visual baseline`
+  - `about page visual baseline`
+  - плюс полный `ui-visual.smoke.spec.mjs` без regressions на соседних экранах.
+
 ### 5. Архитектурная программа: провести cleanup legacy и мусора
 
 Статус:

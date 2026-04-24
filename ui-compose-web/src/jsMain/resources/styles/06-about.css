@@ -1,0 +1,248 @@
+.about-developer-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+
+.about-card {
+  padding: 1.35rem;
+}
+
+.about-card-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #132238;
+}
+
+.about-developer-card {
+  overflow: hidden;
+}
+
+.about-developer-card-primary {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(238, 247, 255, 0.96));
+}
+
+.about-developer-card-secondary {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(246, 240, 255, 0.96));
+}
+
+.about-developer-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 1rem;
+  margin-bottom: 0.9rem;
+}
+
+.about-developer-alias {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(19, 34, 56, 0.08);
+  color: #132238;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.about-motorcycle-stage {
+  position: relative;
+  min-height: 140px;
+  border-radius: 18px;
+  border: 1px solid rgba(19, 34, 56, 0.08);
+  background:
+    linear-gradient(180deg, rgba(248, 251, 255, 0.98), rgba(233, 241, 250, 0.92));
+  overflow: hidden;
+}
+
+.about-motorcycle-track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 30px;
+  height: 6px;
+  background: linear-gradient(90deg, rgba(19, 34, 56, 0.18), rgba(19, 34, 56, 0.08));
+}
+
+.about-motorcycle {
+  position: absolute;
+  left: -76px;
+  bottom: 16px;
+  width: 122px;
+  height: 84px;
+  animation: about-motorcycle-run 4.8s ease-in-out infinite;
+  transform-origin: 28px 66px;
+}
+
+.about-motorcycle-rider,
+.about-motorcycle-tail,
+.about-motorcycle-seat,
+.about-motorcycle-body,
+.about-motorcycle-fairing,
+.about-motorcycle-windscreen,
+.about-motorcycle-front-fork,
+.about-motorcycle-swingarm,
+.about-motorcycle-exhaust,
+.about-motorcycle-wheel {
+  position: absolute;
+}
+
+.about-motorcycle-rider {
+  left: 38px;
+  top: 4px;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: #0b0d11;
+  box-shadow:
+    9px 13px 0 -6px #0b0d11,
+    -2px 18px 0 -7px #0b0d11;
+}
+
+.about-motorcycle-tail {
+  left: 20px;
+  top: 31px;
+  width: 34px;
+  height: 12px;
+  border-radius: 12px 18px 10px 12px;
+  background: linear-gradient(135deg, #0f1115, #2a2f36);
+  transform: rotate(-14deg);
+}
+
+.about-motorcycle-seat {
+  left: 38px;
+  top: 30px;
+  width: 22px;
+  height: 10px;
+  border-radius: 8px 10px 6px 6px;
+  background: #151920;
+  transform: rotate(-7deg);
+}
+
+.about-motorcycle-body {
+  left: 42px;
+  top: 34px;
+  width: 34px;
+  height: 14px;
+  border-radius: 10px 14px 8px 10px;
+  background: linear-gradient(135deg, #050608, #1d2228);
+  transform: rotate(-8deg);
+}
+
+.about-motorcycle-fairing {
+  left: 60px;
+  top: 24px;
+  width: 24px;
+  height: 20px;
+  border-radius: 16px 16px 8px 14px;
+  background: linear-gradient(135deg, #0d1014, #262b31);
+  transform: skewX(-16deg) rotate(6deg);
+}
+
+.about-motorcycle-windscreen {
+  left: 76px;
+  top: 19px;
+  width: 12px;
+  height: 14px;
+  border-radius: 10px 10px 6px 6px;
+  background: linear-gradient(180deg, rgba(181, 198, 214, 0.85), rgba(87, 103, 120, 0.35));
+  transform: rotate(17deg);
+}
+
+.about-motorcycle-front-fork {
+  left: 80px;
+  top: 33px;
+  width: 7px;
+  height: 28px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #5b636d, #2c3238);
+  transform: rotate(18deg);
+}
+
+.about-motorcycle-swingarm {
+  left: 34px;
+  top: 54px;
+  width: 30px;
+  height: 6px;
+  border-radius: 999px;
+  background: #434b55;
+  transform: rotate(12deg);
+}
+
+.about-motorcycle-exhaust {
+  left: 23px;
+  top: 48px;
+  width: 22px;
+  height: 7px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #6d747d, #a0a7af);
+  transform: rotate(16deg);
+}
+
+.about-motorcycle-wheel {
+  bottom: 2px;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 5px solid #0d1014;
+  background:
+    radial-gradient(circle at center, #dde5ee 0 22%, transparent 24% 100%),
+    radial-gradient(circle at center, #5e6570 0 34%, #f7f9fb 35% 38%, transparent 40% 100%),
+    rgba(255, 255, 255, 0.96);
+  animation: about-wheel-spin 0.7s linear infinite;
+}
+
+.about-motorcycle-wheel-back {
+  left: 18px;
+}
+
+.about-motorcycle-wheel-front {
+  left: 76px;
+  bottom: 13px;
+}
+
+.about-sportbike-black {
+  color: #0b0d11;
+}
+
+.about-sportbike-delayed {
+  animation-delay: 0.85s;
+  animation-duration: 5.1s;
+}
+
+@keyframes about-motorcycle-run {
+  0% {
+    transform: translateX(0) translateY(0) rotate(0deg);
+  }
+  14% {
+    transform: translateX(34px) translateY(-1px) rotate(-4deg);
+  }
+  28% {
+    transform: translateX(76px) translateY(-3px) rotate(-16deg);
+  }
+  38% {
+    transform: translateX(118px) translateY(-9px) rotate(-22deg);
+  }
+  48% {
+    transform: translateX(166px) translateY(-5px) rotate(-12deg);
+  }
+  64% {
+    transform: translateX(240px) translateY(-1px) rotate(-4deg);
+  }
+  82% {
+    transform: translateX(330px) translateY(0) rotate(0deg);
+  }
+  100% {
+    transform: translateX(430px) translateY(0) rotate(0deg);
+  }
+}
+
+@keyframes about-wheel-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
