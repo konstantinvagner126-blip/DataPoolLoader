@@ -118,6 +118,10 @@ class KafkaServerTest {
                 """.trimIndent(),
             )
         }.bodyAsText()
+        assertTrue(readMessages.contains("\"status\":\"DONE\""))
+        assertTrue(readMessages.contains("\"durationMs\":3"))
+        assertTrue(readMessages.contains("\"consumedBytes\":24"))
+        assertTrue(readMessages.contains("\"consumedMessages\":1"))
         assertTrue(readMessages.contains("\"offset\":12"))
         assertTrue(readMessages.contains("\"partition\":0"))
         assertTrue(readMessages.contains("\"jsonPrettyText\":\"{\\n  \\\"id\\\" : 12\\n}\""))
@@ -350,6 +354,10 @@ private class FakeKafkaMessageOperations : KafkaMessageOperations {
             topicName = request.topicName,
             scope = request.scope,
             partition = request.partition,
+            status = "DONE",
+            durationMs = 3,
+            consumedBytes = if (request.scope == KafkaTopicMessageReadScope.ALL_PARTITIONS) 19 else 24,
+            consumedMessages = if (request.scope == KafkaTopicMessageReadScope.ALL_PARTITIONS) 2 else 1,
             mode = request.mode,
             requestedLimit = request.limit ?: 2,
             effectiveLimit = request.limit ?: 2,

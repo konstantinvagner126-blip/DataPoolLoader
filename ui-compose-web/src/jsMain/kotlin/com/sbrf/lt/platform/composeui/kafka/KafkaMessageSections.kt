@@ -144,12 +144,32 @@ internal fun KafkaMessageBrowserSection(
 
         state.messages?.takeIf {
             it.topicName == topicOverview.topic.name &&
-                it.scope == state.messageReadScope &&
-                (it.scope == "ALL_PARTITIONS" || it.partition == state.selectedMessagePartition) &&
-                it.mode == state.messageReadMode
+                it.cluster.id == topicOverview.cluster.id
         }?.let { messages ->
             messages.note?.let { note ->
                 P({ classes("kafka-message-note") }) { Text(note) }
+            }
+
+            Div({ classes("kafka-message-browser-meta") }) {
+                P({ classes("kafka-message-browser-summary") }) {
+                    Text(
+                        buildList {
+                            add(messages.status)
+                            add("${messages.durationMs} ms")
+                            add(formatKafkaMessageBytes(messages.consumedBytes))
+                            add("${messages.consumedMessages} messages consumed")
+                        }.joinToString(" · "),
+                    )
+                }
+                P({ classes("kafka-message-browser-context") }) {
+                    Text(
+                        buildList {
+                            add("scope ${messages.scope.lowercase().replace('_', ' ')}")
+                            add("mode ${messages.mode.lowercase()}")
+                            messages.effectiveStartOffset?.let { add("start offset $it") }
+                        }.joinToString(" · "),
+                    )
+                }
             }
 
             if (messages.records.isEmpty()) {
@@ -171,17 +191,6 @@ internal fun KafkaMessageBrowserSection(
                     ?: messages.records.first()
 
                 Div({ classes("kafka-message-browser-shell") }) {
-                    Div({ classes("kafka-message-browser-meta") }) {
-                        Text(
-                            buildList {
-                                add("${messages.records.size} records")
-                                add("scope ${messages.scope.lowercase().replace('_', ' ')}")
-                                add("mode ${messages.mode.lowercase()}")
-                                messages.effectiveStartOffset?.let { add("start offset $it") }
-                            }.joinToString(" · "),
-                        )
-                    }
-
                     Div({ classes("table-responsive", "kafka-message-table-wrap") }) {
                         Table({ classes("table", "table-sm", "align-middle", "mb-0", "kafka-message-table") }) {
                             Thead {
@@ -369,3 +378,10 @@ internal fun formatKafkaMessageTimestamp(timestamp: Long?): String {
         timestamp.toString()
     }
 }
+
+private fun formatKafkaMessageBytes(bytes: Long): String =
+    when {
+        bytes >= 1_048_576L -> "${((bytes * 10) / 1_048_576L) / 10.0} MB"
+        bytes >= 1024L -> "${((bytes * 10) / 1024L) / 10.0} KB"
+        else -> "$bytes Bytes"
+    }

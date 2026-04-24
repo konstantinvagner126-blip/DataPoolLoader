@@ -279,6 +279,108 @@
 2. `Payload` textarea в Kafka `Produce` tab стала выше и удобнее для ручной вставки message body;
 3. produce contract, routing и structured form semantics не менялись.
 
+#### 17.7. Kafka message read execution summary and all-partitions latency hardening
+
+Статус:
+
+- реализовано
+
+Контекст:
+
+- после чтения сообщений `kafka-ui` показывает короткий execution summary вида:
+  - `DONE`;
+  - `3 ms`;
+  - `132 Bytes`;
+  - `5 messages consumed`;
+- в нашем Kafka screen такой summary сейчас отсутствует, хотя он полезен для наблюдаемости bounded read path;
+- дополнительно текущий `ALL_PARTITIONS` read path работает медленнее, чем должен:
+  - offsets и polls идут последовательно по partition;
+  - это особенно заметно на topic с несколькими partition и малым числом сообщений.
+
+Что нужно сделать:
+
+1. добавить в Kafka message-read response summary metadata:
+   - `status`;
+   - `durationMs`;
+   - `consumedBytes`;
+   - `consumedMessages`;
+2. вывести этот summary в `Messages` tab в стиле, близком к `kafka-ui`;
+3. не менять bounded read safety contract:
+   - `assign + seek`;
+   - no commit;
+   - explicit `selected partition / all partitions`;
+4. ускорить `ALL_PARTITIONS` path без перехода к background consumer session:
+   - уйти от последовательного per-partition read;
+   - читать все целевые partition через один short-lived assign/seek session;
+   - по возможности использовать bulk offset lookup вместо repeated single-partition calls;
+5. добавить targeted service/server coverage на response summary и optimized all-partitions path.
+
+Что сделано:
+
+1. Kafka message-read response расширен summary metadata:
+   - `status`;
+   - `durationMs`;
+   - `consumedBytes`;
+   - `consumedMessages`;
+2. `Messages` tab теперь показывает execution summary в формате, близком к `kafka-ui`;
+3. bounded read safety contract сохранен без background session и без commit offsets;
+4. `ALL_PARTITIONS` path переведен с последовательного per-partition read на единый short-lived assign/seek session с bulk offset lookup;
+5. добавлены targeted regressions на service/server response contract и optimized all-partitions flow.
+
+#### 17.8. Remove hidden Kafka message read cap and honor explicit UI limit
+
+Статус:
+
+- реализовано
+
+Контекст:
+
+- в текущем Kafka flow пользователь может указать `limit = 500`, но effective result все равно режется hidden server cap;
+- это противоречит ожидаемому UX:
+  - значение limit уже задается явно в интерфейсе;
+  - именно оно и должно определять размер bounded read;
+- hidden clamp делает поведение непредсказуемым и ломает ручную topic inspection.
+
+Что нужно сделать:
+
+1. зафиксировать follow-up в backlog;
+2. убрать hidden clamp по `ui.kafka.maxRecordsPerRead` из message read service;
+3. оставить `ui.kafka.maxRecordsPerRead` только как default/fallback для initial read, а bounded size определять explicit `limit` из интерфейса;
+4. не запускать implicit reload и не менять semantics других read controls.
+
+Что сделано:
+
+1. follow-up зафиксирован как отдельный bounded package;
+2. hidden server-side clamp по `ui.kafka.maxRecordsPerRead` убран;
+3. `ui.kafka.maxRecordsPerRead` остался только default/fallback для initial read, а effective Kafka read limit теперь определяется значением из интерфейса;
+4. bounded read semantics и explicit reload model сохранены.
+
+#### 17.9. Keep last Kafka message result visible until explicit reload
+
+Статус:
+
+- реализовано
+
+Контекст:
+
+- сейчас при изменении `Scope`, `Mode`, `Partition` и других draft controls текущий message result исчезает еще до нажатия `Читать сообщения`;
+- это создает ложное впечатление, что UI уже сделал reload, хотя фактически пользователь только меняет параметры следующего запроса;
+- message browser должен оставаться в модели `draft controls + last executed result`.
+
+Что нужно сделать:
+
+1. перестать очищать `messages` в shared store при изменении draft controls для message read;
+2. перестать скрывать current results только потому, что draft `Scope/Mode/Partition` уже отличаются от последнего executed request;
+3. оставлять last successful result видимым до явного нажатия `Читать сообщения`;
+4. сохранить очистку результатов только при реальной смене topic/cluster или после explicit reload.
+
+Что сделано:
+
+1. shared store больше не сбрасывает `messages` при изменении `Scope/Mode/Partition/Limit/Offset/Timestamp`;
+2. `Messages` tab рендерит last executed result для текущего topic, а не фильтрует его по live draft controls;
+3. результаты остаются видимыми до explicit read action;
+4. topic-level reload по-прежнему очищает stale results только там, где это реально нужно.
+
 ### 9. Операционная надежность long-running операций
 
 Статус:

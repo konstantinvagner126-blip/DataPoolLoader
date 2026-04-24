@@ -11,7 +11,6 @@ internal class KafkaStoreMessageSupport(
         current.copy(
             selectedMessagePartition = partition,
             messagesError = null,
-            messages = null,
         )
 
     fun updateMessageReadScope(
@@ -21,7 +20,6 @@ internal class KafkaStoreMessageSupport(
         current.copy(
             messageReadScope = stateSupport.normalizeMessageScope(scope),
             messagesError = null,
-            messages = null,
         )
 
     fun updateMessageReadMode(
@@ -31,7 +29,6 @@ internal class KafkaStoreMessageSupport(
         current.copy(
             messageReadMode = stateSupport.normalizeMessageMode(mode),
             messagesError = null,
-            messages = null,
         )
 
     fun updateMessageLimitInput(
@@ -41,7 +38,6 @@ internal class KafkaStoreMessageSupport(
         current.copy(
             messageLimitInput = limit,
             messagesError = null,
-            messages = null,
         )
 
     fun updateMessageOffsetInput(
@@ -51,7 +47,6 @@ internal class KafkaStoreMessageSupport(
         current.copy(
             messageOffsetInput = offset,
             messagesError = null,
-            messages = null,
         )
 
     fun updateMessageTimestampInput(
@@ -61,7 +56,6 @@ internal class KafkaStoreMessageSupport(
         current.copy(
             messageTimestampInput = timestamp,
             messagesError = null,
-            messages = null,
         )
 
     fun startMessagesReload(current: KafkaPageState): KafkaPageState =

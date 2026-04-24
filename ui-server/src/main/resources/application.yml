@@ -1,14 +1,17 @@
----
 ui:
   port: 8080
-  appsRoot: "/Users/kwdev/DataPoolLoader/apps"
-  storageDir: "/Users/kwdev/.datapool-loader/ui/storage"
+  appsRoot: /Users/kwdev/DataPoolLoader/apps
+  storageDir: /Users/kwdev/.datapool-loader/ui/storage
   moduleStore:
     mode: database
     postgres:
       jdbcUrl: "${LOCAL_MANUAL_DB_JDBC_URL}"
       username: "${LOCAL_MANUAL_DB_USERNAME}"
       password: "${LOCAL_MANUAL_DB_PASSWORD}"
+      schema: ui_registry
+  outputRetention:
+    retentionDays: 14
+    keepMinRunsPerModule: 20
   showTechnicalDiagnostics: false
   showRawSummaryJson: false
   defaultCredentialsFile: null
@@ -17,36 +20,50 @@ ui:
     pollTimeoutMs: 3000
     adminTimeoutMs: 5000
     maxPayloadBytes: 1048576
-    clusters: []
+    clusters:
+      - id: local-docker
+        name: Local Kafka Docker
+        readOnly: false
+        properties:
+          bootstrap.servers: localhost:19092
+          client.id: datapool-loader
+          security.protocol: PLAINTEXT
   sqlConsole:
     fetchSize: 1000
-    maxRowsPerShard: 200
+    maxRowsPerShard: 2000
     queryTimeoutSec: 60
-    groups:
-    - name: "dev"
-      sources: ["db1", "db2"]
-    - name: "ift"
-      sources: ["db2", "db3", "db4"]
-    - name: "lt"
-      sources: ["db4", "db5"]
     sourceCatalog:
-    - name: "db1"
-      jdbcUrl: "${LOCAL_MANUAL_DB_JDBC_URL}"
-      username: "${LOCAL_MANUAL_DB_USERNAME}"
-      password: "${LOCAL_MANUAL_DB_PASSWORD}"
-    - name: "db2"
-      jdbcUrl: "${LOCAL_MANUAL_DB_JDBC_URL}"
-      username: "${LOCAL_MANUAL_DB_USERNAME}"
-      password: "${LOCAL_MANUAL_DB_PASSWORD}"
-    - name: "db3"
-      jdbcUrl: "${LOCAL_MANUAL_DB_JDBC_URL}"
-      username: "${LOCAL_MANUAL_DB_USERNAME}"
-      password: "${LOCAL_MANUAL_DB_PASSWORD}"
-    - name: "db4"
-      jdbcUrl: "${LOCAL_MANUAL_DB_JDBC_URL}"
-      username: "${LOCAL_MANUAL_DB_USERNAME}"
-      password: "${LOCAL_MANUAL_DB_PASSWORD}"
-    - name: "db5"
-      jdbcUrl: "${LOCAL_MANUAL_DB_JDBC_URL}"
-      username: "${LOCAL_MANUAL_DB_USERNAME}"
-      password: "${LOCAL_MANUAL_DB_PASSWORD}"
+      - name: db1
+        jdbcUrl: "${LOCAL_MANUAL_DB_JDBC_URL}"
+        username: "${LOCAL_MANUAL_DB_USERNAME}"
+        password: "${LOCAL_MANUAL_DB_PASSWORD}"
+      - name: db2
+        jdbcUrl: "${LOCAL_MANUAL_DB_JDBC_URL}"
+        username: "${LOCAL_MANUAL_DB_USERNAME}"
+        password: "${LOCAL_MANUAL_DB_PASSWORD}"
+      - name: db3
+        jdbcUrl: "${LOCAL_MANUAL_DB_JDBC_URL}"
+        username: "${LOCAL_MANUAL_DB_USERNAME}"
+        password: "${LOCAL_MANUAL_DB_PASSWORD}"
+      - name: db4
+        jdbcUrl: "${LOCAL_MANUAL_DB_JDBC_URL}"
+        username: "${LOCAL_MANUAL_DB_USERNAME}"
+        password: "${LOCAL_MANUAL_DB_PASSWORD}"
+      - name: db5
+        jdbcUrl: "${LOCAL_MANUAL_DB_JDBC_URL}"
+        username: "${LOCAL_MANUAL_DB_USERNAME}"
+        password: "${LOCAL_MANUAL_DB_PASSWORD}"
+    groups:
+      - name: dev
+        sources:
+          - db1
+          - db2
+      - name: ift
+        sources:
+          - db2
+          - db3
+          - db4
+      - name: lt
+        sources:
+          - db4
+          - db5

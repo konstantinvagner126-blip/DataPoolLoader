@@ -203,11 +203,14 @@ Message browser также обязан:
   - `all partitions`;
 - для `selected partition` читать только по явно выбранной partition;
 - для `all partitions` читать bounded merged result по topic scope без fan-out в неограниченный объем;
-- ограничивать `limit` сверху через `ui.kafka.maxRecordsPerRead`;
+- использовать `ui.kafka.maxRecordsPerRead` только как default/fallback для initial read, а не как hidden clamp поверх explicit UI limit;
 - ограничивать payload rendering через `ui.kafka.maxPayloadBytes`;
 - честно помечать `truncated` payload, а не делать вид, что отрисован полный message body;
 - явно показывать `partition` и `offset` у каждой записи в merged result;
 - различать `latest`, `explicit offset` и `timestamp` read modes без скрытого fallback на background session.
+- относиться к `scope/mode/partition/limit/offset/timestamp` как к draft controls следующего запроса:
+  - изменение этих полей само по себе не должно запускать read;
+  - last successful result не должен исчезать до явного нажатия `Читать сообщения`.
 
 ### 5.5. Write operations on readOnly cluster
 

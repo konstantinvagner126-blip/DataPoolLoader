@@ -169,6 +169,54 @@ class KafkaStoreTest {
     }
 
     @Test
+    fun `message draft control changes keep last executed result visible until explicit reload`() {
+        val store = KafkaStore(
+            StubKafkaApi(
+                readMessagesHandler = {
+                    KafkaTopicMessageReadResponse(
+                        cluster = sampleKafkaInfo().clusters.first(),
+                        topicName = "datapool-test",
+                        scope = "SELECTED_PARTITION",
+                        partition = 0,
+                        status = "DONE",
+                        durationMs = 3,
+                        consumedBytes = 132,
+                        consumedMessages = 5,
+                        mode = "LATEST",
+                        requestedLimit = 50,
+                        effectiveLimit = 50,
+                        records = listOf(
+                            KafkaTopicMessageRecordResponse(
+                                partition = 0,
+                                offset = 12,
+                            ),
+                        ),
+                    )
+                },
+            ),
+        )
+
+        val loaded = runKafkaSuspend {
+            store.load(
+                preferredClusterId = "local",
+                preferredTopicName = "datapool-test",
+                activePane = "messages",
+            )
+        }
+        val withMessages = runKafkaSuspend { store.readMessages(loaded) }
+
+        val afterScopeChange = store.updateMessageReadScope(withMessages, "ALL_PARTITIONS")
+        val afterModeChange = store.updateMessageReadMode(afterScopeChange, "OFFSET")
+        val afterPartitionChange = store.updateSelectedMessagePartition(afterModeChange, 1)
+
+        assertNotNull(afterPartitionChange.messages)
+        assertEquals("SELECTED_PARTITION", afterPartitionChange.messages?.scope)
+        assertEquals("LATEST", afterPartitionChange.messages?.mode)
+        assertEquals(0, afterPartitionChange.messages?.partition)
+        assertEquals(12, afterPartitionChange.messages?.records?.single()?.offset)
+    }
+
+    @Test
     fun `produce message maps partition key headers and payload through api request`() {
         var capturedRequest: KafkaTopicProduceRequestPayload? = null
         val store = KafkaStore(

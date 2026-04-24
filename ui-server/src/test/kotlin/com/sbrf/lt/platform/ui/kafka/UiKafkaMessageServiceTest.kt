@@ -163,7 +163,87 @@ class UiKafkaMessageServiceTest {
         assertEquals(4, result.records.size)
         assertEquals(listOf(1, 1, 1, 0), result.records.map { it.partition })
         assertEquals(listOf(8L, 7L, 6L, 7L), result.records.map { it.offset })
+        assertEquals("DONE", result.status)
+        assertEquals(4, result.consumedMessages)
+        assertTrue(result.consumedBytes > 0)
         assertEquals("Результат собран по всем partition и отсортирован по timestamp.", result.note)
+    }
+
+    @Test
+    fun `all partitions read uses bulk consumer path`() {
+        val facadeFactory = FakeUiKafkaMessageConsumerFacadeFactory(
+            partitions = mapOf("datapool-test" to listOf(0, 1)),
+            beginningOffsets = mapOf(
+                tp("datapool-test", 0) to 0L,
+                tp("datapool-test", 1) to 0L,
+            ),
+            endOffsets = mapOf(
+                tp("datapool-test", 0) to 4L,
+                tp("datapool-test", 1) to 4L,
+            ),
+            records = mapOf(
+                KafkaReadKey("datapool-test", 0, 0L) to listOf(
+                    record(partition = 0, offset = 0L, value = """{"id":0}"""),
+                ),
+                KafkaReadKey("datapool-test", 1, 0L) to listOf(
+                    record(partition = 1, offset = 0L, value = """{"id":10}"""),
+                ),
+            ),
+        )
+        val service = ConfigBackedKafkaMessageService(
+            kafkaConfig = testKafkaConfig(),
+            consumerFacadeFactory = facadeFactory,
+        )
+
+        service.readMessages(
+            KafkaTopicMessageReadRequest(
+                clusterId = "local",
+                topicName = "datapool-test",
+                scope = KafkaTopicMessageReadScope.ALL_PARTITIONS,
+                mode = KafkaTopicMessageReadMode.OFFSET,
+                limit = 2,
+                offset = 0L,
+            ),
+        )
+
+        assertEquals(1, facadeFactory.bulkReadCallCount)
+        assertEquals(0, facadeFactory.singleReadCallCount)
+    }
+
+    @Test
+    fun `honors explicit UI read limit even when config default is lower`() {
+        val service = ConfigBackedKafkaMessageService(
+            kafkaConfig = testKafkaConfig(),
+            consumerFacadeFactory = FakeUiKafkaMessageConsumerFacadeFactory(
+                partitions = mapOf("datapool-test" to listOf(0)),
+                beginningOffsets = mapOf(tp("datapool-test", 0) to 0L),
+                endOffsets = mapOf(tp("datapool-test", 0) to 10_000L),
+                records = mapOf(
+                    KafkaReadKey("datapool-test", 0, 9_500L) to List(500) { index ->
+                        record(
+                            partition = 0,
+                            offset = 9_500L + index,
+                            value = """{"id":${9_500 + index}}""",
+                            timestamp = 1_700_000_100_000L + index,
+                        )
+                    },
+                ),
+            ),
+        )
+
+        val result = service.readMessages(
+            KafkaTopicMessageReadRequest(
+                clusterId = "local",
+                topicName = "datapool-test",
+                partition = 0,
+                mode = KafkaTopicMessageReadMode.LATEST,
+                limit = 500,
+            ),
+        )
+
+        assertEquals(500, result.requestedLimit)
+        assertEquals(500, result.effectiveLimit)
+        assertEquals(500, result.records.size)
     }
 }
 
@@ -214,6 +294,11 @@ private class FakeUiKafkaMessageConsumerFacadeFactory(
     private val timestampOffsets: Map<KafkaTimestampKey, Long> = emptyMap(),
     private val records: Map<KafkaReadKey, List<ConsumerRecord<ByteArray, ByteArray>>> = emptyMap(),
 ) : UiKafkaMessageConsumerFacadeFactory {
+    var singleReadCallCount: Int = 0
+        private set
+    var bulkReadCallCount: Int = 0
+        private set
+
     override fun open(cluster: UiKafkaClusterConfig): UiKafkaMessageConsumerFacade =
         object : UiKafkaMessageConsumerFacade {
             override fun loadPartitions(topicName: String): List<PartitionInfo> =
@@ -221,25 +306,47 @@ private class FakeUiKafkaMessageConsumerFacadeFactory(
                     PartitionInfo(topicName, partition, Node.noNode(), emptyArray(), emptyArray(), emptyArray())
                 }
 
-            override fun beginningOffset(topicPartition: TopicPartition): Long? =
-                beginningOffsets[topicPartition]
+            override fun beginningOffsets(topicPartitions: List<TopicPartition>): Map<TopicPartition, Long?> =
+                topicPartitions.associateWith { topicPartition -> beginningOffsets[topicPartition] }
 
-            override fun endOffset(topicPartition: TopicPartition): Long? =
-                endOffsets[topicPartition]
+            override fun endOffsets(topicPartitions: List<TopicPartition>): Map<TopicPartition, Long?> =
+                topicPartitions.associateWith { topicPartition -> endOffsets[topicPartition] }
 
-            override fun offsetForTimestamp(
-                topicPartition: TopicPartition,
-                timestampMs: Long,
-            ): Long? =
-                timestampOffsets[KafkaTimestampKey(topicPartition.topic(), topicPartition.partition(), timestampMs)]
+            override fun offsetsForTimestamps(
+                timestampByPartition: Map<TopicPartition, Long>,
+            ): Map<TopicPartition, Long?> =
+                timestampByPartition.mapValues { (topicPartition, timestampMs) ->
+                    timestampOffsets[KafkaTimestampKey(topicPartition.topic(), topicPartition.partition(), timestampMs)]
+                }
 
             override fun readRecords(
                 topicPartition: TopicPartition,
                 startOffset: Long,
                 limit: Int,
                 pollTimeout: java.time.Duration,
-            ): List<ConsumerRecord<ByteArray, ByteArray>> =
-                records[KafkaReadKey(topicPartition.topic(), topicPartition.partition(), startOffset)].orEmpty().take(limit)
+            ): List<ConsumerRecord<ByteArray, ByteArray>> {
+                singleReadCallCount += 1
+                return records[KafkaReadKey(topicPartition.topic(), topicPartition.partition(), startOffset)]
+                    .orEmpty()
+                    .take(limit)
+            }
+
+            override fun readRecords(
+                partitionReads: List<UiKafkaPartitionReadCursor>,
+                perPartitionLimit: Int,
+                pollTimeout: java.time.Duration,
+            ): List<ConsumerRecord<ByteArray, ByteArray>> {
+                bulkReadCallCount += 1
+                return partitionReads.flatMap { partitionRead ->
+                    records[KafkaReadKey(
+                        partitionRead.topicPartition.topic(),
+                        partitionRead.topicPartition.partition(),
+                        partitionRead.startOffset,
+                    )]
+                        .orEmpty()
+                        .take(perPartitionLimit)
+                }
+            }
 
             override fun close() = Unit
         }

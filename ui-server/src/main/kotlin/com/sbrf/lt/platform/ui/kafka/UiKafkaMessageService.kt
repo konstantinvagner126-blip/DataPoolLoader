@@ -43,6 +43,7 @@ internal class ConfigBackedKafkaMessageService(
         }
 
         val cluster = requireCluster(request.clusterId)
+        val startedAtNs = System.nanoTime()
         consumerFacadeFactory.open(cluster).use { consumer ->
             val partitions = consumer.loadPartitions(request.topicName)
             if (partitions.isEmpty()) {
@@ -59,7 +60,7 @@ internal class ConfigBackedKafkaMessageService(
                 )
             }
             val effectiveLimit = normalizeLimit(request.limit)
-            return when (request.scope) {
+            val result = when (request.scope) {
                 KafkaTopicMessageReadScope.SELECTED_PARTITION -> readSelectedPartition(
                     cluster = cluster,
                     consumer = consumer,
@@ -74,6 +75,13 @@ internal class ConfigBackedKafkaMessageService(
                     effectiveLimit = effectiveLimit,
                 )
             }
+            val durationMs = Duration.ofNanos(System.nanoTime() - startedAtNs).toMillis()
+            return result.copy(
+                status = "DONE",
+                durationMs = durationMs,
+                consumedBytes = result.records.sumOf { it.estimatedSizeBytes() },
+                consumedMessages = result.records.size,
+            )
         }
     }
 
@@ -109,7 +117,7 @@ internal class ConfigBackedKafkaMessageService(
         require(resolved > 0) {
             "Kafka read limit должен быть > 0."
         }
-        return resolved.coerceAtMost(kafkaConfig.maxRecordsPerRead)
+        return resolved
     }
 
     private fun requireCluster(clusterId: String): UiKafkaClusterConfig =
@@ -128,6 +136,7 @@ internal class ConfigBackedKafkaMessageService(
         val latestOffset = consumer.endOffset(topicPartition) ?: earliestOffset
         val cursor = resolveReadCursor(
             request = request,
+            effectiveLimit = effectiveLimit,
             earliestOffset = earliestOffset,
             latestOffset = latestOffset,
             timestampOffset = if (request.mode == KafkaTopicMessageReadMode.TIMESTAMP) {
@@ -170,40 +179,55 @@ internal class ConfigBackedKafkaMessageService(
         effectiveLimit: Int,
     ): KafkaTopicMessageReadResult {
         val topicPartitions = partitions.map { TopicPartition(request.topicName, it) }
+        val earliestOffsets = consumer.beginningOffsets(topicPartitions)
+        val latestOffsets = consumer.endOffsets(topicPartitions)
+        val timestampOffsets = if (request.mode == KafkaTopicMessageReadMode.TIMESTAMP) {
+            consumer.offsetsForTimestamps(
+                topicPartitions.associateWith { request.timestampMs ?: 0L },
+            )
+        } else {
+            emptyMap()
+        }
         val partitionReads = topicPartitions.map { topicPartition ->
-            val earliestOffset = consumer.beginningOffset(topicPartition) ?: 0L
-            val latestOffset = consumer.endOffset(topicPartition) ?: earliestOffset
+            val earliestOffset = earliestOffsets[topicPartition] ?: 0L
+            val latestOffset = latestOffsets[topicPartition] ?: earliestOffset
             val cursor = resolveReadCursor(
                 request = request,
+                effectiveLimit = effectiveLimit,
                 earliestOffset = earliestOffset,
                 latestOffset = latestOffset,
-                timestampOffset = if (request.mode == KafkaTopicMessageReadMode.TIMESTAMP) {
-                    consumer.offsetForTimestamp(topicPartition, request.timestampMs ?: 0L)
-                } else {
-                    null
-                },
+                timestampOffset = timestampOffsets[topicPartition],
             )
-            val records = if (cursor.startOffset >= latestOffset) {
-                emptyList()
-            } else {
-                consumer.readRecords(
-                    topicPartition = topicPartition,
-                    startOffset = cursor.startOffset,
-                    limit = effectiveLimit,
-                    pollTimeout = Duration.ofMillis(kafkaConfig.pollTimeoutMs.toLong()),
-                )
-            }
             KafkaPartitionReadResult(
                 partition = topicPartition.partition(),
                 startOffset = cursor.startOffset,
                 latestOffset = latestOffset,
                 note = cursor.note,
-                records = records.map { record -> record.toViewRecord(topicPartition.partition()) },
+            )
+        }
+        val rawRecords = consumer.readRecords(
+            partitionReads = partitionReads
+                .filter { it.startOffset < it.latestOffset }
+                .map { partitionRead ->
+                    UiKafkaPartitionReadCursor(
+                        topicPartition = TopicPartition(request.topicName, partitionRead.partition),
+                        startOffset = partitionRead.startOffset,
+                    )
+                },
+            perPartitionLimit = effectiveLimit,
+            pollTimeout = Duration.ofMillis(kafkaConfig.pollTimeoutMs.toLong()),
+        )
+        val recordsByPartition = rawRecords.groupBy { it.partition() }
+        val completedPartitionReads = partitionReads.map { partitionRead ->
+            partitionRead.copy(
+                records = recordsByPartition[partitionRead.partition]
+                    .orEmpty()
+                    .map { record -> record.toViewRecord(partitionRead.partition) },
             )
         }
         val orderedRecords = orderAllPartitionsRecords(
             mode = request.mode,
-            records = partitionReads.flatMap { it.records },
+            records = completedPartitionReads.flatMap { it.records },
         ).take(effectiveLimit)
         return KafkaTopicMessageReadResult(
             cluster = cluster.toCatalogEntry(),
@@ -216,20 +240,21 @@ internal class ConfigBackedKafkaMessageService(
             requestedOffset = request.offset,
             requestedTimestampMs = request.timestampMs,
             effectiveStartOffset = null,
-            note = buildAllPartitionsNote(request.mode, partitionReads, orderedRecords.isEmpty()),
+            note = buildAllPartitionsNote(request.mode, completedPartitionReads, orderedRecords.isEmpty()),
             records = orderedRecords,
         )
     }
 
     private fun resolveReadCursor(
         request: KafkaTopicMessageReadRequest,
+        effectiveLimit: Int,
         earliestOffset: Long,
         latestOffset: Long,
         timestampOffset: Long?,
     ): KafkaReadCursor =
         when (request.mode) {
             KafkaTopicMessageReadMode.LATEST -> {
-                val startOffset = (latestOffset - normalizeLimit(request.limit).toLong()).coerceAtLeast(earliestOffset)
+                val startOffset = (latestOffset - effectiveLimit.toLong()).coerceAtLeast(earliestOffset)
                 KafkaReadCursor(
                     startOffset = startOffset,
                     note = if (latestOffset <= earliestOffset) {
@@ -324,6 +349,13 @@ internal class ConfigBackedKafkaMessageService(
                 )
             },
         )
+
+    private fun KafkaTopicMessageRecord.estimatedSizeBytes(): Long =
+        (key?.sizeBytes ?: 0).toLong() +
+            (value?.sizeBytes ?: 0).toLong() +
+            headers.sumOf { header ->
+                header.name.toByteArray(StandardCharsets.UTF_8).size.toLong() + (header.value?.sizeBytes ?: 0).toLong()
+            }
 }
 
 private data class KafkaReadCursor(

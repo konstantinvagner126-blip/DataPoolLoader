@@ -644,8 +644,20 @@
 }
 
 .kafka-message-browser-meta {
+  display: grid;
+  gap: 0.15rem;
   font-size: 0.9rem;
   color: #41556e;
+}
+
+.kafka-message-browser-summary,
+.kafka-message-browser-context {
+  margin: 0;
+}
+
+.kafka-message-browser-summary {
+  font-weight: 700;
+  color: #132238;
 }
 
 .kafka-message-table-wrap {
