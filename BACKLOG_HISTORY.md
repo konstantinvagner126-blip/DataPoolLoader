@@ -366,6 +366,612 @@
 
 - `2026-04-19`
 
+### 2026-04-24. Архив реализованных задач active backlog: Kafka follow-up и recovery regressions
+
+Статус:
+
+- архивировано из рабочего backlog
+
+Ключевой результат:
+
+- активный [BACKLOG.md](/Users/kwdev/DataPoolLoader/BACKLOG.md) снова содержит только незавершенные stream-ы;
+- completed Kafka follow-up packages `17.1–17.13` вынесены из активного backlog;
+- completed long-running reliability packages `9.1–9.5` вынесены из активного backlog;
+- незакрытый SQL-console modernization stream `18` остался первым активным приоритетом.
+
+Что было перенесено из рабочего backlog:
+
+### 17. Kafka follow-up после завершенного redesign
+
+Статус:
+
+- реализовано
+
+Контекст:
+
+- Kafka redesign wave формально закрыта и архивирована;
+- новые Kafka-доработки после этого момента допускаются только как отдельные bounded follow-up пакеты.
+
+#### 17.1. Message browser layout aligned with kafka-ui table-first view
+
+Статус:
+
+- реализовано
+
+Контекст:
+
+- текущий `Messages` tab рендерит каждую Kafka message как отдельную card;
+- это визуально расходится с `kafka-ui`, где messages поданы table-first списком с выбором записи и отдельным details-view;
+- server/store safety contract уже достаточен:
+  - bounded read;
+  - `assign + seek`;
+  - no commit;
+  - explicit `selected partition / all partitions`.
+
+Что нужно сделать:
+
+1. убрать card-stack presentation для message records;
+2. перевести `Messages` tab на table-first list, ближе к `kafka-ui`;
+3. добавить row selection и отдельный details-pane для выбранного сообщения;
+4. не менять server API и bounded read contract без явной необходимости;
+5. оставить текущие read controls и safety text, но выровнять presentation к более IDE/tool-like message browser.
+
+Что сделано:
+
+1. card-stack presentation для Kafka messages удалена;
+2. `Messages` tab переведен на table-first list с columns:
+   - `Offset`;
+   - `Partition`;
+   - `Timestamp`;
+   - `Key`;
+   - `Value`;
+   - `Headers`;
+3. добавлен row selection и отдельный details-pane для выбранного сообщения вместо набора самостоятельных cards;
+4. server/store API и bounded read semantics не менялись:
+   - `assign + seek`;
+   - no commit;
+   - explicit `selected partition / all partitions`;
+5. текущие read controls и safety subtitle сохранены, но screen presentation выровнена ближе к `kafka-ui`.
+
+#### 17.2. Create topic admin path
+
+Статус:
+
+- реализовано
+
+Контекст:
+
+- после завершенного redesign в Kafka UI остается явный functional gap: нельзя создать новый topic;
+- cluster-level `Topics` screen уже стал основной точкой входа и именно там должен появиться create-topic flow;
+- topic create нельзя смешивать с metadata read paths или settings UI: нужен отдельный узкий admin contract.
+
+Что нужно сделать:
+
+1. добавить отдельный `create topic` contract рядом с Kafka metadata/produce contracts;
+2. реализовать server route и AdminClient-based service для create-topic path;
+3. поддержать базовые поля:
+   - `topic name`;
+   - `partitions`;
+   - `replication factor`;
+   - optional `cleanup policy`;
+   - optional `retention.ms`;
+   - optional `retention.bytes`;
+4. запретить create-topic path для `readOnly` cluster до Kafka client call;
+5. вывести create-topic action на `Topics` screen, без прятанья в settings;
+6. после успешного create обновлять topic catalog и открывать созданный topic без ручного refresh;
+7. добавить targeted server/store regression coverage.
+
+Что сделано:
+
+1. добавлен отдельный `create topic` contract рядом с Kafka metadata/produce contracts;
+2. реализованы server route и AdminClient-based service для create-topic path;
+3. поддержаны поля:
+   - `topic name`;
+   - `partitions`;
+   - `replication factor`;
+   - optional `cleanup policy`;
+   - optional `retention.ms`;
+   - optional `retention.bytes`;
+4. `readOnly` cluster блокируется до Kafka client call;
+5. create-topic action выведен на `Topics` screen;
+6. после успешного create topic catalog и topic details обновляются автоматически;
+7. добавлены targeted server/store/service regressions.
+
+#### 17.3. Produce form aligned with kafka-ui structured editor
+
+Статус:
+
+- реализовано
+
+Контекст:
+
+- current `Produce` tab функционально работает, но UI остается слишком примитивным:
+  - raw textarea для headers;
+  - слабая visual hierarchy;
+  - форма не похожа на `kafka-ui`;
+- после `17.1` messages уже выровнены к `kafka-ui`, produce path должен получить такую же плотную tool-like presentation.
+
+Что нужно сделать:
+
+1. убрать raw multiline `headers` textarea и заменить ее на structured header rows;
+2. перестроить `Produce` tab в более плотный editor-like shell:
+   - key;
+   - partition override;
+   - headers list;
+   - payload editor;
+   - delivery result block;
+3. не менять существующий server produce contract без необходимости;
+4. сохранить текущие safety invariants:
+   - no background producer session state;
+   - `readOnly` cluster block;
+   - payload size guard;
+5. добавить regression coverage на shared store mapping produce headers и server route/produce path.
+
+Что сделано:
+
+1. raw multiline `headers` textarea удален и заменен на structured header rows;
+2. `Produce` tab перестроен в более плотный editor-like shell:
+   - key;
+   - partition override;
+   - headers list;
+   - payload editor;
+   - delivery result block;
+3. существующий server produce contract сохранен;
+4. safety invariants сохранены:
+   - no background producer session state;
+   - `readOnly` cluster block;
+   - payload size guard;
+5. regression coverage расширена на shared store mapping produce headers и server route/produce path.
+
+#### 17.4. Fix DOMTokenList runtime error in Kafka all-partitions message browser
+
+Статус:
+
+- реализовано
+
+Контекст:
+
+- при чтении Kafka messages в режиме `ALL_PARTITIONS` UI получал browser-side runtime error:
+  - `SyntaxError: The string did not match the expected pattern`;
+- фактическая причина была в рендере CSS-классов:
+  - в message rows и broker badges в `classes(...)` передавался пустой токен через `if (...) "..." else ""`;
+- ошибка проявлялась на message results render и ломала normal message browser flow, хотя server response уже был корректным.
+
+Что нужно сделать:
+
+1. убрать передачу пустых CSS-class token в Kafka web sections;
+2. починить `Messages` tab для режима `ALL_PARTITIONS`, не меняя server/store contract;
+3. убрать такой же latent defect из `Brokers` screen;
+4. добавить targeted browser regression, который проверяет:
+   - `ALL_PARTITIONS` read completes;
+   - results render;
+   - page errors отсутствуют.
+
+Что сделано:
+
+1. пустые CSS-class token убраны из Kafka message rows и broker role badge rendering;
+2. `Messages` tab в режиме `ALL_PARTITIONS` больше не падает на DOMTokenList error;
+3. latent broker-screen defect устранен тем же safe class rendering pattern;
+4. добавлен targeted Playwright smoke regression на `ALL_PARTITIONS` message read без page errors.
+
+#### 17.5. Local file chooser for Kafka TLS material paths in settings UI
+
+Статус:
+
+- реализовано
+
+Контекст:
+
+- Kafka settings UI уже умеет редактировать `JKS` и `PEM` path-like поля, но сейчас только как raw text inputs;
+- для локального инструмента этого недостаточно:
+  - при добавлении нового cluster пользователь должен иметь возможность выбрать certificate / keystore files из системы;
+- browser `input type=file` здесь не подходит как source of truth, потому что Kafka config хранит path values, а не uploaded file content.
+
+Что нужно сделать:
+
+1. добавить local-only file chooser path через `ui-server`, а не через browser upload;
+2. поддержать выбор файлов для Kafka TLS material полей:
+   - `ssl.truststore.location`;
+   - `ssl.truststore.certificates`;
+   - `ssl.keystore.location`;
+   - `ssl.keystore.certificate.chain`;
+   - `ssl.keystore.key`;
+3. для `JKS` полей возвращать обычный filesystem path;
+4. для `PEM` полей возвращать config-ready placeholder вида `${file:/abs/path/to/file}`;
+5. встроить `Browse` actions в Kafka settings UI рядом с соответствующими path fields;
+6. сохранить текущий `ui.kafka` config contract:
+   - source of truth остается `ui-application.yml`;
+   - browser local state не становится вторым config source;
+7. добавить targeted service/store/server coverage.
+
+Что сделано:
+
+1. добавлен отдельный local Kafka settings file-picker boundary в `ui-server`;
+2. Kafka settings route получил bounded `pick-file` path для supported TLS material fields;
+3. для `JKS` fields chooser возвращает raw absolute path;
+4. для `PEM` fields chooser возвращает config-ready `${file:/...}` placeholder;
+5. в Kafka settings UI добавлены `Выбрать файл` actions рядом с path-like TLS inputs;
+6. source of truth остался прежним:
+   - YAML сохраняет path values;
+   - browser не хранит отдельные uploaded secrets;
+7. добавлены targeted tests на picker/service/store/server contract.
+
+#### 17.6. Increase Kafka produce payload editor height
+
+Статус:
+
+- реализовано
+
+Контекст:
+
+- после перестройки `Produce` tab payload editor остался слишком низким для реальной ручной работы;
+- при наборе или вставке JSON/message body приходится слишком рано скроллить внутри textarea;
+- это не требует изменения Kafka produce contract и относится только к ergonomics текущего editor shell.
+
+Что нужно сделать:
+
+1. зафиксировать отдельный bounded follow-up в backlog;
+2. увеличить высоту payload textarea в `Produce` tab;
+3. не менять server/store produce contract и structured editor layout сверх необходимого минимума.
+
+Что сделано:
+
+1. follow-up зафиксирован как отдельный backlog package;
+2. `Payload` textarea в Kafka `Produce` tab стала выше и удобнее для ручной вставки message body;
+3. produce contract, routing и structured form semantics не менялись.
+
+#### 17.7. Kafka message read execution summary and all-partitions latency hardening
+
+Статус:
+
+- реализовано
+
+Контекст:
+
+- после чтения сообщений `kafka-ui` показывает короткий execution summary вида:
+  - `DONE`;
+  - `3 ms`;
+  - `132 Bytes`;
+  - `5 messages consumed`;
+- в нашем Kafka screen такой summary сейчас отсутствует, хотя он полезен для наблюдаемости bounded read path;
+- дополнительно текущий `ALL_PARTITIONS` read path работает медленнее, чем должен:
+  - offsets и polls идут последовательно по partition;
+  - это особенно заметно на topic с несколькими partition и малым числом сообщений.
+
+Что нужно сделать:
+
+1. добавить в Kafka message-read response summary metadata:
+   - `status`;
+   - `durationMs`;
+   - `consumedBytes`;
+   - `consumedMessages`;
+2. вывести этот summary в `Messages` tab в стиле, близком к `kafka-ui`;
+3. не менять bounded read safety contract:
+   - `assign + seek`;
+   - no commit;
+   - explicit `selected partition / all partitions`;
+4. ускорить `ALL_PARTITIONS` path без перехода к background consumer session:
+   - уйти от последовательного per-partition read;
+   - читать все целевые partition через один short-lived assign/seek session;
+   - по возможности использовать bulk offset lookup вместо repeated single-partition calls;
+5. добавить targeted service/server coverage на response summary и optimized all-partitions path.
+
+Что сделано:
+
+1. Kafka message-read response расширен summary metadata:
+   - `status`;
+   - `durationMs`;
+   - `consumedBytes`;
+   - `consumedMessages`;
+2. `Messages` tab теперь показывает execution summary в формате, близком к `kafka-ui`;
+3. bounded read safety contract сохранен без background session и без commit offsets;
+4. `ALL_PARTITIONS` path переведен с последовательного per-partition read на единый short-lived assign/seek session с bulk offset lookup;
+5. добавлены targeted regressions на service/server response contract и optimized all-partitions flow.
+
+#### 17.8. Remove hidden Kafka message read cap and honor explicit UI limit
+
+Статус:
+
+- реализовано
+
+Контекст:
+
+- в текущем Kafka flow пользователь может указать `limit = 500`, но effective result все равно режется hidden server cap;
+- это противоречит ожидаемому UX:
+  - значение limit уже задается явно в интерфейсе;
+  - именно оно и должно определять размер bounded read;
+- hidden clamp делает поведение непредсказуемым и ломает ручную topic inspection.
+
+Что нужно сделать:
+
+1. зафиксировать follow-up в backlog;
+2. убрать hidden clamp по `ui.kafka.maxRecordsPerRead` из message read service;
+3. оставить `ui.kafka.maxRecordsPerRead` только как default/fallback для initial read, а bounded size определять explicit `limit` из интерфейса;
+4. не запускать implicit reload и не менять semantics других read controls.
+
+Что сделано:
+
+1. follow-up зафиксирован как отдельный bounded package;
+2. hidden server-side clamp по `ui.kafka.maxRecordsPerRead` убран;
+3. `ui.kafka.maxRecordsPerRead` остался только default/fallback для initial read, а effective Kafka read limit теперь определяется значением из интерфейса;
+4. bounded read semantics и explicit reload model сохранены.
+
+#### 17.9. Keep last Kafka message result visible until explicit reload
+
+Статус:
+
+- реализовано
+
+Контекст:
+
+- сейчас при изменении `Scope`, `Mode`, `Partition` и других draft controls текущий message result исчезает еще до нажатия `Читать сообщения`;
+- это создает ложное впечатление, что UI уже сделал reload, хотя фактически пользователь только меняет параметры следующего запроса;
+- message browser должен оставаться в модели `draft controls + last executed result`.
+
+Что нужно сделать:
+
+1. перестать очищать `messages` в shared store при изменении draft controls для message read;
+2. перестать скрывать current results только потому, что draft `Scope/Mode/Partition` уже отличаются от последнего executed request;
+3. оставлять last successful result видимым до явного нажатия `Читать сообщения`;
+4. сохранить очистку результатов только при реальной смене topic/cluster или после explicit reload.
+
+Что сделано:
+
+1. shared store больше не сбрасывает `messages` при изменении `Scope/Mode/Partition/Limit/Offset/Timestamp`;
+2. `Messages` tab рендерит last executed result для текущего topic, а не фильтрует его по live draft controls;
+3. результаты остаются видимыми до explicit read action;
+4. topic-level reload по-прежнему очищает stale results только там, где это реально нужно.
+
+#### 17.10. Clarify Kafka TLS settings UI semantics for certificate files and unspecified type
+
+Статус:
+
+- реализовано
+
+Контекст:
+
+- Kafka settings UI уже поддерживает certificate/key file picking для JKS и PEM-backed fields;
+- технически certificate picker уже принимает `.crt`, `.cer` и `.pem`, но UI скрывает это за подписью `Выбрать PEM`;
+- пустое значение `ssl.truststore.type` / `ssl.keystore.type` рендерится как `default`, хотя по смыслу это не отдельный режим Kafka, а просто `type` не задан.
+
+Что нужно сделать:
+
+1. зафиксировать follow-up в backlog;
+2. убрать misleading label `default` из Kafka TLS settings UI и заменить его на явное `Не задано`;
+3. переименовать certificate/key picker buttons так, чтобы они отражали роль файла, а не внутренний формат placeholder;
+4. добавить helper text с допустимыми расширениями:
+   - сертификат: `.crt / .cer / .pem`;
+   - private key: `.key / .pem`;
+   - keystore: `.jks / .p12 / .pfx`;
+5. не менять backend `properties`-first contract и `${file:/...}` semantics без необходимости.
+
+Что сделано:
+
+1. follow-up зафиксирован как отдельный bounded package;
+2. blank TLS type больше не рендерится как `default`, в UI используется `Не задано`;
+3. browse actions переименованы в role-based labels:
+   - `Выбрать truststore`;
+   - `Выбрать keystore`;
+   - `Выбрать CA сертификат`;
+   - `Выбрать client certificate`;
+   - `Выбрать private key`;
+4. для TLS path fields добавлены helper texts с допустимыми расширениями;
+5. backend contract не менялся:
+   - certificate fields по-прежнему сохраняются как `${file:/...}`;
+   - `.crt/.cer/.pem` для certificates и `.key/.pem` для private key остаются допустимыми.
+
+#### 17.11. Keep Kafka settings usable when cluster catalog is empty and refresh shell after save
+
+Статус:
+
+- реализовано
+
+Контекст:
+
+- Kafka settings UI уже умеет добавлять и сохранять cluster drafts, но shell lifecycle остается неполным;
+- при пустом `info.clusters` page-level empty-state перекрывает settings flow и мешает нормальному first-cluster onboarding;
+- после сохранения нового cluster текущий shell может оставаться на stale `info.clusters`, из-за чего новый cluster не появляется в navigation до полного page reload.
+
+Что нужно сделать:
+
+1. зафиксировать bugfix в backlog;
+2. не блокировать Kafka settings screen global empty-state, если пользователь открывает `cluster-settings`;
+3. дать явный path в settings при `0` configured clusters;
+4. после save settings refresh-ить shell-level cluster catalog и selected cluster state;
+5. добавить regression coverage на first-cluster onboarding flow и post-save shell refresh.
+
+Что сделано:
+
+1. bugfix зафиксирован как отдельный bounded package;
+2. `cluster-settings` screen больше не перекрывается global Kafka empty-state;
+3. при отсутствии configured clusters page показывает явный переход в settings;
+4. после save settings shell refresh-ит `info` и `selectedClusterId`, поэтому новый cluster появляется без full page reload;
+5. regression coverage добавлена на settings save/update flow.
+
+#### 17.12. Add JSON syntax highlighting in Kafka message details
+
+Статус:
+
+- реализовано
+
+Контекст:
+
+- после перехода messages на table-first layout details-pane все еще показывает JSON как plain text в темном `pre` block;
+- payload уже приходит как pretty-printed JSON, но без визуального разделения ключей, строк, чисел и literal values его тяжело читать на больших сообщениях;
+- это чисто web-level ergonomics follow-up и не требует изменения Kafka contracts, store semantics или server response shape.
+
+Что нужно сделать:
+
+1. зафиксировать follow-up в backlog;
+2. добавить локальный JSON syntax highlighting для Kafka message details pane;
+3. выделять хотя бы:
+   - object/array punctuation;
+   - property names;
+   - string values;
+   - numbers;
+   - booleans;
+   - `null`;
+4. сохранить plain-text fallback для non-JSON payload;
+5. не менять message browser server/store contract.
+
+Что сделано:
+
+1. follow-up зафиксирован как отдельный bounded package;
+2. для Kafka message details добавлен локальный JSON tokenizer и span-based syntax highlighting в web renderer;
+3. colored token rendering покрывает punctuation, keys, strings, numbers, booleans и `null`;
+4. non-JSON payload по-прежнему отображается как plain text;
+5. server/store contracts не менялись.
+
+#### 17.13. Preserve safe plain-text fallback for non-JSON and invalid JSON message payloads
+
+Статус:
+
+- реализовано
+
+Контекст:
+
+- после добавления JSON syntax highlighting в Kafka message details важно зафиксировать safety contract:
+  - valid JSON должен подсвечиваться;
+  - plain text и invalid JSON не должны ломать read path или web renderer;
+- текущий server contract уже формирует `jsonPrettyText` только после успешного parse, но без regression coverage это легко сломать следующими Kafka UI изменениями.
+
+Что нужно сделать:
+
+1. зафиксировать follow-up в backlog;
+2. проверить и покрыть тестами сценарии:
+   - plain text payload;
+   - invalid JSON payload;
+   - valid JSON payload;
+3. явно сохранить fallback contract:
+   - при parse failure payload остается plain text;
+   - `jsonPrettyText` остается `null`;
+   - message read не падает.
+
+Что сделано:
+
+1. follow-up зафиксирован как отдельный bounded package;
+2. в Kafka message service добавлены targeted regressions на plain text и invalid JSON payload;
+3. контракт зафиксирован в subsystem doc:
+   - JSON highlighting применяется только при успешном parse;
+   - non-JSON и invalid JSON остаются plain text и не ломают message browser.
+
+### 9. Операционная надежность long-running операций: реализованные packages `9.1–9.5`
+
+Статус:
+
+- архивировано из рабочего backlog
+
+#### 9.1. Write-through recovery interrupted FILES runs after restart
+
+Статус:
+
+- реализовано
+
+Контекст:
+
+- для FILES-run history уже есть recovery path `RUNNING -> FAILED` на старте UI;
+- сейчас этот recovery выполняется только в памяти через `RunStateStore.load()`;
+- `run-state.json` при этом может оставаться stale и продолжать хранить `RUNNING`, хотя текущий runtime уже показывает `FAILED`.
+
+Что нужно сделать:
+
+1. нормализовать `run-state.json` write-through после recovery interrupted runs;
+2. не оставлять stale persisted `RUNNING` snapshots как hidden second state;
+3. добавить regression coverage на сценарий `restart -> recovered FAILED -> run-state.json rewritten`;
+4. синхронизировать state-model contract.
+
+#### 9.2. Eager recovery orphan DB runs after restart
+
+Статус:
+
+- реализовано
+
+Контекст:
+
+- для DB-run history orphan recovery сейчас выполняется только лениво при следующем `startRun()` того же модуля;
+- после рестарта `ui-server` stale `RUNNING` записи в registry могут висеть бесконечно, если пользователь больше не стартует этот модуль;
+- это оставляет hidden second lifecycle state:
+  process-local active registry уже очищен, а persisted DB history все еще выглядит как живой run.
+
+Что нужно сделать:
+
+1. вынести orphan DB run recovery в отдельный reusable support вместо дублирования ad-hoc логики;
+2. выполнять eager recovery всех stale DB `RUNNING` runs на инициализации `DatabaseModuleRunService`;
+3. сохранить текущий bounded recovery при `startRun()` для stale runs того же модуля, но перевести его на тот же shared support;
+4. добавить regression coverage на сценарий `restart -> orphan DB run rewritten to FAILED before first manual action`;
+5. синхронизировать state-model contract для active DB run registry и DB run history.
+
+#### 9.3. Failure-side normalization DB run summary counters
+
+Статус:
+
+- реализовано
+
+Контекст:
+
+- в DB run-history failure path `module_run_source_result` уже нормализуется из `PENDING/RUNNING` в `FAILED`;
+- при этом aggregate counters в `module_run` (`successful_source_count`, `failed_source_count`, `skipped_source_count`) не пересчитываются;
+- из-за этого history list может показывать stale `0/0/0` или другие устаревшие значения для уже проваленного DB-run, хотя details/source results уже отражают фактический failure outcome.
+
+Что нужно сделать:
+
+1. нормализовать aggregate source counters в `module_run` внутри DB failure mutation path;
+2. не оставлять расхождение между DB history list и detailed source results после `markRunFailed`;
+3. добавить regression coverage на сценарий `markRunFailed -> sourceResults FAILED -> failedSourceCount updated`;
+4. при необходимости синхронизировать state-model contract для DB run history summary.
+
+#### 9.4. Server-level regression for startup recovery DB runs
+
+Статус:
+
+- реализовано
+
+Контекст:
+
+- пакеты `9.2–9.3` закрыли eager startup recovery orphan DB runs и нормализацию counters;
+- сейчас эти invariants защищены unit/store-level тестами, но не зафиксированы через реальный `/api/module-runs/database/*` server flow;
+- из-за этого route wiring или history adapter могут снова начать отдавать stale `RUNNING` status, даже если нижние support-слои уже нормализуют run.
+
+Что нужно сделать:
+
+1. добавить отдельный server-level regression test на сценарий `ui-server restart -> orphan DB run already visible as FAILED via module-runs API`;
+2. проверить через HTTP-слой и history adapter, что `activeRunId` уже `null`, а status/details не показывают stale `RUNNING`;
+3. вынести минимальный in-memory DB run test support в reusable test helper, чтобы не плодить ad-hoc дубли между server и run tests.
+
+Что сделано:
+
+1. добавлен отдельный [DatabaseModuleRunsRecoveryServerTest.kt](/Users/kwdev/DataPoolLoader/ui-server/src/test/kotlin/com/sbrf/lt/platform/ui/server/DatabaseModuleRunsRecoveryServerTest.kt) на реальный `/api/module-runs/database/*` flow;
+2. проверено, что после старта `ui-server` orphan DB run уже отдается как `FAILED`, а `activeRunId` равен `null`;
+3. общий in-memory support вынесен в [DatabaseModuleRunTestSupport.kt](/Users/kwdev/DataPoolLoader/ui-server/src/test/kotlin/com/sbrf/lt/platform/ui/run/DatabaseModuleRunTestSupport.kt) и переиспользуется run/server тестами.
+
+#### 9.5. Server-level regression for startup recovery FILES runs
+
+Статус:
+
+- реализовано
+
+Контекст:
+
+- после `9.1` FILES restart recovery уже write-through нормализует stale `RUNNING` snapshot в `FAILED`;
+- этот invariant пока зафиксирован только на `RunManager`/persisted-state уровне;
+- через реальный `/api/module-runs/files/*` flow отдельной регрессии пока нет, поэтому route wiring или history adapter могут снова начать показывать stale `RUNNING`, даже если state-store уже восстановил run.
+
+Что нужно сделать:
+
+1. добавить отдельный server-level regression test на сценарий `ui-server restart -> interrupted FILES run already visible as FAILED via module-runs API`;
+2. проверить через HTTP-слой, что `activeRunId` уже `null`, а history/details не показывают stale `RUNNING`;
+3. не раздувать existing giant [ServerTest.kt](/Users/kwdev/DataPoolLoader/ui-server/src/test/kotlin/com/sbrf/lt/platform/ui/server/ServerTest.kt): вынести сценарий в отдельный targeted test file.
+
+Что сделано:
+
+1. добавлен отдельный [FilesModuleRunsRecoveryServerTest.kt](/Users/kwdev/DataPoolLoader/ui-server/src/test/kotlin/com/sbrf/lt/platform/ui/server/FilesModuleRunsRecoveryServerTest.kt) на реальный `/api/module-runs/files/*` flow;
+2. проверено, что после старта `ui-server` interrupted FILES run уже отдается как `FAILED`, а `activeRunId` равен `null`;
+3. recovery message проверяется через HTTP-слой без раздувания [ServerTest.kt](/Users/kwdev/DataPoolLoader/ui-server/src/test/kotlin/com/sbrf/lt/platform/ui/server/ServerTest.kt), что выровняло FILES/DB restart-contract на уровне server regressions.
+
+Основные даты:
+
+- `2026-04-24`
+
 ## P3
 
 ### 20. `multi-statement SQL` в SQL-консоли

@@ -212,6 +212,10 @@ Message browser также обязан:
 - относиться к `scope/mode/partition/limit/offset/timestamp` как к draft controls следующего запроса:
   - изменение этих полей само по себе не должно запускать read;
   - last successful result не должен исчезать до явного нажатия `Читать сообщения`.
+- применять JSON-specific rendering только при успешном parse:
+  - valid JSON может получать `jsonPrettyText` и syntax highlighting;
+  - plain text и invalid JSON должны оставаться plain text;
+  - parse failure не должен валить message read или web rendering path.
 
 ### 5.5. Write operations on readOnly cluster
 

@@ -24,9 +24,11 @@
 ## Активные приоритеты
 
 1. [18. SQL-консоль: модернизация интерфейса под рабочий IDE/tool experience](/Users/kwdev/DataPoolLoader/BACKLOG.md)
-2. [9. Операционная надежность long-running операций](/Users/kwdev/DataPoolLoader/BACKLOG.md)
-3. [11. Repo-level архитектурная дисциплина](/Users/kwdev/DataPoolLoader/BACKLOG.md)
-4. [16. Тестовая стратегия](/Users/kwdev/DataPoolLoader/BACKLOG.md)
+2. [19. Kafka UI modernization mockups](/Users/kwdev/DataPoolLoader/BACKLOG.md)
+3. [20. Главный экран: modernization mockup и launcher layout](/Users/kwdev/DataPoolLoader/BACKLOG.md)
+4. [9. Операционная надежность long-running операций](/Users/kwdev/DataPoolLoader/BACKLOG.md)
+5. [11. Repo-level архитектурная дисциплина](/Users/kwdev/DataPoolLoader/BACKLOG.md)
+6. [16. Тестовая стратегия](/Users/kwdev/DataPoolLoader/BACKLOG.md)
 
 ## P0
 
@@ -435,6 +437,379 @@ Non-goals первой волны:
 - не считать current limited result snapshot финальной моделью export;
 - в UI redesign можно зарезервировать место для export actions, но не реализовывать новую full-data export semantics.
 
+### 19. Kafka UI modernization mockups
+
+Статус:
+
+- согласовано к реализации
+
+Контекст:
+
+- Kafka baseline уже реализован и включает cluster catalog, topics, topic overview, messages, produce, create topic, consumer groups, brokers и settings UI;
+- текущий UI функционален, но после SQL-console modernization нужно аналогично проверить Kafka tool как рабочий IDE-like экран;
+- визуальный ориентир остается `kafka-ui`, но с учетом локального характера инструмента и уже принятых safety contracts.
+- согласованный HTML-макет находится в [design/kafka-modernization/index.html](/Users/kwdev/DataPoolLoader/design/kafka-modernization/index.html).
+
+Non-goals первой дизайн-волны:
+
+- не менять Kafka server/store contracts;
+- не менять `ui.kafka` source of truth;
+- не добавлять delete topic, ACL, reset offsets, schema registry, live tailing или background consumers;
+- не ослаблять `readOnly` block для produce/create-topic;
+- не менять bounded message read contract `assign + seek / no commit`.
+
+#### 19.1. Kafka modernization HTML mockups
+
+Статус:
+
+- согласовано
+
+Что нужно сделать:
+
+1. подготовить reviewable HTML-макет в [design/kafka-modernization/index.html](/Users/kwdev/DataPoolLoader/design/kafka-modernization/index.html);
+2. показать основные Kafka screens:
+   - cluster overview / topics catalog;
+   - topic overview;
+   - messages browser;
+   - produce;
+   - create topic;
+   - consumer groups;
+   - brokers;
+   - cluster settings;
+3. сохранить в макете обязательные функции:
+   - cluster selector;
+   - topic filter;
+   - table-first topic catalog;
+   - table-first messages view с details pane;
+   - all partitions / selected partition controls;
+   - read mode `LATEST / OFFSET / TIMESTAMP`;
+   - read result summary `DONE / ms / bytes / messages consumed`;
+   - JSON syntax highlighting только для валидного JSON;
+   - plain-text fallback для non-JSON/invalid JSON;
+   - structured produce editor;
+   - create topic form;
+   - TLS settings file picker affordances для JKS/PEM/cert/key fields;
+4. не писать product UI code до review макетов.
+
+Что зафиксировано:
+
+- макет принят как целевое направление для следующего этапа;
+- стартовый экран: `file:///Users/kwdev/DataPoolLoader/design/kafka-modernization/index.html?screen=topics`;
+- review screens:
+  - `?screen=topics`;
+  - `?screen=topic`;
+  - `?screen=messages`;
+  - `?screen=produce`;
+  - `?screen=create`;
+  - `?screen=groups`;
+  - `?screen=brokers`;
+  - `?screen=settings`;
+  - `?screen=empty`.
+
+#### 19.2. Kafka compact tool shell and cluster rail
+
+Статус:
+
+- запланировано
+
+Контекст:
+
+- текущий `PageScaffold` и sidebar работают, но визуально Kafka tool должен стать плотнее и ближе к `kafka-ui`;
+- cluster selector, section navigation и recent topics должны быть видимы без ощущения набора больших cards.
+
+Что нужно сделать:
+
+1. заменить hero-like Kafka header на compact tool header:
+   - tool identity;
+   - current cluster;
+   - protocol;
+   - bootstrap;
+   - read limit/status chips;
+2. переработать left rail:
+   - cluster catalog;
+   - cluster navigation;
+   - recent/selected topics;
+   - settings action;
+3. сохранить route semantics:
+   - selected cluster;
+   - selected section;
+   - selected topic;
+   - active pane;
+   - message read draft controls;
+4. не переносить server/store orchestration в web components.
+
+#### 19.3. Kafka topics catalog table-first view
+
+Статус:
+
+- запланировано
+
+Контекст:
+
+- current topics catalog уже table-first, но визуально остается card-shell heavy;
+- макет фиксирует более плотный catalog с фильтром, status chips и row-click navigation.
+
+Что нужно сделать:
+
+1. выровнять `Topics` screen к согласованному table-first виду;
+2. сохранить:
+   - topic filter;
+   - explicit reload;
+   - internal topic badge;
+   - selected topic badge;
+   - partition/replication/cleanup/retention columns;
+3. create-topic action оставить на topics screen, но не смешивать с settings;
+4. не менять topic catalog API без отдельной причины.
+
+#### 19.4. Kafka topic details and tabs redesign
+
+Статус:
+
+- запланировано
+
+Контекст:
+
+- topic details должен читаться как рабочая карточка topic, а не отдельная landing-section;
+- tab set `Overview / Messages / Consumers / Settings / Produce` уже есть и должен сохраниться.
+
+Что нужно сделать:
+
+1. переработать topic header:
+   - breadcrumbs back to topics;
+   - topic name;
+   - cluster/protocol/bootstrap meta;
+   - refresh action;
+2. сохранить tabs:
+   - overview;
+   - messages;
+   - consumers;
+   - settings;
+   - produce;
+3. overview сделать плотным:
+   - summary metrics;
+   - partition table;
+   - partition load/offset side panel;
+4. не маскировать partial consumer metadata errors как topic failure.
+
+#### 19.5. Kafka messages browser redesign
+
+Статус:
+
+- макет согласован, запланировано к реализации
+
+Контекст:
+
+- message browser является основной рабочей частью Kafka tool;
+- его нельзя превращать в декоративный viewer: safety contract важнее визуального упрощения.
+- визуальный ориентир для экрана чтения сообщений — Provectus Kafka UI:
+  - table-first layout;
+  - filters/seek controls above the table;
+  - consume summary before result table;
+  - selected message раскрывается внутри таблицы, а не отдельной карточной лентой.
+
+Что нужно сделать:
+
+1. сохранить bounded read semantics:
+   - `assign + seek`;
+   - no commit;
+   - no background consumer session;
+2. сохранить draft controls:
+   - `selected partition / all partitions`;
+   - `LATEST / OFFSET / TIMESTAMP`;
+   - limit;
+   - offset;
+   - timestamp;
+3. изменение controls не должно запускать read и не должно скрывать last successful result до явного `Читать сообщения`;
+4. отрисовать result summary в стиле:
+   - `DONE`;
+   - duration ms;
+   - bytes;
+   - messages consumed;
+5. сохранить table-first messages view:
+   - expander column;
+   - offset;
+   - partition;
+   - timestamp;
+   - key;
+   - value preview;
+   - headers count;
+6. selected message показывать через inline expanded row / inspector:
+   - tabs `Value / Key / Headers / Metadata`;
+   - pretty/raw/copy actions for payload;
+   - metadata block with timestamp, partition and offset;
+7. не возвращаться к карточному отображению списка сообщений;
+8. JSON highlighting применять только при valid JSON;
+9. non-JSON и invalid JSON показывать plain text без runtime error.
+
+#### 19.6. Kafka produce and create-topic tool forms
+
+Статус:
+
+- запланировано
+
+Контекст:
+
+- produce и create-topic уже реализованы функционально;
+- redesign должен улучшить форму, не меняя write safety.
+
+Что нужно сделать:
+
+1. выровнять produce form:
+   - partition override;
+   - key;
+   - structured headers rows;
+   - высокий payload editor;
+   - delivery result summary;
+2. сохранить readOnly block до Kafka client call;
+3. выровнять create-topic form:
+   - topic name;
+   - partitions;
+   - replication factor;
+   - cleanup policy;
+   - retention.ms;
+   - retention.bytes;
+4. сохранить явные failure cases:
+   - duplicate topic;
+   - invalid partitions;
+   - invalid replication;
+   - authorization failure;
+5. не добавлять delete topic / alter topic / reset offsets в этот пакет.
+
+#### 19.7. Kafka consumer groups and brokers screens consistency
+
+Статус:
+
+- запланировано
+
+Контекст:
+
+- cluster-level `Consumer Groups` и `Brokers` должны визуально совпадать с новым Kafka shell;
+- metadata может быть частично недоступна, и UI должен показывать это section-level status.
+
+Что нужно сделать:
+
+1. переработать consumer groups screen:
+   - group list;
+   - selected group details;
+   - topic/partition lag table;
+   - status badges for lag/metadata;
+2. переработать brokers screen:
+   - cluster summary;
+   - broker cards/table;
+   - controller role;
+   - rack/endpoint metadata;
+3. сохранить reload actions;
+4. не трактовать partial ACL/metadata failure как полный cluster failure.
+
+#### 19.8. Kafka settings UI redesign
+
+Статус:
+
+- запланировано
+
+Контекст:
+
+- settings UI уже редактирует `ui.kafka` config-backed catalog;
+- после redesign он должен остаться properties-first editor, а не вторым state source.
+
+Что нужно сделать:
+
+1. выровнять settings screen с макетом:
+   - compact toolbar;
+   - cluster cards;
+   - PLAINTEXT/SSL mode;
+   - readOnly;
+   - test connection;
+2. сохранить config source of truth:
+   - `ui.kafka` в `ui-application.yml`;
+   - без hidden browser state;
+3. сохранить TLS file picker affordances:
+   - JKS truststore/keystore paths;
+   - PEM CA certificate;
+   - PEM client certificate;
+   - PEM private key;
+   - `.crt / .cer / .pem / .key / .jks / .p12 / .pfx` semantics;
+4. PEM fields должны сохраняться как `${file:/abs/path}` placeholders;
+5. raw secret values не должны попадать в browser-local state как отдельный source of truth.
+
+#### 19.9. Kafka modernization implementation guide
+
+Статус:
+
+- запланировано
+
+Контекст:
+
+- перед переносом макета в product code нужен короткий implementation contract, аналогичный SQL-console guide;
+- цель: не потерять текущие Kafka behavior/safety contracts при visual rewrite.
+
+Что нужно сделать:
+
+1. создать `KAFKA_MODERNIZATION_IMPLEMENTATION_GUIDE.md`;
+2. перечислить текущие компоненты и контракты:
+   - `KafkaPage`;
+   - `KafkaPageContent`;
+   - `KafkaShellSections`;
+   - topics/details/messages/produce/settings sections;
+   - shared store support;
+   - server routes/services;
+3. зафиксировать phased migration plan;
+4. добавить regression checklist;
+5. связать guide с [KAFKA_FAILURE_SCENARIOS.md](/Users/kwdev/DataPoolLoader/KAFKA_FAILURE_SCENARIOS.md) и этой backlog section.
+
+### 20. Главный экран: modernization mockup и launcher layout
+
+Статус:
+
+- согласовано к реализации
+
+Контекст:
+
+- главный экран должен быть входной точкой локальной инженерной платформы, а не маркетинговым landing page;
+- текущая структура из трех групп остается правильной:
+  - `Нагрузочное тестирование / Датапулы`;
+  - `Работа с данными / Инструменты`;
+  - `Справка`;
+- после модернизации SQL и Kafka главный экран должен визуально соответствовать этим tool screens;
+- HTML-макет для review находится в [design/home-modernization/index.html](/Users/kwdev/DataPoolLoader/design/home-modernization/index.html).
+
+Что нужно сделать:
+
+1. подготовить reviewable HTML-макет главного экрана до правок product UI;
+2. заменить `Load Testing Data Platform` на осмысленное русское название платформы:
+   - рабочий вариант: `Платформа инструментов тестирования микросервисов`;
+   - не показывать отдельный описательный абзац под названием на главном экране;
+   - не показывать hero-метки вроде `локальный режим`, `SQL`, `Kafka`, `датапулы`;
+3. сохранить три строки/группы launcher:
+   - `Нагрузочное тестирование / Датапулы`;
+   - `Работа с данными / Инструменты`;
+   - `Справка`;
+4. сделать группы одинаковыми по визуальной модели:
+   - compact group header;
+   - в group header показывать только метку и название, без подробного описания;
+   - равномерная сетка карточек;
+   - понятная primary action;
+   - без растянутой одной карточки и компактных остальных;
+5. сохранить runtime mode semantics:
+   - файловый режим;
+   - DB режим;
+   - переключатель режима должен находиться только в группе `Нагрузочное тестирование / Датапулы`;
+   - понятное disabled-state для недоступного режима;
+6. не добавлять на главный экран execution history, Kafka internals или SQL result details;
+7. не менять product UI code до согласования макета.
+
+Что зафиксировано:
+
+- макет принят как целевое направление для реализации главного экрана;
+- стартовый экран: `file:///Users/kwdev/DataPoolLoader/design/home-modernization/index.html?screen=home`;
+- название платформы: `Платформа инструментов тестирования микросервисов`;
+- верхняя зона без описательного текста и hero-меток;
+- группы:
+  - `Нагрузочное тестирование / Датапулы`;
+  - `Работа с данными / Инструменты`;
+  - `Справка`;
+- переключатель runtime mode относится только к группе `Нагрузочное тестирование / Датапулы`.
+
 ### 9. Операционная надежность long-running операций
 
 Статус:
@@ -512,7 +887,7 @@ Non-goals первой волны:
 
 ## P3
 
-### 20. Product и UX-задачи, не влияющие на архитектурную программу
+### 21. Product и UX-задачи, не влияющие на архитектурную программу
 
 Статус:
 

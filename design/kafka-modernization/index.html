@@ -1,0 +1,1885 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kafka Modernization Mockups</title>
+  <style>
+    :root {
+      --bg: #edf1f5;
+      --surface: #ffffff;
+      --surface-soft: #f7f9fc;
+      --surface-warm: #fffaf1;
+      --line: #d6dde6;
+      --line-strong: #aeb9c8;
+      --text: #182334;
+      --muted: #657489;
+      --muted-2: #8b97a7;
+      --accent: #1769e0;
+      --accent-soft: #e7f0ff;
+      --ink: #111827;
+      --green: #0f9568;
+      --green-soft: #e7f7ef;
+      --amber: #b7791f;
+      --amber-soft: #fff4da;
+      --red: #cf3f3f;
+      --red-soft: #fff1f1;
+      --violet: #6856d6;
+      --violet-soft: #f0edff;
+      --mono: "SFMono-Regular", "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+      --sans: "Inter", "Segoe UI", system-ui, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at 18% 0%, rgba(23, 105, 224, 0.09), transparent 34%),
+        linear-gradient(180deg, #f6f8fb 0%, var(--bg) 44%, #e7edf4 100%);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 14px;
+    }
+
+    a { color: inherit; text-decoration: none; }
+
+    .review-shell {
+      width: 1440px;
+      margin: 0 auto;
+    }
+
+    .review-nav {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 16px;
+      align-items: center;
+      padding: 10px 18px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(237, 241, 245, 0.96);
+      backdrop-filter: blur(10px);
+    }
+
+    .review-title {
+      font-size: 12px;
+      font-weight: 760;
+      text-transform: uppercase;
+      color: #42536a;
+    }
+
+    .review-note {
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .review-links {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .review-link,
+    .crumb,
+    .tab,
+    .btn,
+    .chip,
+    .select-like,
+    .mini-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: var(--surface);
+      color: var(--text);
+      line-height: 1;
+      white-space: nowrap;
+    }
+
+    .review-link {
+      min-height: 30px;
+      padding: 7px 10px;
+      color: #334257;
+      font-size: 12px;
+      font-weight: 720;
+    }
+
+    .review-link.active,
+    .tab.active,
+    .btn.primary {
+      border-color: var(--ink);
+      background: var(--ink);
+      color: #fff;
+    }
+
+    .screen {
+      width: 1440px;
+      min-height: 960px;
+      padding: 18px;
+    }
+
+    .tool-header {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 16px;
+      align-items: center;
+      margin-bottom: 12px;
+      padding: 13px 14px;
+      border: 1px solid var(--line);
+      border-radius: 13px;
+      background:
+        linear-gradient(135deg, rgba(255,255,255,0.99), rgba(247,249,252,0.99)),
+        var(--surface);
+      box-shadow: 0 12px 32px rgba(21, 35, 55, 0.07);
+    }
+
+    .tool-identity {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      gap: 12px;
+      align-items: center;
+      min-width: 0;
+    }
+
+    .kafka-icon {
+      position: relative;
+      width: 58px;
+      height: 58px;
+      border-radius: 17px;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 26% 22%, rgba(255,255,255,0.38), transparent 36%),
+        linear-gradient(145deg, #1a202d 0%, #1769e0 54%, #15a372 100%);
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.26),
+        0 14px 28px rgba(23, 105, 224, 0.22);
+    }
+
+    .kafka-icon::before,
+    .kafka-icon::after {
+      content: "";
+      position: absolute;
+      inset: 12px;
+      border: 2px solid rgba(255,255,255,0.82);
+      border-radius: 50%;
+    }
+
+    .kafka-icon::after {
+      inset: 25px 24px 24px 25px;
+      background: #fff;
+      box-shadow:
+        -15px -11px 0 -3px #fff,
+        15px -8px 0 -3px #fff,
+        -11px 15px 0 -3px #fff,
+        14px 13px 0 -3px #fff;
+    }
+
+    .crumbs {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 7px;
+    }
+
+    .crumb {
+      padding: 6px 9px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #34445a;
+    }
+
+    .crumb.active {
+      border-color: #d4a33b;
+      background: #fff7e5;
+      color: #7a5410;
+    }
+
+    h1,
+    h2,
+    h3,
+    p {
+      margin: 0;
+    }
+
+    h1 {
+      font-size: 24px;
+      font-weight: 760;
+      letter-spacing: -0.02em;
+    }
+
+    .subtitle {
+      max-width: 880px;
+      margin-top: 4px;
+      overflow: hidden;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.35;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .header-status {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    .chip {
+      min-height: 30px;
+      padding: 7px 9px;
+      background: var(--surface-soft);
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .chip.ok { background: var(--green-soft); border-color: #c1ead7; color: #0d7553; }
+    .chip.warn { background: var(--amber-soft); border-color: #f0d18c; color: #8a5a10; }
+    .chip.lock { background: var(--red-soft); border-color: #f0c7c7; color: #9f2f2f; }
+    .chip.accent { background: var(--accent-soft); border-color: #bed3ff; color: #1857aa; }
+
+    .kafka-layout {
+      display: grid;
+      grid-template-columns: 292px minmax(0, 1fr);
+      gap: 12px;
+      align-items: start;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 13px;
+      background: rgba(255,255,255,0.98);
+      box-shadow: 0 12px 30px rgba(21, 35, 55, 0.055);
+    }
+
+    .rail {
+      position: sticky;
+      top: 72px;
+      overflow: hidden;
+    }
+
+    .rail-head,
+    .pane-head,
+    .detail-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 13px;
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(180deg, rgba(249,251,253,0.98), rgba(255,255,255,0.98));
+    }
+
+    .pane-head {
+      min-height: 58px;
+    }
+
+    .pane-title {
+      font-size: 15px;
+      font-weight: 780;
+      color: var(--text);
+    }
+
+    .pane-subtitle {
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .rail-section {
+      padding: 10px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .rail-label {
+      margin: 2px 0 7px;
+      color: var(--muted-2);
+      font-size: 11px;
+      font-weight: 780;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .cluster-item,
+    .nav-item,
+    .topic-list-item {
+      display: grid;
+      gap: 4px;
+      width: 100%;
+      margin-bottom: 6px;
+      padding: 9px 10px;
+      border: 1px solid transparent;
+      border-radius: 9px;
+      background: transparent;
+      color: inherit;
+    }
+
+    .cluster-item.active,
+    .nav-item.active,
+    .topic-list-item.active {
+      border-color: #bed3ff;
+      background: #edf4ff;
+    }
+
+    .cluster-line,
+    .nav-line,
+    .topic-line {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .cluster-name,
+    .nav-name,
+    .topic-name {
+      overflow: hidden;
+      font-size: 13px;
+      font-weight: 760;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .cluster-meta,
+    .nav-meta,
+    .topic-meta {
+      overflow: hidden;
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 11px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      min-height: 20px;
+      padding: 4px 7px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--surface-soft);
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 780;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .badge.ok { background: var(--green-soft); border-color: #bee6d3; color: #0b7753; }
+    .badge.warn { background: var(--amber-soft); border-color: #efd087; color: #89580f; }
+    .badge.lock { background: var(--red-soft); border-color: #efc3c3; color: #a13333; }
+    .badge.accent { background: var(--accent-soft); border-color: #c6d8ff; color: #1857aa; }
+    .badge.violet { background: var(--violet-soft); border-color: #d4ceff; color: #5544bd; }
+
+    .content-stack {
+      display: grid;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .summary-strip {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 9px;
+    }
+
+    .metric {
+      padding: 11px 12px;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,250,252,0.98));
+    }
+
+    .metric-label {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 760;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+    }
+
+    .metric-value {
+      margin-top: 5px;
+      overflow: hidden;
+      color: var(--text);
+      font-size: 19px;
+      font-weight: 780;
+      letter-spacing: -0.02em;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .metric-note {
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn,
+    .tab,
+    .select-like,
+    .mini-button {
+      min-height: 32px;
+      padding: 8px 10px;
+      font-size: 12px;
+      font-weight: 760;
+    }
+
+    .btn.ghost {
+      background: var(--surface-soft);
+      color: #334257;
+    }
+
+    .btn.danger {
+      border-color: #e8b9b9;
+      background: #fff3f3;
+      color: #9b2f2f;
+    }
+
+    .tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 8px;
+      border-bottom: 1px solid var(--line);
+      background: var(--surface-soft);
+    }
+
+    .tab {
+      color: #42536a;
+      background: #fff;
+    }
+
+    .filter-row,
+    .produce-toolbar,
+    .create-grid,
+    .settings-grid {
+      display: grid;
+      gap: 8px;
+      align-items: end;
+    }
+
+    .filter-row {
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      padding: 12px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .message-query-grid {
+      display: grid;
+      grid-template-columns: 150px minmax(135px, 0.8fr) minmax(170px, 1fr) 135px 135px 95px auto;
+      gap: 8px;
+      align-items: end;
+      padding: 12px;
+      border-bottom: 1px solid var(--line);
+      background: #fff;
+    }
+
+    .message-secondary-toolbar {
+      display: grid;
+      grid-template-columns: 150px minmax(0, 1fr) auto auto;
+      gap: 8px;
+      align-items: center;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      background: #fbfcfe;
+    }
+
+    .produce-toolbar {
+      grid-template-columns: 170px minmax(0, 1fr);
+      margin-bottom: 12px;
+    }
+
+    .create-grid {
+      grid-template-columns: minmax(0, 1.3fr) 130px 150px 160px 150px 150px;
+    }
+
+    .settings-grid {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      margin-bottom: 12px;
+    }
+
+    .field {
+      display: grid;
+      gap: 5px;
+      min-width: 0;
+    }
+
+    label {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 780;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+    }
+
+    .input,
+    .textarea,
+    .select {
+      min-height: 34px;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 13px;
+    }
+
+    .textarea {
+      min-height: 184px;
+      font-family: var(--mono);
+      line-height: 1.5;
+      white-space: pre-wrap;
+    }
+
+    .input.mono,
+    .select.mono {
+      font-family: var(--mono);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th,
+    td {
+      padding: 8px 10px;
+      border-bottom: 1px solid #e7edf4;
+      text-align: left;
+      vertical-align: middle;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: #f0f4f8;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 780;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+    }
+
+    tr.active td {
+      background: #edf4ff;
+    }
+
+    tr:hover td {
+      background: #f8fbff;
+    }
+
+    .table-wrap {
+      overflow: auto;
+      max-height: 620px;
+      border-radius: 0 0 13px 13px;
+    }
+
+    .table-wrap.compact {
+      max-height: 392px;
+    }
+
+    .mono {
+      font-family: var(--mono);
+    }
+
+    .topic-cell {
+      display: grid;
+      gap: 5px;
+      min-width: 0;
+    }
+
+    .topic-title {
+      font-family: var(--mono);
+      font-size: 13px;
+      font-weight: 760;
+      color: #172033;
+    }
+
+    .topic-flags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+    }
+
+    .value-cell {
+      color: #41546a;
+      font-family: var(--mono);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .topic-shell {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      gap: 12px;
+    }
+
+    .side-detail {
+      overflow: hidden;
+    }
+
+    .detail-body,
+    .pane-body {
+      padding: 12px;
+    }
+
+    .partition-bars {
+      display: grid;
+      gap: 8px;
+    }
+
+    .partition-bar {
+      display: grid;
+      grid-template-columns: 28px minmax(0, 1fr) auto;
+      gap: 8px;
+      align-items: center;
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 11px;
+    }
+
+    .bar-track {
+      overflow: hidden;
+      height: 8px;
+      border-radius: 999px;
+      background: #e4ebf3;
+    }
+
+    .bar-fill {
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #1769e0, #12a874);
+    }
+
+    .message-shell {
+      display: grid;
+      min-height: 610px;
+    }
+
+    .result-meta {
+      display: grid;
+      grid-template-columns: 96px repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      background: #fff;
+    }
+
+    .consume-state,
+    .consume-stat {
+      min-width: 0;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fbfcfe;
+    }
+
+    .consume-state {
+      display: grid;
+      place-items: center;
+      border-color: #bfe7d4;
+      background: var(--green-soft);
+      color: #0c7553;
+      font-size: 13px;
+      font-weight: 860;
+    }
+
+    .consume-stat-label {
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 780;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+    }
+
+    .consume-stat-value {
+      margin-top: 4px;
+      font-family: var(--mono);
+      font-size: 13px;
+      font-weight: 760;
+    }
+
+    .result-note {
+      grid-column: 1 / -1;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .expander {
+      display: inline-grid;
+      place-items: center;
+      width: 24px;
+      height: 24px;
+      border: 1px solid #cfd9e6;
+      border-radius: 7px;
+      background: #fff;
+      color: #41546a;
+      font-family: var(--mono);
+      font-size: 14px;
+      font-weight: 800;
+    }
+
+    .message-preview {
+      overflow: hidden;
+      max-width: 620px;
+      color: #273549;
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.45;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .expanded-row td {
+      padding: 0;
+      background: #f8fbff;
+    }
+
+    .message-inspector {
+      display: grid;
+      gap: 0;
+      margin: 0 12px 12px 48px;
+      border: 1px solid #cfdced;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #fff;
+      box-shadow: 0 14px 34px rgba(33, 48, 72, 0.08);
+    }
+
+    .inspector-top {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      background: #f3f7ff;
+    }
+
+    .inspector-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .inspector-tab {
+      padding: 7px 10px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #fff;
+      color: #42536a;
+      font-size: 12px;
+      font-weight: 780;
+    }
+
+    .inspector-tab.active {
+      border-color: #1769e0;
+      background: #1769e0;
+      color: #fff;
+    }
+
+    .inspector-body {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 250px;
+      gap: 12px;
+      padding: 12px;
+    }
+
+    .inspector-side {
+      display: grid;
+      gap: 8px;
+      align-content: start;
+    }
+
+    .payload-actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .payload-actions .toolbar {
+      gap: 5px;
+    }
+
+    .payload-block {
+      display: grid;
+      gap: 7px;
+      margin-bottom: 12px;
+    }
+
+    .payload-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 780;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+    }
+
+    pre {
+      margin: 0;
+      overflow: auto;
+      max-height: 262px;
+      padding: 12px;
+      border: 1px solid #dce4ee;
+      border-radius: 10px;
+      background: #101826;
+      color: #d8e2f1;
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    .json-key { color: #8fd3ff; }
+    .json-string { color: #a4e7b7; }
+    .json-number { color: #ffd166; }
+    .json-bool { color: #ff9f9f; }
+    .json-null { color: #c7b8ff; }
+    .json-punct { color: #8b98aa; }
+
+    .plain-pre {
+      background: #f8fafc;
+      color: #2b3748;
+    }
+
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .mini-metric {
+      padding: 9px;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      background: #fff;
+    }
+
+    .mini-label {
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 780;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+    }
+
+    .mini-value {
+      margin-top: 5px;
+      font-family: var(--mono);
+      font-size: 13px;
+      font-weight: 760;
+    }
+
+    .produce-shell,
+    .create-shell,
+    .settings-shell {
+      padding: 12px;
+    }
+
+    .headers-table {
+      margin-bottom: 12px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .action-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .result-card {
+      padding: 10px 12px;
+      border: 1px solid #bfe7d4;
+      border-radius: 10px;
+      background: var(--green-soft);
+      color: #0c7553;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .settings-card {
+      display: grid;
+      gap: 12px;
+      margin-bottom: 12px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #fff;
+    }
+
+    .ssl-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      padding-top: 10px;
+      border-top: 1px solid var(--line);
+    }
+
+    .path-input {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 6px;
+    }
+
+    .warning-line {
+      padding: 9px 10px;
+      border: 1px solid #efd087;
+      border-radius: 9px;
+      background: var(--amber-soft);
+      color: #84560f;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .groups-shell {
+      display: grid;
+      grid-template-columns: 360px minmax(0, 1fr);
+      gap: 12px;
+    }
+
+    .group-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .group-card {
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+    }
+
+    .group-card.active {
+      border-color: #bed3ff;
+      background: #f3f7ff;
+    }
+
+    .broker-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .broker-card {
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #fff;
+    }
+
+    .broker-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 10px;
+      font-weight: 780;
+    }
+
+    .empty-state {
+      padding: 38px 20px;
+      text-align: center;
+      color: var(--muted);
+    }
+
+    .empty-state strong {
+      display: block;
+      margin-bottom: 7px;
+      color: var(--text);
+      font-size: 18px;
+    }
+
+    @media (max-width: 920px) {
+      .review-shell,
+      .screen {
+        width: 100%;
+      }
+
+      .review-nav,
+      .tool-header,
+      .kafka-layout,
+      .topic-shell,
+      .message-shell,
+      .groups-shell {
+        grid-template-columns: 1fr;
+      }
+
+      .rail {
+        position: static;
+      }
+
+      .summary-strip,
+      .create-grid,
+      .settings-grid,
+      .ssl-grid,
+      .broker-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .inspector-body {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const screen = params.get("screen") || "topics";
+
+    const screens = [
+      ["topics", "Topics"],
+      ["topic", "Topic overview"],
+      ["messages", "Messages"],
+      ["produce", "Produce"],
+      ["create", "Create topic"],
+      ["groups", "Consumer groups"],
+      ["brokers", "Brokers"],
+      ["settings", "Settings"],
+      ["empty", "Empty"]
+    ];
+
+    const topics = [
+      { name: "orders.events", partitions: 12, replication: 3, cleanup: "delete", retention: "7 days", internal: false, size: "18.4M" },
+      { name: "billing.payments.v2", partitions: 8, replication: 3, cleanup: "compact,delete", retention: "30 days", internal: false, size: "4.1M" },
+      { name: "customer.profile.compacted", partitions: 6, replication: 3, cleanup: "compact", retention: "default", internal: false, size: "892K" },
+      { name: "_schemas", partitions: 1, replication: 3, cleanup: "compact", retention: "default", internal: true, size: "12K" },
+      { name: "loadtest.sql.audit", partitions: 16, replication: 2, cleanup: "delete", retention: "24 hours", internal: false, size: "51.9M" },
+      { name: "notifications.push", partitions: 10, replication: 3, cleanup: "delete", retention: "3 days", internal: false, size: "9.6M" }
+    ];
+
+    const messages = [
+      {
+        partition: 0,
+        offset: 1284001,
+        timestamp: "2026-04-25 01:11:42.831",
+        key: "order-9001",
+        headers: 3,
+        value: {
+          json: true,
+          text: `{
+  "eventId": "evt-78152",
+  "type": "ORDER_CREATED",
+  "orderId": "order-9001",
+  "amount": 4290.55,
+  "currency": "RUB",
+  "risk": false,
+  "items": [
+    { "sku": "lt-module-basic", "qty": 2 },
+    { "sku": "support-pack", "qty": 1 }
+  ]
+}`
+        }
+      },
+      {
+        partition: 2,
+        offset: 1283988,
+        timestamp: "2026-04-25 01:11:41.203",
+        key: "order-8999",
+        headers: 2,
+        value: { json: false, text: "plain-text payload: invalid-json { orderId: order-8999" }
+      },
+      {
+        partition: 4,
+        offset: 1283974,
+        timestamp: "2026-04-25 01:11:39.880",
+        key: "order-8998",
+        headers: 4,
+        value: {
+          json: true,
+          text: `{
+  "eventId": "evt-78149",
+  "type": "PAYMENT_RESERVED",
+  "orderId": "order-8998",
+  "status": "RESERVED",
+  "retry": null
+}`
+        }
+      },
+      {
+        partition: 5,
+        offset: 1283962,
+        timestamp: "2026-04-25 01:11:38.412",
+        key: "",
+        headers: 0,
+        value: { json: false, text: "binary payload preview unavailable, 1048576 bytes truncated" }
+      }
+    ];
+
+    function pageUrl(nextScreen, extra = "") {
+      return `?screen=${nextScreen}${extra}`;
+    }
+
+    function active(name) {
+      return screen === name ? "active" : "";
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;");
+    }
+
+    function highlightJson(text) {
+      return escapeHtml(text)
+        .replace(/(&quot;[^&]*?&quot;)(\s*:)/g, '<span class="json-key">$1</span><span class="json-punct">$2</span>')
+        .replace(/(:\s*)(&quot;[^&]*?&quot;)/g, '$1<span class="json-string">$2</span>')
+        .replace(/\b(true|false)\b/g, '<span class="json-bool">$1</span>')
+        .replace(/\b(null)\b/g, '<span class="json-null">$1</span>')
+        .replace(/(-?\b\d+(?:\.\d+)?\b)/g, '<span class="json-number">$1</span>')
+        .replace(/([{}\[\],])/g, '<span class="json-punct">$1</span>');
+    }
+
+    function header() {
+      return `
+        <div class="tool-header">
+          <div class="tool-identity">
+            <div class="kafka-icon" aria-hidden="true"></div>
+            <div>
+              <div class="crumbs">
+                <a class="crumb" href="/">Load Testing Platform</a>
+                <span class="crumb active">Kafka explorer</span>
+                <a class="crumb" href="/sql-console">SQL-консоль</a>
+              </div>
+              <h1>Kafka cluster explorer</h1>
+              <div class="subtitle">Локальный kafka-ui-like инструмент: topics, consumers, brokers, bounded message read, produce и cluster settings без скрытых background consumers.</div>
+            </div>
+          </div>
+          <div class="header-status">
+            <span class="chip ok">Local Kafka</span>
+            <span class="chip accent">PLAINTEXT</span>
+            <span class="chip">localhost:19092</span>
+            <span class="chip warn">max read 500</span>
+          </div>
+        </div>
+      `;
+    }
+
+    function reviewNav() {
+      return `
+        <div class="review-nav">
+          <div>
+            <div class="review-title">Kafka modernization mockups</div>
+            <div class="review-note">HTML-прототип для review. Product code не меняется.</div>
+          </div>
+          <div class="review-links">
+            ${screens.map(([id, label]) => `<a class="review-link ${active(id)}" href="${pageUrl(id)}">${label}</a>`).join("")}
+          </div>
+        </div>
+      `;
+    }
+
+    function rail() {
+      return `
+        <aside class="panel rail">
+          <div class="rail-head">
+            <div>
+              <div class="pane-title">Clusters</div>
+              <div class="pane-subtitle">Source of truth: ui.kafka</div>
+            </div>
+            <a class="mini-button" href="${pageUrl("settings")}">Settings</a>
+          </div>
+          <div class="rail-section">
+            <div class="rail-label">Catalog</div>
+            <a class="cluster-item active" href="${pageUrl("topics")}">
+              <div class="cluster-line"><span class="cluster-name">Local Kafka</span><span class="badge ok">online</span></div>
+              <div class="cluster-meta">localhost:19092 · PLAINTEXT</div>
+            </a>
+            <a class="cluster-item" href="${pageUrl("settings")}">
+              <div class="cluster-line"><span class="cluster-name">DEV mTLS PEM</span><span class="badge lock">read only</span></div>
+              <div class="cluster-meta">dev-kafka-1:9093 · SSL</div>
+            </a>
+            <a class="cluster-item" href="${pageUrl("settings")}">
+              <div class="cluster-line"><span class="cluster-name">Stage JKS</span><span class="badge warn">partial</span></div>
+              <div class="cluster-meta">stage-kafka:9093 · SSL</div>
+            </a>
+          </div>
+          <div class="rail-section">
+            <div class="rail-label">Cluster navigation</div>
+            <a class="nav-item ${["topics","topic","messages","produce","create"].includes(screen) ? "active" : ""}" href="${pageUrl("topics")}">
+              <div class="nav-line"><span class="nav-name">Topics</span><span class="badge accent">126</span></div>
+              <div class="nav-meta">catalog, details, messages, produce</div>
+            </a>
+            <a class="nav-item ${active("groups")}" href="${pageUrl("groups")}">
+              <div class="nav-line"><span class="nav-name">Consumer Groups</span><span class="badge">34</span></div>
+              <div class="nav-meta">lag, members, topic offsets</div>
+            </a>
+            <a class="nav-item ${active("brokers")}" href="${pageUrl("brokers")}">
+              <div class="nav-line"><span class="nav-name">Brokers</span><span class="badge">3</span></div>
+              <div class="nav-meta">controller and broker metadata</div>
+            </a>
+            <a class="nav-item ${active("settings")}" href="${pageUrl("settings")}">
+              <div class="nav-line"><span class="nav-name">Cluster settings</span><span class="badge warn">yaml</span></div>
+              <div class="nav-meta">PLAINTEXT, JKS, PEM, file picker</div>
+            </a>
+          </div>
+          <div class="rail-section">
+            <div class="rail-label">Recent topics</div>
+            ${topics.slice(0, 5).map((topic, index) => `
+              <a class="topic-list-item ${index === 0 && screen !== "topics" ? "active" : ""}" href="${pageUrl("topic")}">
+                <div class="topic-line"><span class="topic-name">${topic.name}</span><span class="badge">${topic.partitions}p</span></div>
+                <div class="topic-meta">${topic.cleanup} · ${topic.size} msgs</div>
+              </a>
+            `).join("")}
+          </div>
+        </aside>
+      `;
+    }
+
+    function shell(content) {
+      return `
+        <div class="review-shell">
+          ${reviewNav()}
+          <main class="screen">
+            ${header()}
+            <div class="kafka-layout">
+              ${rail()}
+              <section class="content-stack">${content}</section>
+            </div>
+          </main>
+        </div>
+      `;
+    }
+
+    function summaryStrip() {
+      return `
+        <div class="summary-strip">
+          <div class="metric"><div class="metric-label">Topics</div><div class="metric-value">126</div><div class="metric-note">6 internal</div></div>
+          <div class="metric"><div class="metric-label">Partitions</div><div class="metric-value">842</div><div class="metric-note">ISR health OK</div></div>
+          <div class="metric"><div class="metric-label">Consumer lag</div><div class="metric-value">14 280</div><div class="metric-note">2 groups need attention</div></div>
+          <div class="metric"><div class="metric-label">Access</div><div class="metric-value">RW</div><div class="metric-note">produce/create enabled</div></div>
+        </div>
+      `;
+    }
+
+    function topicsTable() {
+      return `
+        <div class="panel">
+          <div class="pane-head">
+            <div>
+              <div class="pane-title">Topics</div>
+              <div class="pane-subtitle">Table-first catalog. Row click opens topic details.</div>
+            </div>
+            <div class="toolbar">
+              <span class="badge accent">126 topics</span>
+              <a class="btn ghost" href="${pageUrl("create")}">Create topic</a>
+              <span class="btn primary">Refresh</span>
+            </div>
+          </div>
+          <div class="filter-row">
+            <div class="field">
+              <label>Topic filter</label>
+              <div class="input mono">orders</div>
+            </div>
+            <div class="select-like">All topics</div>
+            <div class="select-like">Internal: shown</div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Topic</th>
+                  <th>Partitions</th>
+                  <th>Replication</th>
+                  <th>Cleanup</th>
+                  <th>Retention</th>
+                  <th>Messages</th>
+                  <th>Health</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${topics.map((topic, index) => `
+                  <tr class="${index === 0 ? "active" : ""}" onclick="location.href='${pageUrl("topic")}'">
+                    <td>
+                      <div class="topic-cell">
+                        <div class="topic-title">${topic.name}</div>
+                        <div class="topic-flags">
+                          ${topic.internal ? '<span class="badge warn">internal</span>' : '<span class="badge ok">user</span>'}
+                          ${index === 0 ? '<span class="badge accent">selected</span>' : ''}
+                        </div>
+                      </div>
+                    </td>
+                    <td class="value-cell">${topic.partitions}</td>
+                    <td class="value-cell">${topic.replication}</td>
+                    <td class="value-cell">${topic.cleanup}</td>
+                    <td class="value-cell">${topic.retention}</td>
+                    <td class="value-cell">${topic.size}</td>
+                    <td>${index === 1 ? '<span class="badge warn">lag high</span>' : '<span class="badge ok">ok</span>'}</td>
+                  </tr>
+                `).join("")}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    function topicsScreen() {
+      return shell(`
+        ${summaryStrip()}
+        ${topicsTable()}
+      `);
+    }
+
+    function topicTabs(activePane) {
+      return `
+        <div class="tabs">
+          <a class="tab ${activePane === "overview" ? "active" : ""}" href="${pageUrl("topic")}">Overview</a>
+          <a class="tab ${activePane === "messages" ? "active" : ""}" href="${pageUrl("messages")}">Messages</a>
+          <a class="tab ${activePane === "consumers" ? "active" : ""}" href="${pageUrl("topic", "&pane=consumers")}">Consumers</a>
+          <a class="tab ${activePane === "settings" ? "active" : ""}" href="${pageUrl("topic", "&pane=settings")}">Settings</a>
+          <a class="tab ${activePane === "produce" ? "active" : ""}" href="${pageUrl("produce")}">Produce</a>
+        </div>
+      `;
+    }
+
+    function topicHeader(activePane = "overview") {
+      return `
+        <div class="panel">
+          <div class="pane-head">
+            <div>
+              <div class="pane-title mono">orders.events</div>
+              <div class="pane-subtitle">Local Kafka · PLAINTEXT · 12 partitions · replication 3</div>
+            </div>
+            <div class="toolbar">
+              <a class="btn ghost" href="${pageUrl("topics")}">Back to topics</a>
+              <span class="btn primary">Refresh topic</span>
+            </div>
+          </div>
+          ${topicTabs(activePane)}
+        </div>
+      `;
+    }
+
+    function partitionBars() {
+      const data = [
+        [0, 1284001, 87],
+        [1, 1281880, 72],
+        [2, 1283988, 84],
+        [3, 1279900, 58],
+        [4, 1283974, 79],
+        [5, 1283962, 91],
+        [6, 1281112, 63],
+        [7, 1282201, 66],
+        [8, 1280931, 61],
+        [9, 1280502, 59],
+        [10, 1279821, 55],
+        [11, 1280303, 57]
+      ];
+      return `
+        <div class="partition-bars">
+          ${data.map(([partition, offset, width]) => `
+            <div class="partition-bar">
+              <span>p${partition}</span>
+              <div class="bar-track"><div class="bar-fill" style="width:${width}%"></div></div>
+              <span>${offset}</span>
+            </div>
+          `).join("")}
+        </div>
+      `;
+    }
+
+    function topicOverviewScreen() {
+      return shell(`
+        ${topicHeader("overview")}
+        <div class="topic-shell">
+          <div class="panel">
+            <div class="pane-head">
+              <div>
+                <div class="pane-title">Topic overview</div>
+                <div class="pane-subtitle">Metadata and partition offsets stay read-only.</div>
+              </div>
+              <span class="badge ok">consumer metadata available</span>
+            </div>
+            <div class="pane-body">
+              <div class="summary-strip">
+                <div class="metric"><div class="metric-label">Partitions</div><div class="metric-value">12</div><div class="metric-note">leader spread OK</div></div>
+                <div class="metric"><div class="metric-label">Replication</div><div class="metric-value">3</div><div class="metric-note">ISR 36/36</div></div>
+                <div class="metric"><div class="metric-label">Cleanup</div><div class="metric-value">delete</div><div class="metric-note">retention 7 days</div></div>
+                <div class="metric"><div class="metric-label">Latest offset</div><div class="metric-value">1.28M</div><div class="metric-note">across partitions</div></div>
+              </div>
+            </div>
+            <div class="table-wrap compact">
+              <table>
+                <thead><tr><th>Partition</th><th>Leader</th><th>Replicas</th><th>ISR</th><th>Earliest</th><th>Latest</th></tr></thead>
+                <tbody>
+                  ${Array.from({ length: 12 }, (_, i) => `
+                    <tr>
+                      <td class="value-cell">${i}</td>
+                      <td class="value-cell">${(i % 3) + 1}</td>
+                      <td class="value-cell">3</td>
+                      <td class="value-cell">3</td>
+                      <td class="value-cell">${41000 + i * 20}</td>
+                      <td class="value-cell">${1280300 + i * 310}</td>
+                    </tr>
+                  `).join("")}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <aside class="panel side-detail">
+            <div class="detail-head">
+              <div>
+                <div class="pane-title">Partition load</div>
+                <div class="pane-subtitle">Latest offsets by partition</div>
+              </div>
+            </div>
+            <div class="detail-body">
+              ${partitionBars()}
+              <div class="warning-line" style="margin-top:12px">Consumer groups are section-level state. Metadata errors must not hide topic overview.</div>
+            </div>
+          </aside>
+        </div>
+      `);
+    }
+
+    function messageRows() {
+      return messages.map((record, index) => `
+        <tr class="${index === 0 ? "active" : ""}">
+          <td><span class="expander">${index === 0 ? "−" : "+"}</span></td>
+          <td class="value-cell">${record.offset}</td>
+          <td class="value-cell">${record.partition}</td>
+          <td>${record.timestamp}</td>
+          <td><span class="mono">${record.key || "∅"}</span></td>
+          <td><div class="message-preview">${escapeHtml(record.value.text.slice(0, 180).replace(/\n/g, " "))}${record.value.text.length > 180 ? "..." : ""}</div></td>
+          <td class="value-cell">${record.headers}</td>
+          <td></td>
+        </tr>
+        ${index === 0 ? messageExpandedRow(record) : ""}
+      `).join("");
+    }
+
+    function messageExpandedRow(selected) {
+      return `
+        <tr class="expanded-row">
+          <td colspan="8">
+            <div class="message-inspector">
+              <div class="inspector-top">
+                <div>
+                  <div class="pane-title">Message at offset ${selected.offset}</div>
+                  <div class="pane-subtitle">partition ${selected.partition} · key ${selected.key || "empty"} · ${selected.headers} headers</div>
+                </div>
+                <div class="inspector-tabs">
+                  <span class="inspector-tab active">Value</span>
+                  <span class="inspector-tab">Key</span>
+                  <span class="inspector-tab">Headers</span>
+                  <span class="inspector-tab">Metadata</span>
+                </div>
+              </div>
+              <div class="inspector-body">
+                <div>
+                  <div class="payload-actions">
+                    <div class="toolbar">
+                      <span class="mini-button">Pretty</span>
+                      <span class="mini-button">Raw</span>
+                      <span class="mini-button">Copy</span>
+                    </div>
+                    <span class="badge ${selected.value.json ? "ok" : "warn"}">${selected.value.json ? "valid JSON" : "plain text fallback"}</span>
+                  </div>
+                  <pre class="${selected.value.json ? "" : "plain-pre"}">${selected.value.json ? highlightJson(selected.value.text) : escapeHtml(selected.value.text)}</pre>
+                </div>
+                <aside class="inspector-side">
+                  <div class="mini-metric"><div class="mini-label">Timestamp</div><div class="mini-value">01:11:42.831</div></div>
+                  <div class="mini-metric"><div class="mini-label">Partition</div><div class="mini-value">${selected.partition}</div></div>
+                  <div class="mini-metric"><div class="mini-label">Offset</div><div class="mini-value">${selected.offset}</div></div>
+                  <div class="headers-table">
+                    <table>
+                      <tbody>
+                        <tr><td class="mono">trace-id</td><td class="mono">lt-9c22a</td></tr>
+                        <tr><td class="mono">content-type</td><td class="mono">application/json</td></tr>
+                        <tr><td class="mono">producer</td><td class="mono">load-test</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </aside>
+              </div>
+            </div>
+          </td>
+        </tr>
+      `;
+    }
+
+    function messagesScreen() {
+      return shell(`
+        ${topicHeader("messages")}
+        <div class="panel">
+          <div class="pane-head">
+            <div>
+              <div class="pane-title">Messages</div>
+              <div class="pane-subtitle">Bounded read via assign + seek. Scope controls are draft until explicit read.</div>
+            </div>
+            <span class="badge warn">no commit</span>
+          </div>
+          <div class="message-query-grid">
+            <div class="field"><label>Seek Type</label><div class="select">Latest</div></div>
+            <div class="field"><label>Offset / timestamp</label><div class="input mono">not used</div></div>
+            <div class="field"><label>Partitions</label><div class="select">All items selected</div></div>
+            <div class="field"><label>Key Serde</label><div class="select">String</div></div>
+            <div class="field"><label>Value Serde</label><div class="select">String</div></div>
+            <div class="field"><label>Limit</label><div class="input mono">500</div></div>
+            <span class="btn primary">Submit read</span>
+          </div>
+          <div class="message-secondary-toolbar">
+            <div class="select">Oldest First</div>
+            <div class="input">Search in current result</div>
+            <span class="btn ghost">Add Filters</span>
+            <span class="badge warn">draft controls do not auto-read</span>
+          </div>
+          <div class="result-meta">
+            <div class="consume-state">DONE</div>
+            <div class="consume-stat"><div class="consume-stat-label">Elapsed Time</div><div class="consume-stat-value">18 ms</div></div>
+            <div class="consume-stat"><div class="consume-stat-label">Bytes Consumed</div><div class="consume-stat-value">132 KB</div></div>
+            <div class="consume-stat"><div class="consume-stat-label">Messages Consumed</div><div class="consume-stat-value">500 messages consumed</div></div>
+            <div class="result-note">scope all partitions · mode latest · effective limit 500 · last successful result is preserved until next explicit read</div>
+          </div>
+          <div class="message-shell">
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th></th><th>Offset</th><th>Partition</th><th>Timestamp</th><th>Key Preview</th><th>Value Preview</th><th>Headers</th><th></th></tr></thead>
+                <tbody>${messageRows()}</tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      `);
+    }
+
+    function produceScreen() {
+      return shell(`
+        ${topicHeader("produce")}
+        <div class="panel">
+          <div class="pane-head">
+            <div>
+              <div class="pane-title">Produce message</div>
+              <div class="pane-subtitle">Structured editor: key, partition override, headers and payload.</div>
+            </div>
+            <span class="badge ok">write enabled</span>
+          </div>
+          <div class="produce-shell">
+            <div class="produce-toolbar">
+              <div class="field"><label>Partition override</label><div class="select">Auto</div></div>
+              <div class="field"><label>Key</label><div class="input mono">order-9002</div></div>
+            </div>
+            <div class="headers-table">
+              <table>
+                <thead><tr><th>Name</th><th>Value</th><th>Action</th></tr></thead>
+                <tbody>
+                  <tr><td><div class="input mono">content-type</div></td><td><div class="input mono">application/json</div></td><td><span class="btn ghost">Remove</span></td></tr>
+                  <tr><td><div class="input mono">trace-id</div></td><td><div class="input mono">lt-9c22b</div></td><td><span class="btn ghost">Remove</span></td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="field">
+              <label>Payload</label>
+              <div class="textarea">{
+  "eventId": "evt-78153",
+  "type": "ORDER_UPDATED",
+  "orderId": "order-9002",
+  "status": "READY_FOR_DELIVERY",
+  "source": "manual-kafka-tool"
+}</div>
+            </div>
+            <div class="action-row">
+              <div class="toolbar"><span class="btn ghost">Add header</span><span class="btn ghost">Format JSON</span></div>
+              <span class="btn primary">Отправить сообщение</span>
+            </div>
+            <div class="result-card" style="margin-top:12px">Sent to orders.events · partition 3 · offset 1284012 · timestamp 2026-04-25 01:12:04</div>
+          </div>
+        </div>
+      `);
+    }
+
+    function createScreen() {
+      return shell(`
+        <div class="panel">
+          <div class="pane-head">
+            <div>
+              <div class="pane-title">Create topic</div>
+              <div class="pane-subtitle">Admin path is blocked before Kafka client call for readOnly clusters.</div>
+            </div>
+            <div class="toolbar"><span class="badge ok">Local Kafka</span><span class="badge">AdminClient</span></div>
+          </div>
+          <div class="create-shell">
+            <div class="create-grid">
+              <div class="field"><label>Topic name</label><div class="input mono">loadtest.audit.v3</div></div>
+              <div class="field"><label>Partitions</label><div class="input mono">12</div></div>
+              <div class="field"><label>Replication factor</label><div class="input mono">3</div></div>
+              <div class="field"><label>Cleanup policy</label><div class="select">delete</div></div>
+              <div class="field"><label>Retention ms</label><div class="input mono">86400000</div></div>
+              <div class="field"><label>Retention bytes</label><div class="input mono">optional</div></div>
+            </div>
+            <div class="warning-line" style="margin-top:12px">Duplicate topic, invalid partitions, invalid replication and authorization failures must stay explicit, not generic 500.</div>
+            <div class="action-row">
+              <span class="btn ghost">Validate</span>
+              <span class="btn primary">Создать топик</span>
+            </div>
+          </div>
+        </div>
+        ${topicsTable()}
+      `);
+    }
+
+    function groupsScreen() {
+      return shell(`
+        <div class="panel">
+          <div class="pane-head">
+            <div>
+              <div class="pane-title">Consumer Groups</div>
+              <div class="pane-subtitle">Cluster-level view. Partial metadata errors are section state, not cluster failure.</div>
+            </div>
+            <div class="toolbar"><span class="badge warn">2 lagging</span><span class="btn primary">Refresh</span></div>
+          </div>
+          <div class="pane-body">
+            <div class="groups-shell">
+              <div class="group-list">
+                <div class="group-card active">
+                  <div class="cluster-line"><strong>orders-service</strong><span class="badge warn">lag high</span></div>
+                  <div class="pane-subtitle">Stable · 6 members · total lag 14 280</div>
+                </div>
+                <div class="group-card">
+                  <div class="cluster-line"><strong>billing-worker</strong><span class="badge ok">ok</span></div>
+                  <div class="pane-subtitle">Stable · 3 members · total lag 0</div>
+                </div>
+                <div class="group-card">
+                  <div class="cluster-line"><strong>notification-pusher</strong><span class="badge">empty</span></div>
+                  <div class="pane-subtitle">Empty · members n/a · lag n/a</div>
+                </div>
+              </div>
+              <div class="panel" style="box-shadow:none">
+                <div class="pane-head">
+                  <div>
+                    <div class="pane-title">orders-service lag by topic</div>
+                    <div class="pane-subtitle">Selected group details</div>
+                  </div>
+                </div>
+                <div class="table-wrap compact">
+                  <table>
+                    <thead><tr><th>Topic</th><th>Partitions</th><th>Committed</th><th>Latest</th><th>Lag</th></tr></thead>
+                    <tbody>
+                      <tr class="active"><td class="mono">orders.events</td><td>12</td><td>1283990</td><td>1284001</td><td><span class="badge warn">14280</span></td></tr>
+                      <tr><td class="mono">billing.payments.v2</td><td>8</td><td>812001</td><td>812001</td><td><span class="badge ok">0</span></td></tr>
+                      <tr><td class="mono">customer.profile.compacted</td><td>6</td><td>55670</td><td>55670</td><td><span class="badge ok">0</span></td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `);
+    }
+
+    function brokersScreen() {
+      return shell(`
+        <div class="panel">
+          <div class="pane-head">
+            <div>
+              <div class="pane-title">Brokers</div>
+              <div class="pane-subtitle">Read-only metadata for broker nodes and controller role.</div>
+            </div>
+            <span class="btn primary">Refresh</span>
+          </div>
+          <div class="pane-body">
+            <div class="summary-strip" style="margin-bottom:12px">
+              <div class="metric"><div class="metric-label">Cluster</div><div class="metric-value">Local Kafka</div><div class="metric-note">localhost:19092</div></div>
+              <div class="metric"><div class="metric-label">Brokers</div><div class="metric-value">3</div><div class="metric-note">all reachable</div></div>
+              <div class="metric"><div class="metric-label">Controller</div><div class="metric-value">1</div><div class="metric-note">broker id</div></div>
+              <div class="metric"><div class="metric-label">Protocol</div><div class="metric-value">PLAINTEXT</div><div class="metric-note">test stand</div></div>
+            </div>
+            <div class="broker-grid">
+              ${[1,2,3].map(id => `
+                <div class="broker-card">
+                  <div class="broker-title"><span>Broker ${id}</span><span class="badge ${id === 1 ? "accent" : "ok"}">${id === 1 ? "controller" : "follower"}</span></div>
+                  <div class="pane-subtitle mono">localhost:${19091 + id}</div>
+                  <div class="partition-bars" style="margin-top:12px">
+                    <div class="partition-bar"><span>rack</span><div class="bar-track"><div class="bar-fill" style="width:${50 + id * 12}%"></div></div><span>${id === 1 ? "local-a" : "local-b"}</span></div>
+                    <div class="partition-bar"><span>load</span><div class="bar-track"><div class="bar-fill" style="width:${35 + id * 15}%"></div></div><span>${35 + id * 15}%</span></div>
+                  </div>
+                </div>
+              `).join("")}
+            </div>
+          </div>
+        </div>
+      `);
+    }
+
+    function settingsScreen() {
+      return shell(`
+        <div class="panel">
+          <div class="pane-head">
+            <div>
+              <div class="pane-title">Kafka settings</div>
+              <div class="pane-subtitle">Config-backed editor. Source of truth remains ui.kafka in ui-application.yml.</div>
+            </div>
+            <div class="toolbar"><span class="btn ghost">Перечитать из конфига</span><span class="btn ghost">Добавить cluster</span><span class="btn primary">Сохранить настройки</span></div>
+          </div>
+          <div class="settings-shell">
+            <div class="settings-card">
+              <div class="cluster-line"><strong>Local Kafka</strong><span class="badge ok">PLAINTEXT</span></div>
+              <div class="settings-grid">
+                <div class="field"><label>ID</label><div class="input mono">local-plain</div></div>
+                <div class="field"><label>Name</label><div class="input">Local Kafka</div></div>
+                <div class="field"><label>bootstrap.servers</label><div class="input mono">localhost:19092</div></div>
+                <div class="field"><label>client.id</label><div class="input mono">datapool-loader</div></div>
+                <div class="field"><label>security.protocol</label><div class="select">PLAINTEXT (без TLS)</div></div>
+                <div class="field"><label>readOnly</label><div class="select">false</div></div>
+              </div>
+              <div class="action-row"><span class="btn ghost">Тест подключения</span><span class="btn danger">Удалить</span></div>
+            </div>
+            <div class="settings-card">
+              <div class="cluster-line"><strong>DEV Kafka mTLS PEM</strong><span class="badge lock">read only</span></div>
+              <div class="settings-grid">
+                <div class="field"><label>ID</label><div class="input mono">dev-mtls-pem</div></div>
+                <div class="field"><label>Name</label><div class="input">DEV Kafka mTLS PEM</div></div>
+                <div class="field"><label>bootstrap.servers</label><div class="input mono">dev-kafka-1:9093,dev-kafka-2:9093</div></div>
+                <div class="field"><label>security.protocol</label><div class="select">SSL / TLS</div></div>
+              </div>
+              <div class="ssl-grid">
+                <div class="field"><label>ssl.truststore.type</label><div class="select">PEM certificate files</div></div>
+                <div class="field">
+                  <label>ssl.truststore.certificates</label>
+                  <div class="path-input"><div class="input mono">${escapeHtml("${file:/Users/kwdev/certs/ca.crt}")}</div><span class="btn ghost">Выбрать CA сертификат</span></div>
+                </div>
+                <div class="field"><label>ssl.keystore.type</label><div class="select">PEM certificate files</div></div>
+                <div class="field">
+                  <label>ssl.keystore.certificate.chain</label>
+                  <div class="path-input"><div class="input mono">${escapeHtml("${file:/Users/kwdev/certs/client.crt}")}</div><span class="btn ghost">Выбрать client certificate</span></div>
+                </div>
+                <div class="field">
+                  <label>ssl.keystore.key</label>
+                  <div class="path-input"><div class="input mono">${escapeHtml("${file:/Users/kwdev/certs/client.key}")}</div><span class="btn ghost">Выбрать private key</span></div>
+                </div>
+                <div class="field"><label>ssl.key.password</label><div class="input mono">${escapeHtml("${KAFKA_CLIENT_KEY_PASSWORD}")}</div></div>
+              </div>
+              <div class="warning-line">PEM fields store config-ready ${escapeHtml("${file:/abs/path}")} placeholders. Browser upload is not a second source of truth.</div>
+              <div class="action-row"><span class="btn ghost">Тест подключения</span><span class="btn danger">Удалить</span></div>
+            </div>
+          </div>
+        </div>
+      `);
+    }
+
+    function emptyScreen() {
+      return `
+        <div class="review-shell">
+          ${reviewNav()}
+          <main class="screen">
+            ${header()}
+            <div class="panel">
+              <div class="empty-state">
+                <strong>Kafka clusters не настроены</strong>
+                <div>Переход сразу ведет в settings, где можно добавить первый cluster и сохранить его в ui-application.yml.</div>
+                <div style="margin-top:16px"><a class="btn primary" href="${pageUrl("settings")}">Открыть настройки Kafka</a></div>
+              </div>
+            </div>
+          </main>
+        </div>
+      `;
+    }
+
+    function render() {
+      const pane = params.get("pane");
+      if (screen === "topic" && pane === "consumers") return topicConsumersScreen();
+      if (screen === "topic" && pane === "settings") return topicSettingsScreen();
+      switch (screen) {
+        case "topic": return topicOverviewScreen();
+        case "messages": return messagesScreen();
+        case "produce": return produceScreen();
+        case "create": return createScreen();
+        case "groups": return groupsScreen();
+        case "brokers": return brokersScreen();
+        case "settings": return settingsScreen();
+        case "empty": return emptyScreen();
+        case "topics":
+        default: return topicsScreen();
+      }
+    }
+
+    function topicConsumersScreen() {
+      return shell(`
+        ${topicHeader("consumers")}
+        <div class="panel">
+          <div class="pane-head">
+            <div>
+              <div class="pane-title">Topic consumers</div>
+              <div class="pane-subtitle">Topic-scoped group lag without hiding partial metadata errors.</div>
+            </div>
+            <span class="badge warn">orders-service lag high</span>
+          </div>
+          <div class="table-wrap compact">
+            <table>
+              <thead><tr><th>Group</th><th>State</th><th>Members</th><th>Total lag</th><th>Metadata</th></tr></thead>
+              <tbody>
+                <tr class="active"><td class="mono">orders-service</td><td>Stable</td><td>6</td><td><span class="badge warn">14 280</span></td><td><span class="badge ok">available</span></td></tr>
+                <tr><td class="mono">billing-worker</td><td>Stable</td><td>3</td><td><span class="badge ok">0</span></td><td><span class="badge ok">available</span></td></tr>
+                <tr><td class="mono">audit-exporter</td><td>unknown</td><td>n/a</td><td><span class="badge">n/a</span></td><td><span class="badge warn">partial</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `);
+    }
+
+    function topicSettingsScreen() {
+      return shell(`
+        ${topicHeader("settings")}
+        <div class="panel">
+          <div class="pane-head">
+            <div>
+              <div class="pane-title">Topic settings</div>
+              <div class="pane-subtitle">Read-only settings shell. Destructive actions remain out of scope.</div>
+            </div>
+          </div>
+          <div class="pane-body">
+            <div class="summary-strip">
+              <div class="metric"><div class="metric-label">cleanup.policy</div><div class="metric-value">delete</div><div class="metric-note">from topic config</div></div>
+              <div class="metric"><div class="metric-label">retention.ms</div><div class="metric-value">604800000</div><div class="metric-note">7 days</div></div>
+              <div class="metric"><div class="metric-label">internal</div><div class="metric-value">no</div><div class="metric-note">user topic</div></div>
+              <div class="metric"><div class="metric-label">cluster readOnly</div><div class="metric-value">no</div><div class="metric-note">write paths enabled</div></div>
+            </div>
+            <div class="warning-line" style="margin-top:12px">Delete topic, alter config, ACL and reset offsets are not part of this redesign scope.</div>
+          </div>
+        </div>
+      `);
+    }
+
+    document.getElementById("app").innerHTML = render();
+  </script>
+</body>
+</html>

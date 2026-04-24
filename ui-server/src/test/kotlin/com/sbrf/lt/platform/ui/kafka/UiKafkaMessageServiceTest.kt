@@ -54,6 +54,66 @@ class UiKafkaMessageServiceTest {
     }
 
     @Test
+    fun `keeps plain text payload without json pretty text`() {
+        val service = ConfigBackedKafkaMessageService(
+            kafkaConfig = testKafkaConfig(),
+            consumerFacadeFactory = FakeUiKafkaMessageConsumerFacadeFactory(
+                partitions = mapOf("datapool-test" to listOf(0)),
+                beginningOffsets = mapOf(tp("datapool-test", 0) to 0L),
+                endOffsets = mapOf(tp("datapool-test", 0) to 2L),
+                records = mapOf(
+                    KafkaReadKey("datapool-test", 0, 1L) to listOf(
+                        record(offset = 1L, value = "plain text payload"),
+                    ),
+                ),
+            ),
+        )
+
+        val result = service.readMessages(
+            KafkaTopicMessageReadRequest(
+                clusterId = "local",
+                topicName = "datapool-test",
+                partition = 0,
+                mode = KafkaTopicMessageReadMode.LATEST,
+                limit = 1,
+            ),
+        )
+
+        assertEquals("plain text payload", result.records.single().value?.text)
+        assertEquals(null, result.records.single().value?.jsonPrettyText)
+    }
+
+    @Test
+    fun `keeps invalid json payload as plain text without failing read`() {
+        val service = ConfigBackedKafkaMessageService(
+            kafkaConfig = testKafkaConfig(),
+            consumerFacadeFactory = FakeUiKafkaMessageConsumerFacadeFactory(
+                partitions = mapOf("datapool-test" to listOf(0)),
+                beginningOffsets = mapOf(tp("datapool-test", 0) to 0L),
+                endOffsets = mapOf(tp("datapool-test", 0) to 2L),
+                records = mapOf(
+                    KafkaReadKey("datapool-test", 0, 1L) to listOf(
+                        record(offset = 1L, value = """{"id":1"""),
+                    ),
+                ),
+            ),
+        )
+
+        val result = service.readMessages(
+            KafkaTopicMessageReadRequest(
+                clusterId = "local",
+                topicName = "datapool-test",
+                partition = 0,
+                mode = KafkaTopicMessageReadMode.LATEST,
+                limit = 1,
+            ),
+        )
+
+        assertEquals("""{"id":1""", result.records.single().value?.text)
+        assertEquals(null, result.records.single().value?.jsonPrettyText)
+    }
+
+    @Test
     fun `clamps explicit offset to earliest available`() {
         val service = ConfigBackedKafkaMessageService(
             kafkaConfig = testKafkaConfig(),
