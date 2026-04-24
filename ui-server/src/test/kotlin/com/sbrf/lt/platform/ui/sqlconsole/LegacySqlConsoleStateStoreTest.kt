@@ -132,6 +132,48 @@ class LegacySqlConsoleStateStoreTest {
     }
 
     @Test
+    fun `stale combined legacy sql console state is removed when dedicated topology already exists`() {
+        val storageDir = Files.createTempDirectory("sql-console-state-stale-combined")
+        storageDir.resolve("sql-console-state.json").writeText(
+            """
+            {
+              "draftSql":"select * from legacy_source",
+              "recentQueries":["select * from legacy_source"],
+              "pageSize":100
+            }
+            """.trimIndent()
+        )
+        storageDir.resolve("sql-console-workspace-state.json").writeText(
+            """
+            {
+              "draftSql":"select * from dedicated_workspace",
+              "selectedSourceNames":["db1"]
+            }
+            """.trimIndent()
+        )
+        storageDir.resolve(SQL_CONSOLE_LIBRARY_STATE_FILE_NAME).writeText(
+            """
+            {
+              "recentQueries":["select * from dedicated_library"]
+            }
+            """.trimIndent()
+        )
+        storageDir.resolve(SQL_CONSOLE_PREFERENCES_STATE_FILE_NAME).writeText(
+            """
+            {
+              "pageSize":25,
+              "strictSafetyEnabled":true
+            }
+            """.trimIndent()
+        )
+
+        val workspace = SqlConsoleWorkspaceStateStore(storageDir).load()
+
+        assertEquals("select * from dedicated_workspace", workspace.draftSql)
+        assertFalse(Files.exists(storageDir.resolve("sql-console-state.json")))
+    }
+
+    @Test
     fun `falls back to defaults when new persisted sql console files are incompatible`() {
         val storageDir = Files.createTempDirectory("sql-console-state-invalid")
         storageDir.resolve("sql-console-workspace-state.json").writeText("draftSql: [broken")

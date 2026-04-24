@@ -17,7 +17,12 @@ class SqlConsoleWorkspaceStateStore(
             stateFile = stateFile,
             configLoader = configLoader,
             stateClass = PersistedSqlConsoleWorkspaceState::class.java,
-        )?.normalized()?.let { return it }
+        )?.normalized()?.let {
+            if (normalizedWorkspaceId == DEFAULT_SQL_CONSOLE_WORKSPACE_ID) {
+                cleanupLegacyCombinedSqlConsoleStateIfMigrated(storageDir, legacyStateStore)
+            }
+            return it
+        }
 
         if (normalizedWorkspaceId != DEFAULT_SQL_CONSOLE_WORKSPACE_ID) {
             return PersistedSqlConsoleWorkspaceState().normalized()

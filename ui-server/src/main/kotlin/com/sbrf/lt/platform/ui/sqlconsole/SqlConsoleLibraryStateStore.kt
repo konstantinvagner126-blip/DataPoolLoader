@@ -16,14 +16,20 @@ class SqlConsoleLibraryStateStore(
             stateFile = stateFile,
             configLoader = configLoader,
             stateClass = PersistedSqlConsoleLibraryState::class.java,
-        )?.normalized()?.let { return it }
+        )?.normalized()?.let {
+            cleanupLegacyCombinedSqlConsoleStateIfMigrated(storageDir, legacyStateStore)
+            return it
+        }
 
         normalizeLegacySplitPreferencesStateIfNeeded(storageDir, configLoader)
         readOptionalSqlConsoleStateFile(
             stateFile = stateFile,
             configLoader = configLoader,
             stateClass = PersistedSqlConsoleLibraryState::class.java,
-        )?.normalized()?.let { return it }
+        )?.normalized()?.let {
+            cleanupLegacyCombinedSqlConsoleStateIfMigrated(storageDir, legacyStateStore)
+            return it
+        }
 
         val migrated = legacyStateStore.load().toLibraryState()
         return migrateSqlConsoleStateIfNeeded(

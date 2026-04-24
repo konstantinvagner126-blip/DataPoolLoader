@@ -140,6 +140,7 @@
   default workspace может мигрировать из legacy combined state; остальные workspace восстанавливаются из своих файлов
 - cleanup:
   отсутствующие файлы означают default state; combined legacy file не должен возвращаться как source of truth;
+  stale `sql-console-state.json` очищается после появления full dedicated topology `workspace + library + preferences`;
   non-default workspace file может быть удален retention-cleanup после `30 days` inactivity;
   access в текущем процессе пинит workspace от cleanup до завершения процесса
 
@@ -162,7 +163,8 @@
   возможна миграция из legacy combined SQL-console state и из old split-preferences payload,
   который при первом чтении нормализуется в dedicated library/preferences files
 - cleanup:
-  normalization ограничивает размер и удаляет дубли
+  normalization ограничивает размер и удаляет дубли;
+  stale combined `sql-console-state.json` очищается после появления full dedicated topology
 
 ### 3.5. SQL console preferences state
 
@@ -181,7 +183,8 @@
   миграция возможна из legacy combined state; old split-preferences payload больше не считается current source of truth
   и при первом чтении переписывается в current-only preferences format
 - cleanup:
-  normalization оставляет только допустимые значения
+  normalization оставляет только допустимые значения;
+  stale combined `sql-console-state.json` очищается после появления full dedicated topology
 
 ### 3.6. SQL console execution history
 
@@ -224,6 +227,7 @@
   читается только если split state files еще не созданы
 - cleanup:
   удаляется после успешной миграции `workspace + library + preferences`
+  и при последующих idempotent cleanup-проходах, если dedicated topology уже собрана
 
 ## 4. Process-Local Runtime State в `ui-server`
 

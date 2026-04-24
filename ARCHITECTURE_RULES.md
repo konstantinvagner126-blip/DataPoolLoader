@@ -86,6 +86,51 @@
 - reliability/safety;
 - следующий верхний backlog-stream.
 
+### 2.5. Review After Store Cleanup Wave
+
+По итогам bounded cleanup-волны для store/page clusters зафиксировано:
+
+- основной store cleanup завершен на уровне `ui-compose-shared` и соседних page-boundary слоев;
+- remaining крупные файлы в этом слое теперь в основном относятся к:
+  - `Models`;
+  - `Labels`;
+  - narrow state/support helpers;
+- новый refactoring pass нельзя открывать только потому, что файл все еще кажется "достаточно большим";
+- reopening этой волны допустим только если появляется новый concrete thick cluster, где в одном месте снова смешаны:
+  - loading;
+  - mutation lifecycle;
+  - runtime branching;
+  - UX policy;
+  - error normalization.
+
+Практическое следствие:
+
+- reviewable façade/store-support файлы больше нельзя распиливать по инерции;
+- следующий пакет в этой области должен быть обоснован не размером файла, а новой смешанной ответственностью.
+
+### 2.6. Review After Legacy Cleanup Wave
+
+По итогам cleanup legacy/state compatibility хвостов зафиксировано:
+
+- active compatibility paths и hidden fallback sources of truth уже вычищены из основных server-side потоков;
+- remaining legacy markers допустимы только как:
+  - explicit migration-only inputs;
+  - negative tests на removed compatibility routes;
+  - documented cleanup/recovery contracts;
+- новый legacy cleanup пакет нельзя открывать только из-за наличия слова `legacy` в коде или тестах.
+
+Reopening этой волны допустим только если появляется concrete сигнал:
+
+- hidden runtime fallback;
+- stale duplicate persisted state;
+- live compatibility branch;
+- migration payload, который снова ведет себя как current source of truth.
+
+Практическое следствие:
+
+- migration-only contracts считаются допустимыми, пока они не возвращаются в active runtime path;
+- cleanup legacy без такого сигнала считается архитектурно слабым и не должен обгонять другие backlog-stream.
+
 ## 3. Главные архитектурные принципы
 
 ### 3.1. `core` владеет бизнес-логикой

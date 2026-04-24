@@ -16,7 +16,10 @@ class SqlConsolePreferencesStateStore(
             stateFile = stateFile,
             configLoader = configLoader,
             stateClass = PersistedSqlConsolePreferencesState::class.java,
-        )?.normalized()?.let { return it }
+        )?.normalized()?.let {
+            cleanupLegacyCombinedSqlConsoleStateIfMigrated(storageDir, legacyStateStore)
+            return it
+        }
 
         val migrated = legacyStateStore.load().toPreferencesState()
         return migrateSqlConsoleStateIfNeeded(
