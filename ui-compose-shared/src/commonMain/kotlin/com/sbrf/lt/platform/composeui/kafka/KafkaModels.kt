@@ -231,6 +231,7 @@ data class KafkaPageState(
     val runtimeContext: RuntimeContext? = null,
     val info: KafkaToolInfoResponse? = null,
     val selectedClusterId: String? = null,
+    val clusterSection: String = "topics",
     val topicQuery: String = "",
     val topics: KafkaTopicsCatalogResponse? = null,
     val selectedTopicName: String? = null,

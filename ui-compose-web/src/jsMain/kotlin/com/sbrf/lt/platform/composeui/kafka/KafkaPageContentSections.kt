@@ -11,6 +11,7 @@ import org.jetbrains.compose.web.dom.Div
 @Composable
 internal fun KafkaPageContent(
     state: KafkaPageState,
+    onClusterSectionChange: (String) -> Unit,
     onTopicQueryChange: (String) -> Unit,
     onApplyTopicQuery: () -> Unit,
     onReloadTopicOverview: (String) -> Unit,
@@ -55,76 +56,24 @@ internal fun KafkaPageContent(
 
     val selectedCluster = info.clusters.firstOrNull { it.id == state.selectedClusterId } ?: info.clusters.first()
     val selectedTopic = state.topicOverview
-
-    Div({ classes("kafka-content-shell") }) {
-        KafkaClusterCatalogSection(
+    Div({ classes("kafka-shell") }) {
+        KafkaClusterSidebar(
             info = info,
             state = state,
-            selectedClusterId = selectedCluster.id,
+            selectedCluster = selectedCluster,
+            onClusterSectionChange = onClusterSectionChange,
+            onOpenSettings = { onPaneChange("cluster-settings") },
         )
 
-        Div({ classes("row", "g-4") }) {
-            Div({ classes("col-12", "col-xl-5") }) {
-                KafkaTopicsCatalogSection(
-                    state = state,
-                    selectedCluster = selectedCluster,
-                    topicsResponse = state.topics,
-                    onTopicQueryChange = onTopicQueryChange,
-                    onApplyTopicQuery = onApplyTopicQuery,
-                )
-            }
-
-            Div({ classes("col-12", "col-xl-7") }) {
-                when {
-                    state.topicOverviewLoading && selectedTopic == null -> {
-                        LoadingStateCard(
-                            title = "Topic overview",
-                            text = "Загружаю metadata выбранного топика.",
-                        )
-                    }
-
-                    selectedTopic == null -> {
-                        if (state.activePane == "settings") {
-                            SectionCard(
-                                title = "Настройки Kafka",
-                                subtitle = "Редактирование cluster catalog в управляемом ui-конфиге.",
-                            ) {
-                                KafkaSettingsSection(
-                                    state = state,
-                                    onReloadSettings = onReloadSettings,
-                                    onAddSettingsCluster = onAddSettingsCluster,
-                                    onRemoveSettingsCluster = onRemoveSettingsCluster,
-                                    onSettingsClusterChange = onSettingsClusterChange,
-                                    onTestSettingsConnection = onTestSettingsConnection,
-                                    onSaveSettings = onSaveSettings,
-                                )
-                            }
-                        } else {
-                            EmptyStateCard(
-                                title = "Topic overview",
-                                text = "Выбери топик из списка слева, чтобы увидеть partition summary и topic config.",
-                            )
-                        }
-                    }
-
-                    else -> {
-                        KafkaTopicOverviewSection(
+        Div({ classes("kafka-main") }) {
+            when {
+                state.activePane == "cluster-settings" -> {
+                    SectionCard(
+                        title = "Настройки Kafka",
+                        subtitle = "Редактирование cluster catalog в управляемом ui-конфиге.",
+                    ) {
+                        KafkaSettingsSection(
                             state = state,
-                            selectedTopic = selectedTopic,
-                            onReloadTopicOverview = onReloadTopicOverview,
-                            onPaneChange = onPaneChange,
-                            onMessagePartitionChange = onMessagePartitionChange,
-                            onMessageReadScopeChange = onMessageReadScopeChange,
-                            onMessageReadModeChange = onMessageReadModeChange,
-                            onMessageLimitChange = onMessageLimitChange,
-                            onMessageOffsetChange = onMessageOffsetChange,
-                            onMessageTimestampChange = onMessageTimestampChange,
-                            onReadMessages = onReadMessages,
-                            onProducePartitionChange = onProducePartitionChange,
-                            onProduceKeyChange = onProduceKeyChange,
-                            onProduceHeadersChange = onProduceHeadersChange,
-                            onProducePayloadChange = onProducePayloadChange,
-                            onProduceMessage = onProduceMessage,
                             onReloadSettings = onReloadSettings,
                             onAddSettingsCluster = onAddSettingsCluster,
                             onRemoveSettingsCluster = onRemoveSettingsCluster,
@@ -132,6 +81,63 @@ internal fun KafkaPageContent(
                             onTestSettingsConnection = onTestSettingsConnection,
                             onSaveSettings = onSaveSettings,
                         )
+                    }
+                }
+
+                state.clusterSection == "consumer-groups" -> {
+                    KafkaClusterSectionPlaceholder(
+                        title = "Consumer Groups",
+                        text = "Следующий пакет вынесет consumer groups в отдельный cluster-level screen. Topic-scoped consumers останутся как отдельная вкладка на странице топика.",
+                    )
+                }
+
+                state.clusterSection == "brokers" -> {
+                    KafkaClusterSectionPlaceholder(
+                        title = "Brokers",
+                        text = "Следующий пакет добавит read-only broker metadata screen без admin actions и destructive операций.",
+                    )
+                }
+
+                else -> {
+                    when {
+                        state.topicOverviewLoading && selectedTopic == null -> {
+                            LoadingStateCard(
+                                title = "Topic details",
+                                text = "Загружаю metadata выбранного топика.",
+                            )
+                        }
+
+                        selectedTopic == null -> {
+                            KafkaTopicsCatalogSection(
+                                state = state,
+                                selectedCluster = selectedCluster,
+                                topicsResponse = state.topics,
+                                onTopicQueryChange = onTopicQueryChange,
+                                onApplyTopicQuery = onApplyTopicQuery,
+                            )
+                        }
+
+                        else -> {
+                            KafkaTopicDetailsPageSection(
+                                state = state,
+                                selectedCluster = selectedCluster,
+                                selectedTopic = selectedTopic,
+                                onReloadTopicOverview = onReloadTopicOverview,
+                                onPaneChange = onPaneChange,
+                                onMessagePartitionChange = onMessagePartitionChange,
+                                onMessageReadScopeChange = onMessageReadScopeChange,
+                                onMessageReadModeChange = onMessageReadModeChange,
+                                onMessageLimitChange = onMessageLimitChange,
+                                onMessageOffsetChange = onMessageOffsetChange,
+                                onMessageTimestampChange = onMessageTimestampChange,
+                                onReadMessages = onReadMessages,
+                                onProducePartitionChange = onProducePartitionChange,
+                                onProduceKeyChange = onProduceKeyChange,
+                                onProduceHeadersChange = onProduceHeadersChange,
+                                onProducePayloadChange = onProducePayloadChange,
+                                onProduceMessage = onProduceMessage,
+                            )
+                        }
                     }
                 }
             }

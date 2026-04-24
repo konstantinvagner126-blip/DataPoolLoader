@@ -13,6 +13,7 @@ class KafkaStoreTest {
         val state = runKafkaSuspend {
             store.load(
                 preferredClusterId = "local",
+                preferredClusterSection = "topics",
                 preferredTopicName = "datapool-test",
                 topicQuery = "data",
                 activePane = "messages",
@@ -29,6 +30,52 @@ class KafkaStoreTest {
         assertEquals("OFFSET", state.messageReadMode)
         assertEquals(1, state.selectedMessagePartition)
         assertEquals("50", state.messageLimitInput)
+    }
+
+    @Test
+    fun `load without explicit topic keeps cluster shell on landing state`() {
+        val store = KafkaStore(StubKafkaApi())
+
+        val state = runKafkaSuspend {
+            store.load(
+                preferredClusterId = "local",
+                preferredClusterSection = "consumer-groups",
+                preferredTopicName = null,
+                activePane = "messages",
+            )
+        }
+
+        assertEquals("local", state.selectedClusterId)
+        assertEquals("consumer-groups", state.clusterSection)
+        assertNull(state.selectedTopicName)
+        assertNull(state.topicOverview)
+        assertEquals("overview", state.activePane)
+    }
+
+    @Test
+    fun `load keeps consumers tab for explicit topic and keeps cluster settings as dedicated pane`() {
+        val store = KafkaStore(StubKafkaApi())
+
+        val topicState = runKafkaSuspend {
+            store.load(
+                preferredClusterId = "local",
+                preferredClusterSection = "topics",
+                preferredTopicName = "datapool-test",
+                activePane = "consumers",
+            )
+        }
+        val settingsState = runKafkaSuspend {
+            store.load(
+                preferredClusterId = "local",
+                preferredClusterSection = "topics",
+                preferredTopicName = "datapool-test",
+                activePane = "cluster-settings",
+            )
+        }
+
+        assertEquals("datapool-test", topicState.selectedTopicName)
+        assertEquals("consumers", topicState.activePane)
+        assertEquals("cluster-settings", settingsState.activePane)
     }
 
     @Test
@@ -183,7 +230,7 @@ class KafkaStoreTest {
             ),
         )
 
-        val loaded = runKafkaSuspend { store.load(activePane = "settings") }
+        val loaded = runKafkaSuspend { store.load(activePane = "cluster-settings") }
         val withSettings = runKafkaSuspend { store.loadSettings(store.startSettingsReload(loaded)) }
         val added = store.addSettingsCluster(withSettings)
         val updatedDraft = store.updateSettingsCluster(added, 1) {

@@ -2,6 +2,7 @@ package com.sbrf.lt.platform.composeui.kafka
 
 data class KafkaRouteState(
     val clusterId: String? = null,
+    val clusterSection: String = "topics",
     val topicName: String? = null,
     val topicQuery: String = "",
     val activePane: String = "overview",
@@ -13,6 +14,7 @@ data class KafkaRouteState(
 fun parseKafkaRoute(params: Map<String, String>): KafkaRouteState =
     KafkaRouteState(
         clusterId = params["clusterId"]?.trim()?.ifBlank { null },
+        clusterSection = params["section"]?.trim()?.ifBlank { null } ?: "topics",
         topicName = params["topic"]?.trim()?.ifBlank { null },
         topicQuery = params["query"]?.trim().orEmpty(),
         activePane = params["pane"]?.trim()?.ifBlank { null } ?: "overview",
@@ -23,6 +25,7 @@ fun parseKafkaRoute(params: Map<String, String>): KafkaRouteState =
 
 fun buildKafkaPageHref(
     clusterId: String? = null,
+    clusterSection: String = "topics",
     topicName: String? = null,
     topicQuery: String = "",
     activePane: String = "overview",
@@ -32,6 +35,7 @@ fun buildKafkaPageHref(
 ): String {
     val queryParams = buildList {
         clusterId?.takeIf { it.isNotBlank() }?.let { add("clusterId=${urlEncode(it)}") }
+        clusterSection.takeIf { it.isNotBlank() && it != "topics" }?.let { add("section=${urlEncode(it)}") }
         topicName?.takeIf { it.isNotBlank() }?.let { add("topic=${urlEncode(it)}") }
         topicQuery.takeIf { it.isNotBlank() }?.let { add("query=${urlEncode(it)}") }
         activePane.takeIf { it.isNotBlank() && it != "overview" }?.let { add("pane=${urlEncode(it)}") }

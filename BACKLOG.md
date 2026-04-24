@@ -158,6 +158,10 @@
 
 #### 15.9.1. Cluster landing и left navigation shell
 
+Статус:
+
+- реализовано
+
 Что нужно сделать:
 
 1. перевести Kafka screen с current single-page explorer на cluster-first shell;
@@ -168,7 +172,27 @@
 3. сделать entry-screen устойчивым и читаемым как при одном, так и при нескольких кластерах;
 4. не превращать cluster landing в dashboard с лишними counters и noise-blocks.
 
+Что сделано:
+
+1. Kafka screen переведен на cluster-first shell с отдельным left sidebar вместо прежнего верхнего cluster strip;
+2. в route/state введен явный `clusterSection` contract:
+   - `topics`;
+   - `consumer-groups`;
+   - `brokers`;
+3. auto-select первого topic убран:
+   - если topic не передан в route, экран остается на cluster landing и не прыгает сразу в topic overview;
+4. левый sidebar теперь держит:
+   - список кластеров;
+   - cluster-level navigation;
+   - отдельный вход в `Настройки`;
+5. `Consumer Groups` и `Brokers` получили честные shell placeholders для следующих bounded пакетов, без fake dashboard counters;
+6. существующие topic/messages/produce/settings flows не сломаны и продолжают работать внутри нового shell.
+
 #### 15.9.2. Topics screen redesign к table-first модели
+
+Статус:
+
+- реализовано
 
 Что нужно сделать:
 
@@ -181,7 +205,24 @@
    - cleanup policy;
    - internal flag.
 
+Что сделано:
+
+1. topics catalog перестроен в плотный table-first screen вместо старой hybrid/card подачи;
+2. сохранены cluster-aware filtering и route-driven navigation по текущему выбранному кластеру;
+3. выбор topic теперь работает как row-click navigation в topic details `overview`, а не только как маленькая inline-ссылка в первой ячейке;
+4. topic metadata сжата до компактного набора прямо в catalog:
+   - partitions;
+   - replication;
+   - cleanup policy;
+   - retention;
+   - internal flag;
+5. catalog получил screen-level header с count/filter/status контекстом, без возврата к dashboard counters и noise-blocks.
+
 #### 15.9.3. Topic details page и tab shell
+
+Статус:
+
+- реализовано
 
 Что нужно сделать:
 
@@ -197,6 +238,25 @@
    - `cluster`;
    - `topic`;
    - `tab`.
+
+Что сделано:
+
+1. topic details больше не живут как inline continuation topics catalog:
+   - при выбранном topic экран переключается в отдельный details shell;
+2. введен явный tab contract на странице topic:
+   - `Overview`;
+   - `Messages`;
+   - `Consumers`;
+   - `Settings`;
+   - `Produce`;
+3. cluster-level settings отделены от topic tab model через отдельный pane `cluster-settings`, чтобы `settings` больше не был перегруженным route/state значением;
+4. текущие `overview/messages/produce` переведены в новый details shell без потери уже реализованных bounded/safety ограничений;
+5. topic-scoped `Consumers` вынесены из overview в отдельную tab, а `Settings` получили read-only topic configuration shell без admin actions;
+6. route contract остался page-driven:
+   - `cluster`;
+   - `topic`;
+   - `pane/tab`;
+   при этом topic tabs теперь нормализуются только при реально выбранном topic.
 
 #### 15.9.4. Consumer Groups screen и topic-consumers drill-down
 

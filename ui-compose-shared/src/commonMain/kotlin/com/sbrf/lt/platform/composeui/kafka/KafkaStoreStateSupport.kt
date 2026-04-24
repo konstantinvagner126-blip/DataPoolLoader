@@ -20,7 +20,7 @@ internal class KafkaStoreStateSupport {
         if (availableTopics.isEmpty()) {
             return null
         }
-        return availableTopics.firstOrNull { it.name == preferredTopicName }?.name ?: availableTopics.first().name
+        return availableTopics.firstOrNull { it.name == preferredTopicName }?.name
     }
 
     fun resolveMessagePartition(
@@ -37,15 +37,38 @@ internal class KafkaStoreStateSupport {
     fun resolveInitialMessageLimit(maxRecordsPerRead: Int): String =
         minOf(50, maxRecordsPerRead).toString()
 
+    fun normalizeClusterSection(value: String): String =
+        when (value.trim().uppercase()) {
+            "CONSUMER-GROUPS",
+            "CONSUMER_GROUPS" -> "consumer-groups"
+            "BROKERS" -> "brokers"
+            else -> "topics"
+        }
+
     fun normalizePane(value: String): String =
         value.trim().uppercase().let { normalized ->
             when (normalized) {
                 "MESSAGES" -> "messages"
+                "CONSUMERS" -> "consumers"
                 "PRODUCE" -> "produce"
                 "SETTINGS" -> "settings"
+                "CLUSTER-SETTINGS",
+                "CLUSTER_SETTINGS" -> "cluster-settings"
                 else -> "overview"
             }
         }
+
+    fun resolveActivePane(
+        requestedPane: String,
+        selectedTopicName: String?,
+    ): String {
+        val normalizedPane = normalizePane(requestedPane)
+        return when {
+            normalizedPane == "cluster-settings" -> "cluster-settings"
+            selectedTopicName.isNullOrBlank() -> "overview"
+            else -> normalizedPane
+        }
+    }
 
     fun normalizeMessageScope(value: String): String =
         when (value.trim().uppercase()) {

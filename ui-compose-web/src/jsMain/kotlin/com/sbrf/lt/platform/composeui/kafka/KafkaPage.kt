@@ -28,6 +28,7 @@ fun ComposeKafkaPage(
     val scope = rememberCoroutineScope()
     var state by remember(
         route.clusterId,
+        route.clusterSection,
         route.topicName,
         route.topicQuery,
         route.activePane,
@@ -42,6 +43,7 @@ fun ComposeKafkaPage(
             "",
             buildKafkaPageHref(
                 clusterId = nextRoute.clusterId,
+                clusterSection = nextRoute.clusterSection,
                 topicName = nextRoute.topicName,
                 topicQuery = nextRoute.topicQuery,
                 activePane = nextRoute.activePane,
@@ -55,7 +57,10 @@ fun ComposeKafkaPage(
     fun currentRouteState(): KafkaRouteState =
         KafkaRouteState(
             clusterId = state.selectedClusterId,
-            topicName = state.selectedTopicName,
+            clusterSection = state.clusterSection,
+            topicName = state.selectedTopicName?.takeIf {
+                state.clusterSection == "topics" && state.activePane != "cluster-settings"
+            },
             topicQuery = state.topicQuery,
             activePane = state.activePane,
             messageReadScope = state.messageReadScope,
@@ -80,6 +85,7 @@ fun ComposeKafkaPage(
 
     LaunchedEffect(
         route.clusterId,
+        route.clusterSection,
         route.topicName,
         route.topicQuery,
         route.activePane,
@@ -91,6 +97,7 @@ fun ComposeKafkaPage(
         state = runCatching {
             store.load(
                 preferredClusterId = route.clusterId,
+                preferredClusterSection = route.clusterSection,
                 preferredTopicName = route.topicName,
                 topicQuery = route.topicQuery,
                 activePane = route.activePane,
@@ -104,15 +111,15 @@ fun ComposeKafkaPage(
                 errorMessage = error.message ?: "Не удалось загрузить Kafka metadata.",
             )
         }
-        if (state.activePane == "settings") {
+        if (state.activePane == "cluster-settings") {
             ensureSettingsLoaded()
         }
     }
 
     PageScaffold(
         eyebrow = "Источники и брокеры",
-        title = "Kafka cluster explorer",
-        subtitle = "Локальный обзор кластеров, топиков и partition metadata по Kafka-каталогу из UI-конфига.",
+        title = "Kafka",
+        subtitle = "Cluster-first tool для локальной работы с Kafka-каталогом, topic metadata и bounded operations.",
         heroHeader = {
             Div({ classes("hero-actions", "mb-3") }) {
                 A(attrs = {
@@ -129,6 +136,12 @@ fun ComposeKafkaPage(
         content = {
             KafkaPageContent(
                 state = state,
+                onClusterSectionChange = { section ->
+                    scope.launch {
+                        state = store.updateClusterSection(state, section)
+                        replaceBrowserRoute(currentRouteState())
+                    }
+                },
                 onTopicQueryChange = { query ->
                     state = store.updateTopicQuery(state, query)
                 },
@@ -164,7 +177,7 @@ fun ComposeKafkaPage(
                 onPaneChange = { pane ->
                     scope.launch {
                         state = store.updateActivePane(state, pane)
-                        if (state.activePane == "settings") {
+                        if (state.activePane == "cluster-settings") {
                             ensureSettingsLoaded()
                         }
                         replaceBrowserRoute(currentRouteState())

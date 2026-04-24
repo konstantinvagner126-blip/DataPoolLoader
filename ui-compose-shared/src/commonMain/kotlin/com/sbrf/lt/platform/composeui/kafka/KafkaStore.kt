@@ -11,6 +11,7 @@ class KafkaStore(
 
     suspend fun load(
         preferredClusterId: String? = null,
+        preferredClusterSection: String = "topics",
         preferredTopicName: String? = null,
         topicQuery: String = "",
         activePane: String = "overview",
@@ -20,6 +21,7 @@ class KafkaStore(
     ): KafkaPageState =
         loadingSupport.load(
             preferredClusterId = preferredClusterId,
+            preferredClusterSection = preferredClusterSection,
             preferredTopicName = preferredTopicName,
             topicQuery = topicQuery,
             activePane = activePane,
@@ -42,6 +44,12 @@ class KafkaStore(
         pane: String,
     ): KafkaPageState =
         loadingSupport.updateActivePane(current, pane)
+
+    fun updateClusterSection(
+        current: KafkaPageState,
+        section: String,
+    ): KafkaPageState =
+        loadingSupport.updateClusterSection(current, section)
 
     fun startTopicsReload(current: KafkaPageState): KafkaPageState =
         loadingSupport.startTopicsReload(current)

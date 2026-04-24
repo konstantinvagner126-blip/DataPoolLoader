@@ -6,6 +6,7 @@ internal class KafkaStoreLoadingSupport(
 ) {
     suspend fun load(
         preferredClusterId: String?,
+        preferredClusterSection: String,
         preferredTopicName: String?,
         topicQuery: String,
         activePane: String,
@@ -21,6 +22,7 @@ internal class KafkaStoreLoadingSupport(
                 loading = false,
                 runtimeContext = runtimeContext,
                 info = info,
+                clusterSection = stateSupport.normalizeClusterSection(preferredClusterSection),
                 topicQuery = topicQuery,
                 activePane = stateSupport.normalizePane(activePane),
                 messageReadScope = stateSupport.normalizeMessageScope(preferredMessageReadScope),
@@ -31,16 +33,21 @@ internal class KafkaStoreLoadingSupport(
         val topics = api.loadTopics(selectedClusterId, topicQuery)
         val selectedTopicName = stateSupport.resolveTopicName(topics, preferredTopicName)
         val topicOverview = selectedTopicName?.let { api.loadTopicOverview(selectedClusterId, it) }
+        val resolvedPane = stateSupport.resolveActivePane(
+            requestedPane = activePane,
+            selectedTopicName = selectedTopicName,
+        )
         return KafkaPageState(
             loading = false,
             runtimeContext = runtimeContext,
             info = info,
             selectedClusterId = selectedClusterId,
+            clusterSection = stateSupport.normalizeClusterSection(preferredClusterSection),
             topicQuery = topicQuery,
             topics = topics,
             selectedTopicName = selectedTopicName,
             topicOverview = topicOverview,
-            activePane = stateSupport.normalizePane(activePane),
+            activePane = resolvedPane,
             selectedMessagePartition = stateSupport.resolveMessagePartition(
                 preferredPartition = preferredMessagePartition,
                 topicOverview = topicOverview,
@@ -65,8 +72,22 @@ internal class KafkaStoreLoadingSupport(
         pane: String,
     ): KafkaPageState =
         current.copy(
-            activePane = stateSupport.normalizePane(pane),
+            activePane = stateSupport.resolveActivePane(pane, current.selectedTopicName),
             errorMessage = null,
+            settingsError = null,
+            settingsStatusMessage = null,
+        )
+
+    fun updateClusterSection(
+        current: KafkaPageState,
+        section: String,
+    ): KafkaPageState =
+        current.copy(
+            clusterSection = stateSupport.normalizeClusterSection(section),
+            activePane = "overview",
+            errorMessage = null,
+            messagesError = null,
+            produceError = null,
             settingsError = null,
             settingsStatusMessage = null,
         )
@@ -115,6 +136,7 @@ internal class KafkaStoreLoadingSupport(
         val overview = api.loadTopicOverview(clusterId, topicName)
         return current.copy(
             topicOverviewLoading = false,
+            clusterSection = "topics",
             selectedTopicName = topicName,
             topicOverview = overview,
             selectedMessagePartition = stateSupport.resolveMessagePartition(
