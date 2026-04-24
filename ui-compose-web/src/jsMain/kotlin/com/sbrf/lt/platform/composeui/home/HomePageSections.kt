@@ -8,93 +8,49 @@ import org.jetbrains.compose.web.attributes.target
 import org.jetbrains.compose.web.dom.A
 import org.jetbrains.compose.web.dom.Div
 import org.jetbrains.compose.web.dom.H1
-import org.jetbrains.compose.web.dom.P
 import org.jetbrains.compose.web.dom.Span
 import org.jetbrains.compose.web.dom.Text
 
 @Composable
-internal fun HeroCard() {
-    Div({ classes("hero-card", "mb-4") }) {
+internal fun HomePlatformHeader() {
+    Div({ classes("home-platform-title-card") }) {
+        Div({
+            classes("home-platform-mark")
+            attr("aria-hidden", "true")
+        })
         Div {
             Div({ classes("eyebrow") }) { Text("MLP Platform") }
-            H1({ classes("display-6", "mb-1") }) {
-                Text("Load Testing Data Platform")
-            }
-            P({ classes("text-secondary", "mb-0") }) {
-                Text("Единая точка входа для подготовки данных, запуска модулей БД и Kafka, ручной работы с источниками и служебных операций при нагрузочном тестировании микросервисов.")
-            }
-        }
-
-        Div({
-            classes("hero-art")
-            attr("aria-hidden", "true")
-        }) {
-            Div({ classes("platform-stage") }) {
-                Div({ classes("platform-node", "platform-node-db") }) { Text("DB") }
-                Div({ classes("platform-node", "platform-node-kafka") }) { Text("KAFKA") }
-                Div({ classes("platform-node", "platform-node-pool") }) { Text("DATAPOOL") }
-                Div({ classes("platform-core") }) {
-                    Div({ classes("platform-core-title") }) { Text("LTP") }
-                    Div({ classes("platform-core-subtitle") }) { Text("MICROSERVICES") }
-                }
-                Rail("platform-rail-db", "packet-db")
-                Rail("platform-rail-kafka", "packet-kafka")
-                Rail("platform-rail-pool", "packet-pool")
+            H1({ classes("home-platform-title") }) {
+                Text("Платформа инструментов тестирования микросервисов")
             }
         }
     }
 }
 
 @Composable
-internal fun Rail(
-    railClass: String,
-    packetClass: String,
-) {
-    Div({ classes("platform-rail", railClass) }) {
-        Span({ classes("platform-packet", packetClass) })
-    }
-}
-
-@Composable
-internal fun ModeCard(
-    label: String,
+internal fun LauncherGroup(
+    label: String? = null,
     title: String,
-    text: String,
-    action: String,
-    href: String,
-    enabled: Boolean,
-    disabledText: String,
-) {
-    if (enabled) {
-        SimpleCard(label, title, text, action, href, "home-mode-card")
-        return
-    }
-
-    Div({
-        classes("home-card", "home-mode-card", "home-card-disabled")
-        attr("aria-disabled", "true")
-        attr("title", disabledText)
-    }) {
-        CardBody(label, title, text, "Недоступно в текущем режиме")
-    }
-}
-
-@Composable
-internal fun HomeSectionCard(
-    label: String,
-    title: String,
-    text: String,
-    vararg extraClasses: String,
+    modifierClass: String? = null,
+    headerAction: (@Composable () -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
     Div({
-        classes("home-group-card", "home-section-card", *extraClasses)
+        if (modifierClass.isNullOrBlank()) {
+            classes("home-launcher-group")
+        } else {
+            classes("home-launcher-group", modifierClass)
+        }
     }) {
-        Div({ classes("home-group-header") }) {
-            Div({ classes("home-group-header-main") }) {
-                Div({ classes("home-card-label") }) { Text(label) }
+        Div({ classes("home-group-intro") }) {
+            Div {
+                if (!label.isNullOrBlank()) {
+                    Div({ classes("eyebrow") }) { Text(label) }
+                }
                 Div({ classes("home-group-title") }) { Text(title) }
-                Div({ classes("home-group-text") }) { Text(text) }
+            }
+            if (headerAction != null) {
+                headerAction()
             }
         }
         content()
@@ -102,36 +58,119 @@ internal fun HomeSectionCard(
 }
 
 @Composable
-internal fun SimpleCard(
-    label: String,
+internal fun ModeCard(
     title: String,
     text: String,
     action: String,
     href: String,
+    enabled: Boolean,
+    disabledText: String,
+    icon: String,
+    iconTone: String? = null,
+    chip: String,
+    chipTone: String,
+) {
+    if (enabled) {
+        SimpleCard(
+            title = title,
+            text = text,
+            action = action,
+            href = href,
+            icon = icon,
+            iconTone = iconTone,
+            chip = chip,
+            chipTone = chipTone,
+            "home-mode-card",
+        )
+        return
+    }
+
+    Div({
+        classes("home-tool-card", "home-mode-card", "home-card-disabled")
+        attr("aria-disabled", "true")
+        attr("title", disabledText)
+    }) {
+        CardBody(
+            title = title,
+            text = text,
+            action = "Недоступно в текущем режиме",
+            icon = icon,
+            iconTone = iconTone,
+            chip = "недоступно",
+            chipTone = "lock",
+        )
+    }
+}
+
+@Composable
+internal fun SimpleCard(
+    title: String,
+    text: String,
+    action: String,
+    href: String,
+    icon: String,
+    iconTone: String? = null,
+    chip: String? = null,
+    chipTone: String? = null,
     vararg extraClasses: String,
 ) {
     A(
         attrs = {
-            classes("home-card", *extraClasses)
+            classes("home-tool-card", *extraClasses)
             href(href)
             target(ATarget.Self)
         },
     ) {
-        CardBody(label, title, text, action)
+        CardBody(
+            title = title,
+            text = text,
+            action = action,
+            icon = icon,
+            iconTone = iconTone,
+            chip = chip,
+            chipTone = chipTone,
+        )
     }
 }
 
 @Composable
 internal fun CardBody(
-    label: String,
     title: String,
     text: String,
     action: String,
+    icon: String,
+    iconTone: String? = null,
+    chip: String? = null,
+    chipTone: String? = null,
 ) {
-    if (label.isNotBlank()) {
-        Div({ classes("home-card-label") }) { Text(label) }
+    Div {
+        Div({ classes("home-tool-top") }) {
+            Div({
+                if (iconTone.isNullOrBlank()) {
+                    classes("home-tool-icon")
+                } else {
+                    classes("home-tool-icon", iconTone)
+                }
+            }) {
+                Text(icon)
+            }
+            if (!chip.isNullOrBlank()) {
+                Span({
+                    if (chipTone.isNullOrBlank()) {
+                        classes("home-chip")
+                    } else {
+                        classes("home-chip", chipTone)
+                    }
+                }) {
+                    Text(chip)
+                }
+            }
+        }
+        Div({ classes("home-card-title") }) { Text(title) }
+        Div({ classes("home-card-text") }) { Text(text) }
     }
-    Div({ classes("home-card-title") }) { Text(title) }
-    Div({ classes("home-card-text") }) { Text(text) }
-    Div({ classes("home-card-action") }) { Text(action) }
+    Div({ classes("home-card-action") }) {
+        Span { Text(action) }
+        Span({ classes("home-card-arrow") }) { Text("->") }
+    }
 }

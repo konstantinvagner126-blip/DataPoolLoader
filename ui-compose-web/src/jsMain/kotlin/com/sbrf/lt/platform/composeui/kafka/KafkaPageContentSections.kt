@@ -61,7 +61,8 @@ internal fun KafkaPageContent(
 
     val info = state.info
     if (info == null || !info.configured || info.clusters.isEmpty()) {
-        Div({ classes("kafka-main") }) {
+        Div({ classes("kafka-page-stack") }) {
+            KafkaToolHeader(info = info, selectedCluster = null)
             if (state.activePane == "cluster-settings") {
                 SectionCard(
                     title = "Настройки Kafka",
@@ -104,101 +105,105 @@ internal fun KafkaPageContent(
 
     val selectedCluster = info.clusters.firstOrNull { it.id == state.selectedClusterId } ?: info.clusters.first()
     val selectedTopic = state.topicOverview
-    Div({ classes("kafka-shell") }) {
-        KafkaClusterSidebar(
-            info = info,
-            state = state,
-            selectedCluster = selectedCluster,
-            onClusterSectionChange = onClusterSectionChange,
-            onOpenSettings = { onPaneChange("cluster-settings") },
-        )
+    Div({ classes("kafka-page-stack") }) {
+        KafkaToolHeader(info = info, selectedCluster = selectedCluster)
 
-        Div({ classes("kafka-main") }) {
-            when {
-                state.activePane == "cluster-settings" -> {
-                    SectionCard(
-                        title = "Настройки Kafka",
-                        subtitle = "Редактирование cluster catalog в управляемом ui-конфиге.",
-                    ) {
-                        KafkaSettingsSection(
-                            state = state,
-                            onReloadSettings = onReloadSettings,
-                            onAddSettingsCluster = onAddSettingsCluster,
-                            onRemoveSettingsCluster = onRemoveSettingsCluster,
-                            onSettingsClusterChange = onSettingsClusterChange,
-                            onPickSettingsFile = onPickSettingsFile,
-                            onTestSettingsConnection = onTestSettingsConnection,
-                            onSaveSettings = onSaveSettings,
-                        )
-                    }
-                }
+        Div({ classes("kafka-shell") }) {
+            KafkaClusterSidebar(
+                info = info,
+                state = state,
+                selectedCluster = selectedCluster,
+                onClusterSectionChange = onClusterSectionChange,
+                onOpenSettings = { onPaneChange("cluster-settings") },
+            )
 
-                state.clusterSection == "consumer-groups" -> {
-                    KafkaClusterConsumerGroupsSection(
-                        state = state,
-                        selectedCluster = selectedCluster,
-                        onReloadConsumerGroups = onReloadConsumerGroups,
-                    )
-                }
-
-                state.clusterSection == "brokers" -> {
-                    KafkaClusterBrokersSection(
-                        state = state,
-                        selectedCluster = selectedCluster,
-                        onReloadBrokers = onReloadBrokers,
-                    )
-                }
-
-                else -> {
-                    when {
-                        state.topicOverviewLoading && selectedTopic == null -> {
-                            LoadingStateCard(
-                                title = "Topic details",
-                                text = "Загружаю metadata выбранного топика.",
+            Div({ classes("kafka-main") }) {
+                when {
+                    state.activePane == "cluster-settings" -> {
+                        SectionCard(
+                            title = "Настройки Kafka",
+                            subtitle = "Редактирование cluster catalog в управляемом ui-конфиге.",
+                        ) {
+                            KafkaSettingsSection(
+                                state = state,
+                                onReloadSettings = onReloadSettings,
+                                onAddSettingsCluster = onAddSettingsCluster,
+                                onRemoveSettingsCluster = onRemoveSettingsCluster,
+                                onSettingsClusterChange = onSettingsClusterChange,
+                                onPickSettingsFile = onPickSettingsFile,
+                                onTestSettingsConnection = onTestSettingsConnection,
+                                onSaveSettings = onSaveSettings,
                             )
                         }
+                    }
 
-                        selectedTopic == null -> {
-                            KafkaTopicsCatalogSection(
-                                state = state,
-                                selectedCluster = selectedCluster,
-                            topicsResponse = state.topics,
-                            onTopicQueryChange = onTopicQueryChange,
-                            onApplyTopicQuery = onApplyTopicQuery,
-                            onToggleCreateTopicForm = onToggleCreateTopicForm,
-                            onCreateTopicNameChange = onCreateTopicNameChange,
-                            onCreateTopicPartitionsChange = onCreateTopicPartitionsChange,
-                            onCreateTopicReplicationFactorChange = onCreateTopicReplicationFactorChange,
-                            onCreateTopicCleanupPolicyChange = onCreateTopicCleanupPolicyChange,
-                            onCreateTopicRetentionMsChange = onCreateTopicRetentionMsChange,
-                            onCreateTopicRetentionBytesChange = onCreateTopicRetentionBytesChange,
-                            onCreateTopic = onCreateTopic,
+                    state.clusterSection == "consumer-groups" -> {
+                        KafkaClusterConsumerGroupsSection(
+                            state = state,
+                            selectedCluster = selectedCluster,
+                            onReloadConsumerGroups = onReloadConsumerGroups,
                         )
                     }
 
-                        else -> {
-                            KafkaTopicDetailsPageSection(
-                                state = state,
-                                selectedCluster = selectedCluster,
-                                selectedTopic = selectedTopic,
-                                onReloadTopicOverview = onReloadTopicOverview,
-                                onPaneChange = onPaneChange,
-                                onMessagePartitionChange = onMessagePartitionChange,
-                                onMessageReadScopeChange = onMessageReadScopeChange,
-                                onMessageReadModeChange = onMessageReadModeChange,
-                                onMessageLimitChange = onMessageLimitChange,
-                                onMessageOffsetChange = onMessageOffsetChange,
-                                onMessageTimestampChange = onMessageTimestampChange,
-                                onReadMessages = onReadMessages,
-                                onProducePartitionChange = onProducePartitionChange,
-                                onProduceKeyChange = onProduceKeyChange,
-                                onAddProduceHeader = onAddProduceHeader,
-                                onRemoveProduceHeader = onRemoveProduceHeader,
-                                onProduceHeaderNameChange = onProduceHeaderNameChange,
-                                onProduceHeaderValueChange = onProduceHeaderValueChange,
-                                onProducePayloadChange = onProducePayloadChange,
-                                onProduceMessage = onProduceMessage,
-                            )
+                    state.clusterSection == "brokers" -> {
+                        KafkaClusterBrokersSection(
+                            state = state,
+                            selectedCluster = selectedCluster,
+                            onReloadBrokers = onReloadBrokers,
+                        )
+                    }
+
+                    else -> {
+                        when {
+                            state.topicOverviewLoading && selectedTopic == null -> {
+                                LoadingStateCard(
+                                    title = "Topic details",
+                                    text = "Загружаю metadata выбранного топика.",
+                                )
+                            }
+
+                            selectedTopic == null -> {
+                                KafkaTopicsCatalogSection(
+                                    state = state,
+                                    selectedCluster = selectedCluster,
+                                    topicsResponse = state.topics,
+                                    onTopicQueryChange = onTopicQueryChange,
+                                    onApplyTopicQuery = onApplyTopicQuery,
+                                    onToggleCreateTopicForm = onToggleCreateTopicForm,
+                                    onCreateTopicNameChange = onCreateTopicNameChange,
+                                    onCreateTopicPartitionsChange = onCreateTopicPartitionsChange,
+                                    onCreateTopicReplicationFactorChange = onCreateTopicReplicationFactorChange,
+                                    onCreateTopicCleanupPolicyChange = onCreateTopicCleanupPolicyChange,
+                                    onCreateTopicRetentionMsChange = onCreateTopicRetentionMsChange,
+                                    onCreateTopicRetentionBytesChange = onCreateTopicRetentionBytesChange,
+                                    onCreateTopic = onCreateTopic,
+                                )
+                            }
+
+                            else -> {
+                                KafkaTopicDetailsPageSection(
+                                    state = state,
+                                    selectedCluster = selectedCluster,
+                                    selectedTopic = selectedTopic,
+                                    onReloadTopicOverview = onReloadTopicOverview,
+                                    onPaneChange = onPaneChange,
+                                    onMessagePartitionChange = onMessagePartitionChange,
+                                    onMessageReadScopeChange = onMessageReadScopeChange,
+                                    onMessageReadModeChange = onMessageReadModeChange,
+                                    onMessageLimitChange = onMessageLimitChange,
+                                    onMessageOffsetChange = onMessageOffsetChange,
+                                    onMessageTimestampChange = onMessageTimestampChange,
+                                    onReadMessages = onReadMessages,
+                                    onProducePartitionChange = onProducePartitionChange,
+                                    onProduceKeyChange = onProduceKeyChange,
+                                    onAddProduceHeader = onAddProduceHeader,
+                                    onRemoveProduceHeader = onRemoveProduceHeader,
+                                    onProduceHeaderNameChange = onProduceHeaderNameChange,
+                                    onProduceHeaderValueChange = onProduceHeaderValueChange,
+                                    onProducePayloadChange = onProducePayloadChange,
+                                    onProduceMessage = onProduceMessage,
+                                )
+                            }
                         }
                     }
                 }

@@ -96,7 +96,7 @@ Non-goals первой волны:
 
 Статус:
 
-- согласовано к реализации
+- реализовано, ожидает визуального подтверждения
 
 Что нужно сделать:
 
@@ -441,7 +441,7 @@ Non-goals первой волны:
 
 Статус:
 
-- согласовано к реализации
+- частично реализовано
 
 Контекст:
 
@@ -449,6 +449,7 @@ Non-goals первой волны:
 - текущий UI функционален, но после SQL-console modernization нужно аналогично проверить Kafka tool как рабочий IDE-like экран;
 - визуальный ориентир остается `kafka-ui`, но с учетом локального характера инструмента и уже принятых safety contracts.
 - согласованный HTML-макет находится в [design/kafka-modernization/index.html](/Users/kwdev/DataPoolLoader/design/kafka-modernization/index.html).
+- implementation contract находится в [KAFKA_MODERNIZATION_IMPLEMENTATION_GUIDE.md](/Users/kwdev/DataPoolLoader/KAFKA_MODERNIZATION_IMPLEMENTATION_GUIDE.md).
 
 Non-goals первой дизайн-волны:
 
@@ -510,7 +511,7 @@ Non-goals первой дизайн-волны:
 
 Статус:
 
-- запланировано
+- реализовано
 
 Контекст:
 
@@ -537,6 +538,18 @@ Non-goals первой дизайн-волны:
    - active pane;
    - message read draft controls;
 4. не переносить server/store orchestration в web components.
+
+Что сделано:
+
+1. `PageScaffold`/hero-like оболочка Kafka страницы заменена на compact product shell;
+2. добавлен Kafka tool header:
+   - breadcrumbs;
+   - текущий cluster;
+   - bootstrap;
+   - protocol/read-write/max-read/bounded-read chips;
+3. left rail переработан в плотный `Clusters / Navigation / Selected topic` layout;
+4. сохранены существующие route semantics и callbacks;
+5. изменения ограничены `ui-compose-web` page/components/styles, без изменения server/store contracts.
 
 #### 19.3. Kafka topics catalog table-first view
 
@@ -736,7 +749,7 @@ Non-goals первой дизайн-волны:
 
 Статус:
 
-- запланировано
+- реализовано
 
 Контекст:
 
@@ -757,11 +770,24 @@ Non-goals первой дизайн-волны:
 4. добавить regression checklist;
 5. связать guide с [KAFKA_FAILURE_SCENARIOS.md](/Users/kwdev/DataPoolLoader/KAFKA_FAILURE_SCENARIOS.md) и этой backlog section.
 
+Что сделано:
+
+1. создан [KAFKA_MODERNIZATION_IMPLEMENTATION_GUIDE.md](/Users/kwdev/DataPoolLoader/KAFKA_MODERNIZATION_IMPLEMENTATION_GUIDE.md);
+2. зафиксированы текущие component/store/server boundaries;
+3. описаны migration phases:
+   - compact shell and rail;
+   - topics catalog and topic overview;
+   - messages browser;
+   - produce and create-topic;
+   - consumer groups, brokers and settings;
+   - visual regression and cleanup;
+4. добавлены state boundaries, file-level implementation map, regression checklist и stop criteria.
+
 ### 20. Главный экран: modernization mockup и launcher layout
 
 Статус:
 
-- согласовано к реализации
+- реализовано
 
 Контекст:
 
@@ -809,6 +835,18 @@ Non-goals первой дизайн-волны:
   - `Работа с данными / Инструменты`;
   - `Справка`;
 - переключатель runtime mode относится только к группе `Нагрузочное тестирование / Датапулы`.
+
+Что сделано в product UI:
+
+1. старый `Load Testing Data Platform` hero заменен compact title-card с названием `Платформа инструментов тестирования микросервисов`;
+2. описательный hero-текст и hero-метки удалены;
+3. главный экран перестроен в три launcher-группы:
+   - `Нагрузочное тестирование / Датапулы`;
+   - `Работа с данными / Инструменты`;
+   - `Справка`;
+4. runtime mode switch оставлен только в группе `Нагрузочное тестирование / Датапулы`;
+5. карточки `Файловые модули`, `DB-модули`, `Очистка истории`, `SQL-консоль`, `Kafka-инструмент`, `Справка`, `О проекте` приведены к единой visual model;
+6. изменения ограничены `ui-compose-web` home components/styles, без новых server/state contracts.
 
 ### 9. Операционная надежность long-running операций
 

@@ -7,17 +7,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import com.sbrf.lt.platform.composeui.foundation.component.PageScaffold
 import com.sbrf.lt.platform.composeui.foundation.dom.classes
 import kotlinx.coroutines.launch
 import kotlinx.browser.window
-import org.jetbrains.compose.web.attributes.disabled
-import org.jetbrains.compose.web.attributes.href
-import org.jetbrains.compose.web.attributes.type
-import org.jetbrains.compose.web.dom.A
-import org.jetbrains.compose.web.dom.Button
 import org.jetbrains.compose.web.dom.Div
-import org.jetbrains.compose.web.dom.Text
 
 @Composable
 fun ComposeKafkaPage(
@@ -116,24 +109,8 @@ fun ComposeKafkaPage(
         }
     }
 
-    PageScaffold(
-        eyebrow = "Источники и брокеры",
-        title = "Kafka",
-        subtitle = "Cluster-first tool для локальной работы с Kafka-каталогом, topic metadata и bounded operations.",
-        heroHeader = {
-            Div({ classes("hero-actions", "mb-3") }) {
-                A(attrs = {
-                    classes("btn", "btn-outline-secondary")
-                    href("/")
-                }) { Text("На главную") }
-                Button(attrs = {
-                    classes("btn", "btn-dark")
-                    attr("type", "button")
-                    disabled()
-                }) { Text("Kafka explorer") }
-            }
-        },
-        content = {
+    Div({ classes("container-fluid", "py-4", "compose-home-root", "kafka-page-root") }) {
+        Div({ classes("kafka-page-shell") }) {
             KafkaPageContent(
                 state = state,
                 onClusterSectionChange = { section ->
@@ -400,6 +377,6 @@ fun ComposeKafkaPage(
                     }
                 },
             )
-        },
-    )
+        }
+    }
 }

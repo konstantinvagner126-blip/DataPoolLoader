@@ -17,7 +17,6 @@ import kotlinx.browser.window
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.web.dom.Div
 import org.jetbrains.compose.web.dom.Footer
-import org.jetbrains.compose.web.dom.Span
 import org.jetbrains.compose.web.dom.Text
 
 @Composable
@@ -43,7 +42,6 @@ fun ComposeHomePage(
     val runtime = state.homeData?.runtimeContext
     val isRequestedDb = runtime?.requestedMode == ModuleStoreMode.DATABASE
     val isEffectiveDb = runtime?.effectiveMode == ModuleStoreMode.DATABASE
-    val effectiveModeLabel = runtime?.effectiveMode?.label ?: "Загрузка..."
     val canRequestDatabaseMode = runtime?.database?.available == true
     val isToggleDisabled = state.loading || state.savingMode || (!canRequestDatabaseMode && !isRequestedDb)
     val modeAccessError = state.modeAccessError
@@ -52,7 +50,7 @@ fun ComposeHomePage(
         classes("container-fluid", "py-4", "compose-home-root")
     }) {
         Div({ classes("home-visual-shell") }) {
-            HeroCard()
+            HomePlatformHeader()
 
             when {
                 state.errorMessage != null -> {
@@ -71,132 +69,123 @@ fun ComposeHomePage(
             }
 
             Div({ classes("home-grid") }) {
-                Div({ classes("home-group-card") }) {
-                    Div({ classes("home-group-header") }) {
-                        Div({ classes("home-group-header-main") }) {
-                            Div({ classes("home-card-label") }) { Text("Нагрузочное тестирование") }
-                        }
-                    }
-
-                    Div({ classes("home-group-stack") }) {
-                        Div({ classes("home-subgroup-card") }) {
-                            Div({ classes("home-subgroup-header") }) {
-                                Div {
-                                    Div({ classes("home-card-label") }) { Text("Обновление датапулов") }
-                                    Div({ classes("home-subgroup-title") }) { Text("Запуск по модулям") }
+                LauncherGroup(
+                    label = "Нагрузочное тестирование",
+                    title = "Датапулы",
+                    headerAction = {
+                        Div({ classes("home-mode-control") }) {
+                            Div({ classes("home-mode-copy") }) {
+                                Div({ classes("home-mode-title") }) { Text(buildModeTitleText(runtime)) }
+                                val modeStatusText = buildModeStatusText(runtime)
+                                if (modeStatusText.isNotBlank()) {
+                                    Div({ classes("home-mode-status") }) { Text(modeStatusText) }
                                 }
-
-                                Div({ classes("db-mode-indicator") }) {
-                                    Div({ classes("db-mode-indicator-inner") }) {
-                                        Span({
-                                            classes(
-                                                "db-mode-indicator-dot",
-                                                if (isEffectiveDb) "db-mode-active" else "db-mode-inactive",
-                                            )
-                                        })
-                                        Span { Text("Режим: $effectiveModeLabel") }
-                                        val modeStatusText = buildModeStatusText(runtime)
-                                        if (modeStatusText.isNotBlank()) {
-                                            Span({ classes("db-mode-status") }) { Text(modeStatusText) }
-                                        }
-                                        RuntimeModeSwitch(
-                                            checked = isRequestedDb,
-                                            disabled = isToggleDisabled,
-                                            onToggle = {
-                                                scope.launch {
-                                                    state = store.startModeSave(state)
-                                                    state = store.updateMode(
-                                                        currentState = state,
-                                                        mode = if (isRequestedDb) {
-                                                            ModuleStoreMode.FILES
-                                                        } else {
-                                                            ModuleStoreMode.DATABASE
-                                                        },
-                                                    )
-                                                }
+                            }
+                            RuntimeModeSwitch(
+                                checked = isRequestedDb,
+                                disabled = isToggleDisabled,
+                                onToggle = {
+                                    scope.launch {
+                                        state = store.startModeSave(state)
+                                        state = store.updateMode(
+                                            currentState = state,
+                                            mode = if (isRequestedDb) {
+                                                ModuleStoreMode.FILES
+                                            } else {
+                                                ModuleStoreMode.DATABASE
                                             },
                                         )
                                     }
-                                }
-                            }
-
-                            Div({ classes("home-group-grid") }) {
-                                ModeCard(
-                                    label = "",
-                                    title = "Файловый режим",
-                                    text = "Запуск модулей из файлов проекта, редактирование YAML и SQL, история запусков и итоги выполнения.",
-                                    action = "Открыть файловые модули",
-                                    href = "/modules",
-                                    enabled = !isEffectiveDb,
-                                    disabledText = "Страница файловых модулей доступна только в режиме «Файлы».",
-                                )
-                                ModeCard(
-                                    label = "",
-                                    title = "DB режим",
-                                    text = "Управление модулями в базе данных: просмотр, редактирование, публикация и запуск.",
-                                    action = "Открыть DB-модули",
-                                    href = "/db-modules",
-                                    enabled = isEffectiveDb,
-                                    disabledText = runtime?.fallbackReason
-                                        ?: "Страница модулей из базы данных доступна только в режиме «База данных».",
-                                )
-                            }
+                                },
+                            )
                         }
-
+                    },
+                ) {
+                    Div({ classes("home-card-grid") }) {
+                        ModeCard(
+                            title = "Файловые модули",
+                            text = "Редактирование модулей из файлов проекта, SQL-ресурсов и локальной истории запусков.",
+                            action = "Открыть файловые модули",
+                            href = "/modules",
+                            enabled = !isEffectiveDb,
+                            disabledText = "Страница файловых модулей доступна только в режиме «Файлы».",
+                            icon = "YML",
+                            chip = if (!isEffectiveDb) "активно" else "недоступно",
+                            chipTone = if (!isEffectiveDb) "ok" else "lock",
+                        )
+                        ModeCard(
+                            title = "DB-модули",
+                            text = "Просмотр, редактирование, публикация и запуск модулей, которые хранятся в PostgreSQL.",
+                            action = "Открыть DB-модули",
+                            href = "/db-modules",
+                            enabled = isEffectiveDb,
+                            disabledText = runtime?.fallbackReason
+                                ?: "Страница модулей из базы данных доступна только в режиме «База данных».",
+                            icon = "DB",
+                            iconTone = "green",
+                            chip = if (isEffectiveDb) "активно" else "недоступно",
+                            chipTone = if (isEffectiveDb) "ok" else "lock",
+                        )
                         SimpleCard(
-                            label = "Сервис",
-                            title = "Очистка истории запусков",
-                            text = "Preview и controlled cleanup истории запусков в текущем режиме без смешения с output-retention.",
-                            action = "Открыть очистку истории",
+                            title = "Очистка истории",
+                            text = "Preview и controlled cleanup истории запусков без смешения с output-retention.",
+                            action = "Открыть очистку",
                             href = "/run-history-cleanup",
+                            icon = "HST",
+                            iconTone = "amber",
+                            chip = "controlled",
+                            chipTone = "warn",
                         )
                     }
                 }
 
-                HomeSectionCard(
-                    label = "Ручная инженерная работа",
-                    title = "SQL и Kafka",
-                    text = "Инструменты ручной работы с источниками и брокерами: SQL-операции, Kafka metadata, topic browsing и controlled message actions.",
+                LauncherGroup(
+                    label = "Работа с данными",
+                    title = "Инструменты",
                 ) {
-                    Div({ classes("home-section-grid") }) {
+                    Div({ classes("home-card-grid", "home-card-grid-two") }) {
                         SimpleCard(
-                            label = "SQL",
                             title = "SQL-консоль",
-                            text = "Ручное выполнение SQL по выбранным источникам, просмотр результатов по shard/source и служебные операции.",
+                            text = "Выполнение SQL по выбранным источникам, result grid, diff-режим, история запусков и настройки sources.",
                             action = "Открыть SQL-консоль",
                             href = "/sql-console",
+                            icon = "SQL",
+                            chip = "sources",
+                            chipTone = "ok",
                         )
-
                         SimpleCard(
-                            label = "Kafka",
                             title = "Kafka-инструмент",
-                            text = "Локальный explorer по кластерам из конфига: топики, consumer groups, lag, bounded read и controlled produce.",
+                            text = "Кластеры из конфига, топики, consumer groups, lag, bounded read сообщений и controlled produce.",
                             action = "Открыть Kafka-инструмент",
                             href = "/kafka",
+                            icon = "KFK",
+                            iconTone = "green",
+                            chip = "cluster-first",
+                            chipTone = "ok",
                         )
                     }
                 }
 
-                HomeSectionCard(
-                    label = "Информация",
-                    title = "Справка и проект",
-                    text = "Документация по рабочим экранам, рекомендации по использованию и краткая информация о платформе и команде.",
+                LauncherGroup(
+                    title = "Справка",
                 ) {
-                    Div({ classes("home-section-grid") }) {
+                    Div({ classes("home-card-grid", "home-card-grid-two") }) {
                         SimpleCard(
-                            label = "Справка",
                             title = "Справка",
-                            text = "Подробные инструкции по каждому модулю, рекомендации по запуску и пояснения по ключевым параметрам конфигурации.",
+                            text = "Короткие инструкции по рабочим экранам, режимам запуска и ключевым параметрам конфигурации.",
                             action = "Открыть справку",
                             href = "/help",
+                            icon = "DOC",
+                            iconTone = "amber",
+                            chip = "readme",
                         )
-
                         SimpleCard(
-                            label = "Команда",
                             title = "О проекте",
-                            text = "Карточки разработчиков и минимальная информация о платформе без лишнего explanatory content.",
+                            text = "Только карточки разработчиков и минимальная техническая атрибуция без лишнего explanatory content.",
                             action = "Открыть страницу проекта",
                             href = "/about",
+                            icon = "MLP",
+                            chip = "карточки",
                         )
                     }
                 }
@@ -224,6 +213,13 @@ private fun buildModeStatusText(runtime: RuntimeContext?): String {
     }
     return parts.joinToString(" · ")
 }
+
+private fun buildModeTitleText(runtime: RuntimeContext?): String =
+    when (runtime?.effectiveMode) {
+        ModuleStoreMode.DATABASE -> "DB режим активен"
+        ModuleStoreMode.FILES -> "Файловый режим активен"
+        null -> "Режим загружается"
+    }
 
 private fun parseModeAccessError(search: String): String? {
     if (search.isBlank()) {
