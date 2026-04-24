@@ -1,9 +1,11 @@
 package com.sbrf.lt.platform.ui.kafka
 
 import com.sbrf.lt.platform.ui.config.UiKafkaClusterConfig
+import org.apache.kafka.clients.admin.NewTopic
 import org.apache.kafka.clients.admin.OffsetSpec
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.config.ConfigResource
+import java.util.concurrent.ExecutionException
 
 internal interface UiKafkaAdminFacadeFactory {
     fun open(cluster: UiKafkaClusterConfig): UiKafkaAdminFacade
@@ -19,6 +21,13 @@ internal interface UiKafkaAdminFacade : AutoCloseable {
     fun describeTopics(topicNames: List<String>): List<UiKafkaTopicDetails>
 
     fun describeTopicConfigs(topicNames: List<String>): Map<String, Map<String, String>>
+
+    fun createTopic(
+        topicName: String,
+        partitionCount: Int,
+        replicationFactor: Short,
+        configs: Map<String, String> = emptyMap(),
+    )
 
     fun listConsumerGroups(): List<UiKafkaConsumerGroupListing>
 
@@ -160,6 +169,20 @@ private class AdminClientUiKafkaAdminFacade(
                 ?.entries()
                 ?.associate { it.name() to it.value() }
                 .orEmpty()
+        }
+    }
+
+    override fun createTopic(
+        topicName: String,
+        partitionCount: Int,
+        replicationFactor: Short,
+        configs: Map<String, String>,
+    ) {
+        val topic = NewTopic(topicName, partitionCount, replicationFactor).configs(configs)
+        try {
+            adminClient.createTopics(listOf(topic)).all().get()
+        } catch (error: ExecutionException) {
+            throw error.cause ?: error
         }
     }
 

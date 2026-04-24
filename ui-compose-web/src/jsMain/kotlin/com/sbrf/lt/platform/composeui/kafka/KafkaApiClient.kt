@@ -46,6 +46,16 @@ class KafkaApiClient(
             KafkaTopicOverviewResponse.serializer(),
         )
 
+    override suspend fun createTopic(
+        request: KafkaTopicCreateRequestPayload,
+    ): KafkaTopicCreateResponse =
+        httpClient.postJson(
+            path = "/api/kafka/topics/create",
+            payload = request,
+            serializer = KafkaTopicCreateRequestPayload.serializer(),
+            deserializer = KafkaTopicCreateResponse.serializer(),
+        )
+
     override suspend fun readMessages(
         request: KafkaTopicMessageReadRequestPayload,
     ): KafkaTopicMessageReadResponse =

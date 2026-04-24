@@ -33,7 +33,10 @@ internal fun KafkaTopicDetailsPageSection(
     onReadMessages: () -> Unit,
     onProducePartitionChange: (String) -> Unit,
     onProduceKeyChange: (String) -> Unit,
-    onProduceHeadersChange: (String) -> Unit,
+    onAddProduceHeader: () -> Unit,
+    onRemoveProduceHeader: (Int) -> Unit,
+    onProduceHeaderNameChange: (Int, String) -> Unit,
+    onProduceHeaderValueChange: (Int, String) -> Unit,
     onProducePayloadChange: (String) -> Unit,
     onProduceMessage: () -> Unit,
 ) {
@@ -125,7 +128,10 @@ internal fun KafkaTopicDetailsPageSection(
                     state = state,
                     onProducePartitionChange = onProducePartitionChange,
                     onProduceKeyChange = onProduceKeyChange,
-                    onProduceHeadersChange = onProduceHeadersChange,
+                    onAddProduceHeader = onAddProduceHeader,
+                    onRemoveProduceHeader = onRemoveProduceHeader,
+                    onProduceHeaderNameChange = onProduceHeaderNameChange,
+                    onProduceHeaderValueChange = onProduceHeaderValueChange,
                     onProducePayloadChange = onProducePayloadChange,
                     onProduceMessage = onProduceMessage,
                 )
@@ -232,7 +238,7 @@ private fun KafkaTopicSettingsSection(
         }
 
         P({ classes("kafka-placeholder-note", "mt-3") }) {
-            Text("Изменение topic settings, create/delete topic и другие admin actions остаются вне текущего redesign scope.")
+            Text("Изменение topic settings, delete topic и другие destructive admin actions остаются вне текущего redesign scope.")
         }
     }
 }

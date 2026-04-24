@@ -3,6 +3,7 @@ package com.sbrf.lt.platform.ui.server
 import com.sbrf.lt.datapool.kafka.KafkaMetadataOperations
 import com.sbrf.lt.datapool.kafka.KafkaMessageOperations
 import com.sbrf.lt.datapool.kafka.KafkaProduceOperations
+import com.sbrf.lt.datapool.kafka.KafkaTopicAdminOperations
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleOperations
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleService
 import com.sbrf.lt.platform.ui.config.UiAppConfig
@@ -14,6 +15,7 @@ import com.sbrf.lt.platform.ui.config.storageDirPath
 import com.sbrf.lt.platform.ui.kafka.ConfigBackedKafkaMetadataService
 import com.sbrf.lt.platform.ui.kafka.ConfigBackedKafkaMessageService
 import com.sbrf.lt.platform.ui.kafka.ConfigBackedKafkaProduceService
+import com.sbrf.lt.platform.ui.kafka.ConfigBackedKafkaTopicAdminService
 import com.sbrf.lt.platform.ui.kafka.UiKafkaSettingsOperations
 import com.sbrf.lt.platform.ui.kafka.UiKafkaSettingsService
 import com.sbrf.lt.platform.ui.module.ModuleRegistry
@@ -95,6 +97,9 @@ internal fun defaultKafkaMetadataService(runtimeUiConfig: UiAppConfig): KafkaMet
 
 internal fun defaultKafkaMessageService(runtimeUiConfig: UiAppConfig): KafkaMessageOperations =
     ConfigBackedKafkaMessageService(runtimeUiConfig.kafka)
+
+internal fun defaultKafkaTopicAdminService(runtimeUiConfig: UiAppConfig): KafkaTopicAdminOperations =
+    ConfigBackedKafkaTopicAdminService(runtimeUiConfig.kafka)
 
 internal fun defaultKafkaProduceService(runtimeUiConfig: UiAppConfig): KafkaProduceOperations =
     ConfigBackedKafkaProduceService(runtimeUiConfig.kafka)

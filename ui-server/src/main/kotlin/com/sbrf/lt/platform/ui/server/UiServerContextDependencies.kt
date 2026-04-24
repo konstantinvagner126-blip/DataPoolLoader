@@ -27,6 +27,7 @@ import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleStateService
 import com.sbrf.lt.datapool.kafka.KafkaMetadataOperations
 import com.sbrf.lt.datapool.kafka.KafkaMessageOperations
 import com.sbrf.lt.datapool.kafka.KafkaProduceOperations
+import com.sbrf.lt.datapool.kafka.KafkaTopicAdminOperations
 
 internal data class UiServerContextDependencies(
     val uiConfig: UiAppConfig,
@@ -48,6 +49,7 @@ internal data class UiServerContextDependencies(
     val sqlConsoleStateService: SqlConsoleStateService,
     val kafkaMetadataService: KafkaMetadataOperations,
     val kafkaMessageService: KafkaMessageOperations,
+    val kafkaTopicAdminService: KafkaTopicAdminOperations,
     val kafkaProduceService: KafkaProduceOperations,
     val kafkaSettingsService: UiKafkaSettingsOperations,
     val uiConfigPersistenceService: UiConfigPersistenceService,

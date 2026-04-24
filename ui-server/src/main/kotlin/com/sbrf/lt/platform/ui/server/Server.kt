@@ -23,6 +23,7 @@ import com.sbrf.lt.platform.ui.run.history.ModuleRunHistoryService
 import com.sbrf.lt.datapool.kafka.KafkaMetadataOperations
 import com.sbrf.lt.datapool.kafka.KafkaMessageOperations
 import com.sbrf.lt.datapool.kafka.KafkaProduceOperations
+import com.sbrf.lt.datapool.kafka.KafkaTopicAdminOperations
 import com.sbrf.lt.datapool.module.sync.ModuleSyncService
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleAsyncQueryOperations
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleExecutionHistoryService
@@ -52,6 +53,7 @@ internal fun Application.uiModule(
     sqlConsoleStateService: SqlConsoleStateService? = null,
     kafkaMetadataService: KafkaMetadataOperations? = null,
     kafkaMessageService: KafkaMessageOperations? = null,
+    kafkaTopicAdminService: KafkaTopicAdminOperations? = null,
     kafkaProduceService: KafkaProduceOperations? = null,
     kafkaSettingsService: UiKafkaSettingsOperations? = null,
     uiConfigPersistenceService: UiConfigPersistenceService? = null,
@@ -85,6 +87,7 @@ internal fun Application.uiModule(
             sqlConsoleStateService = sqlConsoleStateService,
                 kafkaMetadataService = kafkaMetadataService,
                 kafkaMessageService = kafkaMessageService,
+                kafkaTopicAdminService = kafkaTopicAdminService,
                 kafkaProduceService = kafkaProduceService,
                 kafkaSettingsService = kafkaSettingsService,
                 uiConfigPersistenceService = uiConfigPersistenceService,

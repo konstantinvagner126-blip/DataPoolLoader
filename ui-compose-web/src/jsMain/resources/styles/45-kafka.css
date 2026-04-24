@@ -145,6 +145,13 @@
   font-weight: 600;
 }
 
+.kafka-topic-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+
 .kafka-topic-table-wrap {
   max-height: 700px;
   border: 1px solid rgba(19, 34, 56, 0.08);
@@ -233,6 +240,40 @@
 
 .kafka-topic-empty-note {
   line-height: 1.6;
+}
+
+.kafka-topic-create-shell {
+  display: grid;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding: 1rem 1.05rem;
+  border: 1px solid rgba(19, 34, 56, 0.08);
+  border-radius: 16px;
+  background: rgba(248, 250, 252, 0.92);
+}
+
+.kafka-topic-create-header,
+.kafka-produce-section-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.kafka-topic-create-grid,
+.kafka-produce-toolbar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.85rem;
+}
+
+.kafka-topic-create-actions,
+.kafka-produce-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 0.6rem;
 }
 
 .kafka-topic-details-shell {
@@ -548,22 +589,152 @@
   font-size: 0.92rem;
 }
 
-.kafka-message-list {
+.kafka-produce-shell {
   display: grid;
-  gap: 0.85rem;
+  gap: 1rem;
 }
 
-.kafka-message-card {
+.kafka-produce-editor-block {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.kafka-produce-headers-table-wrap {
   border: 1px solid rgba(19, 34, 56, 0.08);
   border-radius: 14px;
-  padding: 0.85rem 0.95rem;
+  background: rgba(255, 255, 255, 0.98);
+}
+
+.kafka-produce-headers-table th,
+.kafka-produce-headers-table td {
+  vertical-align: middle;
+}
+
+.kafka-produce-header-action {
+  white-space: nowrap;
+}
+
+.kafka-produce-payload {
+  min-height: 300px;
+  font-family: "SFMono-Regular", "JetBrains Mono", "Fira Code", monospace;
+  font-size: 0.88rem;
+}
+
+.kafka-produce-result-shell {
+  padding-top: 0.2rem;
+}
+
+.kafka-message-browser-shell {
+  display: grid;
+  gap: 1rem;
+}
+
+.kafka-message-browser-meta {
+  font-size: 0.9rem;
+  color: #41556e;
+}
+
+.kafka-message-table-wrap {
+  max-height: 440px;
+  border: 1px solid rgba(19, 34, 56, 0.08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.98);
+}
+
+.kafka-message-table th,
+.kafka-message-table td,
+.kafka-message-header-table th,
+.kafka-message-header-table td {
+  vertical-align: middle;
+}
+
+.kafka-message-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #eef4fa;
+  color: #607289;
+  font-size: 0.76rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-bottom-width: 1px;
+}
+
+.kafka-message-row {
+  cursor: pointer;
+  transition: background-color 0.18s ease;
+}
+
+.kafka-message-row:hover td {
+  background: rgba(19, 34, 56, 0.04);
+}
+
+.kafka-message-row-active td {
+  background: rgba(29, 111, 216, 0.08);
+}
+
+.kafka-message-cell-mono,
+.kafka-message-header-name {
+  font-family: "SFMono-Regular", "JetBrains Mono", "Fira Code", monospace;
+  font-weight: 600;
+  color: #132238;
+}
+
+.kafka-message-preview {
+  max-width: 560px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #41556e;
+  font-family: "SFMono-Regular", "JetBrains Mono", "Fira Code", monospace;
+  font-size: 0.85rem;
+}
+
+.kafka-message-detail-shell {
+  display: grid;
+  gap: 0.9rem;
+  border: 1px solid rgba(19, 34, 56, 0.08);
+  border-radius: 14px;
+  padding: 0.95rem 1rem;
   background: rgba(248, 250, 252, 0.92);
 }
 
-.kafka-message-card-meta {
-  margin-bottom: 0.65rem;
+.kafka-message-detail-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.kafka-message-detail-title {
+  font-weight: 700;
+  color: #132238;
+}
+
+.kafka-message-detail-meta {
   font-size: 0.88rem;
   color: #41556e;
+}
+
+.kafka-message-detail-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.75rem;
+}
+
+.kafka-message-metric {
+  min-width: 0;
+  padding: 0.7rem 0.8rem;
+  border-radius: 12px;
+  border: 1px solid rgba(19, 34, 56, 0.08);
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.kafka-message-metric-value {
+  color: #132238;
+  font-weight: 700;
+  word-break: break-word;
 }
 
 .kafka-message-payload + .kafka-message-payload,
@@ -583,23 +754,12 @@
   font-size: 0.88rem;
 }
 
-.kafka-message-header-row {
-  display: grid;
-  grid-template-columns: minmax(120px, 180px) 1fr;
-  gap: 0.7rem;
-  padding: 0.2rem 0;
-  font-size: 0.9rem;
-}
-
-.kafka-message-header-name {
-  color: #132238;
-  font-weight: 600;
-  word-break: break-word;
-}
-
 .kafka-message-header-value {
   color: #41556e;
   word-break: break-word;
+  white-space: pre-wrap;
+  font-family: "SFMono-Regular", "JetBrains Mono", "Fira Code", monospace;
+  font-size: 0.85rem;
 }
 
 @media (max-width: 768px) {
@@ -609,6 +769,12 @@
 
   .kafka-topic-filter-row {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .kafka-topic-create-header,
+  .kafka-produce-section-header {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .kafka-topic-details-header {
@@ -628,7 +794,7 @@
     grid-template-columns: 1fr;
   }
 
-  .kafka-message-header-row {
-    grid-template-columns: 1fr;
+  .kafka-message-detail-header {
+    flex-direction: column;
   }
 }

@@ -9,6 +9,7 @@ import com.sbrf.lt.datapool.kafka.KafkaMessageOperations
 import com.sbrf.lt.datapool.kafka.KafkaProduceOperations
 import com.sbrf.lt.datapool.kafka.KafkaRenderedBytes
 import com.sbrf.lt.datapool.kafka.KafkaToolInfo
+import com.sbrf.lt.datapool.kafka.KafkaTopicAdminOperations
 import com.sbrf.lt.datapool.kafka.KafkaTopicMessageHeader
 import com.sbrf.lt.datapool.kafka.KafkaTopicMessageReadRequest
 import com.sbrf.lt.datapool.kafka.KafkaTopicMessageReadScope
@@ -16,6 +17,8 @@ import com.sbrf.lt.datapool.kafka.KafkaTopicMessageReadResult
 import com.sbrf.lt.datapool.kafka.KafkaTopicMessageRecord
 import com.sbrf.lt.datapool.kafka.KafkaTopicProduceRequest
 import com.sbrf.lt.datapool.kafka.KafkaTopicProduceResult
+import com.sbrf.lt.datapool.kafka.KafkaTopicCreateRequest
+import com.sbrf.lt.datapool.kafka.KafkaTopicCreateResult
 import com.sbrf.lt.datapool.kafka.KafkaTopicConsumerGroupLagStatus
 import com.sbrf.lt.datapool.kafka.KafkaTopicConsumerGroupPartitionLag
 import com.sbrf.lt.datapool.kafka.KafkaTopicConsumerGroupSummary
@@ -56,6 +59,7 @@ class KafkaServerTest {
                 uiConfig = uiConfig,
                 kafkaMetadataService = FakeKafkaMetadataOperations(),
                 kafkaMessageService = FakeKafkaMessageOperations(),
+                kafkaTopicAdminService = FakeKafkaTopicAdminOperations(),
                 kafkaProduceService = FakeKafkaProduceOperations(),
                 kafkaSettingsService = FakeKafkaSettingsOperations(),
             )
@@ -128,6 +132,18 @@ class KafkaServerTest {
         }.bodyAsText()
         assertTrue(readAllPartitions.contains("\"scope\":\"ALL_PARTITIONS\""))
         assertTrue(readAllPartitions.contains("\"partition\":1"))
+
+        val createTopic = client.post("/api/kafka/topics/create") {
+            header(HttpHeaders.ContentType, "application/json")
+            setBody(
+                """
+                {"clusterId":"local","topicName":"orders.events","partitionCount":3,"replicationFactor":2,"cleanupPolicy":"compact","retentionMs":120000}
+                """.trimIndent(),
+            )
+        }.bodyAsText()
+        assertTrue(createTopic.contains("\"topicName\":\"orders.events\""))
+        assertTrue(createTopic.contains("\"partitionCount\":3"))
+        assertTrue(createTopic.contains("\"replicationFactor\":2"))
 
         val produce = client.post("/api/kafka/messages/produce") {
             header(HttpHeaders.ContentType, "application/json")
@@ -378,6 +394,29 @@ private class FakeKafkaMessageOperations : KafkaMessageOperations {
                     ),
                 ),
             ),
+        )
+    }
+}
+
+private class FakeKafkaTopicAdminOperations : KafkaTopicAdminOperations {
+    override fun createTopic(request: KafkaTopicCreateRequest): KafkaTopicCreateResult {
+        if (request.clusterId != "local") {
+            throw KafkaClusterNotFoundException(request.clusterId)
+        }
+        return KafkaTopicCreateResult(
+            cluster = KafkaClusterCatalogEntry(
+                id = "local",
+                name = "Local Kafka",
+                readOnly = false,
+                bootstrapServers = "localhost:19092",
+                securityProtocol = "PLAINTEXT",
+            ),
+            topicName = request.topicName,
+            partitionCount = request.partitionCount,
+            replicationFactor = request.replicationFactor,
+            cleanupPolicy = request.cleanupPolicy,
+            retentionMs = request.retentionMs,
+            retentionBytes = request.retentionBytes,
         )
     }
 }

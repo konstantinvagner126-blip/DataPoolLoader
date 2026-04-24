@@ -1,12 +1,15 @@
 package com.sbrf.lt.platform.composeui.kafka
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import com.sbrf.lt.platform.composeui.foundation.component.AlertBanner
 import com.sbrf.lt.platform.composeui.foundation.component.SectionCard
 import com.sbrf.lt.platform.composeui.foundation.dom.classes
 import org.jetbrains.compose.web.attributes.InputType
 import org.jetbrains.compose.web.attributes.disabled
-import org.jetbrains.compose.web.attributes.placeholder
 import org.jetbrains.compose.web.attributes.selected
 import org.jetbrains.compose.web.attributes.type
 import org.jetbrains.compose.web.attributes.value
@@ -18,8 +21,13 @@ import org.jetbrains.compose.web.dom.P
 import org.jetbrains.compose.web.dom.Pre
 import org.jetbrains.compose.web.dom.Select
 import org.jetbrains.compose.web.dom.Span
+import org.jetbrains.compose.web.dom.Table
+import org.jetbrains.compose.web.dom.Tbody
+import org.jetbrains.compose.web.dom.Td
 import org.jetbrains.compose.web.dom.Text
-import org.jetbrains.compose.web.dom.TextArea
+import org.jetbrains.compose.web.dom.Th
+import org.jetbrains.compose.web.dom.Thead
+import org.jetbrains.compose.web.dom.Tr
 
 @Composable
 internal fun KafkaMessageBrowserSection(
@@ -149,10 +157,74 @@ internal fun KafkaMessageBrowserSection(
                     Text("Для выбранного диапазона сообщений не найдено.")
                 }
             } else {
-                Div({ classes("kafka-message-list") }) {
-                    messages.records.forEach { record ->
-                        KafkaMessageRecordCard(record)
+                val recordsKey = messages.records.joinToString("|") { kafkaMessageRecordKey(it) }
+                var selectedRecordKey by remember(
+                    messages.topicName,
+                    messages.scope,
+                    messages.mode,
+                    recordsKey,
+                ) {
+                    mutableStateOf(messages.records.firstOrNull()?.let(::kafkaMessageRecordKey))
+                }
+                val selectedRecord = messages.records
+                    .firstOrNull { kafkaMessageRecordKey(it) == selectedRecordKey }
+                    ?: messages.records.first()
+
+                Div({ classes("kafka-message-browser-shell") }) {
+                    Div({ classes("kafka-message-browser-meta") }) {
+                        Text(
+                            buildList {
+                                add("${messages.records.size} records")
+                                add("scope ${messages.scope.lowercase().replace('_', ' ')}")
+                                add("mode ${messages.mode.lowercase()}")
+                                messages.effectiveStartOffset?.let { add("start offset $it") }
+                            }.joinToString(" · "),
+                        )
                     }
+
+                    Div({ classes("table-responsive", "kafka-message-table-wrap") }) {
+                        Table({ classes("table", "table-sm", "align-middle", "mb-0", "kafka-message-table") }) {
+                            Thead {
+                                Tr {
+                                    Th { Text("Offset") }
+                                    Th { Text("Partition") }
+                                    Th { Text("Timestamp") }
+                                    Th { Text("Key") }
+                                    Th { Text("Value") }
+                                    Th { Text("Headers") }
+                                }
+                            }
+                            Tbody {
+                                messages.records.forEach { record ->
+                                    val recordKey = kafkaMessageRecordKey(record)
+                                    Tr(attrs = {
+                                        classes(
+                                            "kafka-message-row",
+                                            if (recordKey == kafkaMessageRecordKey(selectedRecord)) "kafka-message-row-active" else "",
+                                        )
+                                        onClick { selectedRecordKey = recordKey }
+                                    }) {
+                                        Td({ classes("kafka-message-cell-mono") }) { Text(record.offset.toString()) }
+                                        Td({ classes("kafka-message-cell-mono") }) { Text(record.partition.toString()) }
+                                        Td { Text(formatKafkaMessageTimestamp(record.timestamp)) }
+                                        Td {
+                                            Div({ classes("kafka-message-preview") }) {
+                                                Text(renderKafkaMessagePreview(record.key))
+                                            }
+                                        }
+                                        Td {
+                                            Div({ classes("kafka-message-preview") }) {
+                                                Text(renderKafkaMessagePreview(record.value))
+                                            }
+                                        }
+                                        Td({ classes("kafka-message-cell-mono") }) { Text(record.headers.size.toString()) }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    KafkaMessageDetailsPane(selectedRecord)
                 }
             }
         }
@@ -160,20 +232,32 @@ internal fun KafkaMessageBrowserSection(
 }
 
 @Composable
-internal fun KafkaMessageRecordCard(
+internal fun KafkaMessageDetailsPane(
     record: KafkaTopicMessageRecordResponse,
 ) {
-    Div({ classes("kafka-message-card") }) {
-        Div({ classes("kafka-message-card-meta") }) {
-            Text(
-                buildList {
-                    add("partition ${record.partition}")
-                    add("offset ${record.offset}")
-                    add("timestamp ${record.timestamp?.toString() ?: "n/a"}")
-                    add("headers ${record.headers.size}")
-                }.joinToString(" · "),
-            )
+    Div({ classes("kafka-message-detail-shell") }) {
+        Div({ classes("kafka-message-detail-header") }) {
+            Div({ classes("kafka-message-detail-title") }) {
+                Text("Message details")
+            }
+            Div({ classes("kafka-message-detail-meta") }) {
+                Text(
+                    buildList {
+                        add("partition ${record.partition}")
+                        add("offset ${record.offset}")
+                        add("timestamp ${formatKafkaMessageTimestamp(record.timestamp)}")
+                    }.joinToString(" · "),
+                )
+            }
         }
+
+        Div({ classes("kafka-message-detail-summary") }) {
+            KafkaMessageMetric("Partition", record.partition.toString())
+            KafkaMessageMetric("Offset", record.offset.toString())
+            KafkaMessageMetric("Headers", record.headers.size.toString())
+            KafkaMessageMetric("Timestamp", formatKafkaMessageTimestamp(record.timestamp))
+        }
+
         record.key?.let { payload ->
             KafkaRenderedBytesBlock(
                 title = "Key",
@@ -189,16 +273,39 @@ internal fun KafkaMessageRecordCard(
         if (record.headers.isNotEmpty()) {
             Div({ classes("kafka-message-headers") }) {
                 P({ classes("kafka-message-section-title") }) { Text("Headers") }
-                record.headers.forEach { header ->
-                    Div({ classes("kafka-message-header-row") }) {
-                        Span({ classes("kafka-message-header-name") }) { Text(header.name) }
-                        Span({ classes("kafka-message-header-value") }) {
-                            Text(header.value?.jsonPrettyText ?: header.value?.text ?: "null")
+                Div({ classes("table-responsive") }) {
+                    Table({ classes("table", "table-sm", "align-middle", "mb-0", "kafka-message-header-table") }) {
+                        Thead {
+                            Tr {
+                                Th { Text("Name") }
+                                Th { Text("Value") }
+                            }
+                        }
+                        Tbody {
+                            record.headers.forEach { header ->
+                                Tr {
+                                    Td({ classes("kafka-message-header-name") }) { Text(header.name) }
+                                    Td({ classes("kafka-message-header-value") }) {
+                                        Text(header.value?.jsonPrettyText ?: header.value?.text ?: "null")
+                                    }
+                                }
+                            }
                         }
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+internal fun KafkaMessageMetric(
+    label: String,
+    value: String,
+) {
+    Div({ classes("kafka-message-metric") }) {
+        P({ classes("kafka-message-control-label") }) { Text(label) }
+        Div({ classes("kafka-message-metric-value") }) { Text(value) }
     }
 }
 
@@ -222,5 +329,41 @@ internal fun KafkaRenderedBytesBlock(
         Pre({ classes("kafka-message-payload-body") }) {
             Text(payload.jsonPrettyText ?: payload.text ?: "")
         }
+    }
+}
+
+private fun kafkaMessageRecordKey(record: KafkaTopicMessageRecordResponse): String =
+    "${record.partition}:${record.offset}"
+
+private fun renderKafkaMessagePreview(payload: KafkaRenderedBytesResponse?): String {
+    if (payload == null) {
+        return "null"
+    }
+    val raw = payload.jsonPrettyText
+        ?.lineSequence()
+        ?.firstOrNull()
+        ?.trim()
+        ?.ifBlank { null }
+        ?: payload.text
+            ?.lineSequence()
+            ?.firstOrNull()
+            ?.trim()
+            ?.ifBlank { null }
+        ?: ""
+    if (raw.isBlank()) {
+        return "—"
+    }
+    val compact = raw.replace('\n', ' ').replace('\r', ' ')
+    return if (compact.length > 120) "${compact.take(117)}..." else compact
+}
+
+internal fun formatKafkaMessageTimestamp(timestamp: Long?): String {
+    if (timestamp == null) {
+        return "n/a"
+    }
+    return try {
+        js("new Date(timestamp).toLocaleString('ru-RU')") as String
+    } catch (_: dynamic) {
+        timestamp.toString()
     }
 }

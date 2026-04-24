@@ -22,6 +22,7 @@ internal fun buildUiServerContext(deps: UiServerContextDependencies): UiServerCo
         sqlConsoleStateService = deps.sqlConsoleStateService,
         kafkaMetadataService = deps.kafkaMetadataService,
         kafkaMessageService = deps.kafkaMessageService,
+        kafkaTopicAdminService = deps.kafkaTopicAdminService,
         kafkaProduceService = deps.kafkaProduceService,
         kafkaSettingsService = deps.kafkaSettingsService,
         uiConfigPersistenceService = deps.uiConfigPersistenceService,

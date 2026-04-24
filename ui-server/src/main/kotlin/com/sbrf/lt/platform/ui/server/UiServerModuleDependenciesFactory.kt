@@ -5,6 +5,7 @@ import com.sbrf.lt.datapool.sqlconsole.SqlConsoleOperations
 import com.sbrf.lt.datapool.kafka.KafkaMetadataOperations
 import com.sbrf.lt.datapool.kafka.KafkaMessageOperations
 import com.sbrf.lt.datapool.kafka.KafkaProduceOperations
+import com.sbrf.lt.datapool.kafka.KafkaTopicAdminOperations
 import com.sbrf.lt.platform.ui.config.UiAppConfig
 import com.sbrf.lt.platform.ui.config.UiConfigLoader
 import com.sbrf.lt.platform.ui.config.UiConfigPersistenceService
@@ -50,6 +51,7 @@ internal fun buildUiServerModuleContextDependencies(
     sqlConsoleStateService: SqlConsoleStateService? = null,
     kafkaMetadataService: KafkaMetadataOperations? = null,
     kafkaMessageService: KafkaMessageOperations? = null,
+    kafkaTopicAdminService: KafkaTopicAdminOperations? = null,
     kafkaProduceService: KafkaProduceOperations? = null,
     kafkaSettingsService: UiKafkaSettingsOperations? = null,
     uiConfigPersistenceService: UiConfigPersistenceService? = null,
@@ -90,6 +92,7 @@ internal fun buildUiServerModuleContextDependencies(
     )
     val resolvedKafkaMetadataService = kafkaMetadataService ?: defaultKafkaMetadataService(resolvedRuntimeUiConfig)
     val resolvedKafkaMessageService = kafkaMessageService ?: defaultKafkaMessageService(resolvedRuntimeUiConfig)
+    val resolvedKafkaTopicAdminService = kafkaTopicAdminService ?: defaultKafkaTopicAdminService(resolvedRuntimeUiConfig)
     val resolvedKafkaProduceService = kafkaProduceService ?: defaultKafkaProduceService(resolvedRuntimeUiConfig)
     val resolvedUiConfigPersistenceService = uiConfigPersistenceService ?: UiConfigPersistenceService()
     val resolvedKafkaSettingsService =
@@ -122,6 +125,7 @@ internal fun buildUiServerModuleContextDependencies(
         sqlConsoleStateService = resolvedSqlConsoleStateService,
         kafkaMetadataService = resolvedKafkaMetadataService,
         kafkaMessageService = resolvedKafkaMessageService,
+        kafkaTopicAdminService = resolvedKafkaTopicAdminService,
         kafkaProduceService = resolvedKafkaProduceService,
         kafkaSettingsService = resolvedKafkaSettingsService,
         uiConfigPersistenceService = resolvedUiConfigPersistenceService,

@@ -369,6 +369,13 @@ private class FakeUiKafkaAdminFacadeFactory(
             override fun describeTopicConfigs(topicNames: List<String>): Map<String, Map<String, String>> =
                 topicNames.associateWith { topicName -> topicConfigs[topicName].orEmpty() }
 
+            override fun createTopic(
+                topicName: String,
+                partitionCount: Int,
+                replicationFactor: Short,
+                configs: Map<String, String>,
+            ) = Unit
+
             override fun listConsumerGroups(): List<UiKafkaConsumerGroupListing> {
                 consumerGroupListFailure?.let { throw it }
                 return consumerGroups

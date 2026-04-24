@@ -9,6 +9,9 @@ import com.sbrf.lt.datapool.kafka.KafkaBrokerSummary
 import com.sbrf.lt.datapool.kafka.KafkaProduceOperations
 import com.sbrf.lt.datapool.kafka.KafkaRenderedBytes
 import com.sbrf.lt.datapool.kafka.KafkaToolInfo
+import com.sbrf.lt.datapool.kafka.KafkaTopicAdminOperations
+import com.sbrf.lt.datapool.kafka.KafkaTopicCreateRequest
+import com.sbrf.lt.datapool.kafka.KafkaTopicCreateResult
 import com.sbrf.lt.datapool.kafka.KafkaTopicProduceHeader
 import com.sbrf.lt.datapool.kafka.KafkaTopicProduceRequest
 import com.sbrf.lt.datapool.kafka.KafkaTopicProduceResult
@@ -218,6 +221,28 @@ private fun KafkaTopicProduceHeaderRequestPayload.toCoreHeader(): KafkaTopicProd
     KafkaTopicProduceHeader(
         name = name.trim(),
         valueText = valueText,
+    )
+
+internal fun KafkaTopicCreateRequestPayload.toCoreRequest(): KafkaTopicCreateRequest =
+    KafkaTopicCreateRequest(
+        clusterId = clusterId.trim(),
+        topicName = topicName.trim(),
+        partitionCount = partitionCount,
+        replicationFactor = replicationFactor,
+        cleanupPolicy = cleanupPolicy?.trim()?.takeIf { it.isNotEmpty() },
+        retentionMs = retentionMs,
+        retentionBytes = retentionBytes,
+    )
+
+internal fun KafkaTopicCreateResult.toResponse(): KafkaTopicCreateResponse =
+    KafkaTopicCreateResponse(
+        cluster = cluster.toResponse(),
+        topicName = topicName,
+        partitionCount = partitionCount,
+        replicationFactor = replicationFactor,
+        cleanupPolicy = cleanupPolicy,
+        retentionMs = retentionMs,
+        retentionBytes = retentionBytes,
     )
 
 internal fun KafkaTopicProduceResult.toResponse(): KafkaTopicProduceResponse =

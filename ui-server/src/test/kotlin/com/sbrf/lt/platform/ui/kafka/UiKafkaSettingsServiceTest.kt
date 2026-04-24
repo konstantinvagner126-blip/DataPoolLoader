@@ -141,6 +141,13 @@ class UiKafkaSettingsServiceTest {
 
                         override fun describeTopicConfigs(topicNames: List<String>): Map<String, Map<String, String>> = emptyMap()
 
+                        override fun createTopic(
+                            topicName: String,
+                            partitionCount: Int,
+                            replicationFactor: Short,
+                            configs: Map<String, String>,
+                        ) = Unit
+
                         override fun listConsumerGroups(): List<UiKafkaConsumerGroupListing> = emptyList()
 
                         override fun describeConsumerGroups(groupIds: List<String>): Map<String, UiKafkaConsumerGroupDetails> = emptyMap()

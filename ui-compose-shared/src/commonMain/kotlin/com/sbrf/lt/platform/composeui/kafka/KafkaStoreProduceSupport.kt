@@ -23,12 +23,47 @@ internal class KafkaStoreProduceSupport(
             produceResult = null,
         )
 
-    fun updateProduceHeadersInput(
+    fun addProduceHeader(
         current: KafkaPageState,
+    ): KafkaPageState =
+        current.copy(
+            produceHeaders = current.produceHeaders + KafkaKeyValueDraft(),
+            produceError = null,
+            produceResult = null,
+        )
+
+    fun removeProduceHeader(
+        current: KafkaPageState,
+        index: Int,
+    ): KafkaPageState =
+        current.copy(
+            produceHeaders = current.produceHeaders.filterIndexed { currentIndex, _ -> currentIndex != index },
+            produceError = null,
+            produceResult = null,
+        )
+
+    fun updateProduceHeaderName(
+        current: KafkaPageState,
+        index: Int,
         value: String,
     ): KafkaPageState =
         current.copy(
-            produceHeadersInput = value,
+            produceHeaders = current.produceHeaders.mapIndexed { currentIndex, header ->
+                if (currentIndex == index) header.copy(name = value) else header
+            },
+            produceError = null,
+            produceResult = null,
+        )
+
+    fun updateProduceHeaderValue(
+        current: KafkaPageState,
+        index: Int,
+        value: String,
+    ): KafkaPageState =
+        current.copy(
+            produceHeaders = current.produceHeaders.mapIndexed { currentIndex, header ->
+                if (currentIndex == index) header.copy(value = value) else header
+            },
             produceError = null,
             produceResult = null,
         )
@@ -55,7 +90,17 @@ internal class KafkaStoreProduceSupport(
             partition = current.producePartitionInput.trim().takeIf { it.isNotEmpty() }?.toIntOrNull(),
             keyText = current.produceKeyInput.takeIf { it.isNotBlank() },
             payloadText = current.producePayloadInput,
-            headers = parseProduceHeaders(current.produceHeadersInput),
+            headers = current.produceHeaders
+                .filter { it.name.isNotBlank() || it.value.isNotBlank() }
+                .mapIndexed { index, header ->
+                    require(header.name.isNotBlank()) {
+                        "Kafka header name не должен быть пустым. Ошибка в строке ${index + 1}."
+                    }
+                    KafkaTopicProduceHeaderRequestPayload(
+                        name = header.name.trim(),
+                        valueText = header.value,
+                    )
+                },
         )
         val result = api.produceMessage(request)
         return current.copy(
@@ -63,21 +108,4 @@ internal class KafkaStoreProduceSupport(
             produceResult = result,
         )
     }
-
-    private fun parseProduceHeaders(rawHeaders: String): List<KafkaTopicProduceHeaderRequestPayload> =
-        rawHeaders
-            .lineSequence()
-            .map { it.trim() }
-            .filter { it.isNotEmpty() }
-            .mapIndexed { index, line ->
-                val separatorIndex = line.indexOf('=')
-                require(separatorIndex > 0) {
-                    "Kafka headers должны задаваться как name=value. Ошибка в строке ${index + 1}."
-                }
-                KafkaTopicProduceHeaderRequestPayload(
-                    name = line.substring(0, separatorIndex).trim(),
-                    valueText = line.substring(separatorIndex + 1),
-                )
-            }
-            .toList()
 }

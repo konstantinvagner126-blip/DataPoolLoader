@@ -195,7 +195,12 @@ class KafkaStoreTest {
         }
         var prepared = store.updateProducePartitionInput(loaded, "1")
         prepared = store.updateProduceKeyInput(prepared, "order-key")
-        prepared = store.updateProduceHeadersInput(prepared, "source=test\ntrace-id=abc")
+        prepared = store.addProduceHeader(prepared)
+        prepared = store.updateProduceHeaderName(prepared, 0, "source")
+        prepared = store.updateProduceHeaderValue(prepared, 0, "test")
+        prepared = store.addProduceHeader(prepared)
+        prepared = store.updateProduceHeaderName(prepared, 1, "trace-id")
+        prepared = store.updateProduceHeaderValue(prepared, 1, "abc")
         prepared = store.updateProducePayloadInput(prepared, """{"id":42}""")
 
         val updated = runKafkaSuspend { store.produceMessage(prepared) }
@@ -208,6 +213,76 @@ class KafkaStoreTest {
         assertEquals("source", capturedRequest!!.headers[0].name)
         assertEquals("test", capturedRequest!!.headers[0].valueText)
         assertEquals(42, updated.produceResult?.offset)
+    }
+
+    @Test
+    fun `create topic maps topic admin request and refreshes catalog`() {
+        var capturedRequest: KafkaTopicCreateRequestPayload? = null
+        val store = KafkaStore(
+            StubKafkaApi(
+                createTopicHandler = { request ->
+                    capturedRequest = request
+                    KafkaTopicCreateResponse(
+                        cluster = sampleKafkaInfo().clusters.first(),
+                        topicName = request.topicName,
+                        partitionCount = request.partitionCount,
+                        replicationFactor = request.replicationFactor,
+                        cleanupPolicy = request.cleanupPolicy,
+                        retentionMs = request.retentionMs,
+                        retentionBytes = request.retentionBytes,
+                    )
+                },
+                loadTopicsHandler = { _, _ ->
+                    KafkaTopicsCatalogResponse(
+                        clusterId = "local",
+                        query = "",
+                        topics = listOf(
+                            sampleKafkaTopics().topics.first(),
+                            KafkaTopicSummaryResponse(
+                                name = "orders.events",
+                                internal = false,
+                                partitionCount = 3,
+                                replicationFactor = 2,
+                                cleanupPolicy = "compact",
+                                retentionMs = 120_000,
+                            ),
+                        ),
+                    )
+                },
+                loadTopicOverviewHandler = { _, topicName ->
+                    sampleKafkaOverview().copy(
+                        topic = KafkaTopicSummaryResponse(
+                            name = topicName,
+                            internal = false,
+                            partitionCount = 3,
+                            replicationFactor = 2,
+                            cleanupPolicy = "compact",
+                            retentionMs = 120_000,
+                        ),
+                    )
+                },
+            ),
+        )
+
+        val loaded = runKafkaSuspend { store.load(preferredClusterId = "local") }
+        var prepared = store.toggleCreateTopicForm(loaded)
+        prepared = store.updateCreateTopicNameInput(prepared, "orders.events")
+        prepared = store.updateCreateTopicPartitionsInput(prepared, "3")
+        prepared = store.updateCreateTopicReplicationFactorInput(prepared, "2")
+        prepared = store.updateCreateTopicCleanupPolicyInput(prepared, "compact")
+        prepared = store.updateCreateTopicRetentionMsInput(prepared, "120000")
+
+        val updated = runKafkaSuspend { store.createTopic(store.startCreateTopic(prepared)) }
+
+        assertEquals("orders.events", capturedRequest?.topicName)
+        assertEquals(3, capturedRequest?.partitionCount)
+        assertEquals(2, capturedRequest?.replicationFactor)
+        assertEquals("compact", capturedRequest?.cleanupPolicy)
+        assertEquals(120_000L, capturedRequest?.retentionMs)
+        assertEquals("orders.events", updated.selectedTopicName)
+        assertEquals("orders.events", updated.topicOverview?.topic?.name)
+        assertEquals(false, updated.createTopicFormVisible)
+        assertEquals("orders.events", updated.createTopicResult?.topicName)
     }
 
     @Test

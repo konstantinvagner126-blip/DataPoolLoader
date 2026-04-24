@@ -6,6 +6,7 @@ class KafkaStore(
     private val stateSupport = KafkaStoreStateSupport()
     private val loadingSupport = KafkaStoreLoadingSupport(api, stateSupport)
     private val messageSupport = KafkaStoreMessageSupport(api, stateSupport)
+    private val topicAdminSupport = KafkaStoreTopicAdminSupport(api, stateSupport)
     private val produceSupport = KafkaStoreProduceSupport(api)
     private val settingsSupport = KafkaStoreSettingsSupport(api)
 
@@ -78,6 +79,51 @@ class KafkaStore(
     ): KafkaPageState =
         loadingSupport.loadTopicOverview(current, topicName)
 
+    fun toggleCreateTopicForm(current: KafkaPageState): KafkaPageState =
+        topicAdminSupport.toggleCreateTopicForm(current)
+
+    fun updateCreateTopicNameInput(
+        current: KafkaPageState,
+        value: String,
+    ): KafkaPageState =
+        topicAdminSupport.updateCreateTopicNameInput(current, value)
+
+    fun updateCreateTopicPartitionsInput(
+        current: KafkaPageState,
+        value: String,
+    ): KafkaPageState =
+        topicAdminSupport.updateCreateTopicPartitionsInput(current, value)
+
+    fun updateCreateTopicReplicationFactorInput(
+        current: KafkaPageState,
+        value: String,
+    ): KafkaPageState =
+        topicAdminSupport.updateCreateTopicReplicationFactorInput(current, value)
+
+    fun updateCreateTopicCleanupPolicyInput(
+        current: KafkaPageState,
+        value: String,
+    ): KafkaPageState =
+        topicAdminSupport.updateCreateTopicCleanupPolicyInput(current, value)
+
+    fun updateCreateTopicRetentionMsInput(
+        current: KafkaPageState,
+        value: String,
+    ): KafkaPageState =
+        topicAdminSupport.updateCreateTopicRetentionMsInput(current, value)
+
+    fun updateCreateTopicRetentionBytesInput(
+        current: KafkaPageState,
+        value: String,
+    ): KafkaPageState =
+        topicAdminSupport.updateCreateTopicRetentionBytesInput(current, value)
+
+    fun startCreateTopic(current: KafkaPageState): KafkaPageState =
+        topicAdminSupport.startCreateTopic(current)
+
+    suspend fun createTopic(current: KafkaPageState): KafkaPageState =
+        topicAdminSupport.createTopic(current)
+
     fun updateSelectedMessagePartition(
         current: KafkaPageState,
         partition: Int,
@@ -132,11 +178,28 @@ class KafkaStore(
     ): KafkaPageState =
         produceSupport.updateProduceKeyInput(current, value)
 
-    fun updateProduceHeadersInput(
+    fun addProduceHeader(current: KafkaPageState): KafkaPageState =
+        produceSupport.addProduceHeader(current)
+
+    fun removeProduceHeader(
         current: KafkaPageState,
+        index: Int,
+    ): KafkaPageState =
+        produceSupport.removeProduceHeader(current, index)
+
+    fun updateProduceHeaderName(
+        current: KafkaPageState,
+        index: Int,
         value: String,
     ): KafkaPageState =
-        produceSupport.updateProduceHeadersInput(current, value)
+        produceSupport.updateProduceHeaderName(current, index, value)
+
+    fun updateProduceHeaderValue(
+        current: KafkaPageState,
+        index: Int,
+        value: String,
+    ): KafkaPageState =
+        produceSupport.updateProduceHeaderValue(current, index, value)
 
     fun updateProducePayloadInput(
         current: KafkaPageState,

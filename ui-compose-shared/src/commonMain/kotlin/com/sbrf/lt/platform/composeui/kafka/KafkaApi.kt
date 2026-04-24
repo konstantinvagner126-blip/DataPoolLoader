@@ -25,6 +25,10 @@ interface KafkaApi {
         topicName: String,
     ): KafkaTopicOverviewResponse
 
+    suspend fun createTopic(
+        request: KafkaTopicCreateRequestPayload,
+    ): KafkaTopicCreateResponse
+
     suspend fun readMessages(
         request: KafkaTopicMessageReadRequestPayload,
     ): KafkaTopicMessageReadResponse

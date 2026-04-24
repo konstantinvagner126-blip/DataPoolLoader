@@ -211,6 +211,41 @@ fun ComposeKafkaPage(
                         replaceBrowserRoute(currentRouteState())
                     }
                 },
+                onToggleCreateTopicForm = {
+                    state = store.toggleCreateTopicForm(state)
+                },
+                onCreateTopicNameChange = { value ->
+                    state = store.updateCreateTopicNameInput(state, value)
+                },
+                onCreateTopicPartitionsChange = { value ->
+                    state = store.updateCreateTopicPartitionsInput(state, value)
+                },
+                onCreateTopicReplicationFactorChange = { value ->
+                    state = store.updateCreateTopicReplicationFactorInput(state, value)
+                },
+                onCreateTopicCleanupPolicyChange = { value ->
+                    state = store.updateCreateTopicCleanupPolicyInput(state, value)
+                },
+                onCreateTopicRetentionMsChange = { value ->
+                    state = store.updateCreateTopicRetentionMsInput(state, value)
+                },
+                onCreateTopicRetentionBytesChange = { value ->
+                    state = store.updateCreateTopicRetentionBytesInput(state, value)
+                },
+                onCreateTopic = {
+                    scope.launch {
+                        state = store.startCreateTopic(state)
+                        state = runCatching {
+                            store.createTopic(state)
+                        }.getOrElse { error ->
+                            state.copy(
+                                createTopicLoading = false,
+                                createTopicError = error.message ?: "Не удалось создать Kafka topic.",
+                            )
+                        }
+                        replaceBrowserRoute(currentRouteState())
+                    }
+                },
                 onReloadTopicOverview = { topicName ->
                     scope.launch {
                         state = store.startTopicOverviewReload(state)
@@ -274,8 +309,17 @@ fun ComposeKafkaPage(
                 onProduceKeyChange = { value ->
                     state = store.updateProduceKeyInput(state, value)
                 },
-                onProduceHeadersChange = { value ->
-                    state = store.updateProduceHeadersInput(state, value)
+                onAddProduceHeader = {
+                    state = store.addProduceHeader(state)
+                },
+                onRemoveProduceHeader = { index ->
+                    state = store.removeProduceHeader(state, index)
+                },
+                onProduceHeaderNameChange = { index, value ->
+                    state = store.updateProduceHeaderName(state, index, value)
+                },
+                onProduceHeaderValueChange = { index, value ->
+                    state = store.updateProduceHeaderValue(state, index, value)
                 },
                 onProducePayloadChange = { value ->
                     state = store.updateProducePayloadInput(state, value)

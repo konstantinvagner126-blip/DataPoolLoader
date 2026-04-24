@@ -23,9 +23,10 @@
 
 ## Активные приоритеты
 
-1. [9. Операционная надежность long-running операций](/Users/kwdev/DataPoolLoader/BACKLOG.md)
-2. [11. Repo-level архитектурная дисциплина](/Users/kwdev/DataPoolLoader/BACKLOG.md)
-3. [16. Тестовая стратегия](/Users/kwdev/DataPoolLoader/BACKLOG.md)
+1. [17. Kafka follow-up после завершенного redesign](/Users/kwdev/DataPoolLoader/BACKLOG.md)
+2. [9. Операционная надежность long-running операций](/Users/kwdev/DataPoolLoader/BACKLOG.md)
+3. [11. Repo-level архитектурная дисциплина](/Users/kwdev/DataPoolLoader/BACKLOG.md)
+4. [16. Тестовая стратегия](/Users/kwdev/DataPoolLoader/BACKLOG.md)
 
 ## P0
 
@@ -38,6 +39,148 @@
 - нарушение архитектурного инварианта из [ARCHITECTURE_RULES.md](/Users/kwdev/DataPoolLoader/ARCHITECTURE_RULES.md).
 
 ## P1
+
+### 17. Kafka follow-up после завершенного redesign
+
+Статус:
+
+- реализовано
+
+Контекст:
+
+- Kafka redesign wave формально закрыта и архивирована;
+- новые Kafka-доработки после этого момента допускаются только как отдельные bounded follow-up пакеты.
+
+#### 17.1. Message browser layout aligned with kafka-ui table-first view
+
+Статус:
+
+- реализовано
+
+Контекст:
+
+- текущий `Messages` tab рендерит каждую Kafka message как отдельную card;
+- это визуально расходится с `kafka-ui`, где messages поданы table-first списком с выбором записи и отдельным details-view;
+- server/store safety contract уже достаточен:
+  - bounded read;
+  - `assign + seek`;
+  - no commit;
+  - explicit `selected partition / all partitions`.
+
+Что нужно сделать:
+
+1. убрать card-stack presentation для message records;
+2. перевести `Messages` tab на table-first list, ближе к `kafka-ui`;
+3. добавить row selection и отдельный details-pane для выбранного сообщения;
+4. не менять server API и bounded read contract без явной необходимости;
+5. оставить текущие read controls и safety text, но выровнять presentation к более IDE/tool-like message browser.
+
+Что сделано:
+
+1. card-stack presentation для Kafka messages удалена;
+2. `Messages` tab переведен на table-first list с columns:
+   - `Offset`;
+   - `Partition`;
+   - `Timestamp`;
+   - `Key`;
+   - `Value`;
+   - `Headers`;
+3. добавлен row selection и отдельный details-pane для выбранного сообщения вместо набора самостоятельных cards;
+4. server/store API и bounded read semantics не менялись:
+   - `assign + seek`;
+   - no commit;
+   - explicit `selected partition / all partitions`;
+5. текущие read controls и safety subtitle сохранены, но screen presentation выровнена ближе к `kafka-ui`.
+
+#### 17.2. Create topic admin path
+
+Статус:
+
+- реализовано
+
+Контекст:
+
+- после завершенного redesign в Kafka UI остается явный functional gap: нельзя создать новый topic;
+- cluster-level `Topics` screen уже стал основной точкой входа и именно там должен появиться create-topic flow;
+- topic create нельзя смешивать с metadata read paths или settings UI: нужен отдельный узкий admin contract.
+
+Что нужно сделать:
+
+1. добавить отдельный `create topic` contract рядом с Kafka metadata/produce contracts;
+2. реализовать server route и AdminClient-based service для create-topic path;
+3. поддержать базовые поля:
+   - `topic name`;
+   - `partitions`;
+   - `replication factor`;
+   - optional `cleanup policy`;
+   - optional `retention.ms`;
+   - optional `retention.bytes`;
+4. запретить create-topic path для `readOnly` cluster до Kafka client call;
+5. вывести create-topic action на `Topics` screen, без прятанья в settings;
+6. после успешного create обновлять topic catalog и открывать созданный topic без ручного refresh;
+7. добавить targeted server/store regression coverage.
+
+Что сделано:
+
+1. добавлен отдельный `create topic` contract рядом с Kafka metadata/produce contracts;
+2. реализованы server route и AdminClient-based service для create-topic path;
+3. поддержаны поля:
+   - `topic name`;
+   - `partitions`;
+   - `replication factor`;
+   - optional `cleanup policy`;
+   - optional `retention.ms`;
+   - optional `retention.bytes`;
+4. `readOnly` cluster блокируется до Kafka client call;
+5. create-topic action выведен на `Topics` screen;
+6. после успешного create topic catalog и topic details обновляются автоматически;
+7. добавлены targeted server/store/service regressions.
+
+#### 17.3. Produce form aligned with kafka-ui structured editor
+
+Статус:
+
+- реализовано
+
+Контекст:
+
+- current `Produce` tab функционально работает, но UI остается слишком примитивным:
+  - raw textarea для headers;
+  - слабая visual hierarchy;
+  - форма не похожа на `kafka-ui`;
+- после `17.1` messages уже выровнены к `kafka-ui`, produce path должен получить такую же плотную tool-like presentation.
+
+Что нужно сделать:
+
+1. убрать raw multiline `headers` textarea и заменить ее на structured header rows;
+2. перестроить `Produce` tab в более плотный editor-like shell:
+   - key;
+   - partition override;
+   - headers list;
+   - payload editor;
+   - delivery result block;
+3. не менять существующий server produce contract без необходимости;
+4. сохранить текущие safety invariants:
+   - no background producer session state;
+   - `readOnly` cluster block;
+   - payload size guard;
+5. добавить regression coverage на shared store mapping produce headers и server route/produce path.
+
+Что сделано:
+
+1. raw multiline `headers` textarea удален и заменен на structured header rows;
+2. `Produce` tab перестроен в более плотный editor-like shell:
+   - key;
+   - partition override;
+   - headers list;
+   - payload editor;
+   - delivery result block;
+3. существующий server produce contract сохранен;
+4. safety invariants сохранены:
+   - no background producer session state;
+   - `readOnly` cluster block;
+   - payload size guard;
+5. regression coverage расширена на shared store mapping produce headers и server route/produce path.
 
 ### 9. Операционная надежность long-running операций
 

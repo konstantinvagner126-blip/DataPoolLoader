@@ -1,19 +1,24 @@
 package com.sbrf.lt.platform.composeui.kafka
 
 import androidx.compose.runtime.Composable
+import com.sbrf.lt.platform.composeui.foundation.component.AlertBanner
 import com.sbrf.lt.platform.composeui.foundation.component.SectionCard
 import com.sbrf.lt.platform.composeui.foundation.dom.classes
 import kotlinx.browser.window
 import org.jetbrains.compose.web.attributes.InputType
+import org.jetbrains.compose.web.attributes.disabled
 import org.jetbrains.compose.web.attributes.href
 import org.jetbrains.compose.web.attributes.placeholder
+import org.jetbrains.compose.web.attributes.selected
 import org.jetbrains.compose.web.attributes.type
 import org.jetbrains.compose.web.attributes.value
 import org.jetbrains.compose.web.dom.A
 import org.jetbrains.compose.web.dom.Button
 import org.jetbrains.compose.web.dom.Div
 import org.jetbrains.compose.web.dom.Input
+import org.jetbrains.compose.web.dom.Option
 import org.jetbrains.compose.web.dom.P
+import org.jetbrains.compose.web.dom.Select
 import org.jetbrains.compose.web.dom.Span
 import org.jetbrains.compose.web.dom.Table
 import org.jetbrains.compose.web.dom.Tbody
@@ -30,6 +35,14 @@ internal fun KafkaTopicsCatalogSection(
     topicsResponse: KafkaTopicsCatalogResponse?,
     onTopicQueryChange: (String) -> Unit,
     onApplyTopicQuery: () -> Unit,
+    onToggleCreateTopicForm: () -> Unit,
+    onCreateTopicNameChange: (String) -> Unit,
+    onCreateTopicPartitionsChange: (String) -> Unit,
+    onCreateTopicReplicationFactorChange: (String) -> Unit,
+    onCreateTopicCleanupPolicyChange: (String) -> Unit,
+    onCreateTopicRetentionMsChange: (String) -> Unit,
+    onCreateTopicRetentionBytesChange: (String) -> Unit,
+    onCreateTopic: () -> Unit,
 ) {
     val filteredTopics = topicsResponse?.topics.orEmpty()
     val topicCountLabel = when {
@@ -41,11 +54,31 @@ internal fun KafkaTopicsCatalogSection(
         title = "Топики",
         subtitle = "Кластер: ${selectedCluster.name}",
         actions = {
-            Span({ classes("badge", "text-bg-light", "kafka-topic-count-badge") }) {
-                Text(topicCountLabel)
+            Div({ classes("kafka-topic-header-actions") }) {
+                Span({ classes("badge", "text-bg-light", "kafka-topic-count-badge") }) {
+                    Text(topicCountLabel)
+                }
+                Button(attrs = {
+                    classes("btn", "btn-outline-secondary", "btn-sm")
+                    attr("type", "button")
+                    if (selectedCluster.readOnly) disabled()
+                    onClick { onToggleCreateTopicForm() }
+                }) {
+                    Text(if (state.createTopicFormVisible) "Скрыть форму" else "Создать топик")
+                }
             }
         },
     ) {
+        state.createTopicResult?.takeIf { it.cluster.id == selectedCluster.id }?.let { result ->
+            AlertBanner(
+                "Топик ${result.topicName} создан: partitions ${result.partitionCount}, replication ${result.replicationFactor}.",
+                "success",
+            )
+        }
+        state.createTopicError?.let { message ->
+            AlertBanner(message, "warning")
+        }
+
         Div({ classes("kafka-topic-screen-header") }) {
             Div({ classes("kafka-topic-filter-row") }) {
                 Input(type = InputType.Search, attrs = {
@@ -86,6 +119,20 @@ internal fun KafkaTopicsCatalogSection(
                     }
                 }
             }
+        }
+
+        if (state.createTopicFormVisible) {
+            KafkaCreateTopicForm(
+                state = state,
+                selectedCluster = selectedCluster,
+                onCreateTopicNameChange = onCreateTopicNameChange,
+                onCreateTopicPartitionsChange = onCreateTopicPartitionsChange,
+                onCreateTopicReplicationFactorChange = onCreateTopicReplicationFactorChange,
+                onCreateTopicCleanupPolicyChange = onCreateTopicCleanupPolicyChange,
+                onCreateTopicRetentionMsChange = onCreateTopicRetentionMsChange,
+                onCreateTopicRetentionBytesChange = onCreateTopicRetentionBytesChange,
+                onCreateTopic = onCreateTopic,
+            )
         }
 
         when {
@@ -180,6 +227,110 @@ internal fun KafkaTopicsCatalogSection(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun KafkaCreateTopicForm(
+    state: KafkaPageState,
+    selectedCluster: KafkaClusterCatalogEntryResponse,
+    onCreateTopicNameChange: (String) -> Unit,
+    onCreateTopicPartitionsChange: (String) -> Unit,
+    onCreateTopicReplicationFactorChange: (String) -> Unit,
+    onCreateTopicCleanupPolicyChange: (String) -> Unit,
+    onCreateTopicRetentionMsChange: (String) -> Unit,
+    onCreateTopicRetentionBytesChange: (String) -> Unit,
+    onCreateTopic: () -> Unit,
+) {
+    Div({ classes("kafka-topic-create-shell") }) {
+        Div({ classes("kafka-topic-create-header") }) {
+            Div {
+                P({ classes("kafka-message-section-title") }) { Text("Create topic") }
+                P({ classes("kafka-placeholder-note", "mb-0") }) {
+                    Text("Новый топик создается сразу в выбранном кластере ${selectedCluster.name}.")
+                }
+            }
+            if (selectedCluster.readOnly) {
+                Span({ classes("kafka-topic-flag") }) { Text("read only") }
+            }
+        }
+
+        Div({ classes("kafka-topic-create-grid") }) {
+            Div({ classes("kafka-message-control") }) {
+                P({ classes("kafka-message-control-label") }) { Text("Topic name") }
+                Input(type = InputType.Text, attrs = {
+                    classes("form-control")
+                    placeholder("orders.events")
+                    value(state.createTopicNameInput)
+                    onInput { onCreateTopicNameChange(it.value?.toString().orEmpty()) }
+                })
+            }
+            Div({ classes("kafka-message-control") }) {
+                P({ classes("kafka-message-control-label") }) { Text("Partitions") }
+                Input(type = InputType.Number, attrs = {
+                    classes("form-control")
+                    value(state.createTopicPartitionsInput)
+                    onInput { onCreateTopicPartitionsChange(it.value?.toString().orEmpty()) }
+                })
+            }
+            Div({ classes("kafka-message-control") }) {
+                P({ classes("kafka-message-control-label") }) { Text("Replication factor") }
+                Input(type = InputType.Number, attrs = {
+                    classes("form-control")
+                    value(state.createTopicReplicationFactorInput)
+                    onInput { onCreateTopicReplicationFactorChange(it.value?.toString().orEmpty()) }
+                })
+            }
+            Div({ classes("kafka-message-control") }) {
+                P({ classes("kafka-message-control-label") }) { Text("Cleanup policy") }
+                Select(attrs = {
+                    classes("form-select")
+                    onChange { onCreateTopicCleanupPolicyChange(it.value.orEmpty()) }
+                }) {
+                    Option(value = "", attrs = { if (state.createTopicCleanupPolicyInput.isBlank()) selected() }) {
+                        Text("default")
+                    }
+                    Option(value = "delete", attrs = { if (state.createTopicCleanupPolicyInput == "delete") selected() }) {
+                        Text("delete")
+                    }
+                    Option(value = "compact", attrs = { if (state.createTopicCleanupPolicyInput == "compact") selected() }) {
+                        Text("compact")
+                    }
+                    Option(value = "compact,delete", attrs = { if (state.createTopicCleanupPolicyInput == "compact,delete") selected() }) {
+                        Text("compact,delete")
+                    }
+                }
+            }
+            Div({ classes("kafka-message-control") }) {
+                P({ classes("kafka-message-control-label") }) { Text("Retention ms") }
+                Input(type = InputType.Number, attrs = {
+                    classes("form-control")
+                    placeholder("optional")
+                    value(state.createTopicRetentionMsInput)
+                    onInput { onCreateTopicRetentionMsChange(it.value?.toString().orEmpty()) }
+                })
+            }
+            Div({ classes("kafka-message-control") }) {
+                P({ classes("kafka-message-control-label") }) { Text("Retention bytes") }
+                Input(type = InputType.Number, attrs = {
+                    classes("form-control")
+                    placeholder("optional")
+                    value(state.createTopicRetentionBytesInput)
+                    onInput { onCreateTopicRetentionBytesChange(it.value?.toString().orEmpty()) }
+                })
+            }
+        }
+
+        Div({ classes("kafka-topic-create-actions") }) {
+            Button(attrs = {
+                classes("btn", "btn-dark")
+                attr("type", "button")
+                if (state.createTopicLoading || selectedCluster.readOnly) disabled()
+                onClick { onCreateTopic() }
+            }) {
+                Text(if (state.createTopicLoading) "Создаю..." else "Создать топик")
             }
         }
     }

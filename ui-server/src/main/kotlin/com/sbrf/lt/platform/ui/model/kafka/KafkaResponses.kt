@@ -159,6 +159,26 @@ data class KafkaTopicProduceHeaderRequestPayload(
     val valueText: String? = null,
 )
 
+data class KafkaTopicCreateRequestPayload(
+    val clusterId: String,
+    val topicName: String,
+    val partitionCount: Int,
+    val replicationFactor: Int,
+    val cleanupPolicy: String? = null,
+    val retentionMs: Long? = null,
+    val retentionBytes: Long? = null,
+)
+
+data class KafkaTopicCreateResponse(
+    val cluster: KafkaClusterCatalogEntryResponse,
+    val topicName: String,
+    val partitionCount: Int,
+    val replicationFactor: Int,
+    val cleanupPolicy: String? = null,
+    val retentionMs: Long? = null,
+    val retentionBytes: Long? = null,
+)
+
 data class KafkaTopicProduceResponse(
     val cluster: KafkaClusterCatalogEntryResponse,
     val topicName: String,

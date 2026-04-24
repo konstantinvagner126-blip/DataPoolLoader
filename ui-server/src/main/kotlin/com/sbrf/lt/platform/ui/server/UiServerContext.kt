@@ -26,6 +26,7 @@ import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleStateService
 import com.sbrf.lt.datapool.kafka.KafkaMetadataOperations
 import com.sbrf.lt.datapool.kafka.KafkaMessageOperations
 import com.sbrf.lt.datapool.kafka.KafkaProduceOperations
+import com.sbrf.lt.datapool.kafka.KafkaTopicAdminOperations
 import com.sbrf.lt.datapool.module.sync.ModuleSyncService
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleOperations
 
@@ -53,6 +54,7 @@ internal class UiServerContext(
     internal val sqlConsoleStateService: SqlConsoleStateService,
     internal val kafkaMetadataService: KafkaMetadataOperations,
     internal val kafkaMessageService: KafkaMessageOperations,
+    internal val kafkaTopicAdminService: KafkaTopicAdminOperations,
     internal val kafkaProduceService: KafkaProduceOperations,
     internal val kafkaSettingsService: UiKafkaSettingsOperations,
     internal val uiConfigPersistenceService: UiConfigPersistenceService,

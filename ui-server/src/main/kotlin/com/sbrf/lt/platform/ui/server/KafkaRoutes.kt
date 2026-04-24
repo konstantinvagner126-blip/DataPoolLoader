@@ -4,6 +4,7 @@ import com.sbrf.lt.datapool.kafka.KafkaClusterNotFoundException
 import com.sbrf.lt.datapool.kafka.KafkaTopicPartitionNotFoundException
 import com.sbrf.lt.datapool.kafka.KafkaTopicNotFoundException
 import com.sbrf.lt.platform.ui.model.KafkaTopicMessageReadRequestPayload
+import com.sbrf.lt.platform.ui.model.KafkaTopicCreateRequestPayload
 import com.sbrf.lt.platform.ui.model.KafkaSettingsConnectionTestRequestPayload
 import com.sbrf.lt.platform.ui.model.KafkaSettingsUpdateRequestPayload
 import com.sbrf.lt.platform.ui.model.KafkaTopicProduceRequestPayload
@@ -16,6 +17,10 @@ import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
+import org.apache.kafka.common.errors.AuthorizationException
+import org.apache.kafka.common.errors.InvalidPartitionsException
+import org.apache.kafka.common.errors.InvalidReplicationFactorException
+import org.apache.kafka.common.errors.TopicExistsException
 
 internal fun Route.registerKafkaRoutes(context: UiServerContext) {
     get("/api/kafka/info") {
@@ -148,6 +153,34 @@ internal fun Route.registerKafkaRoutes(context: UiServerContext) {
             call.respond(HttpStatusCode.NotFound, e.message.orEmpty())
         } catch (e: KafkaTopicPartitionNotFoundException) {
             call.respond(HttpStatusCode.NotFound, e.message.orEmpty())
+        } catch (e: AuthorizationException) {
+            call.respond(HttpStatusCode.Forbidden, e.message.orEmpty())
+        }
+    }
+
+    post("/api/kafka/topics/create") {
+        val payload = runCatching { call.receive<KafkaTopicCreateRequestPayload>() }.getOrElse { error ->
+            call.respond(HttpStatusCode.BadRequest, error.message.orEmpty())
+            return@post
+        }
+        try {
+            call.respond(
+                context.kafkaTopicAdminService.createTopic(
+                    payload.toCoreRequest(),
+                ).toResponse(),
+            )
+        } catch (e: IllegalArgumentException) {
+            call.respond(HttpStatusCode.BadRequest, e.message.orEmpty())
+        } catch (e: KafkaClusterNotFoundException) {
+            call.respond(HttpStatusCode.NotFound, e.message.orEmpty())
+        } catch (e: TopicExistsException) {
+            call.respond(HttpStatusCode.Conflict, e.message.orEmpty())
+        } catch (e: InvalidPartitionsException) {
+            call.respond(HttpStatusCode.BadRequest, e.message.orEmpty())
+        } catch (e: InvalidReplicationFactorException) {
+            call.respond(HttpStatusCode.BadRequest, e.message.orEmpty())
+        } catch (e: AuthorizationException) {
+            call.respond(HttpStatusCode.Forbidden, e.message.orEmpty())
         }
     }
 

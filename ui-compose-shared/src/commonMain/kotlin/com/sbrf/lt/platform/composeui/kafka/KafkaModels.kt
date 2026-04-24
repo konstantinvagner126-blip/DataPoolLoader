@@ -182,6 +182,33 @@ data class KafkaTopicProduceHeaderRequestPayload(
 )
 
 @Serializable
+data class KafkaTopicCreateRequestPayload(
+    val clusterId: String,
+    val topicName: String,
+    val partitionCount: Int,
+    val replicationFactor: Int,
+    val cleanupPolicy: String? = null,
+    val retentionMs: Long? = null,
+    val retentionBytes: Long? = null,
+)
+
+@Serializable
+data class KafkaTopicCreateResponse(
+    val cluster: KafkaClusterCatalogEntryResponse,
+    val topicName: String,
+    val partitionCount: Int,
+    val replicationFactor: Int,
+    val cleanupPolicy: String? = null,
+    val retentionMs: Long? = null,
+    val retentionBytes: Long? = null,
+)
+
+data class KafkaKeyValueDraft(
+    val name: String = "",
+    val value: String = "",
+)
+
+@Serializable
 data class KafkaTopicProduceResponse(
     val cluster: KafkaClusterCatalogEntryResponse,
     val topicName: String,
@@ -287,6 +314,16 @@ data class KafkaPageState(
     val selectedTopicName: String? = null,
     val topicOverview: KafkaTopicOverviewResponse? = null,
     val activePane: String = "overview",
+    val createTopicFormVisible: Boolean = false,
+    val createTopicLoading: Boolean = false,
+    val createTopicError: String? = null,
+    val createTopicNameInput: String = "",
+    val createTopicPartitionsInput: String = "1",
+    val createTopicReplicationFactorInput: String = "1",
+    val createTopicCleanupPolicyInput: String = "",
+    val createTopicRetentionMsInput: String = "",
+    val createTopicRetentionBytesInput: String = "",
+    val createTopicResult: KafkaTopicCreateResponse? = null,
     val selectedMessagePartition: Int? = null,
     val messageReadScope: String = "SELECTED_PARTITION",
     val messageReadMode: String = "LATEST",
@@ -298,7 +335,7 @@ data class KafkaPageState(
     val produceError: String? = null,
     val producePartitionInput: String = "",
     val produceKeyInput: String = "",
-    val produceHeadersInput: String = "",
+    val produceHeaders: List<KafkaKeyValueDraft> = emptyList(),
     val producePayloadInput: String = "",
     val produceResult: KafkaTopicProduceResponse? = null,
     val settingsLoading: Boolean = false,

@@ -153,6 +153,9 @@ internal class StubKafkaApi(
     private val loadTopicOverviewHandler: suspend (String, String) -> KafkaTopicOverviewResponse = { _, _ ->
         sampleKafkaOverview()
     },
+    private val createTopicHandler: suspend (KafkaTopicCreateRequestPayload) -> KafkaTopicCreateResponse = {
+        error("createTopic not configured")
+    },
     private val readMessagesHandler: suspend (KafkaTopicMessageReadRequestPayload) -> KafkaTopicMessageReadResponse = {
         error("readMessages not configured")
     },
@@ -188,6 +191,10 @@ internal class StubKafkaApi(
         clusterId: String,
         topicName: String,
     ): KafkaTopicOverviewResponse = loadTopicOverviewHandler(clusterId, topicName)
+
+    override suspend fun createTopic(
+        request: KafkaTopicCreateRequestPayload,
+    ): KafkaTopicCreateResponse = createTopicHandler(request)
 
     override suspend fun readMessages(
         request: KafkaTopicMessageReadRequestPayload,

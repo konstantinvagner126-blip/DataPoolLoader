@@ -16,6 +16,14 @@ internal fun KafkaPageContent(
     onReloadBrokers: () -> Unit,
     onTopicQueryChange: (String) -> Unit,
     onApplyTopicQuery: () -> Unit,
+    onToggleCreateTopicForm: () -> Unit,
+    onCreateTopicNameChange: (String) -> Unit,
+    onCreateTopicPartitionsChange: (String) -> Unit,
+    onCreateTopicReplicationFactorChange: (String) -> Unit,
+    onCreateTopicCleanupPolicyChange: (String) -> Unit,
+    onCreateTopicRetentionMsChange: (String) -> Unit,
+    onCreateTopicRetentionBytesChange: (String) -> Unit,
+    onCreateTopic: () -> Unit,
     onReloadTopicOverview: (String) -> Unit,
     onPaneChange: (String) -> Unit,
     onMessagePartitionChange: (Int) -> Unit,
@@ -27,7 +35,10 @@ internal fun KafkaPageContent(
     onReadMessages: () -> Unit,
     onProducePartitionChange: (String) -> Unit,
     onProduceKeyChange: (String) -> Unit,
-    onProduceHeadersChange: (String) -> Unit,
+    onAddProduceHeader: () -> Unit,
+    onRemoveProduceHeader: (Int) -> Unit,
+    onProduceHeaderNameChange: (Int, String) -> Unit,
+    onProduceHeaderValueChange: (Int, String) -> Unit,
     onProducePayloadChange: (String) -> Unit,
     onProduceMessage: () -> Unit,
     onReloadSettings: () -> Unit,
@@ -115,11 +126,19 @@ internal fun KafkaPageContent(
                             KafkaTopicsCatalogSection(
                                 state = state,
                                 selectedCluster = selectedCluster,
-                                topicsResponse = state.topics,
-                                onTopicQueryChange = onTopicQueryChange,
-                                onApplyTopicQuery = onApplyTopicQuery,
-                            )
-                        }
+                            topicsResponse = state.topics,
+                            onTopicQueryChange = onTopicQueryChange,
+                            onApplyTopicQuery = onApplyTopicQuery,
+                            onToggleCreateTopicForm = onToggleCreateTopicForm,
+                            onCreateTopicNameChange = onCreateTopicNameChange,
+                            onCreateTopicPartitionsChange = onCreateTopicPartitionsChange,
+                            onCreateTopicReplicationFactorChange = onCreateTopicReplicationFactorChange,
+                            onCreateTopicCleanupPolicyChange = onCreateTopicCleanupPolicyChange,
+                            onCreateTopicRetentionMsChange = onCreateTopicRetentionMsChange,
+                            onCreateTopicRetentionBytesChange = onCreateTopicRetentionBytesChange,
+                            onCreateTopic = onCreateTopic,
+                        )
+                    }
 
                         else -> {
                             KafkaTopicDetailsPageSection(
@@ -137,7 +156,10 @@ internal fun KafkaPageContent(
                                 onReadMessages = onReadMessages,
                                 onProducePartitionChange = onProducePartitionChange,
                                 onProduceKeyChange = onProduceKeyChange,
-                                onProduceHeadersChange = onProduceHeadersChange,
+                                onAddProduceHeader = onAddProduceHeader,
+                                onRemoveProduceHeader = onRemoveProduceHeader,
+                                onProduceHeaderNameChange = onProduceHeaderNameChange,
+                                onProduceHeaderValueChange = onProduceHeaderValueChange,
                                 onProducePayloadChange = onProducePayloadChange,
                                 onProduceMessage = onProduceMessage,
                             )
