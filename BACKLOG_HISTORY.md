@@ -217,6 +217,28 @@
 
 ## P1
 
+### 15. Kafka: redesign after baseline
+
+Статус:
+
+- реализовано
+
+Ключевой результат:
+
+- baseline Kafka-подсистемы и последующий UI redesign полностью завершены;
+- Kafka screen переведен в `kafka-ui`-подобную structural model:
+  - cluster-first navigation;
+  - отдельные cluster-level screens `Topics / Consumer Groups / Brokers`;
+  - topic details page с tab shell `Overview / Messages / Consumers / Settings / Produce`;
+- home screen выровнен под итоговый Kafka placement:
+  - карточки сгруппированы в три строки;
+  - блок `SQL и Kafka` остался компактным внутри своей group-card;
+- дальнейшие Kafka-изменения после этой точки считаются уже новым отдельным stream-ом, а не хвостом redesign-волны.
+
+Основные даты:
+
+- `2026-04-24`
+
 ### 10. Экран обслуживания запусков: отображение занимаемого объема
 
 Статус:
