@@ -54,11 +54,11 @@ async function mockKafkaRuntimeContext(page) {
   });
 }
 
-async function mockKafkaExplorerApi(page, { messageReadResult, settingsResponse } = {}) {
+async function mockKafkaExplorerApi(page, { infoResponse, topicOverviewResponse, messageReadResult, settingsResponse } = {}) {
   await page.route("**/api/kafka/info", async route => {
     await route.fulfill({
       contentType: "application/json",
-      body: JSON.stringify({
+      body: JSON.stringify(infoResponse ?? {
         configured: true,
         maxRecordsPerRead: 100,
         maxPayloadBytes: 1048576,
@@ -106,7 +106,7 @@ async function mockKafkaExplorerApi(page, { messageReadResult, settingsResponse 
   await page.route("**/api/kafka/topic-overview*", async route => {
     await route.fulfill({
       contentType: "application/json",
-      body: JSON.stringify({
+      body: JSON.stringify(topicOverviewResponse ?? {
         cluster: {
           id: "local",
           name: "Local Kafka Docker",
@@ -1743,6 +1743,105 @@ test("kafka messages visual baseline", async ({ page }) => {
   });
   await expect(page.locator(".kafka-content-shell")).toBeVisible();
   await expect(page.locator(".kafka-content-shell")).toHaveScreenshot("kafka-messages-shell.png", {
+    animations: "disabled",
+    caret: "hide",
+    maxDiffPixels: 1024
+  });
+});
+
+test("kafka overview visual baseline", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 2100 });
+  await mockKafkaRuntimeContext(page);
+  await mockKafkaExplorerApi(page);
+  await prepareVisualPage(page, "/kafka?clusterId=local&topic=datapool-test", "Kafka cluster explorer");
+  await expect(page.getByText("Consumer groups")).toBeVisible();
+  await expect(page.getByText("datapool-test-group")).toBeVisible();
+  await page.addStyleTag({
+    content: "html { scrollbar-gutter: stable both-edges !important; } body { overflow-y: scroll !important; } .kafka-content-shell { width: 1416px !important; max-height: 1460px !important; overflow: hidden !important; }"
+  });
+  await expect(page.locator(".kafka-content-shell")).toHaveScreenshot("kafka-overview-shell.png", {
+    animations: "disabled",
+    caret: "hide",
+    maxDiffPixels: 1024
+  });
+});
+
+test("kafka empty-state visual baseline", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1500 });
+  await mockKafkaRuntimeContext(page);
+  await mockKafkaExplorerApi(page, {
+    infoResponse: {
+      configured: false,
+      maxRecordsPerRead: 100,
+      maxPayloadBytes: 1048576,
+      clusters: []
+    }
+  });
+  await prepareVisualPage(page, "/kafka", "Kafka cluster explorer");
+  await expect(page.getByText("Kafka clusters не настроены")).toBeVisible();
+  await page.addStyleTag({
+    content: "html { scrollbar-gutter: stable both-edges !important; } body { overflow-y: scroll !important; } .compose-home-root { width: 1416px !important; max-height: 980px !important; overflow: hidden !important; }"
+  });
+  await expect(page.locator(".panel")).toHaveScreenshot("kafka-empty-state-panel.png", {
+    animations: "disabled",
+    caret: "hide",
+    maxDiffPixels: 1024
+  });
+});
+
+test("kafka consumer-groups error visual baseline", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 2100 });
+  await mockKafkaRuntimeContext(page);
+  await mockKafkaExplorerApi(page, {
+    topicOverviewResponse: {
+      cluster: {
+        id: "local",
+        name: "Local Kafka Docker",
+        readOnly: false,
+        bootstrapServers: "localhost:19092",
+        securityProtocol: "PLAINTEXT"
+      },
+      topic: {
+        name: "datapool-test",
+        internal: false,
+        partitionCount: 2,
+        replicationFactor: 1,
+        cleanupPolicy: "delete",
+        retentionMs: 60000,
+        retentionBytes: null
+      },
+      partitions: [
+        {
+          partition: 0,
+          leaderId: 1,
+          replicaCount: 1,
+          inSyncReplicaCount: 1,
+          earliestOffset: 0,
+          latestOffset: 12
+        },
+        {
+          partition: 1,
+          leaderId: 1,
+          replicaCount: 1,
+          inSyncReplicaCount: 1,
+          earliestOffset: 4,
+          latestOffset: 27
+        }
+      ],
+      consumerGroups: {
+        status: "ERROR",
+        message: "Consumer groups metadata недоступна для этого кластера.",
+        groups: []
+      }
+    }
+  });
+  await prepareVisualPage(page, "/kafka?clusterId=local&topic=datapool-test", "Kafka cluster explorer");
+  await expect(page.getByText("Consumer groups metadata недоступна для этого кластера.")).toBeVisible();
+  await page.waitForTimeout(750);
+  await page.addStyleTag({
+    content: "html { scrollbar-gutter: stable both-edges !important; } body { overflow-y: scroll !important; } .kafka-content-shell { width: 1416px !important; max-height: 1460px !important; overflow: hidden !important; }"
+  });
+  await expect(page.locator(".kafka-content-shell")).toHaveScreenshot("kafka-consumer-groups-error-shell.png", {
     animations: "disabled",
     caret: "hide",
     maxDiffPixels: 1024

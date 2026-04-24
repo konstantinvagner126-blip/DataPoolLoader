@@ -955,7 +955,7 @@
 
 Статус:
 
-- частично реализовано
+- реализовано
 
 Цель:
 
@@ -1308,7 +1308,7 @@ ui:
 
 Статус:
 
-- частично реализовано
+- реализовано
 
 Что сделано:
 
@@ -1323,13 +1323,12 @@ ui:
    - produce request mapping;
    - settings workflow state transitions;
 3. добавлены browser-level visual baselines для:
+   - Kafka overview shell;
+   - Kafka empty-state;
+   - Kafka consumer-groups error-state;
    - Kafka message browser shell;
    - produce pane;
    - settings pane.
-
-Что осталось:
-
-1. довести visual coverage для явных `empty/error` состояний Kafka screen.
 
 #### 15.8. Kafka config settings UI для cluster connection editing
 
@@ -1367,6 +1366,12 @@ ui:
   - отправить одно сообщение в topic;
 - при необходимости пользователь может через UI поменять broker hosts и пути к `JKS/PEM` без ручного редактирования YAML;
 - home screen отражает Kafka как один из основных инженерных инструментов платформы.
+
+Closure review:
+
+- baseline Kafka-подсистемы закрыт как отдельный первый продуктовый поток;
+- следующий Kafka-этап нельзя начинать инерционно внутри этой секции;
+- новые расширения вроде `SASL_*`, admin actions, schema-registry tooling или deeper topic operations должны заходить отдельными backlog-stream, а не как хвост baseline.
 
 ## P2
 
