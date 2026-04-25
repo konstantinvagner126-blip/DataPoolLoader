@@ -1225,6 +1225,96 @@ Non-goals первой дизайн-волны:
 
 История реализованных пакетов `9.1–9.14` вынесена в [BACKLOG_HISTORY.md](/Users/kwdev/DataPoolLoader/BACKLOG_HISTORY.md).
 
+#### 9.15. SQL terminal heartbeat route regression
+
+Статус:
+
+- выполнено
+
+Контекст:
+
+- stale browser tab может продолжить отправлять heartbeat после terminal `SUCCESS`;
+- manager уже должен отклонять heartbeat, если execution больше не `RUNNING` и не `PENDING_COMMIT`;
+- HTTP boundary должен явно закрепить этот contract как `409 Conflict`.
+
+Что нужно сделать:
+
+1. добавить server-level regression для `/api/sql-console/query/{id}/heartbeat` после обычного async `SUCCESS`;
+2. проверить `409 Conflict`;
+3. проверить, что response body объясняет, что heartbeat больше не нужен;
+4. не менять heartbeat для active `RUNNING` и `PENDING_COMMIT`.
+
+Что сделано:
+
+1. добавлена server-level regression в `SqlConsoleServerTest` для `/heartbeat` после terminal async `SUCCESS`;
+2. проверяется `409 Conflict`;
+3. проверяется diagnostic response body `больше не требует heartbeat`;
+4. runtime-код не менялся: active heartbeat contract не затронут.
+
+Проверка:
+
+- `./gradlew :ui-server:test --tests 'com.sbrf.lt.platform.ui.server.SqlConsoleServerTest.async sql final route response clears control path metadata and rejects release'` — `BUILD SUCCESSFUL`.
+
+#### 9.16. SQL terminal cancel route regression
+
+Статус:
+
+- выполнено
+
+Контекст:
+
+- stale browser tab может отправить `/cancel` после terminal `SUCCESS`;
+- terminal execution уже нельзя отменить повторно;
+- HTTP boundary должен явно закрепить этот contract как `409 Conflict`.
+
+Что нужно сделать:
+
+1. добавить server-level regression для `/api/sql-console/query/{id}/cancel` после обычного async `SUCCESS`;
+2. проверить `409 Conflict`;
+3. проверить, что response body сообщает, что запрос уже завершен;
+4. не менять cancel для active `RUNNING`.
+
+Что сделано:
+
+1. добавлена server-level regression в `SqlConsoleServerTest` для `/cancel` после terminal async `SUCCESS`;
+2. проверяется `409 Conflict`;
+3. проверяется diagnostic response body `уже завершен`;
+4. runtime-код не менялся: active cancel contract не затронут.
+
+Проверка:
+
+- `./gradlew :ui-server:test --tests 'com.sbrf.lt.platform.ui.server.SqlConsoleServerTest.async sql final route response clears control path metadata and rejects release'` — `BUILD SUCCESSFUL`.
+
+#### 9.17. SQL terminal transaction action repeat route regression
+
+Статус:
+
+- выполнено
+
+Контекст:
+
+- после explicit `Commit` или explicit `Rollback` manual transaction финализирована;
+- повторные `/commit` или `/rollback` со старым owner token не должны быть successful no-op;
+- HTTP boundary должен закрепить это как terminal transaction conflict.
+
+Что нужно сделать:
+
+1. добавить server-level regression для повторного `/commit` после final `COMMITTED`;
+2. добавить server-level regression для повторного `/rollback` после final `ROLLED_BACK`;
+3. проверить `409 Conflict`;
+4. не менять owner-token checks до первого successful `Commit/Rollback`.
+
+Что сделано:
+
+1. добавлены server-level regressions в `SqlConsoleServerTest` для повторного `/commit` после `COMMITTED`;
+2. добавлены server-level regressions в `SqlConsoleServerTest` для повторного `/rollback` после `ROLLED_BACK`;
+3. проверяется `409 Conflict`;
+4. runtime-код не менялся: первая successful transaction action и owner-token checks не затронуты.
+
+Проверка:
+
+- `./gradlew :ui-server:test --tests 'com.sbrf.lt.platform.ui.server.SqlConsoleServerTest.manual transaction final route responses clear control path metadata'` — `BUILD SUCCESSFUL`.
+
 ### 11. Зафиксировать и поддерживать repo-level архитектурную дисциплину
 
 Статус:

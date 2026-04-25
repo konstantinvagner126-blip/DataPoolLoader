@@ -571,6 +571,20 @@ class SqlConsoleServerTest {
                 }
                 assertEquals(HttpStatusCode.Conflict, released.status)
                 assertTrue(released.bodyAsText().contains("control-path"))
+
+                val heartbeat = client.post("/api/sql-console/query/$executionId/heartbeat") {
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"ownerSessionId":"tab-1","ownerToken":"$ownerToken"}""")
+                }
+                assertEquals(HttpStatusCode.Conflict, heartbeat.status)
+                assertTrue(heartbeat.bodyAsText().contains("больше не требует heartbeat"))
+
+                val cancelled = client.post("/api/sql-console/query/$executionId/cancel") {
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"ownerSessionId":"tab-1","ownerToken":"$ownerToken"}""")
+                }
+                assertEquals(HttpStatusCode.Conflict, cancelled.status)
+                assertTrue(cancelled.bodyAsText().contains("уже завершен"))
                 return@testApplication
             }
             Thread.sleep(25)
@@ -761,6 +775,12 @@ class SqlConsoleServerTest {
         }
         assertEquals(HttpStatusCode.Conflict, commitRelease.status)
         assertTrue(commitRelease.bodyAsText().contains("control-path"))
+        val secondCommit = client.post("/api/sql-console/query/$commitExecutionId/commit") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"ownerSessionId":"tab-commit","ownerToken":"$commitOwnerToken"}""")
+        }
+        assertEquals(HttpStatusCode.Conflict, secondCommit.status)
+        assertTrue(secondCommit.bodyAsText().contains("нет незавершенной транзакции"))
 
         val (rollbackExecutionId, rollbackOwnerToken) = startPendingManualTransaction("workspace-rollback", "tab-rollback")
         val rolledBack = client.post("/api/sql-console/query/$rollbackExecutionId/rollback") {
@@ -775,6 +795,12 @@ class SqlConsoleServerTest {
         }
         assertEquals(HttpStatusCode.Conflict, rollbackRelease.status)
         assertTrue(rollbackRelease.bodyAsText().contains("control-path"))
+        val secondRollback = client.post("/api/sql-console/query/$rollbackExecutionId/rollback") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"ownerSessionId":"tab-rollback","ownerToken":"$rollbackOwnerToken"}""")
+        }
+        assertEquals(HttpStatusCode.Conflict, secondRollback.status)
+        assertTrue(secondRollback.bodyAsText().contains("нет незавершенной транзакции"))
     }
 
     @Test
