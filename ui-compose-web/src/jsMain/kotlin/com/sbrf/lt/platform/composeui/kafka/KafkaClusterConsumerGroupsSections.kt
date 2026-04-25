@@ -7,7 +7,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.sbrf.lt.platform.composeui.foundation.component.AlertBanner
 import com.sbrf.lt.platform.composeui.foundation.component.LoadingStateCard
-import com.sbrf.lt.platform.composeui.foundation.component.SectionCard
 import com.sbrf.lt.platform.composeui.foundation.dom.classes
 import org.jetbrains.compose.web.attributes.href
 import org.jetbrains.compose.web.dom.A
@@ -38,19 +37,26 @@ internal fun KafkaClusterConsumerGroupsSection(
         return
     }
 
-    SectionCard(
-        title = "Consumer Groups",
-        subtitle = selectedCluster.name,
-        actions = {
+    Div({ classes("kafka-cluster-metadata-panel") }) {
+        Div({ classes("kafka-cluster-metadata-head") }) {
+            Div {
+                Div({ classes("kafka-message-pane-title") }) { Text("Consumer Groups") }
+                P({ classes("kafka-message-pane-subtitle") }) {
+                    Text("${selectedCluster.name} · cluster-level lag metadata")
+                }
+            }
             Button(attrs = {
                 classes("btn", "btn-outline-secondary", "btn-sm")
                 attr("type", "button")
+                if (state.consumerGroupsLoading) {
+                    attr("disabled", "disabled")
+                }
                 onClick { onReloadConsumerGroups() }
             }) {
                 Text(if (state.consumerGroupsLoading) "Обновляю..." else "Обновить")
             }
-        },
-    ) {
+        }
+
         state.consumerGroupsError?.let { message ->
             AlertBanner(message, "warning")
         }
@@ -80,8 +86,18 @@ internal fun KafkaClusterConsumerGroupsSection(
                     AlertBanner(message, "warning")
                 }
 
-                Div({ classes("table-responsive") }) {
-                    Table({ classes("table", "table-sm", "align-middle", "mb-0", "kafka-cluster-consumer-group-table") }) {
+                KafkaClusterConsumerGroupsSummary(consumerGroups)
+
+                Div({ classes("table-responsive", "kafka-cluster-metadata-table-wrap") }) {
+                    Table({
+                        classes(
+                            "table",
+                            "table-sm",
+                            "align-middle",
+                            "mb-0",
+                            "kafka-cluster-consumer-group-table",
+                        )
+                    }) {
                         Thead {
                             Tr {
                                 Th { Text("Group ID") }
@@ -118,19 +134,25 @@ private fun KafkaClusterConsumerGroupRow(
     Tr {
         Td {
             Div({ classes("kafka-consumer-group-name") }) { Text(group.groupId) }
+            Div({ classes("kafka-consumer-group-status-row") }) {
+                KafkaClusterStatusBadge(group.state ?: "n/a", "neutral")
+                if (!group.metadataAvailable) {
+                    KafkaClusterStatusBadge("metadata partial", "warn")
+                }
+                if (group.lagStatus != "OK") {
+                    KafkaClusterStatusBadge(group.lagStatus.lowercase().replace('_', ' '), "warn")
+                }
+            }
             group.note?.let { note ->
                 P({ classes("kafka-consumer-group-note", "mb-0") }) { Text(note) }
             }
         }
-        Td { Text(group.state ?: "n/a") }
+        Td { KafkaClusterStatusBadge(group.state ?: "n/a", "neutral") }
         Td { Text(group.memberCount?.toString() ?: "n/a") }
         Td { Text(group.topics.size.toString()) }
         Td {
             Div({ classes("kafka-cluster-consumer-group-lag") }) {
                 Text(group.totalLag?.toString() ?: "n/a")
-            }
-            if (group.lagStatus != "OK") {
-                Div({ classes("kafka-topic-meta") }) { Text(group.lagStatus.lowercase().replace('_', ' ')) }
             }
         }
         Td {
@@ -154,6 +176,7 @@ private fun KafkaClusterConsumerGroupRow(
                             Text("Kafka не вернула committed offsets для этой consumer group.")
                         }
                     } else {
+                        KafkaClusterConsumerGroupTopicSummary(group)
                         Div({ classes("table-responsive") }) {
                             Table({ classes("table", "table-sm", "align-middle", "mb-0", "kafka-cluster-consumer-topic-table") }) {
                                 Thead {
@@ -161,6 +184,7 @@ private fun KafkaClusterConsumerGroupRow(
                                         Th { Text("Topic") }
                                         Th { Text("Partitions") }
                                         Th { Text("Lag") }
+                                        Th { Text("Partition lag") }
                                         Th { Text("Open") }
                                     }
                                 }
@@ -170,6 +194,9 @@ private fun KafkaClusterConsumerGroupRow(
                                             Td { Text(topic.topicName) }
                                             Td { Text(topic.partitionCount.toString()) }
                                             Td { Text(topic.totalLag?.toString() ?: "n/a") }
+                                            Td {
+                                                KafkaClusterPartitionLagList(topic.partitions)
+                                            }
                                             Td {
                                                 A(attrs = {
                                                     classes("kafka-topic-details-back-link")
@@ -198,5 +225,78 @@ private fun KafkaClusterConsumerGroupRow(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun KafkaClusterConsumerGroupsSummary(
+    consumerGroups: KafkaClusterConsumerGroupsCatalogResponse,
+) {
+    val totalMembers = consumerGroups.groups.mapNotNull { it.memberCount }.sum()
+    val totalTopics = consumerGroups.groups.flatMap { group -> group.topics.map { it.topicName } }.distinct().size
+    val lagKnown = consumerGroups.groups.mapNotNull { it.totalLag }
+    val lagTotal = lagKnown.sum()
+    val warningCount = consumerGroups.groups.count { !it.metadataAvailable || it.lagStatus != "OK" }
+
+    Div({ classes("kafka-cluster-metadata-summary-grid") }) {
+        KafkaOverviewMetric("Groups", consumerGroups.groups.size.toString())
+        KafkaOverviewMetric("Members", totalMembers.toString())
+        KafkaOverviewMetric("Topics", totalTopics.toString())
+        KafkaOverviewMetric("Total lag", if (lagKnown.isEmpty()) "n/a" else lagTotal.toString())
+        KafkaOverviewMetric("Warnings", warningCount.toString())
+    }
+}
+
+@Composable
+private fun KafkaClusterConsumerGroupTopicSummary(
+    group: KafkaClusterConsumerGroupSummaryResponse,
+) {
+    Div({ classes("kafka-cluster-consumer-topic-summary") }) {
+        KafkaOverviewMetric("Topics", group.topics.size.toString())
+        KafkaOverviewMetric("Members", group.memberCount?.toString() ?: "n/a")
+        KafkaOverviewMetric("Total lag", group.totalLag?.toString() ?: "n/a")
+        KafkaOverviewMetric("Metadata", if (group.metadataAvailable) "available" else "partial")
+    }
+}
+
+@Composable
+private fun KafkaClusterPartitionLagList(
+    partitions: List<KafkaTopicConsumerGroupPartitionLagResponse>,
+) {
+    if (partitions.isEmpty()) {
+        Span({ classes("kafka-topic-meta") }) { Text("n/a") }
+        return
+    }
+    Div({ classes("kafka-cluster-partition-lag-list") }) {
+        partitions.take(8).forEach { partition ->
+            Span({ classes("kafka-cluster-partition-lag-pill") }) {
+                Text("${partition.partition}: ${partition.lag ?: "n/a"}")
+            }
+        }
+        if (partitions.size > 8) {
+            Span({ classes("kafka-cluster-partition-lag-pill", "muted") }) {
+                Text("+${partitions.size - 8}")
+            }
+        }
+    }
+}
+
+@Composable
+internal fun KafkaClusterStatusBadge(
+    label: String,
+    level: String,
+) {
+    Span({
+        classes(
+            "kafka-cluster-status-badge",
+            when (level) {
+                "ok" -> "ok"
+                "warn" -> "warn"
+                "danger" -> "danger"
+                else -> "neutral"
+            },
+        )
+    }) {
+        Text(label)
     }
 }

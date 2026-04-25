@@ -3,6 +3,7 @@ package com.sbrf.lt.platform.composeui.kafka
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import com.sbrf.lt.platform.composeui.foundation.component.AlertBanner
+import com.sbrf.lt.platform.composeui.foundation.component.MonacoEditorPane
 import com.sbrf.lt.platform.composeui.foundation.dom.classes
 import org.jetbrains.compose.web.attributes.InputType
 import org.jetbrains.compose.web.attributes.disabled
@@ -15,14 +16,12 @@ import org.jetbrains.compose.web.dom.Div
 import org.jetbrains.compose.web.dom.Input
 import org.jetbrains.compose.web.dom.Option
 import org.jetbrains.compose.web.dom.P
-import org.jetbrains.compose.web.dom.Pre
 import org.jetbrains.compose.web.dom.Select
 import org.jetbrains.compose.web.dom.Span
 import org.jetbrains.compose.web.dom.Table
 import org.jetbrains.compose.web.dom.Tbody
 import org.jetbrains.compose.web.dom.Td
 import org.jetbrains.compose.web.dom.Text
-import org.jetbrains.compose.web.dom.TextArea
 import org.jetbrains.compose.web.dom.Th
 import org.jetbrains.compose.web.dom.Thead
 import org.jetbrains.compose.web.dom.Tr
@@ -165,14 +164,11 @@ internal fun KafkaProduceSection(
                 }
 
                 Div({ classes("kafka-produce-editor-block") }) {
-                    P({ classes("kafka-message-section-title") }) { Text("Payload") }
-                    TextArea(attrs = {
-                        classes("form-control", "kafka-produce-payload")
-                        placeholder("{\n  \"event\": \"created\"\n}")
-                        value(state.producePayloadInput)
-                        onInput { onProducePayloadChange(it.value) }
-                    })
-                    KafkaProducePayloadPreview(state.producePayloadInput)
+                    KafkaProducePayloadEditor(
+                        topicName = topicOverview.topic.name,
+                        payload = state.producePayloadInput,
+                        onPayloadChange = onProducePayloadChange,
+                    )
                 }
 
                 Div({ classes("kafka-produce-actions") }) {
@@ -203,40 +199,33 @@ internal fun KafkaProduceSection(
 }
 
 @Composable
-private fun KafkaProducePayloadPreview(payload: String) {
-    if (payload.isBlank()) {
-        return
-    }
+private fun KafkaProducePayloadEditor(
+    topicName: String,
+    payload: String,
+    onPayloadChange: (String) -> Unit,
+) {
+    val formattedPayload = remember(payload) { formatKafkaProduceJsonPayload(payload) }
 
-    val jsonPrettyText = remember(payload) { formatKafkaProduceJsonPayload(payload) }
-    val isJson = jsonPrettyText != null
-
-    Div({ classes("kafka-produce-payload-preview") }) {
-        Div({ classes("kafka-produce-payload-preview-head") }) {
-            P({ classes("kafka-message-section-title") }) { Text("Payload preview") }
-            Span({
-                classes(
-                    "kafka-message-payload-badge",
-                    if (isJson) "ok" else "plain",
-                )
-            }) {
-                Text(if (isJson) "valid JSON" else "plain text fallback")
+    Div({ classes("kafka-produce-payload-head") }) {
+        P({ classes("kafka-message-section-title") }) { Text("Payload") }
+        Button(attrs = {
+            classes("btn", "btn-outline-secondary", "btn-sm")
+            attr("type", "button")
+            if (formattedPayload == null) disabled()
+            onClick {
+                formattedPayload?.let(onPayloadChange)
             }
-        }
-        Pre({
-            classes(
-                "kafka-message-payload-body",
-                "kafka-produce-payload-preview-body",
-                if (isJson) "json" else "plain",
-            )
         }) {
-            if (jsonPrettyText != null) {
-                KafkaJsonHighlightedText(jsonPrettyText)
-            } else {
-                Text(payload)
-            }
+            Text("Форматировать JSON")
         }
     }
+    MonacoEditorPane(
+        instanceKey = "kafka-produce-payload-$topicName",
+        language = "json",
+        value = payload,
+        classNames = listOf("editor-frame", "kafka-produce-payload-editor"),
+        onValueChange = onPayloadChange,
+    )
 }
 
 private fun formatKafkaProduceJsonPayload(payload: String): String? {

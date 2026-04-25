@@ -231,21 +231,86 @@ internal class KafkaStoreSettingsSupport(
         }
 
     private fun KafkaEditableClusterResponse.toRequestPayload(): KafkaEditableClusterRequestPayload =
-        KafkaEditableClusterRequestPayload(
-            id = id,
-            name = name,
-            readOnly = readOnly,
-            bootstrapServers = bootstrapServers,
-            clientId = clientId,
-            securityProtocol = securityProtocol,
-            truststoreType = truststoreType,
-            truststoreLocation = truststoreLocation,
-            truststoreCertificates = truststoreCertificates,
-            keystoreType = keystoreType,
-            keystoreLocation = keystoreLocation,
-            keystoreCertificateChain = keystoreCertificateChain,
-            keystoreKey = keystoreKey,
-            keyPassword = keyPassword,
-            additionalProperties = additionalProperties,
-        )
+        normalizedForSave().let { normalized ->
+            KafkaEditableClusterRequestPayload(
+                id = normalized.id,
+                name = normalized.name,
+                readOnly = normalized.readOnly,
+                bootstrapServers = normalized.bootstrapServers,
+                clientId = normalized.clientId,
+                securityProtocol = normalized.securityProtocol,
+                truststoreType = normalized.truststoreType,
+                truststoreLocation = normalized.truststoreLocation,
+                truststoreCertificates = normalized.truststoreCertificates,
+                keystoreType = normalized.keystoreType,
+                keystoreLocation = normalized.keystoreLocation,
+                keystoreCertificateChain = normalized.keystoreCertificateChain,
+                keystoreKey = normalized.keystoreKey,
+                keyPassword = normalized.keyPassword,
+                additionalProperties = normalized.additionalProperties,
+            )
+        }
+
+    private fun KafkaEditableClusterResponse.normalizedForSave(): KafkaEditableClusterResponse {
+        val normalizedSecurityProtocol = securityProtocol.trim().uppercase().ifBlank { "PLAINTEXT" }
+        if (normalizedSecurityProtocol == "PLAINTEXT") {
+            return copy(
+                securityProtocol = "PLAINTEXT",
+                truststoreType = "",
+                truststoreLocation = "",
+                truststoreCertificates = "",
+                keystoreType = "",
+                keystoreLocation = "",
+                keystoreCertificateChain = "",
+                keystoreKey = "",
+                keyPassword = "",
+            )
+        }
+
+        return copy(securityProtocol = "SSL")
+            .normalizeTruststoreForSave()
+            .normalizeKeystoreForSave()
+    }
+
+    private fun KafkaEditableClusterResponse.normalizeTruststoreForSave(): KafkaEditableClusterResponse =
+        when (truststoreType.trim().uppercase()) {
+            "JKS" -> copy(
+                truststoreType = "JKS",
+                truststoreCertificates = "",
+            )
+
+            "PEM" -> copy(
+                truststoreType = "PEM",
+                truststoreLocation = "",
+            )
+
+            else -> copy(
+                truststoreType = "",
+                truststoreLocation = "",
+                truststoreCertificates = "",
+            )
+        }
+
+    private fun KafkaEditableClusterResponse.normalizeKeystoreForSave(): KafkaEditableClusterResponse =
+        when (keystoreType.trim().uppercase()) {
+            "JKS" -> copy(
+                keystoreType = "JKS",
+                keystoreCertificateChain = "",
+                keystoreKey = "",
+                keyPassword = "",
+            )
+
+            "PEM" -> copy(
+                keystoreType = "PEM",
+                keystoreLocation = "",
+            )
+
+            else -> copy(
+                keystoreType = "",
+                keystoreLocation = "",
+                keystoreCertificateChain = "",
+                keystoreKey = "",
+                keyPassword = "",
+            )
+        }
 }

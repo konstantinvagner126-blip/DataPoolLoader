@@ -60,6 +60,8 @@ Kafka credentials и TLS material не должны жить в:
 - `JKS` fields сохраняются как filesystem path;
 - `PEM` fields сохраняются как `${file:/abs/path}` placeholder;
 - certificate targets в settings UI допускают `.crt`, `.cer` и `.pem`, private key target допускает `.key` и `.pem`;
+- material file fields выбираются через системный file chooser и не редактируются ручным вводом path;
+- settings UI должен показывать только поля, релевантные выбранному `JKS` или `PEM` material format;
 - browser upload не становится вторым source of truth для TLS material.
 
 ## 3. Supported transport/security model
@@ -230,11 +232,12 @@ Message browser также обязан:
 - produce;
 - create topic.
 
-Produce payload preview является UI-only функцией:
+Produce payload editor является UI-only функцией:
 
-- valid JSON может форматироваться и подсвечиваться до отправки;
-- invalid JSON и plain text должны оставаться plain text fallback;
-- preview не должен менять фактический payload, который отправляется в Kafka.
+- valid JSON может подсвечиваться внутри editor до отправки;
+- invalid JSON и plain text должны оставаться редактируемыми в том же editor;
+- editor не должен автоматически менять фактический payload, который отправляется в Kafka;
+- pretty-format JSON допустим только по явному действию пользователя и только для валидного JSON.
 
 ### 5.6. Create topic must fail explicitly on duplicate or invalid admin input
 

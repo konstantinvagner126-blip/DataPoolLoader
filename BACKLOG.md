@@ -824,31 +824,38 @@ Non-goals первой дизайн-волны:
 Контекст:
 
 - message inspector уже подсвечивает valid JSON при просмотре сообщений;
-- produce payload editor пока отображает JSON как обычный текст;
-- invalid JSON и plain text не должны ломать UI или менять отправляемый payload.
+- produce payload editor должен подсвечивать JSON внутри самого редактора;
+- отдельный preview увеличивает информационную нагрузку и не нужен;
+- invalid JSON и plain text должны оставаться редактируемыми и не должны менять отправляемый payload.
 
 Что нужно сделать:
 
-1. добавить в produce screen JSON preview рядом с payload editor:
-   - valid JSON форматируется и подсвечивается тем же highlighter, что и message inspector;
-   - invalid JSON и plain text отображаются как plain text fallback;
-2. не изменять фактический payload, который отправляется в Kafka;
-3. сохранить текущий textarea как основной editor;
-4. не менять produce API и write safety.
+1. заменить plain textarea payload на один JSON-aware editor:
+   - подсветка должна быть внутри самого editor;
+   - не показывать отдельный preview-блок;
+   - invalid JSON и plain text должны оставаться редактируемыми;
+2. добавить явную кнопку `Форматировать JSON`:
+   - кнопка активна только для валидного JSON;
+   - pretty-format применяется только по нажатию пользователя;
+   - автоматом payload не форматируется;
+3. не изменять фактический payload, который отправляется в Kafka, кроме явного действия форматирования;
+4. сохранить высоту и рабочий размер payload editor;
+5. не менять produce API и write safety.
 
 Что сделано:
 
-1. produce screen получил payload preview под textarea;
-2. valid JSON форматируется через browser `JSON.parse/JSON.stringify` и подсвечивается общим Kafka JSON highlighter;
-3. invalid JSON и plain text отображаются как plain text fallback;
-4. фактический payload отправки не меняется;
-5. produce API и write safety не менялись.
+1. produce payload переведен на один Monaco JSON editor без отдельного preview;
+2. подсветка JSON отображается внутри editor;
+3. invalid JSON и plain text остаются редактируемыми в том же editor;
+4. добавлена явная кнопка `Форматировать JSON`;
+5. pretty-format применяется только по нажатию и только для валидного JSON;
+6. produce API и write safety не менялись.
 
 #### 19.7. Kafka consumer groups and brokers screens consistency
 
 Статус:
 
-- запланировано
+- выполнено
 
 Контекст:
 
@@ -870,11 +877,29 @@ Non-goals первой дизайн-волны:
 3. сохранить reload actions;
 4. не трактовать partial ACL/metadata failure как полный cluster failure.
 
+Что сделано:
+
+1. Consumer Groups screen переведен на Kafka metadata panel:
+   - compact header с reload action;
+   - summary metrics по groups/members/topics/lag/warnings;
+   - dense table с status badges;
+   - inline detail view по group topics;
+   - partition lag chips внутри detail table;
+2. Brokers screen переведен на Kafka metadata panel:
+   - compact header с reload action;
+   - cluster summary metrics;
+   - broker cards;
+   - dense broker table;
+   - controller/follower role badges;
+3. reload actions сохранены;
+4. partial metadata warnings остаются section/group-level UI state;
+5. Kafka API и store contracts не менялись.
+
 #### 19.8. Kafka settings UI redesign
 
 Статус:
 
-- запланировано
+- выполнено
 
 Контекст:
 
@@ -899,7 +924,36 @@ Non-goals первой дизайн-волны:
    - PEM private key;
    - `.crt / .cer / .pem / .key / .jks / .p12 / .pfx` semantics;
 4. PEM fields должны сохраняться как `${file:/abs/path}` placeholders;
-5. raw secret values не должны попадать в browser-local state как отдельный source of truth.
+5. raw secret values не должны попадать в browser-local state как отдельный source of truth;
+6. показывать только поля выбранного material format:
+   - для `JKS` показывать только соответствующие truststore/keystore file fields;
+   - для `PEM` показывать только соответствующие certificate/key file fields;
+   - для `Не задано` не показывать file fields;
+7. material file fields не должны иметь ручной ввод path:
+   - путь задается только через системный file chooser;
+   - выбранное значение отображается read-only;
+   - очистка значения выполняется явной кнопкой `Очистить`;
+8. не показывать `default` как режим Kafka SSL material.
+
+Что сделано:
+
+1. SSL settings UI разбит на две компактные секции:
+   - `Trust material`;
+   - `Client material`;
+2. для каждой секции есть только явный выбор material format:
+   - `Не задано`;
+   - `JKS / PKCS12`;
+   - `PEM files`;
+3. показываются только поля выбранного формата:
+   - JKS показывает только соответствующий truststore/keystore file;
+   - PEM показывает только соответствующие certificate/key files;
+   - `Не задано` скрывает file fields;
+4. material file fields стали read-only display:
+   - выбрать файл можно только через системный file chooser;
+   - ручной ввод path удален;
+   - добавлена явная кнопка `Очистить`;
+5. store нормализует hidden stale SSL fields перед save/test connection;
+6. `default` как SSL material mode не отображается.
 
 #### 19.9. Kafka modernization implementation guide
 

@@ -24,6 +24,11 @@ internal data class KafkaSettingsSelectOption(
     val label: String,
 )
 
+private const val KafkaSecurityProtocolPlaintext = "PLAINTEXT"
+private const val KafkaSecurityProtocolSsl = "SSL"
+private const val KafkaMaterialTypeJks = "JKS"
+private const val KafkaMaterialTypePem = "PEM"
+
 @Composable
 internal fun KafkaSettingsSection(
     state: KafkaPageState,
@@ -171,13 +176,13 @@ internal fun KafkaSettingsClusterCard(
                 label = "security.protocol",
                 value = cluster.securityProtocol,
                 options = listOf(
-                    KafkaSettingsSelectOption("PLAINTEXT", "PLAINTEXT (без TLS)"),
-                    KafkaSettingsSelectOption("SSL", "SSL / TLS"),
+                    KafkaSettingsSelectOption(KafkaSecurityProtocolPlaintext, "PLAINTEXT (без TLS)"),
+                    KafkaSettingsSelectOption(KafkaSecurityProtocolSsl, "SSL / TLS"),
                 ),
                 disabled = busy,
             ) { nextProtocol ->
                 onClusterChange(
-                    if (nextProtocol == "PLAINTEXT") {
+                    if (nextProtocol == KafkaSecurityProtocolPlaintext) {
                         cluster.copy(
                             securityProtocol = nextProtocol,
                             truststoreType = "",
@@ -190,7 +195,7 @@ internal fun KafkaSettingsClusterCard(
                             keyPassword = "",
                         )
                     } else {
-                        cluster.copy(securityProtocol = nextProtocol)
+                        cluster.copy(securityProtocol = KafkaSecurityProtocolSsl)
                     },
                 )
             }
@@ -200,99 +205,22 @@ internal fun KafkaSettingsClusterCard(
             }
         }
 
-        if (cluster.securityProtocol != "PLAINTEXT") {
+        if (cluster.securityProtocol != KafkaSecurityProtocolPlaintext) {
             Div({ classes("kafka-settings-ssl-grid") }) {
-                KafkaSettingsSelectField(
-                    label = "ssl.truststore.type",
-                    value = cluster.truststoreType,
-                    options = listOf(
-                        KafkaSettingsSelectOption("", "Не задано"),
-                        KafkaSettingsSelectOption("JKS", "JKS / PKCS12"),
-                        KafkaSettingsSelectOption("PEM", "PEM certificate files"),
-                    ),
-                    disabled = busy,
-                    helperText = "Не задано = type property не будет записано в config.",
-                ) { onClusterChange(cluster.copy(truststoreType = it)) }
-                KafkaSettingsPathField(
-                    label = "ssl.truststore.location",
-                    value = cluster.truststoreLocation,
-                    placeholderText = "path to truststore",
-                    disabled = busy,
-                    helperText = "Truststore file: .jks / .p12 / .pfx",
-                    browseLabel = "Выбрать truststore",
-                    browseEnabled = cluster.truststoreType == "JKS",
-                    browseBusy = filePickTargetProperty == "ssl.truststore.location",
-                    onBrowse = { onPickFile("ssl.truststore.location") },
-                ) {
-                    onClusterChange(cluster.copy(truststoreLocation = it))
-                }
-                KafkaSettingsPathField(
-                    "ssl.truststore.certificates",
-                    value = cluster.truststoreCertificates,
-                    placeholderText = "\${file:/path/to/ca.crt}",
-                    disabled = busy,
-                    helperText = "CA certificates: .crt / .cer / .pem",
-                    browseLabel = "Выбрать CA сертификат",
-                    browseEnabled = cluster.truststoreType == "PEM",
-                    browseBusy = filePickTargetProperty == "ssl.truststore.certificates",
-                    onBrowse = { onPickFile("ssl.truststore.certificates") },
-                ) {
-                    onClusterChange(cluster.copy(truststoreCertificates = it))
-                }
-
-                KafkaSettingsSelectField(
-                    label = "ssl.keystore.type",
-                    value = cluster.keystoreType,
-                    options = listOf(
-                        KafkaSettingsSelectOption("", "Не задано"),
-                        KafkaSettingsSelectOption("JKS", "JKS / PKCS12"),
-                        KafkaSettingsSelectOption("PEM", "PEM certificate files"),
-                    ),
-                    disabled = busy,
-                    helperText = "Не задано = type property не будет записано в config.",
-                ) { onClusterChange(cluster.copy(keystoreType = it)) }
-                KafkaSettingsPathField(
-                    label = "ssl.keystore.location",
-                    value = cluster.keystoreLocation,
-                    placeholderText = "path to keystore",
-                    disabled = busy,
-                    helperText = "Keystore file: .jks / .p12 / .pfx",
-                    browseLabel = "Выбрать keystore",
-                    browseEnabled = cluster.keystoreType == "JKS",
-                    browseBusy = filePickTargetProperty == "ssl.keystore.location",
-                    onBrowse = { onPickFile("ssl.keystore.location") },
-                ) {
-                    onClusterChange(cluster.copy(keystoreLocation = it))
-                }
-                KafkaSettingsPathField(
-                    "ssl.keystore.certificate.chain",
-                    value = cluster.keystoreCertificateChain,
-                    placeholderText = "\${file:/path/to/client.crt}",
-                    disabled = busy,
-                    helperText = "Client certificate chain: .crt / .cer / .pem",
-                    browseLabel = "Выбрать client certificate",
-                    browseEnabled = cluster.keystoreType == "PEM",
-                    browseBusy = filePickTargetProperty == "ssl.keystore.certificate.chain",
-                    onBrowse = { onPickFile("ssl.keystore.certificate.chain") },
-                ) {
-                    onClusterChange(cluster.copy(keystoreCertificateChain = it))
-                }
-                KafkaSettingsPathField(
-                    "ssl.keystore.key",
-                    value = cluster.keystoreKey,
-                    placeholderText = "\${file:/path/to/client.key}",
-                    disabled = busy,
-                    helperText = "Private key: .key / .pem",
-                    browseLabel = "Выбрать private key",
-                    browseEnabled = cluster.keystoreType == "PEM",
-                    browseBusy = filePickTargetProperty == "ssl.keystore.key",
-                    onBrowse = { onPickFile("ssl.keystore.key") },
-                ) {
-                    onClusterChange(cluster.copy(keystoreKey = it))
-                }
-                KafkaSettingsTextField("ssl.key.password", cluster.keyPassword, "\${KAFKA_KEY_PASSWORD}", busy) {
-                    onClusterChange(cluster.copy(keyPassword = it))
-                }
+                KafkaSettingsTrustMaterialSection(
+                    cluster = cluster,
+                    busy = busy,
+                    filePickTargetProperty = filePickTargetProperty,
+                    onClusterChange = onClusterChange,
+                    onPickFile = onPickFile,
+                )
+                KafkaSettingsClientMaterialSection(
+                    cluster = cluster,
+                    busy = busy,
+                    filePickTargetProperty = filePickTargetProperty,
+                    onClusterChange = onClusterChange,
+                    onPickFile = onPickFile,
+                )
             }
         }
 
@@ -304,6 +232,115 @@ internal fun KafkaSettingsClusterCard(
                         Span({ classes("kafka-settings-additional-key") }) { Text(entry.key) }
                         Span({ classes("kafka-settings-additional-value") }) { Text(entry.value) }
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun KafkaSettingsTrustMaterialSection(
+    cluster: KafkaEditableClusterResponse,
+    busy: Boolean,
+    filePickTargetProperty: String?,
+    onClusterChange: (KafkaEditableClusterResponse) -> Unit,
+    onPickFile: (String) -> Unit,
+) {
+    val materialType = normalizeKafkaMaterialType(cluster.truststoreType)
+
+    Div({ classes("kafka-settings-material-card") }) {
+        P({ classes("kafka-message-section-title") }) { Text("Trust material") }
+        KafkaSettingsSelectField(
+            label = "Format",
+            value = materialType,
+            options = kafkaMaterialOptions(),
+            disabled = busy,
+        ) { nextType ->
+            onClusterChange(cluster.withTruststoreMaterialType(nextType))
+        }
+
+        when (materialType) {
+            KafkaMaterialTypeJks -> KafkaSettingsPathField(
+                label = "ssl.truststore.location",
+                value = cluster.truststoreLocation,
+                emptyText = "Truststore file не выбран",
+                disabled = busy,
+                browseLabel = "Выбрать truststore",
+                browseBusy = filePickTargetProperty == "ssl.truststore.location",
+                onBrowse = { onPickFile("ssl.truststore.location") },
+                onClear = { onClusterChange(cluster.copy(truststoreLocation = "")) },
+            )
+
+            KafkaMaterialTypePem -> KafkaSettingsPathField(
+                label = "ssl.truststore.certificates",
+                value = cluster.truststoreCertificates,
+                emptyText = "CA certificate не выбран",
+                disabled = busy,
+                browseLabel = "Выбрать CA certificate",
+                browseBusy = filePickTargetProperty == "ssl.truststore.certificates",
+                onBrowse = { onPickFile("ssl.truststore.certificates") },
+                onClear = { onClusterChange(cluster.copy(truststoreCertificates = "")) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun KafkaSettingsClientMaterialSection(
+    cluster: KafkaEditableClusterResponse,
+    busy: Boolean,
+    filePickTargetProperty: String?,
+    onClusterChange: (KafkaEditableClusterResponse) -> Unit,
+    onPickFile: (String) -> Unit,
+) {
+    val materialType = normalizeKafkaMaterialType(cluster.keystoreType)
+
+    Div({ classes("kafka-settings-material-card") }) {
+        P({ classes("kafka-message-section-title") }) { Text("Client material") }
+        KafkaSettingsSelectField(
+            label = "Format",
+            value = materialType,
+            options = kafkaMaterialOptions(),
+            disabled = busy,
+        ) { nextType ->
+            onClusterChange(cluster.withKeystoreMaterialType(nextType))
+        }
+
+        when (materialType) {
+            KafkaMaterialTypeJks -> KafkaSettingsPathField(
+                label = "ssl.keystore.location",
+                value = cluster.keystoreLocation,
+                emptyText = "Keystore file не выбран",
+                disabled = busy,
+                browseLabel = "Выбрать keystore",
+                browseBusy = filePickTargetProperty == "ssl.keystore.location",
+                onBrowse = { onPickFile("ssl.keystore.location") },
+                onClear = { onClusterChange(cluster.copy(keystoreLocation = "")) },
+            )
+
+            KafkaMaterialTypePem -> {
+                KafkaSettingsPathField(
+                    label = "ssl.keystore.certificate.chain",
+                    value = cluster.keystoreCertificateChain,
+                    emptyText = "Client certificate не выбран",
+                    disabled = busy,
+                    browseLabel = "Выбрать client certificate",
+                    browseBusy = filePickTargetProperty == "ssl.keystore.certificate.chain",
+                    onBrowse = { onPickFile("ssl.keystore.certificate.chain") },
+                    onClear = { onClusterChange(cluster.copy(keystoreCertificateChain = "")) },
+                )
+                KafkaSettingsPathField(
+                    label = "ssl.keystore.key",
+                    value = cluster.keystoreKey,
+                    emptyText = "Private key не выбран",
+                    disabled = busy,
+                    browseLabel = "Выбрать private key",
+                    browseBusy = filePickTargetProperty == "ssl.keystore.key",
+                    onBrowse = { onPickFile("ssl.keystore.key") },
+                    onClear = { onClusterChange(cluster.copy(keystoreKey = "")) },
+                )
+                KafkaSettingsTextField("ssl.key.password", cluster.keyPassword, "\${KAFKA_KEY_PASSWORD}", busy) {
+                    onClusterChange(cluster.copy(keyPassword = it))
                 }
             }
         }
@@ -336,40 +373,42 @@ internal fun KafkaSettingsTextField(
 internal fun KafkaSettingsPathField(
     label: String,
     value: String,
-    placeholderText: String,
+    emptyText: String,
     disabled: Boolean,
-    helperText: String = "",
     browseLabel: String,
-    browseEnabled: Boolean,
     browseBusy: Boolean,
     onBrowse: () -> Unit,
-    onChange: (String) -> Unit,
+    onClear: () -> Unit,
 ) {
     Div({ classes("kafka-settings-field") }) {
         P({ classes("kafka-message-control-label") }) { Text(label) }
         Div({ classes("kafka-settings-path-field") }) {
-            Input(type = InputType.Text, attrs = {
-                classes("form-control")
-                value(value)
-                if (placeholderText.isNotBlank()) {
-                    placeholder(placeholderText)
-                }
-                if (disabled) disabled()
-                onInput { onChange(it.value) }
-            })
-            if (browseEnabled) {
+            Div({
+                classes(
+                    "kafka-settings-path-display",
+                    if (value.isBlank()) "empty" else "filled",
+                )
+            }) {
+                Text(value.ifBlank { emptyText })
+            }
+            Button(attrs = {
+                classes("btn", "btn-outline-secondary", "btn-sm", "kafka-settings-path-button")
+                attr("type", "button")
+                if (disabled || browseBusy) disabled()
+                onClick { onBrowse() }
+            }) {
+                Text(if (browseBusy) "Выбираю..." else browseLabel)
+            }
+            if (value.isNotBlank()) {
                 Button(attrs = {
-                    classes("btn", "btn-outline-secondary", "btn-sm", "kafka-settings-path-button")
+                    classes("btn", "btn-outline-danger", "btn-sm", "kafka-settings-path-button")
                     attr("type", "button")
                     if (disabled || browseBusy) disabled()
-                    onClick { onBrowse() }
+                    onClick { onClear() }
                 }) {
-                    Text(if (browseBusy) "Выбираю..." else browseLabel)
+                    Text("Очистить")
                 }
             }
-        }
-        if (helperText.isNotBlank()) {
-            P({ classes("text-secondary", "small", "mb-0") }) { Text(helperText) }
         }
     }
 }
@@ -404,6 +443,65 @@ internal fun KafkaSettingsSelectField(
         }
     }
 }
+
+private fun kafkaMaterialOptions(): List<KafkaSettingsSelectOption> = listOf(
+    KafkaSettingsSelectOption("", "Не задано"),
+    KafkaSettingsSelectOption(KafkaMaterialTypeJks, "JKS / PKCS12"),
+    KafkaSettingsSelectOption(KafkaMaterialTypePem, "PEM files"),
+)
+
+private fun normalizeKafkaMaterialType(value: String): String =
+    when (value.trim().uppercase()) {
+        KafkaMaterialTypeJks -> KafkaMaterialTypeJks
+        KafkaMaterialTypePem -> KafkaMaterialTypePem
+        else -> ""
+    }
+
+private fun KafkaEditableClusterResponse.withTruststoreMaterialType(
+    nextType: String,
+): KafkaEditableClusterResponse =
+    when (normalizeKafkaMaterialType(nextType)) {
+        KafkaMaterialTypeJks -> copy(
+            truststoreType = KafkaMaterialTypeJks,
+            truststoreCertificates = "",
+        )
+
+        KafkaMaterialTypePem -> copy(
+            truststoreType = KafkaMaterialTypePem,
+            truststoreLocation = "",
+        )
+
+        else -> copy(
+            truststoreType = "",
+            truststoreLocation = "",
+            truststoreCertificates = "",
+        )
+    }
+
+private fun KafkaEditableClusterResponse.withKeystoreMaterialType(
+    nextType: String,
+): KafkaEditableClusterResponse =
+    when (normalizeKafkaMaterialType(nextType)) {
+        KafkaMaterialTypeJks -> copy(
+            keystoreType = KafkaMaterialTypeJks,
+            keystoreCertificateChain = "",
+            keystoreKey = "",
+            keyPassword = "",
+        )
+
+        KafkaMaterialTypePem -> copy(
+            keystoreType = KafkaMaterialTypePem,
+            keystoreLocation = "",
+        )
+
+        else -> copy(
+            keystoreType = "",
+            keystoreLocation = "",
+            keystoreCertificateChain = "",
+            keystoreKey = "",
+            keyPassword = "",
+        )
+    }
 
 @Composable
 internal fun KafkaSettingsBooleanField(
