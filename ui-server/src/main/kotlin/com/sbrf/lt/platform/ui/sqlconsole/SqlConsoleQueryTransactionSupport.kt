@@ -48,8 +48,13 @@ internal class SqlConsoleQueryTransactionSupport(
             snapshot = current.snapshot.copy(
                 transactionState = targetState,
                 transactionShardNames = emptyList(),
+                ownerToken = null,
+                ownerLeaseExpiresAt = null,
+                pendingCommitExpiresAt = null,
             ),
             pendingTransaction = null,
+            ownerLost = false,
+            ownerReleaseDeadline = null,
         )
     }
 }

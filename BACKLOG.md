@@ -1223,6 +1223,113 @@ Non-goals первой дизайн-волны:
 3. закрепить rollback / cleanup / recovery policy;
 4. усилить scenario-level и server-side проверки именно на long-running контрактах.
 
+#### 9.6. SQL manual transaction final snapshot cleanup
+
+Статус:
+
+- выполнено
+
+Контекст:
+
+- SQL manual transaction уже защищена owner token, heartbeat, release recovery window и pending commit TTL;
+- после успешного `Commit` или явного `Rollback` control-path больше не должен выглядеть активным;
+- публичный execution snapshot не должен сохранять `ownerLeaseExpiresAt` или `pendingCommitExpiresAt` после финального завершения транзакции.
+
+Что нужно сделать:
+
+1. добавить regression coverage для `Commit` и явного `Rollback`;
+2. проверить, что после финализации транзакции snapshot:
+   - имеет `COMMITTED` или `ROLLED_BACK`;
+   - не содержит active `ownerLeaseExpiresAt`;
+   - не содержит active `pendingCommitExpiresAt`;
+   - не содержит public `ownerToken`;
+3. исправить серверную финализацию без изменения owner-token проверок до действия;
+4. не менять SQL execution lifecycle и transaction safety contracts.
+
+Что сделано:
+
+1. добавлена regression coverage в `SqlConsoleQueryManagerTransactionSafetyTest`:
+   - successful `Commit` очищает public control-path metadata;
+   - explicit `Rollback` очищает public control-path metadata;
+2. `SqlConsoleQueryTransactionSupport` после финального `Commit/Rollback` очищает:
+   - `ownerToken`;
+   - `ownerLeaseExpiresAt`;
+   - `pendingCommitExpiresAt`;
+   - `ownerReleaseDeadline`;
+3. owner-token проверка до выполнения действия сохранена без изменений;
+4. SQL execution lifecycle, heartbeat, release recovery window и pending commit TTL не менялись.
+
+Проверка:
+
+- `./gradlew :ui-server:test --tests 'com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleQueryManagerTransactionSafetyTest'` — `BUILD SUCCESSFUL`.
+
+#### 9.7. SQL manual transaction final route response regression
+
+Статус:
+
+- выполнено
+
+Контекст:
+
+- `9.6` закрыл cleanup финального snapshot на уровне `SqlConsoleQueryManager`;
+- нужен server-level regression, чтобы HTTP boundary `/commit` и `/rollback` не вернул наружу active control-path metadata после финализации;
+- route handlers должны оставаться thin и не содержать отдельной lifecycle-логики.
+
+Что нужно сделать:
+
+1. добавить server-level regression в `SqlConsoleServerTest`;
+2. проверить route responses после explicit `Commit` и explicit `Rollback`:
+   - `transactionState` равен `COMMITTED` или `ROLLED_BACK`;
+   - `ownerToken` отсутствует или `null`;
+   - `ownerLeaseExpiresAt` отсутствует или `null`;
+   - `pendingCommitExpiresAt` отсутствует или `null`;
+3. не добавлять lifecycle-логику в route handlers;
+4. не менять contracts, уже закрепленные в `9.6`.
+
+Что сделано:
+
+1. добавлен server-level regression в `SqlConsoleServerTest` для HTTP `/commit` и `/rollback`;
+2. route responses проверяются на финальный `transactionState` и отсутствие active control-path metadata:
+   - `ownerToken`;
+   - `ownerLeaseExpiresAt`;
+   - `pendingCommitExpiresAt`;
+3. route handlers оставлены thin: lifecycle cleanup остается в `SqlConsoleQueryManager`;
+4. JSON-проверка допускает `null` или отсутствие поля, чтобы тест не зависел от политики сериализации null.
+
+Проверка:
+
+- `./gradlew :ui-server:test --tests 'com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleQueryManagerTransactionSafetyTest' --tests 'com.sbrf.lt.platform.ui.server.SqlConsoleServerTest'` — `BUILD SUCCESSFUL`.
+
+#### 9.8. SQL manual transaction rollback history final state regression
+
+Статус:
+
+- выполнено
+
+Контекст:
+
+- SQL execution history используется для диагностики long-running и manual transaction flow;
+- при explicit `Rollback` history entry не должна оставаться в `PENDING_COMMIT`;
+- это отдельный observability contract: пользователь должен видеть финальное состояние транзакции в истории.
+
+Что нужно сделать:
+
+1. добавить regression coverage для explicit `Rollback` в execution history;
+2. проверить, что history entry для того же `executionId` обновляется с `PENDING_COMMIT` на `ROLLED_BACK`;
+3. сохранить один entry на execution, без дублирования;
+4. не менять формат persisted history без отдельной задачи.
+
+Что сделано:
+
+1. добавлен manager-level regression в `SqlConsoleQueryManagerTransactionSafetyTest`;
+2. проверено, что после старта manual transaction history содержит один entry с `PENDING_COMMIT`;
+3. после explicit `Rollback` тот же execution history entry обновляется до `ROLLED_BACK`;
+4. формат persisted history не менялся, дублирование execution entry не вводилось.
+
+Проверка:
+
+- `./gradlew :ui-server:test --tests 'com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleQueryManagerTransactionSafetyTest' --tests 'com.sbrf.lt.platform.ui.server.SqlConsoleServerTest'` — `BUILD SUCCESSFUL`.
+
 История реализованных пакетов `9.1–9.5` вынесена в [BACKLOG_HISTORY.md](/Users/kwdev/DataPoolLoader/BACKLOG_HISTORY.md).
 
 ### 11. Зафиксировать и поддерживать repo-level архитектурную дисциплину

@@ -10,6 +10,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class SqlConsoleQueryManagerTransactionSafetyTest {
@@ -33,6 +34,33 @@ class SqlConsoleQueryManagerTransactionSafetyTest {
 
         assertEquals(SqlConsoleExecutionTransactionState.COMMITTED, committed.transactionState)
         assertTrue(committed.transactionShardNames.isEmpty())
+        assertNull(committed.ownerToken)
+        assertNull(committed.ownerLeaseExpiresAt)
+        assertNull(committed.pendingCommitExpiresAt)
+    }
+
+    @Test
+    fun `clears control path metadata after explicit rollback`() {
+        val manager = SqlConsoleQueryManager(sqlConsoleService = manualTransactionService())
+
+        val started = manager.startQuery(
+            sql = "update demo set flag = true",
+            credentialsPath = null,
+            ownerSessionId = OWNER_SESSION_ID,
+            transactionMode = SqlConsoleTransactionMode.TRANSACTION_PER_SHARD,
+        )
+        val pending = waitForCompletion(manager, started.id)
+
+        assertEquals(SqlConsoleExecutionStatus.SUCCESS, pending.status)
+        assertEquals(SqlConsoleExecutionTransactionState.PENDING_COMMIT, pending.transactionState)
+
+        val rolledBack = manager.rollback(started.id, OWNER_SESSION_ID, requireNotNull(started.ownerToken))
+
+        assertEquals(SqlConsoleExecutionTransactionState.ROLLED_BACK, rolledBack.transactionState)
+        assertTrue(rolledBack.transactionShardNames.isEmpty())
+        assertNull(rolledBack.ownerToken)
+        assertNull(rolledBack.ownerLeaseExpiresAt)
+        assertNull(rolledBack.pendingCommitExpiresAt)
     }
 
     @Test
@@ -81,6 +109,37 @@ class SqlConsoleQueryManagerTransactionSafetyTest {
         val committedHistory = historyService.currentHistory("workspace-a").entries.single()
         assertEquals("COMMITTED", committedHistory.transactionState)
         assertEquals("SUCCESS", committedHistory.status)
+    }
+
+    @Test
+    fun `records execution history and updates same entry after rollback`() {
+        val historyService = SqlConsoleExecutionHistoryService(Files.createTempDirectory("sql-console-history-manager"))
+        val manager = SqlConsoleQueryManager(
+            sqlConsoleService = manualTransactionService(),
+            executionHistoryService = historyService,
+        )
+
+        val started = manager.startQuery(
+            sql = "update demo set flag = false",
+            credentialsPath = null,
+            selectedSourceNames = listOf("db1"),
+            workspaceId = "workspace-a",
+            ownerSessionId = OWNER_SESSION_ID,
+            transactionMode = SqlConsoleTransactionMode.TRANSACTION_PER_SHARD,
+        )
+        val pending = waitForCompletion(manager, started.id)
+        assertEquals(SqlConsoleExecutionTransactionState.PENDING_COMMIT, pending.transactionState)
+
+        val pendingHistory = historyService.currentHistory("workspace-a").entries.single()
+        assertEquals(started.id, pendingHistory.executionId)
+        assertEquals("PENDING_COMMIT", pendingHistory.transactionState)
+
+        manager.rollback(started.id, OWNER_SESSION_ID, requireNotNull(started.ownerToken))
+
+        val rolledBackHistory = historyService.currentHistory("workspace-a").entries.single()
+        assertEquals(started.id, rolledBackHistory.executionId)
+        assertEquals("ROLLED_BACK", rolledBackHistory.transactionState)
+        assertEquals("SUCCESS", rolledBackHistory.status)
     }
 
     @Test

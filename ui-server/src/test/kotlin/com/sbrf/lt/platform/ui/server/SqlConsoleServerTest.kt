@@ -632,6 +632,74 @@ class SqlConsoleServerTest {
     }
 
     @Test
+    fun `manual transaction final route responses clear control path metadata`() = testApplication {
+        val root = createProject()
+        val registry = ModuleRegistry(appsRoot = root.resolve("apps"))
+        val storageDir = Files.createTempDirectory("ui-server-state-")
+        val uiConfig = UiAppConfig(
+            storageDir = storageDir.toString(),
+            sqlConsole = SqlConsoleConfig(
+                queryTimeoutSec = 30,
+                sourceCatalog = listOf(SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user", "pwd")),
+            ),
+        )
+        val runManager = RunManager(moduleRegistry = registry, uiConfig = uiConfig)
+        val sqlConsoleService = manualTransactionSqlConsoleService(uiConfig.sqlConsole)
+        val queryManager = SqlConsoleQueryManager(sqlConsoleService = sqlConsoleService)
+        application {
+            uiModule(
+                moduleRegistry = registry,
+                runManager = runManager,
+                sqlConsoleService = sqlConsoleService,
+                sqlConsoleQueryManager = queryManager,
+            )
+        }
+
+        suspend fun startPendingManualTransaction(
+            workspaceId: String,
+            ownerSessionId: String,
+        ): Pair<String, String> {
+            val started = client.post("/api/sql-console/query/start") {
+                contentType(ContentType.Application.Json)
+                setBody(
+                    """{"sql":"update demo set flag = true","selectedSourceNames":["shard1"],"workspaceId":"$workspaceId","ownerSessionId":"$ownerSessionId","transactionMode":"TRANSACTION_PER_SHARD"}""",
+                )
+            }
+            assertEquals(HttpStatusCode.OK, started.status)
+            val startedBody = started.bodyAsText()
+            val executionId = startedBody.jsonStringField("id")
+            assertNotNull(executionId)
+            val ownerToken = startedBody.jsonStringField("ownerToken")
+            assertNotNull(ownerToken)
+
+            repeat(20) {
+                val polled = client.get("/api/sql-console/query/$executionId").bodyAsText()
+                if (polled.contains(""""transactionState":"PENDING_COMMIT"""")) {
+                    return executionId to ownerToken
+                }
+                Thread.sleep(25)
+            }
+            error("manual SQL execution did not reach pending commit in time")
+        }
+
+        val (commitExecutionId, commitOwnerToken) = startPendingManualTransaction("workspace-commit", "tab-commit")
+        val committed = client.post("/api/sql-console/query/$commitExecutionId/commit") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"ownerSessionId":"tab-commit","ownerToken":"$commitOwnerToken"}""")
+        }
+        assertEquals(HttpStatusCode.OK, committed.status)
+        assertFinalRouteControlPathCleared(committed.bodyAsText(), "COMMITTED")
+
+        val (rollbackExecutionId, rollbackOwnerToken) = startPendingManualTransaction("workspace-rollback", "tab-rollback")
+        val rolledBack = client.post("/api/sql-console/query/$rollbackExecutionId/rollback") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"ownerSessionId":"tab-rollback","ownerToken":"$rollbackOwnerToken"}""")
+        }
+        assertEquals(HttpStatusCode.OK, rolledBack.status)
+        assertFinalRouteControlPathCleared(rolledBack.bodyAsText(), "ROLLED_BACK")
+    }
+
+    @Test
     fun `expiring one workspace release does not remove cancel path from another workspace`() = testApplication {
         val root = createProject()
         val registry = ModuleRegistry(appsRoot = root.resolve("apps"))
@@ -795,6 +863,66 @@ class SqlConsoleServerTest {
         }
         assertEquals(HttpStatusCode.NotFound, missingShardExportResponse.status)
         assertTrue(missingShardExportResponse.bodyAsText().contains("Результат для source 'missing-shard' не найден."))
+    }
+
+    private fun manualTransactionSqlConsoleService(config: SqlConsoleConfig): SqlConsoleService =
+        SqlConsoleService(
+            config = config,
+            executor = object : ShardSqlExecutor, com.sbrf.lt.datapool.sqlconsole.ShardSqlTransactionalExecutor {
+                override fun execute(
+                    shard: com.sbrf.lt.datapool.sqlconsole.ResolvedSqlConsoleShardConfig,
+                    statement: com.sbrf.lt.datapool.sqlconsole.SqlConsoleStatement,
+                    fetchSize: Int,
+                    maxRows: Int,
+                    queryTimeoutSec: Int?,
+                    executionControl: com.sbrf.lt.datapool.sqlconsole.SqlConsoleExecutionControl,
+                ): RawShardExecutionResult =
+                    RawShardExecutionResult(
+                        shardName = shard.name,
+                        status = "SUCCESS",
+                        columns = listOf("id"),
+                        rows = listOf(mapOf("id" to "1")),
+                    )
+
+                override fun executeScriptInTransaction(
+                    shard: com.sbrf.lt.datapool.sqlconsole.ResolvedSqlConsoleShardConfig,
+                    statements: List<com.sbrf.lt.datapool.sqlconsole.SqlConsoleStatement>,
+                    fetchSize: Int,
+                    maxRows: Int,
+                    queryTimeoutSec: Int?,
+                    executionPolicy: com.sbrf.lt.datapool.sqlconsole.SqlConsoleExecutionPolicy,
+                    executionControl: com.sbrf.lt.datapool.sqlconsole.SqlConsoleExecutionControl,
+                ): com.sbrf.lt.datapool.sqlconsole.TransactionalShardScriptExecution =
+                    com.sbrf.lt.datapool.sqlconsole.TransactionalShardScriptExecution(
+                        results = statements.map {
+                            RawShardExecutionResult(
+                                shardName = shard.name,
+                                status = "SUCCESS",
+                                affectedRows = 1,
+                                message = "ok",
+                            )
+                        },
+                        pendingTransaction = object : com.sbrf.lt.datapool.sqlconsole.PendingShardTransaction {
+                            override val shardName: String = shard.name
+
+                            override fun commit() = Unit
+
+                            override fun rollback() = Unit
+                        },
+                    )
+            },
+        )
+
+    private fun assertFinalRouteControlPathCleared(body: String, expectedTransactionState: String) {
+        assertTrue(body.contains(""""transactionState":"$expectedTransactionState""""), body)
+        assertTrue(body.jsonFieldIsNullOrMissing("ownerToken"), body)
+        assertTrue(body.jsonFieldIsNullOrMissing("ownerLeaseExpiresAt"), body)
+        assertTrue(body.jsonFieldIsNullOrMissing("pendingCommitExpiresAt"), body)
+    }
+
+    private fun String.jsonFieldIsNullOrMissing(name: String): Boolean {
+        val node = createUiServerObjectMapper().readTree(this)
+        return !node.has(name) || node.get(name).isNull
     }
 
     private fun String.jsonStringField(name: String): String? =
