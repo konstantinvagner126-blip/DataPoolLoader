@@ -10,6 +10,13 @@
   padding: 0.7rem 0.8rem;
 }
 
+.sql-tool-window-secondary {
+  background:
+    linear-gradient(180deg, rgba(250, 252, 255, 0.82), rgba(244, 247, 251, 0.82)),
+    #ffffff;
+  box-shadow: none;
+}
+
 .sql-tool-window-head {
   display: flex;
   flex-wrap: wrap;
@@ -61,7 +68,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.55rem;
-  margin-bottom: 0.7rem;
+  margin-bottom: 0.55rem;
 }
 
 .sql-query-library-summary-chips {

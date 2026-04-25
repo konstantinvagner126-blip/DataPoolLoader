@@ -11,7 +11,7 @@ data class SqlConsoleContextSelectionPill(
 fun buildConsoleInfoText(info: SqlConsoleInfo?): String =
     when {
         info == null -> "Конфигурация не загружена."
-        !info.configured -> "SQL-консоль не настроена. Проверь конфигурацию источников и credential.properties."
+        !info.configured -> "SQL-консоль не настроена. Проверь конфигурацию источников."
         info.groups.none { !it.synthetic } -> "Доступно источников: ${info.sourceCatalog.size}. Лимит строк по умолчанию: ${info.maxRowsPerShard}."
         else -> "Доступно источников: ${info.sourceCatalog.size}, групп: ${info.groups.count { !it.synthetic }}. Лимит строк по умолчанию: ${info.maxRowsPerShard}."
     }

@@ -58,14 +58,9 @@ internal fun SqlConsoleSourceSidebar(
             onSaveSettings = onSaveSettings,
         )
         state.connectionCheck?.let { connectionCheck ->
-            Div({ classes("small", "text-secondary", "mt-2") }) {
+            Div({ classes("small", "sql-source-runtime-message", "mt-2") }) {
                 Text(buildConnectionCheckStatusText(connectionCheck))
             }
-        } ?: Div({ classes("small", "text-secondary", "mt-2") }) {
-            Text("Явная проверка подключений еще не выполнялась. Индикаторы ниже обновляются также по факту выполнения SQL.")
-        }
-        Div({ classes("small", "text-secondary", "mt-3") }) {
-            Text("Выбери, по каким источникам выполнять запрос.")
         }
         SqlConsoleSourceSelectionBlock(
             groups = state.info?.groups.orEmpty(),
@@ -74,15 +69,6 @@ internal fun SqlConsoleSourceSidebar(
             connectionStatusBySource = connectionStatusBySource,
             onToggleSourceGroup = onToggleSourceGroup,
             onToggleSource = onToggleSource,
-        )
-        SqlConsoleCredentialsPanel(
-            credentialsStatus = credentialsStatus,
-            credentialsMessage = credentialsMessage,
-            credentialsMessageLevel = credentialsMessageLevel,
-            selectedCredentialsFile = selectedCredentialsFile,
-            credentialsUploadInProgress = credentialsUploadInProgress,
-            onFileSelected = onCredentialsFileSelected,
-            onUpload = onUploadCredentials,
         )
     }
 }

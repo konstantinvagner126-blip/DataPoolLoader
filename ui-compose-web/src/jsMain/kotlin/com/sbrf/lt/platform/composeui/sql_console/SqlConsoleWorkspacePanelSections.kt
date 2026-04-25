@@ -69,7 +69,6 @@ internal fun SqlConsoleWorkspacePanel(
     Div({ classes("panel", "sql-shell-pane", "sql-workspace-panel") }) {
         Div({ classes("sql-shell-pane-head", "sql-workspace-pane-head", "mb-3") }) {
             Div {
-                Div({ classes("eyebrow", "mb-1") }) { Text("Workspace") }
                 Div({ classes("panel-title", "mb-1") }) { Text("SQL-редактор") }
                 Div({ classes("text-secondary", "small", "sql-shell-pane-note") }) {
                     Text("Поддерживается один SQL или SQL-скрипт из нескольких statement-ов. Результат показывается отдельно по каждому statement и source.")
@@ -77,28 +76,24 @@ internal fun SqlConsoleWorkspacePanel(
             }
         }
 
-        QueryLibraryBlock(
+        Div({ classes("sql-workspace-control-strip") }) {
+            SqlConsoleQuerySettingsBlock(
+                state = state,
+                onStrictSafetyToggle = onStrictSafetyToggle,
+                onAutoCommitToggle = onAutoCommitToggle,
+            )
+        }
+
+        SqlConsoleWorkspaceToolbar(
             state = state,
             selectedSqlText = selectedSqlText,
             selectedSqlLineCount = selectedSqlLineCount,
-            selectedRecentQuery = selectedRecentQuery,
-            selectedFavoriteQuery = selectedFavoriteQuery,
             currentOutlineItem = currentOutlineItem,
             runButtonClass = runButtonClass,
             pendingManualTransaction = pendingManualTransaction,
             isRunning = isRunning,
             exportableResult = exportableResult,
             activeExportShard = activeExportShard,
-            onRecentSelected = onRecentSelected,
-            onFavoriteSelected = onFavoriteSelected,
-            onApplyRecent = onApplyRecent,
-            onApplyFavorite = onApplyFavorite,
-            onOpenExecutionHistory = onOpenExecutionHistory,
-            onRememberFavorite = onRememberFavorite,
-            onRemoveFavorite = onRemoveFavorite,
-            onClearRecent = onClearRecent,
-            onStrictSafetyToggle = onStrictSafetyToggle,
-            onAutoCommitToggle = onAutoCommitToggle,
             onPageSizeChange = onPageSizeChange,
             onFormatSql = onFormatSql,
             onOpenNewTab = onOpenNewTab,
@@ -116,21 +111,6 @@ internal fun SqlConsoleWorkspacePanel(
             onExportZip = onExportZip,
         )
 
-        SqlFavoriteObjectsBlock(
-            favorites = state.favoriteObjects,
-            onInsert = { favorite ->
-                onInsertFavoriteObject(favorite, favorite.qualifiedName())
-            },
-            onInsertSelect = { favorite ->
-                onInsertFavoriteObject(favorite, buildFavoritePreviewSql(favorite))
-            },
-            onInsertCount = { favorite ->
-                onInsertFavoriteObject(favorite, buildFavoriteCountSql(favorite))
-            },
-            onOpenMetadata = onOpenFavoriteMetadata,
-            onRemove = onRemoveFavoriteObject,
-        )
-
         MonacoEditorPane(
             instanceKey = "compose-sql-console-editor",
             language = "sql",
@@ -140,12 +120,6 @@ internal fun SqlConsoleWorkspacePanel(
             classNames = listOf("editor-frame", "sql-editor-frame"),
             onEditorReady = { editor -> onEditorReady(editor) },
             onValueChange = onDraftSqlChange,
-        )
-
-        SqlConsoleShortcutPanel(
-            editorFocused = editorFocused,
-            hasSelectedSql = selectedSqlText.isNotBlank(),
-            onFocusEditor = onFocusEditor,
         )
 
         CommandGuardrail(analysis = statementAnalysis, strictSafetyEnabled = state.strictSafetyEnabled)
@@ -187,6 +161,41 @@ internal fun SqlConsoleWorkspacePanel(
             statementResults = statementResults,
             selectedShard = selectedResultShard,
             currentPage = currentDataPage,
+        )
+
+        QueryLibraryBlock(
+            state = state,
+            selectedRecentQuery = selectedRecentQuery,
+            selectedFavoriteQuery = selectedFavoriteQuery,
+            onRecentSelected = onRecentSelected,
+            onFavoriteSelected = onFavoriteSelected,
+            onApplyRecent = onApplyRecent,
+            onApplyFavorite = onApplyFavorite,
+            onOpenExecutionHistory = onOpenExecutionHistory,
+            onRememberFavorite = onRememberFavorite,
+            onRemoveFavorite = onRemoveFavorite,
+            onClearRecent = onClearRecent,
+        )
+
+        SqlFavoriteObjectsBlock(
+            favorites = state.favoriteObjects,
+            onInsert = { favorite ->
+                onInsertFavoriteObject(favorite, favorite.qualifiedName())
+            },
+            onInsertSelect = { favorite ->
+                onInsertFavoriteObject(favorite, buildFavoritePreviewSql(favorite))
+            },
+            onInsertCount = { favorite ->
+                onInsertFavoriteObject(favorite, buildFavoriteCountSql(favorite))
+            },
+            onOpenMetadata = onOpenFavoriteMetadata,
+            onRemove = onRemoveFavoriteObject,
+        )
+
+        SqlConsoleShortcutPanel(
+            editorFocused = editorFocused,
+            hasSelectedSql = selectedSqlText.isNotBlank(),
+            onFocusEditor = onFocusEditor,
         )
     }
 }

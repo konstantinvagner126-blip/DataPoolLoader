@@ -144,7 +144,7 @@ Non-goals первой волны:
 
 Статус:
 
-- запланировано
+- реализовано, ожидает визуального подтверждения
 
 Контекст:
 
@@ -165,11 +165,23 @@ Non-goals первой волны:
 5. ниже шапки сделать плотный SQL workspace без лишнего повторения title/copy;
 6. проверить, что editor и result pane остаются хорошо видимыми на первом viewport после compact header.
 
+Что сделано:
+
+1. основной `/sql-console` больше не использует большой `PageScaffold` hero;
+2. добавлен компактный `SqlConsoleToolHeader`:
+   - navigation actions `На главную / Объекты БД / SQL-консоль`;
+   - `Load Testing Data Platform`;
+   - `SQL-консоль по источникам`;
+   - chips по выбранным sources, workspace, transaction/autocommit mode и connection status;
+3. текущий `SqlConsolePageContent`, source selection, Monaco editor, execution callbacks и result pane оставлены без изменения;
+4. старый hero art удален из основного SQL workspace в пользу компактной CSS-векторной SQL tool icon;
+5. CSS ограничен SQL-specific styles и не меняет server/store contracts.
+
 #### 18.3. Rebalance workspace hierarchy around editor and result pane
 
 Статус:
 
-- запланировано
+- реализовано, ожидает визуального подтверждения
 
 Контекст:
 
@@ -189,11 +201,20 @@ Non-goals первой волны:
    - export;
    - favorite/recent query flows.
 
+Что сделано:
+
+1. execution toolbar вынесен из query library и расположен над Monaco editor;
+2. editor и result pane стали основным вертикальным flow workspace;
+3. query library, favorite objects и Monaco shortcuts перенесены в secondary-зону ниже result pane;
+4. settings toggles `Read-only / Autocommit` оставлены доступными над toolbar;
+5. visible label `Tool Window` удален из SQL workspace secondary blocks;
+6. существующие callbacks для execute, explain, transaction, export, recent/favorite queries и favorite objects сохранены.
+
 #### 18.4. Source navigator as dense IDE-like tree/list pane
 
 Статус:
 
-- запланировано
+- реализовано, ожидает визуального подтверждения
 
 Контекст:
 
@@ -214,6 +235,15 @@ Non-goals первой волны:
    - error;
    - warning;
    - explicit runtime result.
+
+Что сделано:
+
+1. source navigator уплотнен в tree/list style без card-heavy shell вокруг каждой группы;
+2. group selection labels сокращены до `Все / Часть / Нет`, source rows показывают status text только после явного статуса;
+3. стандартный текст `Не проверено` и idle explanation про проверку подключений убраны из списка;
+4. runtime connection-check summary оставлен компактным сообщением только после явной проверки;
+5. блок загрузки `credential.properties` убран из рабочего SQL workspace;
+6. текст `credential.properties` удален из общего not-configured сообщения SQL-консоли.
 
 #### 18.5. Execution controls and transaction state redesign
 

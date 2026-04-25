@@ -118,8 +118,10 @@ internal fun SqlConsoleSourceGroupCard(
                             Text(translateSourceGroupSelectionState(selectionState))
                         }
                     }
-                    Div({ classes("sql-source-group-checkbox-message") }) {
-                        Text(buildSourceGroupMessage(group))
+                    buildSourceGroupMessage(group)?.let { message ->
+                        Div({ classes("sql-source-group-checkbox-message") }) {
+                            Text(message)
+                        }
                     }
                 }
             }
@@ -177,8 +179,10 @@ internal fun SqlConsoleSourceCheckbox(
                     }
                     Span({ classes("sql-source-checkbox-status-dot") }) { }
                 }
-                Span({ classes("sql-source-checkbox-status") }) {
-                    Text(sourceStatus?.let { translateConnectionStatus(it.status) } ?: "Не проверено")
+                sourceStatus?.let { status ->
+                    Span({ classes("sql-source-checkbox-status") }) {
+                        Text(translateConnectionStatus(status.status))
+                    }
                 }
             }
             sourceDetail?.let { detail ->
@@ -194,15 +198,15 @@ private fun translateSourceGroupSelectionState(
     selectionState: SqlConsoleSourceGroupSelectionState,
 ): String =
     when (selectionState) {
-        SqlConsoleSourceGroupSelectionState.ALL -> "Все выбраны"
-        SqlConsoleSourceGroupSelectionState.PARTIAL -> "Частично"
-        SqlConsoleSourceGroupSelectionState.NONE -> "Не выбрана"
+        SqlConsoleSourceGroupSelectionState.ALL -> "Все"
+        SqlConsoleSourceGroupSelectionState.PARTIAL -> "Часть"
+        SqlConsoleSourceGroupSelectionState.NONE -> "Нет"
     }
 
-private fun buildSourceGroupMessage(group: SqlConsoleSourceGroup): String =
+private fun buildSourceGroupMessage(group: SqlConsoleSourceGroup): String? =
     when {
-        group.synthetic -> "Источники без явной группы."
-        else -> "Выбор группы переключает все ее source."
+        group.synthetic -> "Без явной группы"
+        else -> null
     }
 
 private fun sourceStatusDetail(sourceStatus: SqlConsoleSourceConnectionStatus?): String? =

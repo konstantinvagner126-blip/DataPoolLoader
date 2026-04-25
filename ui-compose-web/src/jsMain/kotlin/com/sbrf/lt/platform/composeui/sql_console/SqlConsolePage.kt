@@ -6,11 +6,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import com.sbrf.lt.platform.composeui.foundation.component.PageScaffold
 import com.sbrf.lt.platform.composeui.foundation.dom.classes
 import com.sbrf.lt.platform.composeui.foundation.http.ComposeHttpClient
-import com.sbrf.lt.platform.composeui.sql_console.runButtonTone
 import org.jetbrains.compose.web.dom.Div
+import org.jetbrains.compose.web.dom.Footer
+import org.jetbrains.compose.web.dom.Text
 
 @Composable
 fun ComposeSqlConsolePage(
@@ -74,26 +74,14 @@ fun ComposeSqlConsolePage(
         setState = { state = it },
     )
 
-    PageScaffold(
-        eyebrow = "Load Testing Data Platform",
-        title = "SQL-консоль по источникам",
-        subtitle = "Проверяй доступность sources, выполняй один SQL или SQL-скрипт по выбранным подключениям и сравнивай результат по каждому statement и source.",
-        heroClassNames = listOf("hero-card-compact", "sql-console-hero"),
-        heroCopyClassNames = listOf("sql-console-hero-copy"),
-        heroHeader = {
-            Div({ classes("hero-actions", "mb-3") }) {
-                SqlConsoleNavActionButton("На главную", hrefValue = "/")
-                SqlConsoleNavActionButton(
-                    "Объекты БД",
-                    hrefValue = buildSqlConsoleObjectsWorkspaceHref(resolveSqlConsoleWorkspaceId()),
-                )
-                SqlConsoleNavActionButton("SQL-консоль", active = true)
-            }
-        },
-        heroArt = {
-            SqlConsoleHeroArt()
-        },
-        content = {
+    Div({ classes("container-fluid", "py-4", "compose-home-root", "sql-console-page-root") }) {
+        Div({ classes("sql-console-page-shell") }) {
+            SqlConsoleToolHeader(
+                state = state,
+                workspaceId = uiState.workspaceId,
+                isRunning = isRunning,
+                pendingManualTransaction = pendingManualTransaction,
+            )
             SqlConsolePageContent(
                 state = state,
                 uiState = uiState,
@@ -110,6 +98,10 @@ fun ComposeSqlConsolePage(
                 exportableResult = exportableResult,
                 activeExportShard = activeExportShard,
             )
-        },
-    )
+        }
+
+        Footer({ classes("footer-note", "text-center", "mt-4") }) {
+            Text("Разработано командой MLP")
+        }
+    }
 }
