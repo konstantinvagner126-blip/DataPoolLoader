@@ -513,7 +513,7 @@ class SqlConsoleServerTest {
     }
 
     @Test
-    fun `async sql final route response clears control path metadata`() = testApplication {
+    fun `async sql final route response clears control path metadata and rejects release`() = testApplication {
         val root = createProject()
         val registry = ModuleRegistry(appsRoot = root.resolve("apps"))
         val storageDir = Files.createTempDirectory("ui-server-state-")
@@ -552,8 +552,11 @@ class SqlConsoleServerTest {
             setBody("""{"sql":"select 1 as id","selectedSourceNames":["shard1"],"workspaceId":"workspace-a","ownerSessionId":"tab-1"}""")
         }
         assertEquals(HttpStatusCode.OK, started.status)
-        val executionId = started.bodyAsText().jsonStringField("id")
+        val startedBody = started.bodyAsText()
+        val executionId = startedBody.jsonStringField("id")
+        val ownerToken = startedBody.jsonStringField("ownerToken")
         assertNotNull(executionId)
+        assertNotNull(ownerToken)
 
         repeat(20) {
             val polled = client.get("/api/sql-console/query/$executionId").bodyAsText()
@@ -562,6 +565,12 @@ class SqlConsoleServerTest {
                 assertTrue(polled.jsonFieldIsNullOrMissing("ownerToken"), polled)
                 assertTrue(polled.jsonFieldIsNullOrMissing("ownerLeaseExpiresAt"), polled)
                 assertTrue(polled.jsonFieldIsNullOrMissing("pendingCommitExpiresAt"), polled)
+                val released = client.post("/api/sql-console/query/$executionId/release") {
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"ownerSessionId":"tab-1","ownerToken":"$ownerToken"}""")
+                }
+                assertEquals(HttpStatusCode.Conflict, released.status)
+                assertTrue(released.bodyAsText().contains("control-path"))
                 return@testApplication
             }
             Thread.sleep(25)
@@ -746,6 +755,12 @@ class SqlConsoleServerTest {
         }
         assertEquals(HttpStatusCode.OK, committed.status)
         assertFinalRouteControlPathCleared(committed.bodyAsText(), "COMMITTED")
+        val commitRelease = client.post("/api/sql-console/query/$commitExecutionId/release") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"ownerSessionId":"tab-commit","ownerToken":"$commitOwnerToken"}""")
+        }
+        assertEquals(HttpStatusCode.Conflict, commitRelease.status)
+        assertTrue(commitRelease.bodyAsText().contains("control-path"))
 
         val (rollbackExecutionId, rollbackOwnerToken) = startPendingManualTransaction("workspace-rollback", "tab-rollback")
         val rolledBack = client.post("/api/sql-console/query/$rollbackExecutionId/rollback") {
@@ -754,6 +769,12 @@ class SqlConsoleServerTest {
         }
         assertEquals(HttpStatusCode.OK, rolledBack.status)
         assertFinalRouteControlPathCleared(rolledBack.bodyAsText(), "ROLLED_BACK")
+        val rollbackRelease = client.post("/api/sql-console/query/$rollbackExecutionId/release") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"ownerSessionId":"tab-rollback","ownerToken":"$rollbackOwnerToken"}""")
+        }
+        assertEquals(HttpStatusCode.Conflict, rollbackRelease.status)
+        assertTrue(rollbackRelease.bodyAsText().contains("control-path"))
     }
 
     @Test

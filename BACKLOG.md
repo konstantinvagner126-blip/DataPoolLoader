@@ -1341,6 +1341,94 @@ Non-goals первой дизайн-волны:
 
 - `./gradlew :ui-server:test --tests 'com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleQueryManagerTransactionSafetyTest.release pending commit auto rollbacks when recovery window expires' --tests 'com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleQueryManagerTransactionSafetyTest.auto rollbacks pending commit when ttl expires' --tests 'com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleQueryManagerTransactionSafetyTest.auto rollbacks completed manual transaction when owner lease was lost during running' --tests 'com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleQueryManagerTransactionSafetyTest.release running manual transaction causes safe rollback after recovery window'` — `BUILD SUCCESSFUL`.
 
+#### 9.12. SQL terminal release manager conflict
+
+Статус:
+
+- выполнено
+
+Контекст:
+
+- `releaseOwnership` является active control-path action для `RUNNING` и `PENDING_COMMIT`;
+- после terminal state активного владельца больше нет, даже если stale client все еще знает старый owner token;
+- manager-level contract должен запрещать successful release после завершения execution.
+
+Что нужно сделать:
+
+1. добавить manager-level regression для `releaseOwnership` после обычного async `SUCCESS`;
+2. добавить manager-level regression для `releaseOwnership` после explicit `COMMITTED`;
+3. проверить, что оба сценария возвращают `UiStateConflictException`;
+4. не менять поведение release для active `RUNNING` и `PENDING_COMMIT`.
+
+Что сделано:
+
+1. добавлен manager-level regression в `SqlConsoleQueryManagerExecutionTest` для `releaseOwnership` после обычного async `SUCCESS`;
+2. добавлен manager-level regression в `SqlConsoleQueryManagerTransactionSafetyTest` для `releaseOwnership` после explicit `COMMITTED`;
+3. `SqlConsoleQueryStateSupport.releaseOwnership` теперь возвращает `UiStateConflictException`, если execution уже не `RUNNING` и не `PENDING_COMMIT`;
+4. release для active `RUNNING` и `PENDING_COMMIT` не менялся.
+
+Проверка:
+
+- `./gradlew :ui-server:test --tests 'com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleQueryManagerExecutionTest.rejects release after async query completed' --tests 'com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleQueryManagerTransactionSafetyTest.keeps pending transaction until commit' --tests 'com.sbrf.lt.platform.ui.server.SqlConsoleServerTest.async sql final route response clears control path metadata and rejects release' --tests 'com.sbrf.lt.platform.ui.server.SqlConsoleServerTest.manual transaction final route responses clear control path metadata'` — `BUILD SUCCESSFUL`.
+
+#### 9.13. SQL terminal release route conflict after async completion
+
+Статус:
+
+- выполнено
+
+Контекст:
+
+- stale browser tab может отправить `/release` после того, как async SQL execution уже завершился;
+- HTTP boundary не должен отвечать `200 OK`, если control-path уже terminal.
+
+Что нужно сделать:
+
+1. добавить server-level regression для `/api/sql-console/query/{id}/release` после обычного async `SUCCESS`;
+2. проверить `409 Conflict`;
+3. проверить, что route handler остается thin и не добавляет lifecycle-логику;
+4. не менять running snapshot DTO, где owner token нужен для release.
+
+Что сделано:
+
+1. server-level regression добавлен в `SqlConsoleServerTest`;
+2. `/api/sql-console/query/{id}/release` после обычного async `SUCCESS` возвращает `409 Conflict`;
+3. route handler не менялся: вся lifecycle-логика осталась в `SqlConsoleQueryStateSupport`;
+4. running snapshot DTO и active release contract не менялись.
+
+Проверка:
+
+- `./gradlew :ui-server:test --tests 'com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleQueryManagerExecutionTest.rejects release after async query completed' --tests 'com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleQueryManagerTransactionSafetyTest.keeps pending transaction until commit' --tests 'com.sbrf.lt.platform.ui.server.SqlConsoleServerTest.async sql final route response clears control path metadata and rejects release' --tests 'com.sbrf.lt.platform.ui.server.SqlConsoleServerTest.manual transaction final route responses clear control path metadata'` — `BUILD SUCCESSFUL`.
+
+#### 9.14. SQL terminal release route conflict after transaction finalization
+
+Статус:
+
+- выполнено
+
+Контекст:
+
+- explicit `Commit` и explicit `Rollback` финализируют manual transaction;
+- после этого `/release` для старого owner token тоже не должен быть successful no-op.
+
+Что нужно сделать:
+
+1. расширить server-level regression для final `COMMITTED`;
+2. расширить server-level regression для final `ROLLED_BACK`;
+3. проверить, что `/release` после обоих финальных состояний возвращает `409 Conflict`;
+4. не менять `Commit/Rollback` owner-token проверки до действия.
+
+Что сделано:
+
+1. server-level regression для final `COMMITTED` расширен проверкой `/release -> 409 Conflict`;
+2. server-level regression для final `ROLLED_BACK` расширен проверкой `/release -> 409 Conflict`;
+3. `Commit/Rollback` owner-token checks до действия не менялись;
+4. final transaction snapshots по-прежнему очищают public control-path metadata.
+
+Проверка:
+
+- `./gradlew :ui-server:test --tests 'com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleQueryManagerExecutionTest.rejects release after async query completed' --tests 'com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleQueryManagerTransactionSafetyTest.keeps pending transaction until commit' --tests 'com.sbrf.lt.platform.ui.server.SqlConsoleServerTest.async sql final route response clears control path metadata and rejects release' --tests 'com.sbrf.lt.platform.ui.server.SqlConsoleServerTest.manual transaction final route responses clear control path metadata'` — `BUILD SUCCESSFUL`.
+
 ### 11. Зафиксировать и поддерживать repo-level архитектурную дисциплину
 
 Статус:

@@ -37,6 +37,11 @@ class SqlConsoleQueryManagerTransactionSafetyTest {
         assertNull(committed.ownerToken)
         assertNull(committed.ownerLeaseExpiresAt)
         assertNull(committed.pendingCommitExpiresAt)
+
+        val releaseError = assertFailsWith<UiStateConflictException> {
+            manager.releaseOwnership(started.id, OWNER_SESSION_ID, requireNotNull(started.ownerToken))
+        }
+        assertTrue(releaseError.message!!.contains("control-path"))
     }
 
     @Test

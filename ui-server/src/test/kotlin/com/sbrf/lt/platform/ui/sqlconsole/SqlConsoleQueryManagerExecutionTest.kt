@@ -63,6 +63,20 @@ class SqlConsoleQueryManagerExecutionTest {
     }
 
     @Test
+    fun `rejects release after async query completed`() {
+        val manager = SqlConsoleQueryManager(sqlConsoleService = sqlConsoleQueryManagerSuccessService())
+
+        val started = manager.startQuery("select 1 as id", null, ownerSessionId = OWNER_SESSION_ID)
+        val snapshot = waitForCompletion(manager, started.id)
+        assertEquals(SqlConsoleExecutionStatus.SUCCESS, snapshot.status)
+
+        val error = assertFailsWith<UiStateConflictException> {
+            manager.releaseOwnership(started.id, OWNER_SESSION_ID, requireNotNull(started.ownerToken))
+        }
+        assertTrue(error.message!!.contains("control-path"))
+    }
+
+    @Test
     fun `cancels running query`() {
         val manager = SqlConsoleQueryManager(
             sqlConsoleService = SqlConsoleService(

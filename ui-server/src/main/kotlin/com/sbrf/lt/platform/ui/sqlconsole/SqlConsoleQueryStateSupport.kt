@@ -198,7 +198,7 @@ internal class SqlConsoleQueryStateSupport(
         if (current.snapshot.status != SqlConsoleExecutionStatus.RUNNING &&
             current.snapshot.transactionState != SqlConsoleExecutionTransactionState.PENDING_COMMIT
         ) {
-            return current.snapshot
+            throw UiStateConflictException("Execution session SQL-консоли больше не принадлежит активному control-path этой вкладки.")
         }
         val releaseDeadline = now.plus(ownerReleaseRecoveryWindow)
         val updated = current.copy(
