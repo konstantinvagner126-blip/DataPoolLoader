@@ -513,6 +513,63 @@ class SqlConsoleServerTest {
     }
 
     @Test
+    fun `async sql final route response clears control path metadata`() = testApplication {
+        val root = createProject()
+        val registry = ModuleRegistry(appsRoot = root.resolve("apps"))
+        val storageDir = Files.createTempDirectory("ui-server-state-")
+        val uiConfig = UiAppConfig(
+            storageDir = storageDir.toString(),
+            sqlConsole = SqlConsoleConfig(
+                queryTimeoutSec = 30,
+                sourceCatalog = listOf(SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user", "pwd")),
+            ),
+        )
+        val runManager = RunManager(moduleRegistry = registry, uiConfig = uiConfig)
+        val sqlConsoleService = SqlConsoleService(
+            config = uiConfig.sqlConsole,
+            executor = ShardSqlExecutor { shard, statement, _, _, _, _ ->
+                assertEquals("SELECT", statement.leadingKeyword)
+                RawShardExecutionResult(
+                    shardName = shard.name,
+                    status = "SUCCESS",
+                    columns = listOf("id"),
+                    rows = listOf(mapOf("id" to "1")),
+                )
+            },
+        )
+        val queryManager = SqlConsoleQueryManager(sqlConsoleService = sqlConsoleService)
+        application {
+            uiModule(
+                moduleRegistry = registry,
+                runManager = runManager,
+                sqlConsoleService = sqlConsoleService,
+                sqlConsoleQueryManager = queryManager,
+            )
+        }
+
+        val started = client.post("/api/sql-console/query/start") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"sql":"select 1 as id","selectedSourceNames":["shard1"],"workspaceId":"workspace-a","ownerSessionId":"tab-1"}""")
+        }
+        assertEquals(HttpStatusCode.OK, started.status)
+        val executionId = started.bodyAsText().jsonStringField("id")
+        assertNotNull(executionId)
+
+        repeat(20) {
+            val polled = client.get("/api/sql-console/query/$executionId").bodyAsText()
+            if (polled.contains(""""status":"SUCCESS"""")) {
+                assertTrue(polled.contains(""""transactionState":"NONE""""), polled)
+                assertTrue(polled.jsonFieldIsNullOrMissing("ownerToken"), polled)
+                assertTrue(polled.jsonFieldIsNullOrMissing("ownerLeaseExpiresAt"), polled)
+                assertTrue(polled.jsonFieldIsNullOrMissing("pendingCommitExpiresAt"), polled)
+                return@testApplication
+            }
+            Thread.sleep(25)
+        }
+        error("async SQL execution did not complete in time")
+    }
+
+    @Test
     fun `rejects second manual transaction route when another workspace already has pending commit`() = testApplication {
         val root = createProject()
         val registry = ModuleRegistry(appsRoot = root.resolve("apps"))

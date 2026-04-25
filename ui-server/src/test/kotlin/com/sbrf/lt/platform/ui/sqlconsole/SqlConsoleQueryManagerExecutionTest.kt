@@ -54,6 +54,10 @@ class SqlConsoleQueryManagerExecutionTest {
         val snapshot = waitForCompletion(manager, started.id)
 
         assertEquals(SqlConsoleExecutionStatus.SUCCESS, snapshot.status)
+        assertEquals(SqlConsoleExecutionTransactionState.NONE, snapshot.transactionState)
+        assertNull(snapshot.ownerToken)
+        assertNull(snapshot.ownerLeaseExpiresAt)
+        assertNull(snapshot.pendingCommitExpiresAt)
         assertNotNull(snapshot.result)
         assertEquals("SELECT", snapshot.result.statementKeyword)
     }

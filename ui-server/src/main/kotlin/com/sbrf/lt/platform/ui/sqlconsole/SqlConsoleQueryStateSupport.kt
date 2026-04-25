@@ -74,7 +74,7 @@ internal class SqlConsoleQueryStateSupport(
             null -> {
                 finalExecution.copy(
                     snapshot = finalExecution.snapshot.copy(
-                        ownerToken = current.ownerToken,
+                        ownerToken = null,
                         ownerLeaseExpiresAt = null,
                         pendingCommitExpiresAt = null,
                     ),
@@ -95,7 +95,7 @@ internal class SqlConsoleQueryStateSupport(
                             snapshot = finalExecution.snapshot.copy(
                                 transactionState = SqlConsoleExecutionTransactionState.ROLLED_BACK_BY_OWNER_LOSS,
                                 transactionShardNames = emptyList(),
-                                ownerToken = current.ownerToken,
+                                ownerToken = null,
                                 ownerLeaseExpiresAt = null,
                                 pendingCommitExpiresAt = null,
                                 errorMessage = "Транзакция автоматически откатана: владелец execution session потерян.",
@@ -274,7 +274,7 @@ internal class SqlConsoleQueryStateSupport(
                                 SqlConsoleExecutionTransactionState.ROLLED_BACK_BY_OWNER_LOSS
                             },
                             transactionShardNames = emptyList(),
-                            ownerToken = updated.ownerToken,
+                            ownerToken = null,
                             ownerLeaseExpiresAt = null,
                             pendingCommitExpiresAt = null,
                             errorMessage = if (timeoutExpired) {

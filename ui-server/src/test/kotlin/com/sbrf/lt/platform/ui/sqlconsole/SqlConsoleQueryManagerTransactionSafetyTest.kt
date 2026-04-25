@@ -294,6 +294,7 @@ class SqlConsoleQueryManagerTransactionSafetyTest {
 
         assertEquals(SqlConsoleExecutionTransactionState.ROLLED_BACK_BY_OWNER_LOSS, rolledBack.transactionState)
         assertTrue(rolledBack.errorMessage!!.contains("владелец"))
+        assertFinalControlPathCleared(rolledBack)
     }
 
     @Test
@@ -321,6 +322,7 @@ class SqlConsoleQueryManagerTransactionSafetyTest {
 
         assertEquals(SqlConsoleExecutionTransactionState.ROLLED_BACK_BY_TIMEOUT, timedOut.transactionState)
         assertTrue(timedOut.errorMessage!!.contains("TTL"))
+        assertFinalControlPathCleared(timedOut)
     }
 
     @Test
@@ -347,6 +349,7 @@ class SqlConsoleQueryManagerTransactionSafetyTest {
 
         assertEquals(SqlConsoleExecutionTransactionState.ROLLED_BACK_BY_OWNER_LOSS, finished.transactionState)
         assertTrue(finished.errorMessage!!.contains("владелец"))
+        assertFinalControlPathCleared(finished)
     }
 
     @Test
@@ -374,6 +377,7 @@ class SqlConsoleQueryManagerTransactionSafetyTest {
 
         assertEquals(SqlConsoleExecutionTransactionState.ROLLED_BACK_BY_OWNER_LOSS, finished.transactionState)
         assertTrue(finished.errorMessage!!.contains("владелец"))
+        assertFinalControlPathCleared(finished)
     }
 
     @Test
@@ -456,5 +460,11 @@ class SqlConsoleQueryManagerTransactionSafetyTest {
 
         assertEquals(SqlConsoleExecutionStatus.SUCCESS, finishedFirst.status)
         assertEquals(SqlConsoleExecutionStatus.CANCELLED, finishedSecond.status)
+    }
+
+    private fun assertFinalControlPathCleared(snapshot: SqlConsoleExecutionSnapshot) {
+        assertNull(snapshot.ownerToken)
+        assertNull(snapshot.ownerLeaseExpiresAt)
+        assertNull(snapshot.pendingCommitExpiresAt)
     }
 }
