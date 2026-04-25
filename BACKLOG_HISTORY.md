@@ -302,6 +302,70 @@
 
 ## P2
 
+### 16.17. Kafka targeted visual coverage after modernization
+
+Статус:
+
+- реализовано
+
+Контекст:
+
+- Kafka redesign по `19.2–19.8` завершен функционально;
+- старый широкий `ui-visual.smoke.spec.mjs` смешивает Home, SQL, module и Kafka baselines и не должен становиться блокером после каждой локальной правки;
+- нужен отдельный Kafka-only visual suite, который защищает именно согласованные Kafka contracts.
+
+Что нужно сделать:
+
+1. добавить отдельный targeted Playwright visual suite для Kafka;
+2. покрыть baselines:
+   - topics catalog;
+   - topic overview;
+   - messages browser с inline expanded rows;
+   - produce form с JSON editor;
+   - create-topic form;
+   - consumer groups;
+   - brokers;
+   - settings screen;
+   - empty cluster catalog state;
+3. замокать Kafka API responses, чтобы suite не зависел от локального Docker/Kafka runtime;
+4. сохранить safety checks из [KAFKA_FAILURE_SCENARIOS.md](/Users/kwdev/DataPoolLoader/KAFKA_FAILURE_SCENARIOS.md):
+   - message read только по явной кнопке;
+   - last successful result не исчезает при изменении draft controls;
+   - JSON highlighting не ломает plain/invalid payload;
+   - readOnly/write state не маскируется;
+5. добавить отдельный npm shortcut для запуска только Kafka visual suite.
+
+Что сделано:
+
+1. добавлен targeted Playwright visual suite [kafka-visual.targeted.spec.mjs](/Users/kwdev/DataPoolLoader/tools/sql-console-browser-smoke/tests/kafka-visual.targeted.spec.mjs);
+2. зафиксированы 9 Kafka-only visual baselines:
+   - topics catalog;
+   - create-topic form;
+   - topic overview;
+   - messages browser с двумя одновременно раскрытыми inline rows;
+   - produce form с Monaco JSON editor;
+   - consumer groups;
+   - brokers;
+   - cluster settings;
+   - empty cluster catalog;
+3. Kafka API responses мокируются внутри suite, поэтому visual gate не зависит от Docker/Kafka runtime;
+4. suite проверяет ключевые safety/UX contracts:
+   - чтение сообщений происходит только после `Читать сообщения`;
+   - смена draft `mode` после чтения не очищает last successful result;
+   - одновременно раскрываются несколько сообщений;
+   - mixed JSON/plain/invalid payload не ломает rendering;
+   - readOnly/write states видимы в settings;
+5. добавлен npm shortcut `test:kafka-visual`;
+6. visual screenshots стабилизированы через explicit target frame и ожидание styled controls/table cells, чтобы baseline не зависел от скорости загрузки CSS.
+
+Проверка:
+
+- `SQL_CONSOLE_SMOKE_SKIP_DB_SETUP=1 PLAYWRIGHT_TEST_ARGS='tests/kafka-visual.targeted.spec.mjs' ./scripts/run-sql-console-browser-smoke.sh` — `9 passed`.
+
+Основные даты:
+
+- `2026-04-25`
+
 ### 17. Расширенный summary по длительностям
 
 Статус:
@@ -855,11 +919,16 @@
    - JSON highlighting применяется только при успешном parse;
    - non-JSON и invalid JSON остаются plain text и не ломают message browser.
 
-### 9. Операционная надежность long-running операций: реализованные packages `9.1–9.5`
+### 9. Операционная надежность long-running операций: реализованные packages `9.1–9.8`
 
 Статус:
 
 - архивировано из рабочего backlog
+
+Архивные переносы:
+
+- `2026-04-24`: packages `9.1–9.5`;
+- `2026-04-25`: packages `9.6–9.8`.
 
 #### 9.1. Write-through recovery interrupted FILES runs after restart
 
@@ -968,9 +1037,117 @@
 2. проверено, что после старта `ui-server` interrupted FILES run уже отдается как `FAILED`, а `activeRunId` равен `null`;
 3. recovery message проверяется через HTTP-слой без раздувания [ServerTest.kt](/Users/kwdev/DataPoolLoader/ui-server/src/test/kotlin/com/sbrf/lt/platform/ui/server/ServerTest.kt), что выровняло FILES/DB restart-contract на уровне server regressions.
 
+#### 9.6. SQL manual transaction final snapshot cleanup
+
+Статус:
+
+- реализовано
+
+Контекст:
+
+- SQL manual transaction уже защищена owner token, heartbeat, release recovery window и pending commit TTL;
+- после успешного `Commit` или явного `Rollback` control-path больше не должен выглядеть активным;
+- публичный execution snapshot не должен сохранять `ownerLeaseExpiresAt` или `pendingCommitExpiresAt` после финального завершения транзакции.
+
+Что нужно сделать:
+
+1. добавить regression coverage для `Commit` и явного `Rollback`;
+2. проверить, что после финализации транзакции snapshot:
+   - имеет `COMMITTED` или `ROLLED_BACK`;
+   - не содержит active `ownerLeaseExpiresAt`;
+   - не содержит active `pendingCommitExpiresAt`;
+   - не содержит public `ownerToken`;
+3. исправить серверную финализацию без изменения owner-token проверок до действия;
+4. не менять SQL execution lifecycle и transaction safety contracts.
+
+Что сделано:
+
+1. добавлена regression coverage в `SqlConsoleQueryManagerTransactionSafetyTest`:
+   - successful `Commit` очищает public control-path metadata;
+   - explicit `Rollback` очищает public control-path metadata;
+2. `SqlConsoleQueryTransactionSupport` после финального `Commit/Rollback` очищает:
+   - `ownerToken`;
+   - `ownerLeaseExpiresAt`;
+   - `pendingCommitExpiresAt`;
+   - `ownerReleaseDeadline`;
+3. owner-token проверка до выполнения действия сохранена без изменений;
+4. SQL execution lifecycle, heartbeat, release recovery window и pending commit TTL не менялись.
+
+Проверка:
+
+- `./gradlew :ui-server:test --tests 'com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleQueryManagerTransactionSafetyTest'` — `BUILD SUCCESSFUL`.
+
+#### 9.7. SQL manual transaction final route response regression
+
+Статус:
+
+- реализовано
+
+Контекст:
+
+- `9.6` закрыл cleanup финального snapshot на уровне `SqlConsoleQueryManager`;
+- нужен server-level regression, чтобы HTTP boundary `/commit` и `/rollback` не вернул наружу active control-path metadata после финализации;
+- route handlers должны оставаться thin и не содержать отдельной lifecycle-логики.
+
+Что нужно сделать:
+
+1. добавить server-level regression в `SqlConsoleServerTest`;
+2. проверить route responses после explicit `Commit` и explicit `Rollback`:
+   - `transactionState` равен `COMMITTED` или `ROLLED_BACK`;
+   - `ownerToken` отсутствует или `null`;
+   - `ownerLeaseExpiresAt` отсутствует или `null`;
+   - `pendingCommitExpiresAt` отсутствует или `null`;
+3. не добавлять lifecycle-логику в route handlers;
+4. не менять contracts, уже закрепленные в `9.6`.
+
+Что сделано:
+
+1. добавлен server-level regression в `SqlConsoleServerTest` для HTTP `/commit` и `/rollback`;
+2. route responses проверяются на финальный `transactionState` и отсутствие active control-path metadata:
+   - `ownerToken`;
+   - `ownerLeaseExpiresAt`;
+   - `pendingCommitExpiresAt`;
+3. route handlers оставлены thin: lifecycle cleanup остается в `SqlConsoleQueryManager`;
+4. JSON-проверка допускает `null` или отсутствие поля, чтобы тест не зависел от политики сериализации null.
+
+Проверка:
+
+- `./gradlew :ui-server:test --tests 'com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleQueryManagerTransactionSafetyTest' --tests 'com.sbrf.lt.platform.ui.server.SqlConsoleServerTest'` — `BUILD SUCCESSFUL`.
+
+#### 9.8. SQL manual transaction rollback history final state regression
+
+Статус:
+
+- реализовано
+
+Контекст:
+
+- SQL execution history используется для диагностики long-running и manual transaction flow;
+- при explicit `Rollback` history entry не должна оставаться в `PENDING_COMMIT`;
+- это отдельный observability contract: пользователь должен видеть финальное состояние транзакции в истории.
+
+Что нужно сделать:
+
+1. добавить regression coverage для explicit `Rollback` в execution history;
+2. проверить, что history entry для того же `executionId` обновляется с `PENDING_COMMIT` на `ROLLED_BACK`;
+3. сохранить один entry на execution, без дублирования;
+4. не менять формат persisted history без отдельной задачи.
+
+Что сделано:
+
+1. добавлен manager-level regression в `SqlConsoleQueryManagerTransactionSafetyTest`;
+2. проверено, что после старта manual transaction history содержит один entry с `PENDING_COMMIT`;
+3. после explicit `Rollback` тот же execution history entry обновляется до `ROLLED_BACK`;
+4. формат persisted history не менялся, дублирование execution entry не вводилось.
+
+Проверка:
+
+- `./gradlew :ui-server:test --tests 'com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleQueryManagerTransactionSafetyTest' --tests 'com.sbrf.lt.platform.ui.server.SqlConsoleServerTest'` — `BUILD SUCCESSFUL`.
+
 Основные даты:
 
 - `2026-04-24`
+- `2026-04-25`
 
 ## P3
 
