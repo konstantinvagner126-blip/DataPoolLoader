@@ -1,6 +1,6 @@
 @import url("./styles/00-foundation.css?v=20260424e");
 @import url("./styles/01-hero-visuals.css?v=20260424a");
-@import url("./styles/05-home.css?v=20260424b");
+@import url("./styles/05-home.css?v=20260425a");
 @import url("./styles/06-about.css?v=20260424a");
 @import url("./styles/07-help-api.css?v=20260424a");
 @import url("./styles/10-config-editor.css?v=20260424e");
@@ -17,4 +17,4 @@
 @import url("./styles/42-runtime-mode.css?v=20260424b");
 @import url("./styles/43-module-metadata.css?v=20260424b");
 @import url("./styles/44-sql-objects.css?v=20260424b");
-@import url("./styles/45-kafka.css?v=20260419a");
+@import url("./styles/45-kafka.css?v=20260425b");

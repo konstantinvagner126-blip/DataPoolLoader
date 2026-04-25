@@ -216,6 +216,10 @@ Message browser также обязан:
   - valid JSON может получать `jsonPrettyText` и syntax highlighting;
   - plain text и invalid JSON должны оставаться plain text;
   - parse failure не должен валить message read или web rendering path.
+- поддерживать независимое раскрытие сообщений в таблице:
+  - раскрытие одного сообщения не должно сворачивать другие уже раскрытые сообщения;
+  - каждое раскрытое сообщение должно сворачиваться явным действием пользователя;
+  - смена result set после нового чтения может сбрасывать UI-only expansion state.
 
 ### 5.5. Write operations on readOnly cluster
 
@@ -225,6 +229,12 @@ Message browser также обязан:
 
 - produce;
 - create topic.
+
+Produce payload preview является UI-only функцией:
+
+- valid JSON может форматироваться и подсвечиваться до отправки;
+- invalid JSON и plain text должны оставаться plain text fallback;
+- preview не должен менять фактический payload, который отправляется в Kafka.
 
 ### 5.6. Create topic must fail explicitly on duplicate or invalid admin input
 

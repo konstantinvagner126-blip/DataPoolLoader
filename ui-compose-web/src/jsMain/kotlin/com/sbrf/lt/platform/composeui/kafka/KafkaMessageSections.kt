@@ -170,22 +170,13 @@ internal fun KafkaMessageBrowserSection(
                 }
             } else {
                 val recordsKey = messages.records.joinToString("|") { kafkaMessageRecordKey(it) }
-                var selectedRecordKey by remember(
+                var expandedRecordKeys by remember(
                     messages.topicName,
                     messages.scope,
                     messages.mode,
                     recordsKey,
                 ) {
-                    mutableStateOf(messages.records.firstOrNull()?.let(::kafkaMessageRecordKey))
-                }
-                val selectedRecord = messages.records
-                    .firstOrNull { kafkaMessageRecordKey(it) == selectedRecordKey }
-                    ?: messages.records.first()
-                var activeInspectorTab by remember(selectedRecordKey) {
-                    mutableStateOf(KafkaMessageInspectorTabValue)
-                }
-                var payloadMode by remember(selectedRecordKey, activeInspectorTab) {
-                    mutableStateOf(KafkaMessagePayloadModePretty)
+                    mutableStateOf(emptySet<String>())
                 }
 
                 Div({ classes("kafka-message-browser-shell") }) {
@@ -205,26 +196,28 @@ internal fun KafkaMessageBrowserSection(
                             Tbody {
                                 messages.records.forEach { record ->
                                     val recordKey = kafkaMessageRecordKey(record)
-                                    val rowClasses = if (recordKey == kafkaMessageRecordKey(selectedRecord)) {
+                                    val expanded = recordKey in expandedRecordKeys
+                                    val rowClasses = if (expanded) {
                                         arrayOf("kafka-message-row", "kafka-message-row-active")
                                     } else {
                                         arrayOf("kafka-message-row")
                                     }
                                     Tr(attrs = {
                                         classes(*rowClasses)
-                                        onClick {
-                                            selectedRecordKey = recordKey
-                                        }
                                     }) {
                                         Td({ classes("kafka-message-expander-cell") }) {
                                             Button(attrs = {
                                                 classes("kafka-message-expander")
                                                 attr("type", "button")
                                                 onClick {
-                                                    selectedRecordKey = recordKey
+                                                    expandedRecordKeys = if (expanded) {
+                                                        expandedRecordKeys - recordKey
+                                                    } else {
+                                                        expandedRecordKeys + recordKey
+                                                    }
                                                 }
                                             }) {
-                                                Text(if (recordKey == kafkaMessageRecordKey(selectedRecord)) "-" else "+")
+                                                Text(if (expanded) "-" else "+")
                                             }
                                         }
                                         Td({ classes("kafka-message-cell-mono") }) { Text(record.offset.toString()) }
@@ -242,20 +235,8 @@ internal fun KafkaMessageBrowserSection(
                                         }
                                         Td({ classes("kafka-message-cell-mono") }) { Text(record.headers.size.toString()) }
                                     }
-                                    if (recordKey == kafkaMessageRecordKey(selectedRecord)) {
-                                        Tr({ classes("kafka-message-expanded-row") }) {
-                                            Td(attrs = {
-                                                attr("colspan", "7")
-                                            }) {
-                                                KafkaMessageExpandedInspector(
-                                                    record = record,
-                                                    activeTab = activeInspectorTab,
-                                                    payloadMode = payloadMode,
-                                                    onActiveTabChange = { activeInspectorTab = it },
-                                                    onPayloadModeChange = { payloadMode = it },
-                                                )
-                                            }
-                                        }
+                                    if (expanded) {
+                                        KafkaMessageExpandedTableRow(record)
                                     }
                                 }
                             }
@@ -263,6 +244,31 @@ internal fun KafkaMessageBrowserSection(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun KafkaMessageExpandedTableRow(record: KafkaTopicMessageRecordResponse) {
+    val recordKey = kafkaMessageRecordKey(record)
+    var activeInspectorTab by remember(recordKey) {
+        mutableStateOf(KafkaMessageInspectorTabValue)
+    }
+    var payloadMode by remember(recordKey, activeInspectorTab) {
+        mutableStateOf(KafkaMessagePayloadModePretty)
+    }
+
+    Tr({ classes("kafka-message-expanded-row") }) {
+        Td(attrs = {
+            attr("colspan", "7")
+        }) {
+            KafkaMessageExpandedInspector(
+                record = record,
+                activeTab = activeInspectorTab,
+                payloadMode = payloadMode,
+                onActiveTabChange = { activeInspectorTab = it },
+                onPayloadModeChange = { payloadMode = it },
+            )
         }
     }
 }

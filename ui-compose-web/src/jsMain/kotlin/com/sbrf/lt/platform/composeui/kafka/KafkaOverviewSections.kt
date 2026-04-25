@@ -247,13 +247,15 @@ private fun KafkaCreateTopicForm(
     Div({ classes("kafka-topic-create-shell") }) {
         Div({ classes("kafka-topic-create-header") }) {
             Div {
-                P({ classes("kafka-message-section-title") }) { Text("Create topic") }
-                P({ classes("kafka-placeholder-note", "mb-0") }) {
-                    Text("Новый топик создается сразу в выбранном кластере ${selectedCluster.name}.")
+                Div({ classes("kafka-message-pane-title") }) { Text("Create topic") }
+                P({ classes("kafka-message-pane-subtitle") }) {
+                    Text("Create topic in ${selectedCluster.name}.")
                 }
             }
-            if (selectedCluster.readOnly) {
-                Span({ classes("kafka-topic-flag") }) { Text("read only") }
+            Span({
+                classes("kafka-tool-chip", if (selectedCluster.readOnly) "lock" else "ok")
+            }) {
+                Text(if (selectedCluster.readOnly) "read only" else "admin enabled")
             }
         }
 

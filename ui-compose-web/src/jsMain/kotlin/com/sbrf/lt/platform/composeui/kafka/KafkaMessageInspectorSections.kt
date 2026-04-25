@@ -307,7 +307,7 @@ private fun KafkaRenderedPayloadContent(
 }
 
 @Composable
-private fun KafkaJsonHighlightedText(json: String) {
+internal fun KafkaJsonHighlightedText(json: String) {
     kafkaJsonTokens(json).forEach { token ->
         if (token.kind == KafkaJsonTokenKind.WHITESPACE) {
             Text(token.text)

@@ -726,7 +726,7 @@ Non-goals первой дизайн-волны:
 
 Статус:
 
-- запланировано
+- выполнено
 
 Контекст:
 
@@ -755,6 +755,94 @@ Non-goals первой дизайн-волны:
    - invalid replication;
    - authorization failure;
 5. не добавлять delete topic / alter topic / reset offsets в этот пакет.
+
+Что сделано:
+
+1. produce form переведена на Kafka UI-like tool panel:
+   - сохранены partition override;
+   - сохранен key input;
+   - сохранены structured headers rows;
+   - payload editor увеличен по высоте;
+   - delivery result summary отображается отдельной success-карточкой;
+2. readOnly cluster продолжает блокировать produce UI до действия отправки;
+3. create-topic form выровнена как compact tool form:
+   - topic name;
+   - partitions;
+   - replication factor;
+   - cleanup policy;
+   - retention.ms;
+   - retention.bytes;
+4. failure cases и Kafka admin/produce contracts не менялись;
+5. delete topic / alter topic / reset offsets не добавлялись.
+
+#### 19.6.1. Kafka message expansion and full-width modernization shells
+
+Статус:
+
+- выполнено
+
+Контекст:
+
+- message browser должен вести себя как таблица с независимыми раскрываемыми строками;
+- текущая механика одного selected message сворачивает предыдущую строку при раскрытии следующей;
+- утвержденные модернизируемые экраны не должны ограничиваться max-width с большими боковыми полями.
+
+Что нужно сделать:
+
+1. заменить single-selected expansion на независимый набор раскрытых сообщений:
+   - можно раскрыть несколько сообщений одновременно;
+   - раскрытие нового сообщения не сворачивает уже открытые;
+   - любое раскрытое сообщение можно свернуть обратно;
+2. сохранить inline inspector внутри таблицы сообщений;
+3. проверить, что изменение сообщения/режима чтения сбрасывает expansion только для нового result set;
+4. убрать `max-width` ограничение у модернизируемых shell:
+   - Kafka page;
+   - Home page;
+   - применять тот же full-width подход для следующих модернизируемых экранов;
+5. увеличить высоту payload editor на produce screen;
+6. не менять Kafka read API и bounded read semantics.
+
+Что сделано:
+
+1. message browser теперь хранит UI-only set раскрытых сообщений:
+   - можно раскрыть несколько сообщений одновременно;
+   - раскрытие нового сообщения не закрывает уже раскрытые;
+   - каждое раскрытое сообщение сворачивается повторным нажатием;
+2. inline inspector сохранен внутри таблицы;
+3. expansion state сбрасывается при смене result set через ключ набора records;
+4. Kafka и Home modernization shell переведены на full-width без `max-width: 1440px`;
+5. produce payload editor увеличен до 620px на desktop и 420px на узких экранах;
+6. обновлены cache-busters для `styles.css`, `05-home.css` и `45-kafka.css`;
+7. Kafka read API и bounded read semantics не менялись.
+
+#### 19.6.2. Kafka produce JSON highlighting
+
+Статус:
+
+- выполнено
+
+Контекст:
+
+- message inspector уже подсвечивает valid JSON при просмотре сообщений;
+- produce payload editor пока отображает JSON как обычный текст;
+- invalid JSON и plain text не должны ломать UI или менять отправляемый payload.
+
+Что нужно сделать:
+
+1. добавить в produce screen JSON preview рядом с payload editor:
+   - valid JSON форматируется и подсвечивается тем же highlighter, что и message inspector;
+   - invalid JSON и plain text отображаются как plain text fallback;
+2. не изменять фактический payload, который отправляется в Kafka;
+3. сохранить текущий textarea как основной editor;
+4. не менять produce API и write safety.
+
+Что сделано:
+
+1. produce screen получил payload preview под textarea;
+2. valid JSON форматируется через browser `JSON.parse/JSON.stringify` и подсвечивается общим Kafka JSON highlighter;
+3. invalid JSON и plain text отображаются как plain text fallback;
+4. фактический payload отправки не меняется;
+5. produce API и write safety не менялись.
 
 #### 19.7. Kafka consumer groups and brokers screens consistency
 
