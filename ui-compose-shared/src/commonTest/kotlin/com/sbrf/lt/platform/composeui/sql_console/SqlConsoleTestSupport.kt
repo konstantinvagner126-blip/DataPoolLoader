@@ -53,6 +53,32 @@ internal class StubSqlConsoleApi(
     private val saveSettingsHandler: suspend (SqlConsoleSettingsUpdate) -> SqlConsoleInfo = {
         error("saveSettings not configured")
     },
+    private val loadSourceSettingsHandler: suspend () -> SqlConsoleSourceSettings = {
+        error("loadSourceSettings not configured")
+    },
+    private val saveSourceSettingsHandler: suspend (SqlConsoleSourceSettingsUpdate) -> SqlConsoleSourceSettings = {
+        error("saveSourceSettings not configured")
+    },
+    private val testSourceSettingsConnectionHandler: suspend (
+        SqlConsoleSourceSettingsConnectionTestRequest,
+    ) -> SqlConsoleSourceSettingsConnectionTestResponse = {
+        error("testSourceSettingsConnection not configured")
+    },
+    private val testSourceSettingsConnectionsHandler: suspend (
+        SqlConsoleSourceSettingsConnectionsTestRequest,
+    ) -> SqlConsoleSourceSettingsConnectionsTestResponse = {
+        error("testSourceSettingsConnections not configured")
+    },
+    private val diagnoseSourceSettingsCredentialsHandler: suspend (
+        SqlConsoleSourceSettingsCredentialsDiagnosticsRequest,
+    ) -> SqlConsoleSourceSettingsCredentialsDiagnosticsResponse = {
+        error("diagnoseSourceSettingsCredentials not configured")
+    },
+    private val pickSourceSettingsCredentialsFileHandler: suspend (
+        SqlConsoleSourceSettingsFilePickRequest,
+    ) -> SqlConsoleSourceSettingsFilePickResponse = {
+        error("pickSourceSettingsCredentialsFile not configured")
+    },
     private val checkConnectionsHandler: suspend () -> SqlConsoleConnectionCheckResponse = {
         error("checkConnections not configured")
     },
@@ -102,6 +128,27 @@ internal class StubSqlConsoleApi(
     ): SqlConsoleStateSnapshot = saveStateHandler(request, workspaceId)
 
     override suspend fun saveSettings(request: SqlConsoleSettingsUpdate): SqlConsoleInfo = saveSettingsHandler(request)
+
+    override suspend fun loadSourceSettings(): SqlConsoleSourceSettings = loadSourceSettingsHandler()
+
+    override suspend fun saveSourceSettings(request: SqlConsoleSourceSettingsUpdate): SqlConsoleSourceSettings =
+        saveSourceSettingsHandler(request)
+
+    override suspend fun testSourceSettingsConnection(
+        request: SqlConsoleSourceSettingsConnectionTestRequest,
+    ): SqlConsoleSourceSettingsConnectionTestResponse = testSourceSettingsConnectionHandler(request)
+
+    override suspend fun testSourceSettingsConnections(
+        request: SqlConsoleSourceSettingsConnectionsTestRequest,
+    ): SqlConsoleSourceSettingsConnectionsTestResponse = testSourceSettingsConnectionsHandler(request)
+
+    override suspend fun diagnoseSourceSettingsCredentials(
+        request: SqlConsoleSourceSettingsCredentialsDiagnosticsRequest,
+    ): SqlConsoleSourceSettingsCredentialsDiagnosticsResponse = diagnoseSourceSettingsCredentialsHandler(request)
+
+    override suspend fun pickSourceSettingsCredentialsFile(
+        request: SqlConsoleSourceSettingsFilePickRequest,
+    ): SqlConsoleSourceSettingsFilePickResponse = pickSourceSettingsCredentialsFileHandler(request)
 
     override suspend fun checkConnections(): SqlConsoleConnectionCheckResponse = checkConnectionsHandler()
 

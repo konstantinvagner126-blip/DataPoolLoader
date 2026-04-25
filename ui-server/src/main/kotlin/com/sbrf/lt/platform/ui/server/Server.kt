@@ -30,6 +30,7 @@ import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleExecutionHistoryService
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleExportService
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleOperations
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleStateService
+import com.sbrf.lt.platform.ui.sqlconsole.UiSqlConsoleSourceSettingsOperations
 import io.ktor.server.application.Application
 
 internal fun Application.uiModule(
@@ -51,6 +52,7 @@ internal fun Application.uiModule(
     sqlConsoleExportService: SqlConsoleExportService? = null,
     sqlConsoleExecutionHistoryService: SqlConsoleExecutionHistoryService? = null,
     sqlConsoleStateService: SqlConsoleStateService? = null,
+    sqlConsoleSourceSettingsService: UiSqlConsoleSourceSettingsOperations? = null,
     kafkaMetadataService: KafkaMetadataOperations? = null,
     kafkaMessageService: KafkaMessageOperations? = null,
     kafkaTopicAdminService: KafkaTopicAdminOperations? = null,
@@ -85,12 +87,13 @@ internal fun Application.uiModule(
             sqlConsoleExportService = sqlConsoleExportService,
             sqlConsoleExecutionHistoryService = sqlConsoleExecutionHistoryService,
             sqlConsoleStateService = sqlConsoleStateService,
-                kafkaMetadataService = kafkaMetadataService,
-                kafkaMessageService = kafkaMessageService,
-                kafkaTopicAdminService = kafkaTopicAdminService,
-                kafkaProduceService = kafkaProduceService,
-                kafkaSettingsService = kafkaSettingsService,
-                uiConfigPersistenceService = uiConfigPersistenceService,
+            sqlConsoleSourceSettingsService = sqlConsoleSourceSettingsService,
+            kafkaMetadataService = kafkaMetadataService,
+            kafkaMessageService = kafkaMessageService,
+            kafkaTopicAdminService = kafkaTopicAdminService,
+            kafkaProduceService = kafkaProduceService,
+            kafkaSettingsService = kafkaSettingsService,
+            uiConfigPersistenceService = uiConfigPersistenceService,
             moduleSyncService = moduleSyncService,
             databaseModuleRunService = databaseModuleRunService,
             databaseModuleActiveRunRegistry = databaseModuleActiveRunRegistry,

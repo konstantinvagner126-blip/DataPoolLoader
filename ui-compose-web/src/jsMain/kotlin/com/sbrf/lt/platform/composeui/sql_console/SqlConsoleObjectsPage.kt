@@ -65,6 +65,7 @@ fun ComposeSqlConsoleObjectsPage(
                 ObjectsNavActionButton("На главную", hrefValue = "/")
                 ObjectsNavActionButton("SQL-консоль", hrefValue = buildSqlConsoleWorkspaceHref(workspaceId))
                 ObjectsNavActionButton("Объекты БД", active = true)
+                ObjectsNavActionButton("Источники", hrefValue = "/static/compose-app/index.html?screen=sql-console-sources")
             }
         },
         content = {

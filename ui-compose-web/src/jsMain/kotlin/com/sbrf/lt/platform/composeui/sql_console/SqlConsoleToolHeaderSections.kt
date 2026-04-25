@@ -28,6 +28,10 @@ internal fun SqlConsoleToolHeader(
                         classes("sql-tool-nav-action")
                         href(buildSqlConsoleObjectsWorkspaceHref(workspaceId))
                     }) { Text("Объекты БД") }
+                    A(attrs = {
+                        classes("sql-tool-nav-action")
+                        href("/static/compose-app/index.html?screen=sql-console-sources")
+                    }) { Text("Источники") }
                     Span({ classes("sql-tool-nav-action", "active") }) { Text("SQL-консоль") }
                 }
                 Div({ classes("sql-tool-eyebrow") }) { Text("MLP Platform") }

@@ -45,6 +45,57 @@ class SqlConsoleApiClient(
             deserializer = SqlConsoleInfo.serializer(),
         )
 
+    override suspend fun loadSourceSettings(): SqlConsoleSourceSettings =
+        httpClient.get("/api/sql-console/source-settings", SqlConsoleSourceSettings.serializer())
+
+    override suspend fun saveSourceSettings(request: SqlConsoleSourceSettingsUpdate): SqlConsoleSourceSettings =
+        httpClient.postJson(
+            path = "/api/sql-console/source-settings",
+            payload = request,
+            serializer = SqlConsoleSourceSettingsUpdate.serializer(),
+            deserializer = SqlConsoleSourceSettings.serializer(),
+        )
+
+    override suspend fun testSourceSettingsConnection(
+        request: SqlConsoleSourceSettingsConnectionTestRequest,
+    ): SqlConsoleSourceSettingsConnectionTestResponse =
+        httpClient.postJson(
+            path = "/api/sql-console/source-settings/test-connection",
+            payload = request,
+            serializer = SqlConsoleSourceSettingsConnectionTestRequest.serializer(),
+            deserializer = SqlConsoleSourceSettingsConnectionTestResponse.serializer(),
+        )
+
+    override suspend fun testSourceSettingsConnections(
+        request: SqlConsoleSourceSettingsConnectionsTestRequest,
+    ): SqlConsoleSourceSettingsConnectionsTestResponse =
+        httpClient.postJson(
+            path = "/api/sql-console/source-settings/test-connections",
+            payload = request,
+            serializer = SqlConsoleSourceSettingsConnectionsTestRequest.serializer(),
+            deserializer = SqlConsoleSourceSettingsConnectionsTestResponse.serializer(),
+        )
+
+    override suspend fun diagnoseSourceSettingsCredentials(
+        request: SqlConsoleSourceSettingsCredentialsDiagnosticsRequest,
+    ): SqlConsoleSourceSettingsCredentialsDiagnosticsResponse =
+        httpClient.postJson(
+            path = "/api/sql-console/source-settings/credentials/diagnose",
+            payload = request,
+            serializer = SqlConsoleSourceSettingsCredentialsDiagnosticsRequest.serializer(),
+            deserializer = SqlConsoleSourceSettingsCredentialsDiagnosticsResponse.serializer(),
+        )
+
+    override suspend fun pickSourceSettingsCredentialsFile(
+        request: SqlConsoleSourceSettingsFilePickRequest,
+    ): SqlConsoleSourceSettingsFilePickResponse =
+        httpClient.postJson(
+            path = "/api/sql-console/source-settings/pick-credentials-file",
+            payload = request,
+            serializer = SqlConsoleSourceSettingsFilePickRequest.serializer(),
+            deserializer = SqlConsoleSourceSettingsFilePickResponse.serializer(),
+        )
+
     override suspend fun checkConnections(): SqlConsoleConnectionCheckResponse =
         httpClient.postJson(
             path = "/api/sql-console/connections/check",

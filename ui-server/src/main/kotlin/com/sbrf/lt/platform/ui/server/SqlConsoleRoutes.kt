@@ -11,4 +11,5 @@ internal fun Route.registerSqlConsoleRoutes(context: UiServerContext) {
     registerSqlConsoleQueryRoutes(context)
     registerSqlConsoleExportRoutes(context)
     registerSqlConsoleAsyncQueryRoutes(context)
+    registerSqlConsoleSourceSettingsRoutes(context)
 }

@@ -12,6 +12,8 @@ interface SqlConsoleOperations {
         queryTimeoutSec: Int?,
     ): SqlConsoleInfo
 
+    fun updateConfig(config: SqlConsoleConfig): SqlConsoleInfo
+
     fun executeQuery(
         rawSql: String,
         credentialsPath: Path?,

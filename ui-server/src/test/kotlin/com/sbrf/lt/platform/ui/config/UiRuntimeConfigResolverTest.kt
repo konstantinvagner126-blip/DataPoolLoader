@@ -114,4 +114,40 @@ class UiRuntimeConfigResolverTest {
         )
         assertEquals("key-secret", resolved.kafka.clusters.single().properties["ssl.key.password"])
     }
+
+    @Test
+    fun `resolves sql console secret placeholders from secret provider`() {
+        val rawConfig = UiAppConfig(
+            sqlConsole = SqlConsoleConfig(
+                sourceCatalog = listOf(
+                    SqlConsoleSourceConfig(
+                        name = "db1",
+                        jdbcUrl = "jdbc:postgresql://localhost/db",
+                        username = "user",
+                        password = "\${secret:sqlConsole.sources.db1.password}",
+                    ),
+                ),
+            ),
+        )
+        val secretProvider = object : UiSecretProvider {
+            override fun providerInfo(): UiSecretProviderInfo =
+                UiSecretProviderInfo(
+                    providerId = "fake",
+                    displayName = "Fake secret storage",
+                    available = true,
+                )
+
+            override fun readSecret(key: String): String? =
+                if (key == "sqlConsole.sources.db1.password") "resolved-secret" else null
+
+            override fun saveSecret(
+                key: String,
+                value: String,
+            ) = Unit
+        }
+
+        val resolved = UiRuntimeConfigResolver(secretProvider = secretProvider).resolve(rawConfig)
+
+        assertEquals("resolved-secret", resolved.sqlConsole.sourceCatalog.single().password)
+    }
 }

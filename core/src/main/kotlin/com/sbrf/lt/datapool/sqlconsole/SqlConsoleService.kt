@@ -47,6 +47,11 @@ class SqlConsoleService(
         return info()
     }
 
+    override fun updateConfig(config: SqlConsoleConfig): SqlConsoleInfo {
+        currentConfig = config
+        return info()
+    }
+
     override fun executeQuery(
         rawSql: String,
         credentialsPath: Path?,

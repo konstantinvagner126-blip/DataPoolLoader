@@ -128,6 +128,8 @@ class SqlConsoleQueryManagerExecutionTest {
 
                 override fun updateSettings(maxRowsPerShard: Int, queryTimeoutSec: Int?): SqlConsoleInfo = info()
 
+                override fun updateConfig(config: SqlConsoleConfig): SqlConsoleInfo = info()
+
                 override fun executeQuery(
                     rawSql: String,
                     credentialsPath: Path?,

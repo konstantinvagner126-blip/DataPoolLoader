@@ -28,6 +28,8 @@ import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleExecutionHistoryService
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleQueryManager
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleStateService
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleWorkspaceRetentionService
+import com.sbrf.lt.platform.ui.sqlconsole.UiSqlConsoleSourceSettingsOperations
+import com.sbrf.lt.platform.ui.sqlconsole.UiSqlConsoleSourceSettingsService
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
@@ -90,6 +92,17 @@ internal fun defaultSqlConsoleStateService(
         libraryStore = com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleLibraryStateStore(uiConfig.storageDirPath()),
         preferencesStore = com.sbrf.lt.platform.ui.sqlconsole.SqlConsolePreferencesStateStore(uiConfig.storageDirPath()),
         workspaceRetentionService = workspaceRetentionService,
+    )
+
+internal fun defaultSqlConsoleSourceSettingsService(
+    uiConfigPersistenceService: UiConfigPersistenceService,
+    runtimeConfigResolver: UiRuntimeConfigResolver,
+    sqlConsoleService: SqlConsoleOperations,
+): UiSqlConsoleSourceSettingsOperations =
+    UiSqlConsoleSourceSettingsService(
+        uiConfigPersistenceService = uiConfigPersistenceService,
+        runtimeConfigResolver = runtimeConfigResolver,
+        sqlConsoleService = sqlConsoleService,
     )
 
 internal fun defaultKafkaMetadataService(runtimeUiConfig: UiAppConfig): KafkaMetadataOperations =

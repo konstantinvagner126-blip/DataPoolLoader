@@ -46,7 +46,7 @@
 
 Статус:
 
-- проектируется
+- основной UI реализован, ожидает визуального подтверждения; `18.10` отложено для отдельного обсуждения
 
 Контекст:
 
@@ -368,7 +368,7 @@ Non-goals первой волны:
 
 Статус:
 
-- запланировано
+- выполнено
 
 Контекст:
 
@@ -450,11 +450,55 @@ Non-goals первой волны:
    - raw password / plain-text credentials в `ui-application.yml` не поддерживать как UI-режим;
 9. добавить targeted server/store tests на config persistence, hot reload и validation.
 
+Что сделано:
+
+1. добавлен первый vertical slice экрана `/sql-console-sources`:
+   - отдельный Compose screen;
+   - навигация из SQL workspace, history и objects;
+   - формы редактирования `sources`, `groups` и `ui.defaultCredentialsFile`;
+   - local file chooser для выбора `credential.properties`;
+2. добавлен server-side boundary `UiSqlConsoleSourceSettingsService`:
+   - route handlers оставлены thin;
+   - сохранение идет через `UiConfigPersistenceService`;
+   - после сохранения выполняется hot reload runtime SQL catalog через `SqlConsoleOperations.updateConfig`;
+3. raw password values не возвращаются в browser response:
+   - placeholder password показывается как reference;
+   - non-placeholder/hidden password показывается только статусом `passwordConfigured`;
+   - при сохранении hidden password можно оставить без изменений;
+4. добавлены targeted tests:
+   - persistence update для `sourceCatalog/groups/defaultCredentialsFile`;
+   - скрытие non-placeholder password;
+   - сохранение hidden password и hot reload SQL catalog;
+5. добавлен второй vertical slice диагностики:
+   - endpoint и UI action `Проверить` для `credential.properties`;
+   - required / available / missing placeholder keys без раскрытия secret values;
+   - endpoint и UI action `Проверить все sources` для draft-настроек;
+   - single-source test теперь учитывает draft `ui.defaultCredentialsFile`;
+   - targeted test на missing placeholder keys без утечки значений;
+6. добавлен secure contract для режима `System keychain`:
+   - server-side `UiSecretProvider` abstraction;
+   - macOS Keychain provider через системную команду `security`;
+   - explicit unavailable-state для Windows Credential Manager, Linux Secret Service и unsupported OS;
+   - runtime resolution `${secret:...}` без сохранения raw password в `ui-application.yml`;
+   - manual password input используется только как draft value и не возвращается в browser response после сохранения;
+   - `Credentials mode` selector показывает только поля активного режима;
+   - режим `Plain text` как отдельный UI/storage mode не поддерживается;
+   - targeted tests на secret placeholder resolution и сохранение `${secret:...}` вместо plaintext;
+7. улучшен UX source references и проверки подключений:
+   - source card показывает группы, где используется source;
+   - удаление source очищает references из groups в draft state, чтобы не оставлять битые ссылки;
+   - результат `Проверить все sources` дополнительно показывается на соответствующих source cards;
+   - добавлен shared-store test на удаление source и очистку group references;
+8. добавлен collapsed `technical details` block для `System keychain`:
+   - обычный UI остается без `${secret:...}`;
+   - secret key и config value доступны только по явному раскрытию блока;
+   - secret value / password не отображается.
+
 #### 18.9. Restore targeted visual coverage after SQL redesign stabilizes
 
 Статус:
 
-- запланировано
+- выполнено
 
 Контекст:
 
@@ -472,6 +516,29 @@ Non-goals первой волны:
 2. не обновлять snapshots на промежуточном нестабильном layout;
 3. добавить только те baselines, которые защищают реальные UI contracts;
 4. не использовать visual suite как блокер до завершения задач `18.2–18.8`.
+
+Что сделано:
+
+1. добавлен отдельный SQL-only Playwright visual suite:
+   - `tools/sql-console-browser-smoke/tests/sql-console-visual.targeted.spec.mjs`;
+   - suite не зависит от широких Kafka/Home/module visual baselines;
+2. зафиксированы targeted baselines для:
+   - main SQL console shell;
+   - result pane empty state;
+   - result pane combined grid;
+   - result pane per-source grid;
+   - result pane diff view;
+   - DB objects inspector;
+   - SQL source catalog settings screen;
+   - SQL execution history screen;
+3. API в visual suite замоканы, чтобы baselines не зависели от локальной БД и runtime данных;
+4. добавлено ожидание внешних visual styles перед screenshot, чтобы Bootstrap CDN не давал нестабильные снимки;
+5. добавлен npm shortcut:
+   - `npm --prefix tools/sql-console-browser-smoke run test:sql-visual`;
+6. проверка выполнена командой:
+   - `SQL_CONSOLE_SMOKE_SKIP_DB_SETUP=1 PLAYWRIGHT_TEST_ARGS='tests/sql-console-visual.targeted.spec.mjs' ./scripts/run-sql-console-browser-smoke.sh`;
+7. результат проверки:
+   - `8 passed`.
 
 #### 18.10. SQL export full-data contract discussion
 
@@ -1200,6 +1267,66 @@ Non-goals первой дизайн-волны:
    - новые visual baseline-ы под завершенный Kafka redesign;
    - дополнительные scenario-level coverage пакеты для long-running reliability stream;
    - targeted store/server tests для новых bounded subsystem changes.
+
+#### 16.17. Kafka targeted visual coverage after modernization
+
+Статус:
+
+- выполнено
+
+Контекст:
+
+- Kafka redesign по `19.2–19.8` завершен функционально;
+- старый широкий `ui-visual.smoke.spec.mjs` смешивает Home, SQL, module и Kafka baselines и не должен становиться блокером после каждой локальной правки;
+- нужен отдельный Kafka-only visual suite, который защищает именно согласованные Kafka contracts.
+
+Что нужно сделать:
+
+1. добавить отдельный targeted Playwright visual suite для Kafka;
+2. покрыть baselines:
+   - topics catalog;
+   - topic overview;
+   - messages browser с inline expanded rows;
+   - produce form с JSON editor;
+   - create-topic form;
+   - consumer groups;
+   - brokers;
+   - settings screen;
+   - empty cluster catalog state;
+3. замокать Kafka API responses, чтобы suite не зависел от локального Docker/Kafka runtime;
+4. сохранить safety checks из [KAFKA_FAILURE_SCENARIOS.md](/Users/kwdev/DataPoolLoader/KAFKA_FAILURE_SCENARIOS.md):
+   - message read только по явной кнопке;
+   - last successful result не исчезает при изменении draft controls;
+   - JSON highlighting не ломает plain/invalid payload;
+   - readOnly/write state не маскируется;
+5. добавить отдельный npm shortcut для запуска только Kafka visual suite.
+
+Что сделано:
+
+1. добавлен targeted Playwright visual suite [kafka-visual.targeted.spec.mjs](/Users/kwdev/DataPoolLoader/tools/sql-console-browser-smoke/tests/kafka-visual.targeted.spec.mjs);
+2. зафиксированы 9 Kafka-only visual baselines:
+   - topics catalog;
+   - create-topic form;
+   - topic overview;
+   - messages browser с двумя одновременно раскрытыми inline rows;
+   - produce form с Monaco JSON editor;
+   - consumer groups;
+   - brokers;
+   - cluster settings;
+   - empty cluster catalog;
+3. Kafka API responses мокируются внутри suite, поэтому visual gate не зависит от Docker/Kafka runtime;
+4. suite проверяет ключевые safety/UX contracts:
+   - чтение сообщений происходит только после `Читать сообщения`;
+   - смена draft `mode` после чтения не очищает last successful result;
+   - одновременно раскрываются несколько сообщений;
+   - mixed JSON/plain/invalid payload не ломает rendering;
+   - readOnly/write states видимы в settings;
+5. добавлен npm shortcut `test:kafka-visual`;
+6. visual screenshots стабилизированы через explicit target frame и ожидание styled controls/table cells, чтобы baseline не зависел от скорости загрузки CSS.
+
+Проверка:
+
+- `SQL_CONSOLE_SMOKE_SKIP_DB_SETUP=1 PLAYWRIGHT_TEST_ARGS='tests/kafka-visual.targeted.spec.mjs' ./scripts/run-sql-console-browser-smoke.sh` — `9 passed`.
 
 История завершенных test packages вынесена в [BACKLOG_HISTORY.md](/Users/kwdev/DataPoolLoader/BACKLOG_HISTORY.md).
 

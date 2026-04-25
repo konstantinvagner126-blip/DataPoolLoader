@@ -15,6 +15,7 @@ import com.sbrf.lt.platform.composeui.run_history_cleanup.ComposeRunHistoryClean
 import com.sbrf.lt.platform.composeui.sql_console.ComposeSqlConsolePage
 import com.sbrf.lt.platform.composeui.sql_console.ComposeSqlConsoleHistoryPage
 import com.sbrf.lt.platform.composeui.sql_console.ComposeSqlConsoleObjectsPage
+import com.sbrf.lt.platform.composeui.sql_console.ComposeSqlConsoleSourceSettingsPage
 
 @Composable
 fun ComposeSpikeApp() {
@@ -33,6 +34,7 @@ fun ComposeSpikeApp() {
         "sql-console" -> ComposeSqlConsolePage()
         "sql-console-history" -> ComposeSqlConsoleHistoryPage(route.params)
         "sql-console-objects" -> ComposeSqlConsoleObjectsPage(route.params)
+        "sql-console-sources" -> ComposeSqlConsoleSourceSettingsPage()
         else -> ComposeHomePage()
     }
 }

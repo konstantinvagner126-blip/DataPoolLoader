@@ -18,6 +18,26 @@ interface SqlConsoleApi {
 
     suspend fun saveSettings(request: SqlConsoleSettingsUpdate): SqlConsoleInfo
 
+    suspend fun loadSourceSettings(): SqlConsoleSourceSettings
+
+    suspend fun saveSourceSettings(request: SqlConsoleSourceSettingsUpdate): SqlConsoleSourceSettings
+
+    suspend fun testSourceSettingsConnection(
+        request: SqlConsoleSourceSettingsConnectionTestRequest,
+    ): SqlConsoleSourceSettingsConnectionTestResponse
+
+    suspend fun testSourceSettingsConnections(
+        request: SqlConsoleSourceSettingsConnectionsTestRequest,
+    ): SqlConsoleSourceSettingsConnectionsTestResponse
+
+    suspend fun diagnoseSourceSettingsCredentials(
+        request: SqlConsoleSourceSettingsCredentialsDiagnosticsRequest,
+    ): SqlConsoleSourceSettingsCredentialsDiagnosticsResponse
+
+    suspend fun pickSourceSettingsCredentialsFile(
+        request: SqlConsoleSourceSettingsFilePickRequest,
+    ): SqlConsoleSourceSettingsFilePickResponse
+
     suspend fun checkConnections(): SqlConsoleConnectionCheckResponse
 
     suspend fun searchObjects(request: SqlConsoleObjectSearchRequest): SqlConsoleObjectSearchResponse

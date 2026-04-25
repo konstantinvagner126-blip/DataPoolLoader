@@ -3,7 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "playwright test"
+    "test": "playwright test",
+    "test:kafka-visual": "playwright test tests/kafka-visual.targeted.spec.mjs",
+    "test:sql-visual": "playwright test tests/sql-console-visual.targeted.spec.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.55.0"

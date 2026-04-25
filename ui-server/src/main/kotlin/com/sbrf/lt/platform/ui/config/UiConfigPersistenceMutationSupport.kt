@@ -1,6 +1,8 @@
 package com.sbrf.lt.platform.ui.config
 
 import com.sbrf.lt.datapool.config.ConfigLoader
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleSourceConfig
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleSourceGroupConfig
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -26,6 +28,23 @@ internal class UiConfigPersistenceMutationSupport(
             sqlConsole = baseUiConfig.sqlConsole.copy(
                 maxRowsPerShard = maxRowsPerShard,
                 queryTimeoutSec = queryTimeoutSec,
+            ),
+        )
+        return writeUiConfig(targetPath, updatedUiConfig)
+    }
+
+    fun updateSqlConsoleSourceCatalog(
+        targetPath: Path,
+        sourceCatalog: List<SqlConsoleSourceConfig>,
+        groups: List<SqlConsoleSourceGroupConfig>,
+        defaultCredentialsFile: String?,
+    ): UiAppConfig {
+        val baseUiConfig = readBaseUiConfig(targetPath)
+        val updatedUiConfig = baseUiConfig.copy(
+            defaultCredentialsFile = defaultCredentialsFile?.trim()?.takeIf { it.isNotEmpty() },
+            sqlConsole = baseUiConfig.sqlConsole.copy(
+                sourceCatalog = sourceCatalog,
+                groups = groups,
             ),
         )
         return writeUiConfig(targetPath, updatedUiConfig)

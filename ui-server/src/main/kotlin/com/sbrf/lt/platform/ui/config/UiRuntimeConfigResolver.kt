@@ -15,6 +15,7 @@ import java.io.StringReader
  */
 open class UiRuntimeConfigResolver(
     private val credentialsProvider: UiCredentialsProvider? = null,
+    private val secretProvider: UiSecretProvider? = defaultUiSecretProvider(),
 ) {
     private val placeholderResolutionSupport = UiConfigPlaceholderResolutionSupport()
     private val kafkaValidationSupport = UiKafkaConfigValidationSupport()
@@ -39,9 +40,9 @@ open class UiRuntimeConfigResolver(
 
     private fun UiModuleStorePostgresConfig.resolvePlaceholders(properties: Map<String, String>): UiModuleStorePostgresConfig =
         copy(
-            jdbcUrl = jdbcUrl?.let { placeholderResolutionSupport.resolveIfPossible(it, properties) },
-            username = username?.let { placeholderResolutionSupport.resolveIfPossible(it, properties) },
-            password = password?.let { placeholderResolutionSupport.resolveIfPossible(it, properties) },
+            jdbcUrl = jdbcUrl?.let { resolveRuntimeValue(it, properties) },
+            username = username?.let { resolveRuntimeValue(it, properties) },
+            password = password?.let { resolveRuntimeValue(it, properties) },
         )
 
     private fun SqlConsoleConfig.resolvePlaceholders(properties: Map<String, String>): SqlConsoleConfig =
@@ -51,9 +52,9 @@ open class UiRuntimeConfigResolver(
 
     private fun SqlConsoleSourceConfig.resolvePlaceholders(properties: Map<String, String>): SqlConsoleSourceConfig =
         copy(
-            jdbcUrl = placeholderResolutionSupport.resolveIfPossible(jdbcUrl, properties),
-            username = placeholderResolutionSupport.resolveIfPossible(username, properties),
-            password = placeholderResolutionSupport.resolveIfPossible(password, properties),
+            jdbcUrl = resolveRuntimeValue(jdbcUrl, properties),
+            username = resolveRuntimeValue(username, properties),
+            password = resolveRuntimeValue(password, properties),
         )
 
     private fun UiKafkaConfig.resolvePlaceholders(
@@ -68,9 +69,21 @@ open class UiRuntimeConfigResolver(
         baseDir: Path?,
     ): UiKafkaClusterConfig = copy(
         properties = this.properties.mapValues { (_, value) ->
-            placeholderResolutionSupport.resolveIfPossible(value, properties, baseDir)
+            resolveRuntimeValue(value, properties, baseDir)
         },
     )
+
+    private fun resolveRuntimeValue(
+        rawValue: String,
+        properties: Map<String, String>,
+        baseDir: Path? = null,
+    ): String =
+        placeholderResolutionSupport.resolveIfPossible(
+            rawValue = rawValue,
+            properties = properties,
+            baseDir = baseDir,
+            secretResolver = secretProvider?.let { provider -> { key -> provider.readSecret(key) } },
+        )
 
     private fun loadFallbackProperties(path: Path?): Map<String, String> {
         if (path == null || !path.exists()) {

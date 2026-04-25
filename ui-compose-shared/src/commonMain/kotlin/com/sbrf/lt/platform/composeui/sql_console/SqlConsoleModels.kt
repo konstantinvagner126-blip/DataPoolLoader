@@ -57,6 +57,124 @@ data class SqlConsoleSettingsUpdate(
 )
 
 @Serializable
+data class SqlConsoleSourceSettings(
+    val editableConfigPath: String? = null,
+    val defaultCredentialsFile: String = "",
+    val secretProvider: SqlConsoleSecretProvider = SqlConsoleSecretProvider(),
+    val sources: List<SqlConsoleEditableSource> = emptyList(),
+    val groups: List<SqlConsoleEditableSourceGroup> = emptyList(),
+)
+
+@Serializable
+data class SqlConsoleSecretProvider(
+    val providerId: String = "unsupported",
+    val displayName: String = "System secret storage",
+    val available: Boolean = false,
+    val unavailableReason: String? = null,
+)
+
+@Serializable
+data class SqlConsoleEditableSource(
+    val originalName: String = "",
+    val name: String = "",
+    val credentialsMode: String = "PLACEHOLDERS",
+    val jdbcUrl: String = "",
+    val username: String = "",
+    val passwordReference: String = "",
+    val passwordConfigured: Boolean = false,
+    val secretKey: String = "",
+    val secretConfigured: Boolean = false,
+    val passwordPlainText: String = "",
+)
+
+@Serializable
+data class SqlConsoleEditableSourceGroup(
+    val originalName: String = "",
+    val name: String = "",
+    val sources: List<String> = emptyList(),
+)
+
+@Serializable
+data class SqlConsoleSourceSettingsUpdate(
+    val defaultCredentialsFile: String = "",
+    val sources: List<SqlConsoleEditableSourceUpdate> = emptyList(),
+    val groups: List<SqlConsoleEditableSourceGroupUpdate> = emptyList(),
+)
+
+@Serializable
+data class SqlConsoleEditableSourceUpdate(
+    val originalName: String = "",
+    val name: String = "",
+    val credentialsMode: String = "PLACEHOLDERS",
+    val jdbcUrl: String = "",
+    val username: String = "",
+    val passwordReference: String = "",
+    val keepExistingPassword: Boolean = true,
+    val secretKey: String = "",
+    val passwordPlainText: String = "",
+)
+
+@Serializable
+data class SqlConsoleEditableSourceGroupUpdate(
+    val originalName: String = "",
+    val name: String = "",
+    val sources: List<String> = emptyList(),
+)
+
+@Serializable
+data class SqlConsoleSourceSettingsConnectionTestRequest(
+    val defaultCredentialsFile: String = "",
+    val source: SqlConsoleEditableSourceUpdate,
+)
+
+@Serializable
+data class SqlConsoleSourceSettingsConnectionTestResponse(
+    val success: Boolean,
+    val sourceName: String,
+    val message: String,
+)
+
+@Serializable
+data class SqlConsoleSourceSettingsConnectionsTestRequest(
+    val settings: SqlConsoleSourceSettingsUpdate,
+)
+
+@Serializable
+data class SqlConsoleSourceSettingsConnectionsTestResponse(
+    val success: Boolean,
+    val message: String,
+    val sourceResults: List<SqlConsoleSourceConnectionStatus> = emptyList(),
+)
+
+@Serializable
+data class SqlConsoleSourceSettingsCredentialsDiagnosticsRequest(
+    val settings: SqlConsoleSourceSettingsUpdate,
+)
+
+@Serializable
+data class SqlConsoleSourceSettingsCredentialsDiagnosticsResponse(
+    val configuredPath: String = "",
+    val resolvedPath: String? = null,
+    val fileAvailable: Boolean = false,
+    val requiredKeys: List<String> = emptyList(),
+    val availableKeys: List<String> = emptyList(),
+    val missingKeys: List<String> = emptyList(),
+    val message: String,
+)
+
+@Serializable
+data class SqlConsoleSourceSettingsFilePickRequest(
+    val currentValue: String = "",
+)
+
+@Serializable
+data class SqlConsoleSourceSettingsFilePickResponse(
+    val cancelled: Boolean,
+    val selectedPath: String? = null,
+    val configValue: String? = null,
+)
+
+@Serializable
 data class SqlConsoleQueryStartRequest(
     val sql: String,
     val selectedSourceNames: List<String> = emptyList(),
@@ -361,4 +479,16 @@ data class SqlConsoleObjectsPageState(
     val inspectorLoading: Boolean = false,
     val inspectorErrorMessage: String? = null,
     val inspectorResponse: SqlConsoleObjectInspectorResponse? = null,
+)
+
+data class SqlConsoleSourceSettingsPageState(
+    val loading: Boolean = true,
+    val errorMessage: String? = null,
+    val successMessage: String? = null,
+    val settings: SqlConsoleSourceSettings? = null,
+    val connectionTestSourceIndex: Int? = null,
+    val connectionTestResult: SqlConsoleSourceSettingsConnectionTestResponse? = null,
+    val connectionsTestResult: SqlConsoleSourceSettingsConnectionsTestResponse? = null,
+    val credentialsDiagnostics: SqlConsoleSourceSettingsCredentialsDiagnosticsResponse? = null,
+    val filePickInProgress: Boolean = false,
 )

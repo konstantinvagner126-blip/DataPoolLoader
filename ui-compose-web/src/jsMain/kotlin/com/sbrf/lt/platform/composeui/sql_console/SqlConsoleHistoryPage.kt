@@ -91,6 +91,7 @@ fun ComposeSqlConsoleHistoryPage(
                     hrefValue = buildSqlConsoleWorkspaceHref(workspaceId),
                 )
                 SqlConsoleNavActionButton("История запусков", active = true)
+                SqlConsoleNavActionButton("Источники", hrefValue = "/static/compose-app/index.html?screen=sql-console-sources")
             }
         },
         content = {

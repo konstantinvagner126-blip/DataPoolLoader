@@ -10,8 +10,10 @@ internal class UiConfigPlaceholderResolutionSupport {
         rawValue: String,
         properties: Map<String, String>,
         baseDir: Path? = null,
+        secretResolver: ((String) -> String?)? = null,
     ): String {
         resolveFilePlaceholder(rawValue, baseDir)?.let { return it }
+        resolveSecretPlaceholder(rawValue, secretResolver)?.let { return it }
 
         val trimmed = rawValue.trim()
         val match = placeholderPattern.matchEntire(trimmed) ?: return rawValue
@@ -20,6 +22,16 @@ internal class UiConfigPlaceholderResolutionSupport {
             ?: System.getenv(key)
             ?: System.getProperty(key)
             ?: rawValue
+    }
+
+    private fun resolveSecretPlaceholder(
+        rawValue: String,
+        secretResolver: ((String) -> String?)?,
+    ): String? {
+        val trimmed = rawValue.trim()
+        val match = secretPlaceholderPattern.matchEntire(trimmed) ?: return null
+        val key = match.groupValues[1].trim().takeIf { it.isNotEmpty() } ?: return rawValue
+        return secretResolver?.invoke(key) ?: rawValue
     }
 
     private fun resolveFilePlaceholder(
@@ -43,6 +55,7 @@ internal class UiConfigPlaceholderResolutionSupport {
 
     private companion object {
         val placeholderPattern = Regex("^\\$\\{([A-Za-z0-9_.-]+)}$")
+        val secretPlaceholderPattern = Regex("^\\$\\{secret:([A-Za-z0-9_.-]+)}$")
         val filePlaceholderPattern = Regex("^\\$\\{file:(.+)}$")
     }
 }

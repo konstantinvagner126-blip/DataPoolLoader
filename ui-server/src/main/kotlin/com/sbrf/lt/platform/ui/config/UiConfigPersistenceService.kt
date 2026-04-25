@@ -1,8 +1,8 @@
 package com.sbrf.lt.platform.ui.config
 
 import com.sbrf.lt.datapool.config.ConfigLoader
-import com.sbrf.lt.datapool.config.ProjectRootLocator
-import java.nio.file.Files
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleSourceConfig
+import com.sbrf.lt.datapool.sqlconsole.SqlConsoleSourceGroupConfig
 import java.nio.file.Path
 
 open class UiConfigPersistenceService(
@@ -44,6 +44,22 @@ open class UiConfigPersistenceService(
     open fun updateSqlConsoleMaxRowsPerShard(maxRowsPerShard: Int): UiAppConfig {
         val currentTimeout = uiConfigLoader.load().sqlConsole.queryTimeoutSec
         return updateSqlConsoleSettings(maxRowsPerShard, currentTimeout)
+    }
+
+    open fun updateSqlConsoleSourceCatalog(
+        sourceCatalog: List<SqlConsoleSourceConfig>,
+        groups: List<SqlConsoleSourceGroupConfig>,
+        defaultCredentialsFile: String?,
+    ): UiAppConfig {
+        val targetPath = requireNotNull(resolveEditableConfigPath()) {
+            "Не удалось определить редактируемый ui-конфиг. Укажи внешний ui-application.yml или запусти UI из проекта."
+        }
+        return mutationSupport.updateSqlConsoleSourceCatalog(
+            targetPath = targetPath,
+            sourceCatalog = sourceCatalog,
+            groups = groups,
+            defaultCredentialsFile = defaultCredentialsFile,
+        )
     }
 
     open fun updateKafkaClusterCatalog(
