@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import com.sbrf.lt.platform.composeui.foundation.dom.classes
 import com.sbrf.lt.platform.composeui.foundation.dom.classesFromString
 import org.jetbrains.compose.web.dom.Div
+import org.jetbrains.compose.web.dom.Span
 import org.jetbrains.compose.web.dom.Text
 
 @Composable
@@ -29,6 +30,7 @@ internal fun CommandGuardrail(
         else -> "Команда ${analysis.keyword} распознана как read-only."
     }
     Div({ classesFromString(cssClass) }) {
-        Text(text)
+        Span({ classes("sql-guardrail-label") }) { Text("Защита") }
+        Span({ classes("sql-guardrail-text") }) { Text(text) }
     }
 }

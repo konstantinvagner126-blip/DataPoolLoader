@@ -57,7 +57,7 @@ fun ComposeSqlConsoleObjectsPage(
     PageScaffold(
         eyebrow = "MLP Platform",
         title = "Объекты БД",
-        subtitle = "Search-first просмотр объектов БД с отдельным lazy inspector flow по источникам SQL-консоли.",
+        subtitle = "Поиск объектов БД и отдельный lazy inspector по источникам SQL-консоли.",
         heroClassNames = listOf("hero-card-compact", "sql-console-hero"),
         heroCopyClassNames = listOf("sql-console-hero-copy"),
         heroHeader = {

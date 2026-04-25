@@ -71,7 +71,7 @@ internal fun SqlConsoleObjectCard(
             SqlObjectIdentityBlock(
                 name = dbObject.qualifiedName(),
                 note = dbObject.contextLabel(sourceName),
-                selectedNote = if (isSelectedObject) "Точное совпадение по deep-link" else null,
+                selectedNote = if (isSelectedObject) "Точное совпадение по прямой ссылке" else null,
                 detailNote = dbObject.tableReferenceLabel(),
             )
             SqlObjectActionButton(
@@ -83,7 +83,7 @@ internal fun SqlConsoleObjectCard(
         Div({ classes("sql-object-action-row") }) {
             SqlObjectActionButton("Инспектор", "btn-dark") { onOpenInspector() }
             if (supportsRowPreview(dbObject)) {
-                SqlObjectActionButton("Открыть SELECT", "btn-outline-dark") { onOpenSelect() }
+                SqlObjectActionButton("SELECT", "btn-outline-dark") { onOpenSelect() }
                 SqlObjectActionButton("COUNT(*)", "btn-outline-dark") { onOpenCount() }
             }
         }

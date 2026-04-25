@@ -56,7 +56,7 @@ fun ComposeSqlConsoleHistoryPage(
                 workspaceId = workspaceId,
                 ownerSessionId = ownerSessionId,
                 sqlOverride = entry.sql,
-                successMessage = "Запрос из execution history запущен.",
+                successMessage = "Запрос из истории запусков запущен.",
             )
             state = startedState
             startedState.currentExecutionId?.let { executionId ->
@@ -78,9 +78,9 @@ fun ComposeSqlConsoleHistoryPage(
     }
 
     PageScaffold(
-        eyebrow = "Load Testing Data Platform",
+        eyebrow = "MLP Platform",
         title = "История запусков SQL-консоли",
-        subtitle = "Отдельный operational log текущего workspace: что запускалось, по каким source и с каким итогом.",
+        subtitle = "Отдельный журнал текущего workspace: что запускалось, по каким источникам и с каким итогом.",
         heroClassNames = listOf("hero-card-compact", "sql-console-hero"),
         heroCopyClassNames = listOf("sql-console-hero-copy"),
         heroHeader = {

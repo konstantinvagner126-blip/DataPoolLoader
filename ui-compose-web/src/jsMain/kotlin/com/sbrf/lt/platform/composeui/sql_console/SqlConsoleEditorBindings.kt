@@ -90,7 +90,7 @@ internal class SqlConsoleEditorBindings(
     fun selectDataView(view: String) {
         context.updateUiState {
             it.copy(
-                activeDataView = view,
+                activeDataView = normalizeSqlResultDataView(view),
                 selectedResultShard = null,
                 currentDataPage = 1,
             )
@@ -120,10 +120,11 @@ internal class SqlConsoleEditorBindings(
     }
 
     private fun shiftShard(delta: Int) {
+        val normalizedDataView = normalizeSqlResultDataView(context.currentUiState().activeDataView)
         val successfulShards = context.exportableResult()
             ?.takeIf {
                 context.currentUiState().activeOutputTab == "data" &&
-                    context.currentUiState().activeDataView == "grid"
+                    normalizedDataView == SQL_RESULT_VIEW_SOURCE
             }
             ?.shardResults
             ?.filter { it.status.equals("SUCCESS", ignoreCase = true) && it.rows.isNotEmpty() }
@@ -138,19 +139,30 @@ internal class SqlConsoleEditorBindings(
     }
 
     private fun shiftPage(delta: Int) {
+        val uiState = context.currentUiState()
+        val normalizedDataView = normalizeSqlResultDataView(uiState.activeDataView)
         val result = context.exportableResult()
             ?.takeIf {
-                context.currentUiState().activeOutputTab == "data" &&
-                    context.currentUiState().activeDataView == "grid" &&
+                uiState.activeOutputTab == "data" &&
+                    normalizedDataView != SQL_RESULT_VIEW_DIFF &&
                     it.statementType == "RESULT_SET"
             }
             ?: return
-        val selectedShard = result.shardResults
-            .filter { it.status.equals("SUCCESS", ignoreCase = true) && it.rows.isNotEmpty() }
-            .firstOrNull { it.shardName == context.currentUiState().selectedResultShard }
-            ?: return
-        val totalPages = maxOf(1, (selectedShard.rowCount + context.currentState().pageSize - 1) / context.currentState().pageSize)
-        val currentPage = context.currentUiState().currentDataPage
+        val pageSize = context.currentState().pageSize
+        val totalRows = if (normalizedDataView == SQL_RESULT_VIEW_COMBINED) {
+            buildSqlResultCombinedRows(result).rows.size
+        } else {
+            result.shardResults
+                .filter { it.status.equals("SUCCESS", ignoreCase = true) && it.rows.isNotEmpty() }
+                .let { successfulShards ->
+                    successfulShards.firstOrNull { it.shardName == uiState.selectedResultShard }
+                        ?: successfulShards.firstOrNull()
+                }
+                ?.rowCount
+                ?: return
+        }
+        val totalPages = maxOf(1, (totalRows + pageSize - 1) / pageSize)
+        val currentPage = uiState.currentDataPage
         selectPage((currentPage + delta).coerceIn(1, totalPages))
     }
 }

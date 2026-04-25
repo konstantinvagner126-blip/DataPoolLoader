@@ -22,6 +22,23 @@ import org.jetbrains.compose.web.dom.Th
 import org.jetbrains.compose.web.dom.Thead
 import org.jetbrains.compose.web.dom.Tr
 
+internal const val SQL_RESULT_VIEW_COMBINED = "combined"
+internal const val SQL_RESULT_VIEW_SOURCE = "source"
+internal const val SQL_RESULT_VIEW_DIFF = "diff"
+
+internal fun normalizeSqlResultDataView(value: String): String =
+    when (value.lowercase()) {
+        SQL_RESULT_VIEW_COMBINED -> SQL_RESULT_VIEW_COMBINED
+        SQL_RESULT_VIEW_DIFF -> SQL_RESULT_VIEW_DIFF
+        "grid", SQL_RESULT_VIEW_SOURCE -> SQL_RESULT_VIEW_SOURCE
+        else -> SQL_RESULT_VIEW_COMBINED
+    }
+
+internal data class SqlResultCombinedRows(
+    val columns: List<String>,
+    val rows: List<Map<String, String?>>,
+)
+
 @Composable
 internal fun SelectResultPane(
     execution: SqlConsoleExecutionResponse?,
@@ -49,7 +66,8 @@ internal fun SelectResultPane(
         return
     }
 
-    if (activeDataView == "diff") {
+    val normalizedDataView = normalizeSqlResultDataView(activeDataView)
+    if (normalizedDataView == SQL_RESULT_VIEW_DIFF) {
         SqlConsoleDiffResultPane(result = readyResult)
         return
     }
@@ -60,22 +78,60 @@ internal fun SelectResultPane(
         return
     }
 
+    if (normalizedDataView == SQL_RESULT_VIEW_COMBINED) {
+        val combined = buildSqlResultCombinedRows(readyResult)
+        if (combined.rows.isEmpty()) {
+            SqlResultPlaceholder("Общий grid пуст: ни один source не вернул строки.")
+            return
+        }
+        SqlResultGridView(
+            gridKey = "combined|" + combined.columns.joinToString("\u0001"),
+            columns = combined.columns,
+            rows = combined.rows,
+            rowCount = combined.rows.size,
+            pageSize = pageSize,
+            currentPage = currentPage,
+            metaLines = buildCombinedResultMetaLines(readyResult, successfulShards.size, combined.rows.size),
+        )
+        return
+    }
+
     val activeShard = successfulShards.firstOrNull { it.shardName == selectedShard } ?: successfulShards.first()
     val totalPages = maxOf(1, (activeShard.rowCount + pageSize - 1) / pageSize)
     val normalizedPage = currentPage.coerceIn(1, totalPages)
+    SqlResultGridView(
+        gridKey = activeShard.shardName + "|" + activeShard.columns.joinToString("\u0001"),
+        columns = activeShard.columns,
+        rows = activeShard.rows,
+        rowCount = activeShard.rowCount,
+        pageSize = pageSize,
+        currentPage = normalizedPage,
+        metaLines = buildSourceResultMetaLines(readyResult, activeShard, normalizedPage, totalPages, pageSize),
+    )
+}
+
+@Composable
+private fun SqlResultGridView(
+    gridKey: String,
+    columns: List<String>,
+    rows: List<Map<String, String?>>,
+    rowCount: Int,
+    pageSize: Int,
+    currentPage: Int,
+    metaLines: List<String>,
+) {
+    val totalPages = maxOf(1, (rowCount + pageSize - 1) / pageSize)
+    val normalizedPage = currentPage.coerceIn(1, totalPages)
     val startIndex = (normalizedPage - 1) * pageSize
-    val endIndexExclusive = minOf(startIndex + pageSize, activeShard.rowCount)
-    val visibleRows = activeShard.rows.drop(startIndex).take(pageSize)
-    val gridKey = remember(activeShard.shardName, activeShard.columns.joinToString("\u0001")) {
-        activeShard.shardName + "|" + activeShard.columns.joinToString("\u0001")
-    }
+    val endIndexExclusive = minOf(startIndex + pageSize, rowCount)
+    val visibleRows = rows.drop(startIndex).take(pageSize)
     var wrapCellContent by remember(gridKey) { mutableStateOf(false) }
     var selectedCell by remember(gridKey) { mutableStateOf<SqlResultGridSelection?>(null) }
     var columnWidths by remember(gridKey) {
         mutableStateOf(
             buildSqlResultGridInitialColumnWidths(
-                columns = activeShard.columns,
-                rows = activeShard.rows,
+                columns = columns,
+                rows = rows,
             ),
         )
     }
@@ -86,17 +142,7 @@ internal fun SelectResultPane(
     val selectedCellOnCurrentPage = selectedCell != null && selectedRow != null && selectedColumnName != null
 
     ResultMetaStack {
-        ResultMutedText("Данные показываются отдельно по каждому source. Лимит на source: ${readyResult.maxRowsPerShard}.")
-        ResultMutedText(
-            buildResultPageSummary(
-                shard = activeShard,
-                result = readyResult,
-                startIndex = startIndex,
-                endIndexExclusive = endIndexExclusive,
-                normalizedPage = normalizedPage,
-                totalPages = totalPages,
-            ),
-        )
+        metaLines.forEach { line -> ResultMutedText(line) }
         ResultMutedText("Grid поддерживает wrap/nowrap, resize/autosize колонок и copy по ячейке, строке и колонке.")
     }
     Div({ classes("sql-result-grid-toolbar") }) {
@@ -112,8 +158,8 @@ internal fun SelectResultPane(
                 title = "Подобрать ширину колонок по содержимому",
             ) {
                 columnWidths = buildSqlResultGridInitialColumnWidths(
-                    columns = activeShard.columns,
-                    rows = activeShard.rows,
+                    columns = columns,
+                    rows = rows,
                 )
             }
             SqlResultGridToolbarButton(
@@ -130,7 +176,7 @@ internal fun SelectResultPane(
                 enabled = selectedRow != null,
             ) {
                 selectedRow?.let { row ->
-                    copySqlResultToClipboard(buildSqlResultGridRowCopyValue(activeShard.columns, row))
+                    copySqlResultToClipboard(buildSqlResultGridRowCopyValue(columns, row))
                 }
             }
             SqlResultGridToolbarButton(
@@ -139,7 +185,7 @@ internal fun SelectResultPane(
                 enabled = selectedColumnName != null,
             ) {
                 selectedColumnName?.let { columnName ->
-                    copySqlResultToClipboard(buildSqlResultGridColumnCopyValue(columnName, activeShard.rows))
+                    copySqlResultToClipboard(buildSqlResultGridColumnCopyValue(columnName, rows))
                 }
             }
         }
@@ -167,7 +213,7 @@ internal fun SelectResultPane(
                 Col({
                     attr("style", "width:64px;min-width:64px;max-width:64px;")
                 })
-                activeShard.columns.forEach { column ->
+                columns.forEach { column ->
                     val width = columnWidths[column] ?: SQL_RESULT_GRID_MIN_WIDTH_PX
                     Col({
                         attr("style", "width:${width}px;min-width:${width}px;")
@@ -177,7 +223,7 @@ internal fun SelectResultPane(
             Thead {
                 Tr {
                     Th({ classes("sql-result-grid-rowhead") }) { Text("#") }
-                    activeShard.columns.forEach { column ->
+                    columns.forEach { column ->
                         val width = columnWidths[column] ?: SQL_RESULT_GRID_MIN_WIDTH_PX
                         Th({
                             classes("sql-result-grid-header")
@@ -194,13 +240,13 @@ internal fun SelectResultPane(
                                     SqlResultGridIconButton("⧉", "Скопировать колонку $column") {
                                         selectedCell = selectedCell?.copy(columnName = column)
                                             ?: SqlResultGridSelection(startIndex, column)
-                                        copySqlResultToClipboard(buildSqlResultGridColumnCopyValue(column, activeShard.rows))
+                                        copySqlResultToClipboard(buildSqlResultGridColumnCopyValue(column, rows))
                                     }
                                     SqlResultGridIconButton("↔", "Подобрать ширину колонки $column") {
                                         columnWidths = columnWidths + (
                                             column to calculateSqlResultGridColumnWidthPx(
                                                 header = column,
-                                                values = activeShard.rows.asSequence().map { row -> row[column].orEmpty() },
+                                                values = rows.asSequence().map { row -> row[column].orEmpty() },
                                             )
                                         )
                                     }
@@ -228,17 +274,17 @@ internal fun SelectResultPane(
                         Td({ classes("sql-result-grid-rowhead-cell") }) {
                             Div({ classes("sql-result-grid-rowhead-body") }) {
                                 SqlResultGridIconButton("⧉", "Скопировать строку ${absoluteRowIndex + 1}") {
-                                    activeShard.columns.firstOrNull()?.let { firstColumn ->
+                                    columns.firstOrNull()?.let { firstColumn ->
                                         selectedCell = selectedCell ?: SqlResultGridSelection(absoluteRowIndex, firstColumn)
                                     }
-                                    copySqlResultToClipboard(buildSqlResultGridRowCopyValue(activeShard.columns, row))
+                                    copySqlResultToClipboard(buildSqlResultGridRowCopyValue(columns, row))
                                 }
                                 Span({ classes("sql-result-grid-row-index") }) {
                                     Text((absoluteRowIndex + 1).toString())
                                 }
                             }
                         }
-                        activeShard.columns.forEach { column ->
+                        columns.forEach { column ->
                             val value = row[column] ?: ""
                             val isActiveCell = selectedCell?.absoluteRowIndex == absoluteRowIndex &&
                                 selectedCell?.columnName == column
@@ -278,6 +324,66 @@ internal fun SelectResultPane(
         }
     }
 }
+
+internal fun buildSqlResultCombinedRows(result: SqlConsoleQueryResult): SqlResultCombinedRows {
+    val successfulShards = result.shardResults
+        .filter { it.status.equals("SUCCESS", ignoreCase = true) && it.rows.isNotEmpty() }
+    val sourceColumn = "source"
+    val sourceValueColumn = "source_value"
+    val originalColumns = successfulShards
+        .flatMap { it.columns }
+        .distinct()
+    val normalizedColumns = originalColumns
+        .map { column -> if (column == sourceColumn) sourceValueColumn else column }
+        .distinct()
+    val rows = successfulShards.flatMap { shard ->
+        shard.rows.map { row ->
+            buildMap<String, String?> {
+                put(sourceColumn, shard.shardName)
+                originalColumns.forEach { column ->
+                    val displayColumn = if (column == sourceColumn) sourceValueColumn else column
+                    put(displayColumn, row[column])
+                }
+            }
+        }
+    }
+    return SqlResultCombinedRows(
+        columns = listOf(sourceColumn) + normalizedColumns,
+        rows = rows,
+    )
+}
+
+private fun buildCombinedResultMetaLines(
+    result: SqlConsoleQueryResult,
+    sourceCount: Int,
+    totalRows: Int,
+): List<String> =
+    buildList {
+        add("Общий grid объединяет $totalRows строк из $sourceCount source. Колонка source добавлена первой.")
+        add("Лимит на source: ${result.maxRowsPerShard}. Режим использует уже загруженный result snapshot.")
+        if (result.shardResults.any { it.truncated }) {
+            add("Есть усеченные source: полный export данных остается отдельным контрактом.")
+        }
+    }
+
+private fun buildSourceResultMetaLines(
+    result: SqlConsoleQueryResult,
+    shard: SqlConsoleShardResult,
+    normalizedPage: Int,
+    totalPages: Int,
+    pageSize: Int,
+): List<String> =
+    listOf(
+        "Данные показываются отдельно по каждому source. Лимит на source: ${result.maxRowsPerShard}.",
+        buildResultPageSummary(
+            shard = shard,
+            result = result,
+            startIndex = (normalizedPage - 1) * pageSize,
+            endIndexExclusive = minOf((normalizedPage - 1) * pageSize + pageSize, shard.rowCount),
+            normalizedPage = normalizedPage,
+            totalPages = totalPages,
+        ),
+    )
 
 @Composable
 private fun SqlResultGridToolbarButton(

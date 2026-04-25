@@ -66,13 +66,13 @@ internal fun SqlConsoleObjectsPageContent(
             SqlObjectOverviewCard(
                 "Лимит",
                 (searchResponse?.maxObjectsPerSource ?: 30).toString(),
-                "Максимум результатов на source",
+                "Максимум результатов на источник",
             )
         }
 
         if (inspectorSearchMismatch) {
             AlertBanner(
-                "Объект не найден в текущем search result. Инспектор работает по прямому deep-link metadata path.",
+                "Объект не найден в текущем результате поиска. Инспектор работает по прямой ссылке на путь метаданных.",
                 "warning",
             )
         }
@@ -94,7 +94,7 @@ internal fun SqlConsoleObjectsPageContent(
             inspectorSelection != null && state.inspectorLoading -> {
                 LoadingStateCard(
                     title = "Инспектор объекта",
-                    text = "Metadata выбранного объекта загружается отдельным inspector-запросом.",
+                    text = "Метаданные выбранного объекта загружаются отдельным inspector-запросом.",
                 )
             }
             inspectorSelection != null && state.inspectorErrorMessage != null -> {
@@ -107,13 +107,13 @@ internal fun SqlConsoleObjectsPageContent(
             targetInspectorSelection != null -> {
                 LoadingStateCard(
                     title = "Инспектор объекта",
-                    text = "Metadata выбранного объекта подготавливается к прямой загрузке по deep-link.",
+                    text = "Метаданные выбранного объекта подготавливаются к прямой загрузке по ссылке.",
                 )
             }
             navigationTarget != null && searchResponse != null -> {
                 EmptyStateCard(
                     title = "Объект не найден",
-                    text = "Для текущего deep-link объект не найден в search result. Для прямой загрузки inspector укажи source, schema, object и type.",
+                    text = "Для текущей ссылки объект не найден в результате поиска. Для прямой загрузки inspector нужны source, schema, object и type.",
                 )
             }
         }
@@ -121,7 +121,7 @@ internal fun SqlConsoleObjectsPageContent(
         if (state.favoriteObjects.isNotEmpty()) {
             SqlObjectPanel(
                 title = "Избранные объекты",
-                note = "Эти объекты доступны для быстрой вставки в основной SQL-редактор.",
+                note = "Доступны для быстрой вставки в основной SQL-редактор.",
                 panelClasses = "panel mb-4",
             ) {
                 Div({ classes("sql-favorite-objects-grid") }) {
@@ -143,8 +143,8 @@ internal fun SqlConsoleObjectsPageContent(
         Div({ classes("row", "g-4") }) {
             Div({ classes("col-12", "col-xl-3") }) {
                 SqlObjectPanel(
-                    title = "Sources",
-                    note = "Выбери, по каким источникам искать объекты БД.",
+                    title = "Источники",
+                    note = "Выбери источники для поиска объектов БД.",
                     panelClasses = "panel h-100",
                     useParagraphNote = true,
                 ) {
@@ -172,7 +172,7 @@ internal fun SqlConsoleObjectsPageContent(
             Div({ classes("col-12", "col-xl-9") }) {
                 SqlObjectPanel(
                     title = "Поиск объектов",
-                    note = "Введи имя объекта или часть имени. Полный каталог схемы на старте не загружается.",
+                    note = "Поиск идет по имени объекта или его части. Полный каталог схемы на старте не загружается.",
                     panelClasses = "panel mb-4",
                     useParagraphNote = true,
                 ) {
@@ -217,10 +217,10 @@ internal fun SqlConsoleObjectsPageContent(
                                     sourceResult.errorMessage?.let { errorMessage ->
                                         AlertBanner(errorMessage, "warning")
                                     } ?: if (sourceResult.objects.isEmpty()) {
-                                        SqlObjectSourceMutedText("По этому source совпадений нет.")
+                                        SqlObjectSourceMutedText("По этому источнику совпадений нет.")
                                     } else {
                                         if (sourceResult.truncated) {
-                                            SqlObjectSourceMutedText("Показаны первые ${searchResponse.maxObjectsPerSource} объектов по source.", "mb-3")
+                                            SqlObjectSourceMutedText("Показаны первые ${searchResponse.maxObjectsPerSource} объектов по источнику.", "mb-3")
                                         }
                                         Div({ classes("sql-object-result-list") }) {
                                             sourceResult.objects

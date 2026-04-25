@@ -112,7 +112,7 @@ internal class SqlConsoleLibraryBindings(
                     workspaceId = context.currentUiState().workspaceId,
                     ownerSessionId = context.currentUiState().ownerSessionId,
                     sqlOverride = entry.sql,
-                    successMessage = "Запрос из execution history запущен.",
+                    successMessage = "Запрос из истории запусков запущен.",
                 ),
             )
         }

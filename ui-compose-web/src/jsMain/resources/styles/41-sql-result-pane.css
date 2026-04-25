@@ -303,6 +303,26 @@
   color: #64748b;
 }
 
+.sql-result-navigator-export-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.36rem;
+  margin-top: 0.2rem;
+}
+
+.sql-result-export-button {
+  padding: 0.34rem 0.58rem;
+  border-radius: 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.sql-result-export-button-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .sql-result-navigator-groups {
   display: flex;
   flex-wrap: wrap;

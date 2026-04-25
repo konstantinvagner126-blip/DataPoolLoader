@@ -92,8 +92,6 @@ internal fun SqlConsoleWorkspacePanel(
             runButtonClass = runButtonClass,
             pendingManualTransaction = pendingManualTransaction,
             isRunning = isRunning,
-            exportableResult = exportableResult,
-            activeExportShard = activeExportShard,
             onPageSizeChange = onPageSizeChange,
             onFormatSql = onFormatSql,
             onOpenNewTab = onOpenNewTab,
@@ -107,8 +105,6 @@ internal fun SqlConsoleWorkspacePanel(
             onStop = onStop,
             onCommit = onCommit,
             onRollback = onRollback,
-            onExportCsv = onExportCsv,
-            onExportZip = onExportZip,
         )
 
         MonacoEditorPane(
@@ -122,8 +118,10 @@ internal fun SqlConsoleWorkspacePanel(
             onValueChange = onDraftSqlChange,
         )
 
-        CommandGuardrail(analysis = statementAnalysis, strictSafetyEnabled = state.strictSafetyEnabled)
-        ExecutionStatusStrip(currentExecution, runningClockTick)
+        Div({ classes("sql-safety-strip-stack") }) {
+            CommandGuardrail(analysis = statementAnalysis, strictSafetyEnabled = state.strictSafetyEnabled)
+            ExecutionStatusStrip(currentExecution, runningClockTick)
+        }
 
         Div({ classes("sql-output-panel") }) {
             SqlConsoleResultNavigator(
@@ -135,10 +133,13 @@ internal fun SqlConsoleWorkspacePanel(
                 selectedShard = selectedResultShard,
                 currentPage = currentDataPage,
                 pageSize = state.pageSize,
+                activeExportShard = activeExportShard,
                 onSelectStatement = onSelectStatement,
                 onSelectDataView = onSelectDataView,
                 onSelectShard = onSelectShard,
                 onSelectPage = onSelectPage,
+                onExportCsv = onExportCsv,
+                onExportZip = onExportZip,
             )
             QueryOutputPanel(
                 execution = currentExecution,

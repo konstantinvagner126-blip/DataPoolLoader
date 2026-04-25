@@ -249,7 +249,7 @@ Non-goals первой волны:
 
 Статус:
 
-- запланировано
+- реализовано, ожидает визуального подтверждения
 
 Контекст:
 
@@ -267,11 +267,25 @@ Non-goals первой волны:
 4. transaction state вынести в compact status strip или dedicated safety strip;
 5. не менять safety semantics manual transaction / commit / rollback.
 
+Что сделано:
+
+1. execution toolbar переведен из card-like action groups в compact tool row;
+2. primary actions отделены от secondary actions:
+   - `Весь script`;
+   - `Текущий`;
+   - `Выделение`;
+   - `Стоп`;
+3. secondary groups `EXPLAIN / Транзакция` остались отдельными compact controls без прежней card-heavy подачи;
+4. command buttons получили readable text labels вместо icon-only affordance для основных действий;
+5. `CommandGuardrail` и `ExecutionStatusStrip` объединены визуально в compact safety/status stack;
+6. disabled conditions и callbacks для run/explain/commit/rollback не менялись;
+7. export actions перенесены из execution toolbar в result pane в рамках 18.6.
+
 #### 18.6. Result pane and empty states densification
 
 Статус:
 
-- запланировано
+- реализовано, ожидает визуального подтверждения
 
 Контекст:
 
@@ -299,11 +313,25 @@ Non-goals первой волны:
    - финальный full-data export contract пока не реализовывать и не привязывать к текущему limited result snapshot;
    - для empty/running state кнопки должны быть disabled или явно недоступны.
 
+Что сделано:
+
+1. result data view переведен на явные режимы `combined/source/diff` с совместимостью старого `grid`;
+2. default view для SQL result pane стал `Общий grid`;
+3. `Общий grid` использует тот же table interaction model, что и source-grid, и добавляет diagnostic column `source`;
+4. `По источникам` сохраняет текущую таблицу результатов: wrap/nowrap, autosize, resize, copy cell/row/column, active selection, row index, pagination и horizontal scroll;
+5. `Diff` сохранен отдельным режимом без деградации текущей логики;
+6. result navigator показывает режимы `Общий grid / По источникам / Diff`, source selector только в per-source режиме и pagination для combined/source;
+7. export actions перенесены в result pane:
+   - `Source CSV` для активного source snapshot;
+   - `Экспорт по sources` для ZIP по source snapshot;
+   - `Экспорт общий` показан disabled до отдельного full-data export contract из 18.10;
+8. status bar и keyboard shortcuts синхронизированы с новыми режимами.
+
 #### 18.7. SQL-related screens consistency pass
 
 Статус:
 
-- запланировано
+- реализовано, ожидает визуального подтверждения
 
 Контекст:
 
@@ -323,6 +351,18 @@ Non-goals первой волны:
    - list остается dense и readable;
 4. унифицировать copy и action labels между связанными SQL screens;
 5. не смешивать object catalog redesign с main workspace redesign без отдельного bounded package.
+
+Что сделано:
+
+1. SQL history и SQL objects приведены к единому `MLP Platform` branding без старого `Load Testing Data Platform`;
+2. execution history screen сохранен отдельным экраном, без возврата списка запусков в main workspace;
+3. history list уплотнен визуально, action labels унифицированы:
+   - `Подставить SQL`;
+   - `Повторить запуск`;
+4. object inspector direct-load behavior сохранен: mismatch/search-result states остались, изменены только пользовательские тексты;
+5. англо-русские UI-подписи на связанных SQL screens очищены там, где они не являются technical identifiers;
+6. objects screen стал визуально ближе к новому SQL shell: меньше card-heavy shadow/radius, компактнее object cards и inspector tabs;
+7. отдельный redesign object catalog не начинался, чтобы не расширять scope 18.7.
 
 #### 18.8. SQL source catalog settings screen
 

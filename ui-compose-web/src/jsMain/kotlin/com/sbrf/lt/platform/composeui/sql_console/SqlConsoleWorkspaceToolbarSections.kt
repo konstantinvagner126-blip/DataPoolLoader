@@ -21,8 +21,6 @@ internal fun SqlConsoleWorkspaceToolbar(
     runButtonClass: String,
     pendingManualTransaction: Boolean,
     isRunning: Boolean,
-    exportableResult: SqlConsoleQueryResult?,
-    activeExportShard: String?,
     onPageSizeChange: (Int) -> Unit,
     onFormatSql: () -> Unit,
     onOpenNewTab: () -> Unit,
@@ -36,115 +34,22 @@ internal fun SqlConsoleWorkspaceToolbar(
     onStop: () -> Unit,
     onCommit: () -> Unit,
     onRollback: () -> Unit,
-    onExportCsv: () -> Unit,
-    onExportZip: () -> Unit,
 ) {
     Div({ classes("sql-toolbar") }) {
-        Div({ classes("sql-toolbar-meta") }) {
-            Label(attrs = {
-                classes("small", "text-secondary", "mb-0")
-                attr("for", "composeSqlPageSize")
-            }) { Text("Строк на странице") }
-            Select(attrs = {
-                id("composeSqlPageSize")
-                classes("form-select", "form-select-sm", "sql-page-size-select")
-                onChange {
-                    onPageSizeChange(it.value?.toIntOrNull() ?: 50)
-                }
-            }) {
-                listOf(25, 50, 100).forEach { pageSize ->
-                    Option(value = pageSize.toString(), attrs = {
-                        if (state.pageSize == pageSize) {
-                            selected()
-                        }
-                    }) {
-                        Text(pageSize.toString())
-                    }
-                }
-            }
-        }
-        Div({ classes("sql-toolbar-action-groups") }) {
-            SqlToolbarActionGroup("Подготовка") {
+        Div({ classes("sql-toolbar-primary-row") }) {
+            Div({ classes("sql-toolbar-run-actions") }) {
                 SqlToolbarActionButton(
-                    title = "Форматировать SQL",
-                    icon = "≣",
-                    toneClass = "btn-outline-dark",
-                    onClick = onFormatSql,
+                    title = "Выполнить весь script",
+                    label = "Весь script",
+                    icon = "≫",
+                    toneClass = runButtonClass,
+                    buttonDisabled = state.actionInProgress == "run-query" || state.info?.configured != true || pendingManualTransaction,
+                    extraClasses = arrayOf("sql-toolbar-primary-action"),
+                    onClick = onRunAll,
                 )
-                SqlToolbarActionButton(
-                    title = "Открыть новую вкладку консоли",
-                    icon = "⊞",
-                    toneClass = "btn-outline-dark",
-                    onClick = onOpenNewTab,
-                )
-            }
-            SqlToolbarActionGroup(
-                title = "EXPLAIN",
-                note = buildSqlExplainScopeSummary(
-                    currentOutlineItem = currentOutlineItem,
-                    selectedSqlText = selectedSqlText,
-                    selectedSqlLineCount = selectedSqlLineCount,
-                ),
-            ) {
-                SqlToolbarActionButton(
-                    title = "EXPLAIN текущий statement",
-                    icon = "↦E",
-                    toneClass = "btn-outline-dark",
-                    buttonDisabled = (
-                        state.actionInProgress == "explain-current-query" ||
-                            state.info?.configured != true ||
-                            pendingManualTransaction ||
-                            currentOutlineItem == null
-                        ),
-                    onClick = onExplainCurrent,
-                )
-                SqlToolbarActionButton(
-                    title = "EXPLAIN ANALYZE текущий statement",
-                    icon = "↦A",
-                    toneClass = "btn-outline-warning",
-                    buttonDisabled = (
-                        state.actionInProgress == "explain-analyze-current-query" ||
-                            state.info?.configured != true ||
-                            pendingManualTransaction ||
-                            currentOutlineItem == null
-                        ),
-                    onClick = onExplainAnalyzeCurrent,
-                )
-                SqlToolbarActionButton(
-                    title = "EXPLAIN выделение",
-                    icon = "▣E",
-                    toneClass = "btn-outline-dark",
-                    buttonDisabled = (
-                        state.actionInProgress == "explain-selection-query" ||
-                            state.info?.configured != true ||
-                            pendingManualTransaction ||
-                            selectedSqlText.isBlank()
-                        ),
-                    onClick = onExplainSelection,
-                )
-                SqlToolbarActionButton(
-                    title = "EXPLAIN ANALYZE выделение",
-                    icon = "▣A",
-                    toneClass = "btn-outline-warning",
-                    buttonDisabled = (
-                        state.actionInProgress == "explain-analyze-selection-query" ||
-                            state.info?.configured != true ||
-                            pendingManualTransaction ||
-                            selectedSqlText.isBlank()
-                        ),
-                    onClick = onExplainAnalyzeSelection,
-                )
-            }
-            SqlToolbarActionGroup(
-                title = "Выполнение",
-                note = buildSqlRunScopeSummary(
-                    currentOutlineItem = currentOutlineItem,
-                    selectedSqlText = selectedSqlText,
-                    selectedSqlLineCount = selectedSqlLineCount,
-                ),
-            ) {
                 SqlToolbarActionButton(
                     title = "Выполнить текущий statement",
+                    label = "Текущий",
                     icon = "↦",
                     toneClass = "btn-outline-dark",
                     buttonDisabled = (
@@ -157,6 +62,7 @@ internal fun SqlConsoleWorkspaceToolbar(
                 )
                 SqlToolbarActionButton(
                     title = "Выполнить выделение",
+                    label = "Выделение",
                     icon = "▣",
                     toneClass = "btn-outline-dark",
                     buttonDisabled = (
@@ -168,24 +74,120 @@ internal fun SqlConsoleWorkspaceToolbar(
                     onClick = onRunSelection,
                 )
                 SqlToolbarActionButton(
-                    title = "Выполнить весь script",
-                    icon = "≫",
-                    toneClass = runButtonClass,
-                    buttonDisabled = state.actionInProgress == "run-query" || state.info?.configured != true || pendingManualTransaction,
-                    extraClasses = arrayOf("sql-toolbar-primary-action"),
-                    onClick = onRunAll,
-                )
-                SqlToolbarActionButton(
                     title = "Остановить выполнение",
+                    label = "Стоп",
                     icon = "■",
                     toneClass = "btn-danger",
                     buttonDisabled = !isRunning || state.actionInProgress == "cancel-query",
                     onClick = onStop,
                 )
             }
+            Div({ classes("sql-toolbar-meta") }) {
+                SqlToolbarActionButton(
+                    title = "Форматировать SQL",
+                    label = "Формат",
+                    icon = "≣",
+                    toneClass = "btn-outline-dark",
+                    onClick = onFormatSql,
+                )
+                SqlToolbarActionButton(
+                    title = "Открыть новую вкладку консоли",
+                    label = "Новая вкладка",
+                    icon = "⊞",
+                    toneClass = "btn-outline-dark",
+                    onClick = onOpenNewTab,
+                )
+                Label(attrs = {
+                    classes("sql-toolbar-page-size")
+                    attr("for", "composeSqlPageSize")
+                }) {
+                    Span({ classes("sql-toolbar-page-size-label") }) { Text("Строк") }
+                    Select(attrs = {
+                        id("composeSqlPageSize")
+                        classes("form-select", "form-select-sm", "sql-page-size-select")
+                        onChange {
+                            onPageSizeChange(it.value?.toIntOrNull() ?: 50)
+                        }
+                    }) {
+                        listOf(25, 50, 100).forEach { pageSize ->
+                            Option(value = pageSize.toString(), attrs = {
+                                if (state.pageSize == pageSize) {
+                                    selected()
+                                }
+                            }) {
+                                Text(pageSize.toString())
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Div({ classes("sql-toolbar-secondary-row") }) {
+            SqlToolbarActionGroup(
+                title = "EXPLAIN",
+                note = buildSqlExplainScopeSummary(
+                    currentOutlineItem = currentOutlineItem,
+                    selectedSqlText = selectedSqlText,
+                    selectedSqlLineCount = selectedSqlLineCount,
+                ),
+            ) {
+                SqlToolbarActionButton(
+                    title = "EXPLAIN текущий statement",
+                    label = "Current",
+                    icon = "↦E",
+                    toneClass = "btn-outline-dark",
+                    buttonDisabled = (
+                        state.actionInProgress == "explain-current-query" ||
+                            state.info?.configured != true ||
+                            pendingManualTransaction ||
+                            currentOutlineItem == null
+                        ),
+                    onClick = onExplainCurrent,
+                )
+                SqlToolbarActionButton(
+                    title = "EXPLAIN ANALYZE текущий statement",
+                    label = "Analyze current",
+                    icon = "↦A",
+                    toneClass = "btn-outline-warning",
+                    buttonDisabled = (
+                        state.actionInProgress == "explain-analyze-current-query" ||
+                            state.info?.configured != true ||
+                            pendingManualTransaction ||
+                            currentOutlineItem == null
+                        ),
+                    onClick = onExplainAnalyzeCurrent,
+                )
+                SqlToolbarActionButton(
+                    title = "EXPLAIN выделение",
+                    label = "Selection",
+                    icon = "▣E",
+                    toneClass = "btn-outline-dark",
+                    buttonDisabled = (
+                        state.actionInProgress == "explain-selection-query" ||
+                            state.info?.configured != true ||
+                            pendingManualTransaction ||
+                            selectedSqlText.isBlank()
+                        ),
+                    onClick = onExplainSelection,
+                )
+                SqlToolbarActionButton(
+                    title = "EXPLAIN ANALYZE выделение",
+                    label = "Analyze selection",
+                    icon = "▣A",
+                    toneClass = "btn-outline-warning",
+                    buttonDisabled = (
+                        state.actionInProgress == "explain-analyze-selection-query" ||
+                            state.info?.configured != true ||
+                            pendingManualTransaction ||
+                            selectedSqlText.isBlank()
+                        ),
+                    onClick = onExplainAnalyzeSelection,
+                )
+            }
             SqlToolbarActionGroup("Транзакция") {
                 SqlToolbarActionButton(
                     title = "Commit",
+                    label = "Commit",
                     icon = "✓",
                     toneClass = "btn-success",
                     buttonDisabled = !pendingManualTransaction || state.actionInProgress == "commit-query",
@@ -193,28 +195,17 @@ internal fun SqlConsoleWorkspaceToolbar(
                 )
                 SqlToolbarActionButton(
                     title = "Rollback",
+                    label = "Rollback",
                     icon = "↶",
                     toneClass = "btn-outline-danger",
                     buttonDisabled = !pendingManualTransaction || state.actionInProgress == "rollback-query",
                     onClick = onRollback,
                 )
             }
-            SqlToolbarActionGroup("Экспорт") {
-                SqlToolbarActionButton(
-                    title = "Скачать CSV",
-                    icon = "▦",
-                    toneClass = "btn-outline-secondary",
-                    buttonDisabled = activeExportShard == null,
-                    onClick = onExportCsv,
-                )
-                SqlToolbarActionButton(
-                    title = "Скачать ZIP",
-                    icon = "⇩",
-                    toneClass = "btn-outline-secondary",
-                    buttonDisabled = exportableResult?.statementType != "RESULT_SET",
-                    onClick = onExportZip,
-                )
-            }
+        }
+        Div({ classes("sql-toolbar-scope-line") }) {
+            Span({ classes("sql-toolbar-scope-label") }) { Text("Scope") }
+            Span { Text(buildSqlRunScopeSummary(currentOutlineItem, selectedSqlText, selectedSqlLineCount)) }
         }
     }
 }
@@ -256,12 +247,19 @@ internal fun SqlToolbarActionButton(
     title: String,
     icon: String,
     toneClass: String,
+    label: String? = null,
     buttonDisabled: Boolean = false,
     extraClasses: Array<String> = emptyArray(),
     onClick: () -> Unit,
 ) {
     Button(attrs = {
-        classes("btn", toneClass, "sql-toolbar-icon-button", *extraClasses)
+        classes(
+            "btn",
+            toneClass,
+            "sql-toolbar-command-button",
+            if (label == null) "sql-toolbar-icon-button" else "sql-toolbar-text-button",
+            *extraClasses,
+        )
         attr("type", "button")
         attr("title", title)
         attr("aria-label", title)
@@ -271,5 +269,8 @@ internal fun SqlToolbarActionButton(
         onClick { onClick() }
     }) {
         Span({ classes("sql-toolbar-icon") }) { Text(icon) }
+        label?.let {
+            Span({ classes("sql-toolbar-button-label") }) { Text(it) }
+        }
     }
 }

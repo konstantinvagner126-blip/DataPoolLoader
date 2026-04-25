@@ -2,6 +2,7 @@ package com.sbrf.lt.platform.composeui.sql_console
 
 import androidx.compose.runtime.Composable
 import com.sbrf.lt.platform.composeui.foundation.dom.classes
+import org.jetbrains.compose.web.attributes.disabled
 import org.jetbrains.compose.web.dom.Button
 import org.jetbrains.compose.web.dom.Div
 import org.jetbrains.compose.web.dom.Span
@@ -17,10 +18,13 @@ internal fun SqlConsoleResultNavigator(
     selectedShard: String?,
     currentPage: Int,
     pageSize: Int,
+    activeExportShard: String?,
     onSelectStatement: (Int) -> Unit,
     onSelectDataView: (String) -> Unit,
     onSelectShard: (String?) -> Unit,
     onSelectPage: (Int) -> Unit,
+    onExportCsv: () -> Unit,
+    onExportZip: () -> Unit,
 ) {
     if (statementResults.isEmpty() && result == null) {
         return
@@ -28,24 +32,55 @@ internal fun SqlConsoleResultNavigator(
 
     val normalizedStatementIndex = selectedStatementIndex.coerceIn(0, statementResults.lastIndex.coerceAtLeast(0))
     val activeStatement = statementResults.getOrNull(normalizedStatementIndex)
+    val normalizedDataView = normalizeSqlResultDataView(activeDataView)
     val showDataNavigation = activeTab == "data" && result?.statementType == "RESULT_SET"
-    val showGridNavigation = showDataNavigation && activeDataView == "grid"
+    val showSourceNavigation = showDataNavigation && normalizedDataView == SQL_RESULT_VIEW_SOURCE
     val successfulShards = result
-        ?.takeIf { showGridNavigation }
+        ?.takeIf { showSourceNavigation }
         ?.shardResults
         ?.filter { it.status.equals("SUCCESS", ignoreCase = true) && it.rows.isNotEmpty() }
         .orEmpty()
     val activeShard = successfulShards.firstOrNull { it.shardName == selectedShard } ?: successfulShards.firstOrNull()
-    val totalPages = activeShard?.let { maxOf(1, (it.rowCount + pageSize - 1) / pageSize) } ?: 1
+    val combinedRows = result
+        ?.takeIf { showDataNavigation && normalizedDataView == SQL_RESULT_VIEW_COMBINED }
+        ?.let { buildSqlResultCombinedRows(it).rows }
+        .orEmpty()
+    val totalPages = when {
+        showSourceNavigation -> activeShard?.let { maxOf(1, (it.rowCount + pageSize - 1) / pageSize) } ?: 1
+        showDataNavigation && normalizedDataView == SQL_RESULT_VIEW_COMBINED -> maxOf(1, (combinedRows.size + pageSize - 1) / pageSize)
+        else -> 1
+    }
     val normalizedPage = currentPage.coerceIn(1, totalPages)
 
     Div({ classes("sql-result-navigator") }) {
         Div({ classes("sql-result-navigator-head") }) {
             Div({ classes("sql-result-navigator-title") }) {
-                Text(buildNavigatorTitle(activeTab, activeDataView, activeStatement, normalizedStatementIndex))
+                Text(buildNavigatorTitle(activeTab, normalizedDataView, activeStatement, normalizedStatementIndex))
             }
             Div({ classes("sql-result-navigator-note") }) {
-                Text(buildNavigatorNote(activeTab, activeDataView, successfulShards.size, activeShard?.shardName, normalizedPage, totalPages))
+                Text(buildNavigatorNote(activeTab, normalizedDataView, successfulShards.size, activeShard?.shardName, normalizedPage, totalPages))
+            }
+            if (showDataNavigation) {
+                Div({ classes("sql-result-navigator-export-actions") }) {
+                    SqlResultExportButton(
+                        label = "Экспорт общий",
+                        title = "Full combined export будет реализован отдельным контрактом после обсуждения 18.10.",
+                        enabled = false,
+                        onClick = {},
+                    )
+                    SqlResultExportButton(
+                        label = "Source CSV",
+                        title = "Скачать CSV активного source из текущего result snapshot.",
+                        enabled = activeExportShard != null,
+                        onClick = onExportCsv,
+                    )
+                    SqlResultExportButton(
+                        label = "Экспорт по sources",
+                        title = "Скачать ZIP с отдельным CSV по каждому source из текущего result snapshot.",
+                        enabled = result?.statementType == "RESULT_SET",
+                        onClick = onExportZip,
+                    )
+                }
             }
         }
         Div({ classes("sql-result-navigator-groups") }) {
@@ -64,20 +99,26 @@ internal fun SqlConsoleResultNavigator(
             if (showDataNavigation) {
                 SqlResultNavigatorGroup(title = "Режим") {
                     SqlResultNavigatorButton(
-                        active = activeDataView == "grid",
-                        onClick = { onSelectDataView("grid") },
+                        active = normalizedDataView == SQL_RESULT_VIEW_COMBINED,
+                        onClick = { onSelectDataView(SQL_RESULT_VIEW_COMBINED) },
                     ) {
-                        Text("Grid")
+                        Text("Общий grid")
                     }
                     SqlResultNavigatorButton(
-                        active = activeDataView == "diff",
-                        onClick = { onSelectDataView("diff") },
+                        active = normalizedDataView == SQL_RESULT_VIEW_SOURCE,
+                        onClick = { onSelectDataView(SQL_RESULT_VIEW_SOURCE) },
+                    ) {
+                        Text("По источникам")
+                    }
+                    SqlResultNavigatorButton(
+                        active = normalizedDataView == SQL_RESULT_VIEW_DIFF,
+                        onClick = { onSelectDataView(SQL_RESULT_VIEW_DIFF) },
                     ) {
                         Text("Diff")
                     }
                 }
             }
-            if (successfulShards.size > 1) {
+            if (showSourceNavigation && successfulShards.size > 1) {
                 SqlResultNavigatorGroup(title = "Source") {
                     successfulShards.forEach { shard ->
                         SqlResultNavigatorButton(
@@ -144,22 +185,23 @@ private fun SqlResultNavigatorButton(
 
 private fun buildNavigatorTitle(
     activeTab: String,
-    activeDataView: String,
+    normalizedDataView: String,
     activeStatement: SqlConsoleStatementResult?,
     statementIndex: Int,
 ): String {
     val statementLabel = activeStatement?.statementKeyword?.takeIf { it.isNotBlank() } ?: "SQL"
     val viewLabel = when {
         activeTab == "status" -> "Статусы"
-        activeDataView == "diff" -> "Diff"
-        else -> "Данные"
+        normalizedDataView == SQL_RESULT_VIEW_DIFF -> "Diff"
+        normalizedDataView == SQL_RESULT_VIEW_SOURCE -> "По источникам"
+        else -> "Общий grid"
     }
     return "$viewLabel для statement #${statementIndex + 1} $statementLabel"
 }
 
 private fun buildNavigatorNote(
     activeTab: String,
-    activeDataView: String,
+    normalizedDataView: String,
     shardCount: Int,
     activeShardName: String?,
     currentPage: Int,
@@ -167,7 +209,9 @@ private fun buildNavigatorNote(
 ): String =
     when {
         activeTab == "status" -> "Выбери statement, чтобы смотреть итог по всем source без переключения контекста."
-        activeDataView == "diff" -> "Compare-режим показывает расхождения по всем source относительно baseline, не смешивая их с обычной grid."
+        normalizedDataView == SQL_RESULT_VIEW_DIFF -> "Compare-режим показывает расхождения по всем source относительно baseline, не смешивая их с обычной grid."
+        normalizedDataView == SQL_RESULT_VIEW_COMBINED && totalPages > 1 -> "Объединенный результат по всем source. Страница $currentPage из $totalPages."
+        normalizedDataView == SQL_RESULT_VIEW_COMBINED -> "Объединенный результат по всем source с диагностической колонкой source."
         shardCount == 0 -> "Текущий statement не вернул табличные данные по source."
         totalPages > 1 && activeShardName != null ->
             "Активный source: $activeShardName. Страница $currentPage из $totalPages."
@@ -175,6 +219,29 @@ private fun buildNavigatorNote(
             "Активный source: $activeShardName. Данные показываются отдельно по каждому source."
         else -> "Данные показываются отдельно по каждому source."
     }
+
+@Composable
+private fun SqlResultExportButton(
+    label: String,
+    title: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    Button(attrs = {
+        classes("btn", "btn-sm", "sql-result-export-button")
+        if (enabled) {
+            classes("btn-outline-secondary")
+        } else {
+            classes("btn-outline-secondary", "sql-result-export-button-disabled")
+            disabled()
+        }
+        attr("type", "button")
+        attr("title", title)
+        onClick { onClick() }
+    }) {
+        Text(label)
+    }
+}
 
 private fun buildNavigatorPages(
     currentPage: Int,

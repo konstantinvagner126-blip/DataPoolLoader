@@ -1,16 +1,15 @@
 .sql-object-overview-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 16px;
-  margin-bottom: 24px;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
 }
 
 .sql-object-overview-card {
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 18px;
-  padding: 18px 20px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.98));
-  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.06);
+  border: 1px solid rgba(19, 34, 56, 0.08);
+  border-radius: 12px;
+  padding: 0.78rem 0.9rem;
+  background: rgba(255, 255, 255, 0.92);
 }
 
 .sql-object-overview-value {
@@ -69,15 +68,15 @@
 }
 
 .sql-object-card {
-  padding: 16px 18px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 16px;
+  padding: 0.78rem 0.88rem;
+  border: 1px solid rgba(19, 34, 56, 0.08);
+  border-radius: 12px;
   background: rgba(255, 255, 255, 0.92);
 }
 
 .sql-object-target-card {
-  padding: 16px 18px;
-  border-radius: 16px;
+  padding: 0.78rem 0.88rem;
+  border-radius: 12px;
   background: rgba(29, 111, 216, 0.06);
   border: 1px solid rgba(29, 111, 216, 0.18);
 }
@@ -103,28 +102,28 @@
 .sql-object-action-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin: 0 0 14px;
+  gap: 0.36rem;
+  margin: 0 0 0.65rem;
 }
 
 .sql-object-inspector-tabs {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  margin: 0 0 16px;
+  gap: 0.4rem;
+  margin: 0 0 0.75rem;
 }
 
 .sql-object-inspector-tab {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 38px;
-  padding: 8px 14px;
+  min-height: 32px;
+  padding: 0.38rem 0.68rem;
   border: 1px solid rgba(15, 23, 42, 0.12);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.9);
   color: #132238;
-  font-size: 0.85rem;
+  font-size: 0.78rem;
   font-weight: 700;
 }
 

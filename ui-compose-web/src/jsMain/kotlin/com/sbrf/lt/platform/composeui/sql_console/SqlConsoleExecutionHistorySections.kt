@@ -53,7 +53,7 @@ internal fun SqlConsoleExecutionHistoryEntryRow(
                 if (entry.selectedSourceNames.isEmpty()) {
                     "Источники не сохранены."
                 } else {
-                    "Source: ${entry.selectedSourceNames.joinToString(", ")}"
+                    "Источники: ${entry.selectedSourceNames.joinToString(", ")}"
                 },
             )
         }
@@ -66,14 +66,14 @@ internal fun SqlConsoleExecutionHistoryEntryRow(
                 attr("type", "button")
                 onClick { onApply() }
             }) {
-                Text("Подставить")
+                Text("Подставить SQL")
             }
             Button(attrs = {
-                classes("btn", "btn-outline-primary", "btn-sm")
+                classes("btn", "btn-outline-dark", "btn-sm")
                 attr("type", "button")
                 onClick { onRepeat() }
             }) {
-                Text("Повторить")
+                Text("Повторить запуск")
             }
         }
     }

@@ -30,7 +30,7 @@ internal fun SqlConsoleToolHeader(
                     }) { Text("Объекты БД") }
                     Span({ classes("sql-tool-nav-action", "active") }) { Text("SQL-консоль") }
                 }
-                Div({ classes("sql-tool-eyebrow") }) { Text("Load Testing Data Platform") }
+                Div({ classes("sql-tool-eyebrow") }) { Text("MLP Platform") }
                 Div({ classes("sql-tool-title") }) { Text("SQL-консоль по источникам") }
             }
         }

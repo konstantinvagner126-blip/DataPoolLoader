@@ -24,7 +24,7 @@ internal fun SqlConsoleHistoryPageContent(
             AlertBanner(
                 buildRuntimeModeFallbackMessage(
                     fallbackContext,
-                    suffix = "History screen доступен, но runtime screens модулей работают по текущему runtime-context.",
+                    suffix = "Экран истории доступен, но runtime-экраны модулей работают по текущему runtime-context.",
                 ),
                 "warning",
             )
@@ -40,12 +40,12 @@ internal fun SqlConsoleHistoryPageContent(
                 Div({ classes("sql-history-screen-summary") }) {
                     Div({ classes("panel-title", "mb-1") }) { Text("История текущей вкладки") }
                     Div({ classes("small", "text-secondary") }) {
-                        Text("Workspace-scoped execution log. Подставить и Повторить работают только для этого workspace.")
+                        Text("Журнал запусков привязан к workspace. Подстановка и повторный запуск работают только для этого workspace.")
                     }
                 }
                 Div({ classes("sql-query-library-summary-chips") }) {
                     SqlQueryLibrarySummaryChip("Workspace", workspaceId.takeLast(10))
-                    SqlQueryLibrarySummaryChip("Sessions", state.executionHistory.size.toString())
+                    SqlQueryLibrarySummaryChip("Запусков", state.executionHistory.size.toString())
                 }
             }
 

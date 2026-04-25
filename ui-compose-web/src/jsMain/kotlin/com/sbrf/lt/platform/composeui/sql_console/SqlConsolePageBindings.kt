@@ -22,7 +22,7 @@ internal data class SqlConsolePageUiState(
     val credentialsMessage: String? = null,
     val credentialsMessageLevel: String = "success",
     val activeOutputTab: String = "data",
-    val activeDataView: String = "grid",
+    val activeDataView: String = SQL_RESULT_VIEW_COMBINED,
     val selectedStatementIndex: Int = 0,
     val selectedResultShard: String? = null,
     val currentDataPage: Int = 1,

@@ -109,22 +109,24 @@ private fun buildSqlConsoleWorkingResultContext(
     selectedShard: String?,
     currentPage: Int,
 ): String {
+    val normalizedDataView = normalizeSqlResultDataView(activeDataView)
     val baseView = when {
         activeOutputTab == "status" -> "Статусы"
-        activeDataView == "diff" -> "Diff"
-        else -> "Grid"
+        normalizedDataView == SQL_RESULT_VIEW_DIFF -> "Diff"
+        normalizedDataView == SQL_RESULT_VIEW_SOURCE -> "По источникам"
+        else -> "Общий grid"
     }
     val statementPart = if (totalStatements > 1) {
         " • stmt ${selectedStatementIndex + 1}/$totalStatements"
     } else {
         ""
     }
-    val shardPart = if (activeOutputTab == "data" && selectedShard != null && activeDataView == "grid") {
+    val shardPart = if (activeOutputTab == "data" && selectedShard != null && normalizedDataView == SQL_RESULT_VIEW_SOURCE) {
         " • $selectedShard"
     } else {
         ""
     }
-    val pagePart = if (activeOutputTab == "data" && activeDataView == "grid") {
+    val pagePart = if (activeOutputTab == "data" && normalizedDataView != SQL_RESULT_VIEW_DIFF) {
         " • p.$currentPage"
     } else {
         ""
