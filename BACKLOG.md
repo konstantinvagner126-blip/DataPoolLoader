@@ -1246,6 +1246,66 @@ Non-goals первой дизайн-волны:
 
 История закрытых rule-sync пакетов вынесена в [BACKLOG_HISTORY.md](/Users/kwdev/DataPoolLoader/BACKLOG_HISTORY.md).
 
+#### 11.2. SQL terminal control-path architecture invariant
+
+Статус:
+
+- выполнено
+
+Контекст:
+
+- пакеты `9.9–9.17` закрепили terminal behavior для SQL async/manual transaction execution;
+- это уже не локальная тестовая деталь, а архитектурный invariant SQL control-path;
+- [ARCHITECTURE_RULES.md](/Users/kwdev/DataPoolLoader/ARCHITECTURE_RULES.md) должен явно запрещать successful no-op для stale terminal control actions.
+
+Что нужно сделать:
+
+1. добавить architecture review note после reliability wave;
+2. зафиксировать, что terminal snapshots не должны публиковать active control-path metadata;
+3. зафиксировать, что stale terminal actions должны отвечать conflict, а не successful no-op;
+4. сохранить distinction между active `RUNNING/PENDING_COMMIT` и terminal states.
+
+Что сделано:
+
+1. в [ARCHITECTURE_RULES.md](/Users/kwdev/DataPoolLoader/ARCHITECTURE_RULES.md) добавлен review note `Review After SQL Terminal Control-Path Wave`;
+2. зафиксировано, что terminal snapshots не публикуют `ownerToken`, `ownerLeaseExpiresAt`, `pendingCommitExpiresAt`;
+3. зафиксировано, что stale `release`, `heartbeat`, `cancel`, повторные `commit/rollback` должны быть state conflict;
+4. distinction между active `RUNNING/PENDING_COMMIT` и terminal observable history сохранен.
+
+Проверка:
+
+- `git diff --check` — без замечаний.
+
+#### 11.3. SQL failure-scenarios terminal control-path sync
+
+Статус:
+
+- выполнено
+
+Контекст:
+
+- [SQL_CONSOLE_FAILURE_SCENARIOS.md](/Users/kwdev/DataPoolLoader/SQL_CONSOLE_FAILURE_SCENARIOS.md) описывает owner token, heartbeat, rollback и safety model;
+- после `9.9–9.17` нужно явно описать terminal control-path cleanup и stale action behavior;
+- это защищает будущие UI/store правки от возврата terminal owner metadata.
+
+Что нужно сделать:
+
+1. добавить в failure-scenarios doc terminal control-path invariant;
+2. описать expected behavior для stale `/heartbeat`, `/cancel`, `/release`, `/commit`, `/rollback`;
+3. зафиксировать, что active control-path metadata допустима только в active states;
+4. не менять runtime contracts.
+
+Что сделано:
+
+1. в [SQL_CONSOLE_FAILURE_SCENARIOS.md](/Users/kwdev/DataPoolLoader/SQL_CONSOLE_FAILURE_SCENARIOS.md) добавлен раздел `Terminal control-path invariant`;
+2. описано expected behavior для stale `/heartbeat`, `/cancel`, `/release`, повторных `/commit` и `/rollback`;
+3. зафиксировано, что owner token и lease metadata относятся только к active `RUNNING/PENDING_COMMIT`;
+4. runtime contracts не менялись.
+
+Проверка:
+
+- `git diff --check` — без замечаний.
+
 ## P2
 
 ### 16. Усилить тестовую стратегию под архитектурную программу
@@ -1264,11 +1324,42 @@ Non-goals первой дизайн-волны:
 
 1. расширять test strategy уже после стабилизации текущих `P1` stream-ов, а не параллельно с большим subsystem redesign;
 2. следующий релевантный visual/testing follow-up:
-   - новые visual baseline-ы под завершенный Kafka redesign;
    - дополнительные scenario-level coverage пакеты для long-running reliability stream;
    - targeted store/server tests для новых bounded subsystem changes.
 
 История завершенных test packages вынесена в [BACKLOG_HISTORY.md](/Users/kwdev/DataPoolLoader/BACKLOG_HISTORY.md).
+
+#### 16.18. Test strategy backlog sync after Kafka visual baselines
+
+Статус:
+
+- выполнено
+
+Контекст:
+
+- Kafka visual follow-up уже закрыт и перенесен в history как `16.17`;
+- активная секция `16` не должна продолжать указывать завершенный Kafka visual baseline как следующий follow-up;
+- следующий test focus должен оставаться на long-running scenario coverage и targeted tests для новых bounded changes.
+
+Что нужно сделать:
+
+1. убрать устаревший Kafka visual baseline follow-up из активной секции `16`;
+2. оставить актуальные test strategy directions:
+   - long-running scenario-level coverage;
+   - targeted store/server tests для новых bounded subsystem changes;
+3. не включать широкий Playwright suite обратно как обязательный gate до стабилизации UI.
+
+Что сделано:
+
+1. из активной секции `16` убран уже закрытый follow-up про Kafka visual baselines;
+2. актуальные направления оставлены:
+   - long-running scenario-level coverage;
+   - targeted store/server tests для новых bounded subsystem changes;
+3. широкий Playwright suite не возвращался как обязательный gate.
+
+Проверка:
+
+- `git diff --check` — без замечаний.
 
 ## P3
 

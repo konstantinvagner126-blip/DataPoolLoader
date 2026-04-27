@@ -156,6 +156,32 @@
 - держать transaction session только на основании того, что процесс сервера еще жив;
 - разрешать `Commit`/`Rollback` без подтверждения владельца session.
 
+### Terminal control-path invariant
+
+После terminal state SQL execution больше не имеет active browser owner session.
+
+Terminal states включают:
+
+- обычное завершение async execution;
+- explicit `Commit`;
+- explicit `Rollback`;
+- system rollback по timeout или потере владельца;
+- cancel/failure, если execution уже перешел в финальное состояние.
+
+Ожидаемое поведение:
+
+- public terminal snapshot не должен возвращать active control-path metadata:
+  - `ownerToken`;
+  - `ownerLeaseExpiresAt`;
+  - `pendingCommitExpiresAt`;
+- stale browser tab не должен получать успешный ответ на terminal control action;
+- `/heartbeat` после terminal state должен возвращать conflict, потому что heartbeat больше не нужен;
+- `/cancel` после terminal state должен возвращать conflict, потому что execution уже завершен;
+- `/release` после terminal state должен возвращать conflict, потому что active control-path session уже отсутствует;
+- повторные `/commit` и `/rollback` после final manual transaction должны возвращать conflict, потому что незавершенной транзакции уже нет.
+
+Это не отменяет owner-token model для active states. В `RUNNING` и `PENDING_COMMIT` owner token, heartbeat и explicit actions остаются обязательной частью safety-механизма.
+
 ## Минимальный безопасный план реализации
 
 ### Этап 1
