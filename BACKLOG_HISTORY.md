@@ -300,6 +300,244 @@
 
 - `2026-04-23`
 
+### 18. SQL-консоль: completed modernization follow-ups
+
+Статус:
+
+- частично архивировано из рабочего backlog
+
+Архивные переносы:
+
+- `2026-04-27`: packages `18.8–18.9`, `18.11`.
+
+#### 18.8. SQL source catalog settings screen
+
+Статус:
+
+- выполнено
+
+Ключевой результат:
+
+- добавлен отдельный экран `/sql-console-sources` для редактирования SQL sources, groups и `ui.defaultCredentialsFile`;
+- source of truth остался в `ui-application.yml`, сохранение идет через server-side config persistence boundary, а runtime SQL catalog перечитывается без рестарта приложения;
+- загрузка `credential.properties` перенесена из рабочего SQL workspace на экран настроек sources;
+- добавлены диагностика placeholder-ключей, проверка одного source и проверка всех sources без раскрытия secret values;
+- raw password values не возвращаются в browser response;
+- режим ручного пароля реализован через `System keychain` / placeholder contract, без plain-text UI/storage mode;
+- fields формы меняются по выбранному credential mode, а технические `${secret:...}` details скрыты в collapsed block;
+- добавлены targeted tests на persistence, hidden password, hot reload, placeholder diagnostics, secret resolution и очистку group references при удалении source.
+
+#### 18.9. Restore targeted visual coverage after SQL redesign stabilizes
+
+Статус:
+
+- выполнено
+
+Ключевой результат:
+
+- добавлен SQL-only Playwright visual suite `tools/sql-console-browser-smoke/tests/sql-console-visual.targeted.spec.mjs`;
+- зафиксированы targeted baselines для main SQL shell, result pane empty/combined/per-source/diff, DB objects inspector, source settings и execution history;
+- API в suite замоканы, чтобы snapshots не зависели от локальной БД и runtime данных;
+- добавлено ожидание внешних visual styles перед screenshot;
+- добавлен npm shortcut `npm --prefix tools/sql-console-browser-smoke run test:sql-visual`;
+- проверка: `SQL_CONSOLE_SMOKE_SKIP_DB_SETUP=1 PLAYWRIGHT_TEST_ARGS='tests/sql-console-visual.targeted.spec.mjs' ./scripts/run-sql-console-browser-smoke.sh` — `8 passed`.
+
+#### 18.11. SQL source settings connection status normalization
+
+Статус:
+
+- выполнено
+
+Контекст:
+
+- при выборе `credential.properties` и проверке подключения одного source UI может показать противоречивое сообщение:
+  - `Не удалось подключиться к source 'db1'. Подключение установлено.`;
+- причина: source-settings test flow считает успешным только статус `OK`;
+- core/JDBC checker для SQL-консоли возвращает successful status как `SUCCESS` и message `Подключение установлено.`;
+- основной SQL connection status layer уже считает `SUCCESS` и `OK` успешными, а source-settings flow должен быть с ним согласован.
+
+Что нужно сделать:
+
+1. нормализовать success detection в single-source test connection:
+   - `SUCCESS` и `OK` считаются успешным подключением;
+   - `FAILED` и `ERROR` считаются ошибкой;
+2. нормализовать aggregate `Проверить все sources`:
+   - `SUCCESS` должен попадать в successful count;
+   - summary не должен показывать `0 OK` при успешном `SUCCESS`;
+3. выровнять визуальный статус на странице source settings, чтобы `SUCCESS` не подсвечивался как failed;
+4. добавить targeted regression tests на source-settings service;
+5. не менять core/JDBC status contract и не менять формат connection check DTO.
+
+Что сделано:
+
+1. single-source test connection теперь считает `SUCCESS` и `OK` успешными статусами;
+2. aggregate `Проверить все sources` считает `SUCCESS` в successful count и не показывает `0 OK` при успешном подключении;
+3. страница source settings подсвечивает `SUCCESS` как успешный статус, а не как failed;
+4. добавлены targeted regressions в `UiSqlConsoleSourceSettingsServiceTest`:
+   - single-source `SUCCESS` после `credential.properties` resolution;
+   - aggregate `SUCCESS` summary;
+5. core/JDBC status contract и DTO формат не менялись.
+
+Проверка:
+
+- `./gradlew :ui-server:test --tests 'com.sbrf.lt.platform.ui.sqlconsole.UiSqlConsoleSourceSettingsServiceTest'` — `BUILD SUCCESSFUL`.
+
+### 11. Repo-level архитектурная дисциплина: rule-sync packages `11.1–11.3`
+
+Статус:
+
+- частично архивировано из рабочего backlog
+
+Архивные переносы:
+
+- `2026-04-24`: package `11.1`;
+- `2026-04-27`: packages `11.2–11.3`.
+
+#### 11.2. SQL terminal control-path architecture invariant
+
+Статус:
+
+- выполнено
+
+Контекст:
+
+- пакеты `9.9–9.17` закрепили terminal behavior для SQL async/manual transaction execution;
+- это уже не локальная тестовая деталь, а архитектурный invariant SQL control-path;
+- [ARCHITECTURE_RULES.md](/Users/kwdev/DataPoolLoader/ARCHITECTURE_RULES.md) должен явно запрещать successful no-op для stale terminal control actions.
+
+Что нужно сделать:
+
+1. добавить architecture review note после reliability wave;
+2. зафиксировать, что terminal snapshots не должны публиковать active control-path metadata;
+3. зафиксировать, что stale terminal actions должны отвечать conflict, а не successful no-op;
+4. сохранить distinction между active `RUNNING/PENDING_COMMIT` и terminal states.
+
+Что сделано:
+
+1. в [ARCHITECTURE_RULES.md](/Users/kwdev/DataPoolLoader/ARCHITECTURE_RULES.md) добавлен review note `Review After SQL Terminal Control-Path Wave`;
+2. зафиксировано, что terminal snapshots не публикуют `ownerToken`, `ownerLeaseExpiresAt`, `pendingCommitExpiresAt`;
+3. зафиксировано, что stale `release`, `heartbeat`, `cancel`, повторные `commit/rollback` должны быть state conflict;
+4. distinction между active `RUNNING/PENDING_COMMIT` и terminal observable history сохранен.
+
+Проверка:
+
+- `git diff --check` — без замечаний.
+
+#### 11.3. SQL failure-scenarios terminal control-path sync
+
+Статус:
+
+- выполнено
+
+Контекст:
+
+- [SQL_CONSOLE_FAILURE_SCENARIOS.md](/Users/kwdev/DataPoolLoader/SQL_CONSOLE_FAILURE_SCENARIOS.md) описывает owner token, heartbeat, rollback и safety model;
+- после `9.9–9.17` нужно явно описать terminal control-path cleanup и stale action behavior;
+- это защищает будущие UI/store правки от возврата terminal owner metadata.
+
+Что нужно сделать:
+
+1. добавить в failure-scenarios doc terminal control-path invariant;
+2. описать expected behavior для stale `/heartbeat`, `/cancel`, `/release`, `/commit`, `/rollback`;
+3. зафиксировать, что active control-path metadata допустима только в active states;
+4. не менять runtime contracts.
+
+Что сделано:
+
+1. в [SQL_CONSOLE_FAILURE_SCENARIOS.md](/Users/kwdev/DataPoolLoader/SQL_CONSOLE_FAILURE_SCENARIOS.md) добавлен раздел `Terminal control-path invariant`;
+2. описано expected behavior для stale `/heartbeat`, `/cancel`, `/release`, повторных `/commit` и `/rollback`;
+3. зафиксировано, что owner token и lease metadata относятся только к active `RUNNING/PENDING_COMMIT`;
+4. runtime contracts не менялись.
+
+Проверка:
+
+- `git diff --check` — без замечаний.
+
+### 19. Kafka UI modernization: completed implementation packages `19.6–19.8`
+
+Статус:
+
+- частично архивировано из рабочего backlog
+
+Архивные переносы:
+
+- `2026-04-27`: packages `19.6–19.8`.
+
+#### 19.6. Kafka produce and create-topic tool forms
+
+Статус:
+
+- выполнено
+
+Ключевой результат:
+
+- produce form переведена на Kafka UI-like tool panel с partition override, key input, structured headers, высоким payload editor и delivery result summary;
+- readOnly cluster продолжает блокировать produce UI до действия отправки;
+- create-topic form выровнена как compact tool form с topic name, partitions, replication factor, cleanup policy, retention.ms и retention.bytes;
+- failure cases и Kafka admin/produce contracts не менялись;
+- delete topic, alter topic и reset offsets не добавлялись.
+
+#### 19.6.1. Kafka message expansion and full-width modernization shells
+
+Статус:
+
+- выполнено
+
+Ключевой результат:
+
+- message browser хранит UI-only set раскрытых сообщений, поэтому можно раскрыть несколько строк одновременно;
+- повторное нажатие сворачивает конкретную раскрытую строку;
+- inline inspector сохранен внутри таблицы;
+- expansion state сбрасывается только при смене result set;
+- Kafka и Home modernization shell переведены на full-width без `max-width: 1440px`;
+- produce payload editor увеличен до 620px на desktop и 420px на узких экранах;
+- Kafka read API и bounded read semantics не менялись.
+
+#### 19.6.2. Kafka produce JSON highlighting
+
+Статус:
+
+- выполнено
+
+Ключевой результат:
+
+- produce payload переведен на один Monaco JSON editor без отдельного preview;
+- подсветка JSON отображается внутри editor;
+- invalid JSON и plain text остаются редактируемыми в том же editor;
+- добавлена явная кнопка `Форматировать JSON`;
+- pretty-format применяется только по нажатию и только для валидного JSON;
+- produce API и write safety не менялись.
+
+#### 19.7. Kafka consumer groups and brokers screens consistency
+
+Статус:
+
+- выполнено
+
+Ключевой результат:
+
+- Consumer Groups screen переведен на Kafka metadata panel с compact header, reload action, summary metrics, dense table, status badges и inline detail view по group topics;
+- Brokers screen переведен на Kafka metadata panel с compact header, reload action, cluster summary metrics, broker cards, dense broker table и controller/follower role badges;
+- reload actions сохранены;
+- partial metadata warnings остаются section/group-level UI state;
+- Kafka API и store contracts не менялись.
+
+#### 19.8. Kafka settings UI redesign
+
+Статус:
+
+- выполнено
+
+Ключевой результат:
+
+- SSL settings UI разбит на компактные секции `Trust material` и `Client material`;
+- для каждой секции доступны только material formats `Не задано`, `JKS / PKCS12`, `PEM files`;
+- показываются только поля выбранного формата;
+- material file fields стали read-only display, path задается только через системный file chooser;
+- добавлена явная кнопка `Очистить`;
+- store нормализует hidden stale SSL fields перед save/test connection;
+- `default` как SSL material mode не отображается.
+
 ## P2
 
 ### 16.17. Kafka targeted visual coverage after modernization
@@ -365,6 +603,42 @@
 Основные даты:
 
 - `2026-04-25`
+
+### 16.18. Test strategy backlog sync after Kafka visual baselines
+
+Статус:
+
+- выполнено
+
+Контекст:
+
+- Kafka visual follow-up уже закрыт и перенесен в history как `16.17`;
+- активная секция `16` не должна продолжать указывать завершенный Kafka visual baseline как следующий follow-up;
+- следующий test focus должен оставаться на long-running scenario coverage и targeted tests для новых bounded changes.
+
+Что нужно сделать:
+
+1. убрать устаревший Kafka visual baseline follow-up из активной секции `16`;
+2. оставить актуальные test strategy directions:
+   - long-running scenario-level coverage;
+   - targeted store/server tests для новых bounded subsystem changes;
+3. не включать широкий Playwright suite обратно как обязательный gate до стабилизации UI.
+
+Что сделано:
+
+1. из активной секции `16` убран уже закрытый follow-up про Kafka visual baselines;
+2. актуальные направления оставлены:
+   - long-running scenario-level coverage;
+   - targeted store/server tests для новых bounded subsystem changes;
+3. широкий Playwright suite не возвращался как обязательный gate.
+
+Проверка:
+
+- `git diff --check` — без замечаний.
+
+Основные даты:
+
+- `2026-04-27`
 
 ### 17. Расширенный summary по длительностям
 
@@ -919,7 +1193,7 @@
    - JSON highlighting применяется только при успешном parse;
    - non-JSON и invalid JSON остаются plain text и не ломают message browser.
 
-### 9. Операционная надежность long-running операций: реализованные packages `9.1–9.17`
+### 9. Операционная надежность long-running операций: реализованные packages `9.1–9.20`
 
 Статус:
 
@@ -931,6 +1205,7 @@
 - `2026-04-25`: packages `9.6–9.8`.
 - `2026-04-25`: packages `9.9–9.14`.
 - `2026-04-25`: packages `9.15–9.17`.
+- `2026-04-27`: packages `9.18–9.20`.
 
 #### 9.1. Write-through recovery interrupted FILES runs after restart
 
@@ -1440,10 +1715,101 @@
 
 - `./gradlew :ui-server:test --tests 'com.sbrf.lt.platform.ui.server.SqlConsoleServerTest.manual transaction final route responses clear control path metadata'` — `BUILD SUCCESSFUL`.
 
+#### 9.18. SQL pending commit TTL rollback history regression
+
+Статус:
+
+- выполнено
+
+Контекст:
+
+- `PENDING_COMMIT` auto-rollback по TTL уже проверяется по current snapshot;
+- execution history является пользовательской диагностикой long-running/manual transaction flow;
+- history entry не должна оставаться в `PENDING_COMMIT` после system rollback.
+
+Что нужно сделать:
+
+1. добавить manager-level regression для `PENDING_COMMIT -> ROLLED_BACK_BY_TIMEOUT`;
+2. проверить, что history entry обновляется для того же `executionId`;
+3. проверить, что entry не дублируется;
+4. не менять persisted history format.
+
+Что сделано:
+
+1. добавлена manager-level regression в `SqlConsoleQueryManagerTransactionSafetyTest`;
+2. проверяется переход history entry `PENDING_COMMIT -> ROLLED_BACK_BY_TIMEOUT`;
+3. проверяется single-entry behavior для того же `executionId`;
+4. persisted history format не менялся.
+
+Проверка:
+
+- `./gradlew :ui-server:test --tests 'com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleQueryManagerTransactionSafetyTest'` — `BUILD SUCCESSFUL`.
+
+#### 9.19. SQL released pending commit owner-loss rollback history regression
+
+Статус:
+
+- выполнено
+
+Контекст:
+
+- release pending commit recovery window уже приводит к `ROLLED_BACK_BY_OWNER_LOSS`;
+- history должна показывать финальный rollback reason, а не stale `PENDING_COMMIT`;
+- это нужно для диагностики закрытой вкладки или потерянного owner session.
+
+Что нужно сделать:
+
+1. добавить manager-level regression для released `PENDING_COMMIT -> ROLLED_BACK_BY_OWNER_LOSS`;
+2. проверить, что history entry обновляется для того же `executionId`;
+3. проверить, что entry не дублируется;
+4. не менять release/heartbeat runtime contract.
+
+Что сделано:
+
+1. добавлена manager-level regression в `SqlConsoleQueryManagerTransactionSafetyTest`;
+2. проверяется переход history entry `PENDING_COMMIT -> ROLLED_BACK_BY_OWNER_LOSS`;
+3. проверяется single-entry behavior для того же `executionId`;
+4. release/heartbeat runtime contract не менялся.
+
+Проверка:
+
+- `./gradlew :ui-server:test --tests 'com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleQueryManagerTransactionSafetyTest'` — `BUILD SUCCESSFUL`.
+
+#### 9.20. SQL running owner-loss rollback history regression
+
+Статус:
+
+- выполнено
+
+Контекст:
+
+- если owner lease потерян во время manual transaction `RUNNING`, успешное выполнение должно завершаться system rollback;
+- current snapshot уже проверяется, но history должна показывать финальный `ROLLED_BACK_BY_OWNER_LOSS`;
+- пользователь не должен видеть в истории ambiguous success без причины rollback.
+
+Что нужно сделать:
+
+1. добавить manager-level regression для owner lease loss while `RUNNING`;
+2. проверить, что после completion history entry имеет `ROLLED_BACK_BY_OWNER_LOSS`;
+3. проверить, что entry не дублируется;
+4. не менять running execution lifecycle.
+
+Что сделано:
+
+1. добавлена manager-level regression в `SqlConsoleQueryManagerTransactionSafetyTest`;
+2. проверяется, что после completion history entry имеет `ROLLED_BACK_BY_OWNER_LOSS`;
+3. проверяется single-entry behavior для того же `executionId`;
+4. running execution lifecycle не менялся.
+
+Проверка:
+
+- `./gradlew :ui-server:test --tests 'com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleQueryManagerTransactionSafetyTest'` — `BUILD SUCCESSFUL`.
+
 Основные даты:
 
 - `2026-04-24`
 - `2026-04-25`
+- `2026-04-27`
 
 ## P3
 
