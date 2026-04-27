@@ -25,10 +25,9 @@
 
 1. [18. SQL-консоль: модернизация интерфейса под рабочий IDE/tool experience](/Users/kwdev/DataPoolLoader/BACKLOG.md)
 2. [19. Kafka UI modernization mockups](/Users/kwdev/DataPoolLoader/BACKLOG.md)
-3. [20. Главный экран: modernization mockup и launcher layout](/Users/kwdev/DataPoolLoader/BACKLOG.md)
-4. [9. Операционная надежность long-running операций](/Users/kwdev/DataPoolLoader/BACKLOG.md)
-5. [11. Repo-level архитектурная дисциплина](/Users/kwdev/DataPoolLoader/BACKLOG.md)
-6. [16. Тестовая стратегия](/Users/kwdev/DataPoolLoader/BACKLOG.md)
+3. [9. Операционная надежность long-running операций](/Users/kwdev/DataPoolLoader/BACKLOG.md)
+4. [11. Repo-level архитектурная дисциплина](/Users/kwdev/DataPoolLoader/BACKLOG.md)
+5. [16. Тестовая стратегия](/Users/kwdev/DataPoolLoader/BACKLOG.md)
 
 ## P0
 
@@ -431,71 +430,6 @@ Non-goals первой дизайн-волны:
 5. product UI перенос считается завершенным и ожидает финального визуального подтверждения.
 
 История выполненных packages `19.1–19.10` вынесена в [BACKLOG_HISTORY.md](/Users/kwdev/DataPoolLoader/BACKLOG_HISTORY.md).
-
-### 20. Главный экран: modernization mockup и launcher layout
-
-Статус:
-
-- реализовано
-
-Контекст:
-
-- главный экран должен быть входной точкой локальной инженерной платформы, а не маркетинговым landing page;
-- текущая структура из трех групп остается правильной:
-  - `Нагрузочное тестирование / Датапулы`;
-  - `Работа с данными / Инструменты`;
-  - `Справка`;
-- после модернизации SQL и Kafka главный экран должен визуально соответствовать этим tool screens;
-- HTML-макет для review находится в [design/home-modernization/index.html](/Users/kwdev/DataPoolLoader/design/home-modernization/index.html).
-
-Что нужно сделать:
-
-1. подготовить reviewable HTML-макет главного экрана до правок product UI;
-2. заменить `Load Testing Data Platform` на осмысленное русское название платформы:
-   - рабочий вариант: `Платформа инструментов тестирования микросервисов`;
-   - не показывать отдельный описательный абзац под названием на главном экране;
-   - не показывать hero-метки вроде `локальный режим`, `SQL`, `Kafka`, `датапулы`;
-3. сохранить три строки/группы launcher:
-   - `Нагрузочное тестирование / Датапулы`;
-   - `Работа с данными / Инструменты`;
-   - `Справка`;
-4. сделать группы одинаковыми по визуальной модели:
-   - compact group header;
-   - в group header показывать только метку и название, без подробного описания;
-   - равномерная сетка карточек;
-   - понятная primary action;
-   - без растянутой одной карточки и компактных остальных;
-5. сохранить runtime mode semantics:
-   - файловый режим;
-   - DB режим;
-   - переключатель режима должен находиться только в группе `Нагрузочное тестирование / Датапулы`;
-   - понятное disabled-state для недоступного режима;
-6. не добавлять на главный экран execution history, Kafka internals или SQL result details;
-7. не менять product UI code до согласования макета.
-
-Что зафиксировано:
-
-- макет принят как целевое направление для реализации главного экрана;
-- стартовый экран: `file:///Users/kwdev/DataPoolLoader/design/home-modernization/index.html?screen=home`;
-- название платформы: `Платформа инструментов тестирования микросервисов`;
-- верхняя зона без описательного текста и hero-меток;
-- группы:
-  - `Нагрузочное тестирование / Датапулы`;
-  - `Работа с данными / Инструменты`;
-  - `Справка`;
-- переключатель runtime mode относится только к группе `Нагрузочное тестирование / Датапулы`.
-
-Что сделано в product UI:
-
-1. старый `Load Testing Data Platform` hero заменен compact title-card с названием `Платформа инструментов тестирования микросервисов`;
-2. описательный hero-текст и hero-метки удалены;
-3. главный экран перестроен в три launcher-группы:
-   - `Нагрузочное тестирование / Датапулы`;
-   - `Работа с данными / Инструменты`;
-   - `Справка`;
-4. runtime mode switch оставлен только в группе `Нагрузочное тестирование / Датапулы`;
-5. карточки `Файловые модули`, `DB-модули`, `Очистка истории`, `SQL-консоль`, `Kafka-инструмент`, `Справка`, `О проекте` приведены к единой visual model;
-6. изменения ограничены `ui-compose-web` home components/styles, без новых server/state contracts.
 
 ### 9. Операционная надежность long-running операций
 
