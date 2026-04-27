@@ -1193,7 +1193,7 @@
    - JSON highlighting применяется только при успешном parse;
    - non-JSON и invalid JSON остаются plain text и не ломают message browser.
 
-### 9. Операционная надежность long-running операций: реализованные packages `9.1–9.22`
+### 9. Операционная надежность long-running операций: реализованные packages `9.1–9.23`
 
 Статус:
 
@@ -1208,6 +1208,7 @@
 - `2026-04-27`: packages `9.18–9.20`.
 - `2026-04-27`: package `9.21`.
 - `2026-04-27`: package `9.22`.
+- `2026-04-27`: package `9.23`.
 
 #### 9.1. Write-through recovery interrupted FILES runs after restart
 
@@ -1872,6 +1873,44 @@
 Проверка:
 
 - `./gradlew :ui-server:test --tests 'com.sbrf.lt.platform.ui.server.SqlConsoleServerTest.system rollback terminal route actions return conflicts'` — `BUILD SUCCESSFUL`.
+
+#### 9.23. SQL system rollback current snapshot boundary regression
+
+Статус:
+
+- выполнено
+
+Контекст:
+
+- `/api/sql-console/query/{id}` и `/api/sql-console/history` уже покрыты для system rollback terminal states;
+- рабочий UI и store/polling слой также опираются на `currentSnapshot(workspaceId)` как boundary текущего execution;
+- после `ROLLED_BACK_BY_TIMEOUT` или `ROLLED_BACK_BY_OWNER_LOSS` этот boundary не должен возвращать stale `PENDING_COMMIT` или active control-path metadata.
+
+Что нужно сделать:
+
+1. добавить manager-level regression для `currentSnapshot(workspaceId)` после `PENDING_COMMIT -> ROLLED_BACK_BY_TIMEOUT`;
+2. добавить regression для `currentSnapshot(workspaceId)` после released owner `PENDING_COMMIT -> ROLLED_BACK_BY_OWNER_LOSS`;
+3. проверить, что terminal current snapshot сохраняет `executionId`, показывает финальный `transactionState` и очищает `ownerToken`, `ownerLeaseExpiresAt`, `pendingCommitExpiresAt`;
+4. не менять runtime contract без необходимости.
+
+Что сделано:
+
+1. добавлен отдельный [SqlConsoleQueryManagerCurrentSnapshotTest.kt](/Users/kwdev/DataPoolLoader/ui-server/src/test/kotlin/com/sbrf/lt/platform/ui/sqlconsole/SqlConsoleQueryManagerCurrentSnapshotTest.kt);
+2. проверен `currentSnapshot(workspaceId)` после TTL rollback:
+   - сохраняется тот же `executionId`;
+   - `transactionState = ROLLED_BACK_BY_TIMEOUT`;
+   - `ownerToken`, `ownerLeaseExpiresAt`, `pendingCommitExpiresAt` очищены;
+3. проверен `currentSnapshot(workspaceId)` после released owner rollback:
+   - сохраняется тот же `executionId`;
+   - `transactionState = ROLLED_BACK_BY_OWNER_LOSS`;
+   - active control-path metadata очищена;
+4. runtime contract и production-код не менялись.
+
+Проверка:
+
+- `./gradlew :ui-server:test --tests 'com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleQueryManagerCurrentSnapshotTest'` — `BUILD SUCCESSFUL`;
+- `./gradlew :ui-server:test --tests 'com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleQueryManagerTransactionSafetyTest'` — `BUILD SUCCESSFUL`;
+- `./gradlew :ui-server:test --tests 'com.sbrf.lt.platform.ui.server.SqlConsoleSystemRollbackRoutesTest'` — `BUILD SUCCESSFUL`.
 
 Основные даты:
 
