@@ -187,14 +187,17 @@ class SqlConsoleRunningOwnerLossRoutesTest {
 
         assertOwnerLostActionConflict(
             path = "/api/sql-console/query/$executionId/heartbeat",
+            ownerSessionId = "tab-running-release-owner-loss-route",
             ownerToken = ownerToken,
         )
         assertOwnerLostActionConflict(
             path = "/api/sql-console/query/$executionId/release",
+            ownerSessionId = "tab-running-release-owner-loss-route",
             ownerToken = ownerToken,
         )
         assertOwnerLostActionConflict(
             path = "/api/sql-console/query/$executionId/cancel",
+            ownerSessionId = "tab-running-release-owner-loss-route",
             ownerToken = ownerToken,
         )
 
@@ -212,13 +215,105 @@ class SqlConsoleRunningOwnerLossRoutesTest {
         error("released manual SQL execution did not roll back after owner loss")
     }
 
+    @Test
+    fun `released running auto commit route completes success after recovery window`() = testApplication {
+        var now = Instant.parse("2026-04-27T00:00:00Z")
+        val releaseExecution = CountDownLatch(1)
+        val root = createProject()
+        val registry = ModuleRegistry(appsRoot = root.resolve("apps"))
+        val storageDir = Files.createTempDirectory("ui-server-state-")
+        val uiConfig = UiAppConfig(
+            storageDir = storageDir.toString(),
+            sqlConsole = SqlConsoleConfig(
+                queryTimeoutSec = 30,
+                sourceCatalog = listOf(SqlConsoleSourceConfig("db1", "jdbc:test:one", "user", "pwd")),
+            ),
+        )
+        val runManager = RunManager(moduleRegistry = registry, uiConfig = uiConfig)
+        val sqlConsoleService = autoCommitBlockingService(releaseExecution)
+        val queryManager = SqlConsoleQueryManager(
+            sqlConsoleService = sqlConsoleService,
+            clock = { now },
+            ownerReleaseRecoveryWindow = Duration.ofSeconds(3),
+        )
+        application {
+            uiModule(
+                moduleRegistry = registry,
+                runManager = runManager,
+                sqlConsoleService = sqlConsoleService,
+                sqlConsoleQueryManager = queryManager,
+            )
+        }
+
+        val ownerSessionId = "tab-running-release-autocommit-route"
+        val started = client.post("/api/sql-console/query/start") {
+            contentType(ContentType.Application.Json)
+            setBody(
+                """{"sql":"select pg_sleep(10)","selectedSourceNames":["db1"],"workspaceId":"workspace-running-release-autocommit-route","ownerSessionId":"$ownerSessionId"}""",
+            )
+        }
+        assertEquals(HttpStatusCode.OK, started.status)
+        val startedBody = started.bodyAsText()
+        val executionId = startedBody.jsonStringField("id")
+        assertNotNull(executionId)
+        val ownerToken = startedBody.jsonStringField("ownerToken")
+        assertNotNull(ownerToken)
+
+        val released = client.post("/api/sql-console/query/$executionId/release") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"ownerSessionId":"$ownerSessionId","ownerToken":"$ownerToken"}""")
+        }
+        assertEquals(HttpStatusCode.OK, released.status)
+
+        now = now.plusSeconds(4)
+        queryManager.enforceSafetyTimeouts()
+
+        val ownerLost = client.get("/api/sql-console/query/$executionId").bodyAsText()
+        assertTrue(ownerLost.contains(""""id":"$executionId""""), ownerLost)
+        assertTrue(ownerLost.contains(""""status":"RUNNING""""), ownerLost)
+        assertTrue(ownerLost.jsonFieldIsNullOrMissing("ownerToken"), ownerLost)
+        assertTrue(ownerLost.jsonFieldIsNullOrMissing("ownerLeaseExpiresAt"), ownerLost)
+        assertTrue(ownerLost.jsonFieldIsNullOrMissing("pendingCommitExpiresAt"), ownerLost)
+
+        assertOwnerLostActionConflict(
+            path = "/api/sql-console/query/$executionId/heartbeat",
+            ownerSessionId = ownerSessionId,
+            ownerToken = ownerToken,
+        )
+        assertOwnerLostActionConflict(
+            path = "/api/sql-console/query/$executionId/release",
+            ownerSessionId = ownerSessionId,
+            ownerToken = ownerToken,
+        )
+        assertOwnerLostActionConflict(
+            path = "/api/sql-console/query/$executionId/cancel",
+            ownerSessionId = ownerSessionId,
+            ownerToken = ownerToken,
+        )
+
+        releaseExecution.countDown()
+        repeat(20) {
+            val completed = client.get("/api/sql-console/query/$executionId").bodyAsText()
+            if (completed.contains(""""status":"SUCCESS"""")) {
+                assertTrue(completed.contains(""""transactionState":"NONE""""), completed)
+                assertTrue(completed.jsonFieldIsNullOrMissing("ownerToken"), completed)
+                assertTrue(completed.jsonFieldIsNullOrMissing("ownerLeaseExpiresAt"), completed)
+                assertTrue(completed.jsonFieldIsNullOrMissing("pendingCommitExpiresAt"), completed)
+                return@testApplication
+            }
+            Thread.sleep(25)
+        }
+        error("released auto-commit SQL execution did not complete successfully")
+    }
+
     private suspend fun io.ktor.server.testing.ApplicationTestBuilder.assertOwnerLostActionConflict(
         path: String,
+        ownerSessionId: String,
         ownerToken: String,
     ) {
         val response = client.post(path) {
             contentType(ContentType.Application.Json)
-            setBody("""{"ownerSessionId":"tab-running-release-owner-loss-route","ownerToken":"$ownerToken"}""")
+            setBody("""{"ownerSessionId":"$ownerSessionId","ownerToken":"$ownerToken"}""")
         }
         assertEquals(HttpStatusCode.Conflict, response.status)
         assertTrue(response.bodyAsText().contains("потеряла владельца"))
