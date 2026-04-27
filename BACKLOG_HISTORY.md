@@ -453,15 +453,99 @@
 
 - `git diff --check` — без замечаний.
 
-### 19. Kafka UI modernization: completed implementation packages `19.6–19.8`
+### 19. Kafka UI modernization: completed implementation packages `19.1–19.10`
 
 Статус:
 
-- частично архивировано из рабочего backlog
+- архивировано из рабочего backlog
 
 Архивные переносы:
 
 - `2026-04-27`: packages `19.6–19.8`.
+- `2026-04-27`: packages `19.1–19.5`, `19.9–19.10`.
+
+#### 19.1. Kafka modernization HTML mockups
+
+Статус:
+
+- выполнено
+
+Ключевой результат:
+
+- подготовлен и согласован reviewable HTML-макет [design/kafka-modernization/index.html](/Users/kwdev/DataPoolLoader/design/kafka-modernization/index.html);
+- макет покрывает topics catalog, topic overview, messages browser, produce, create-topic, consumer groups, brokers, settings и empty cluster state;
+- в макете сохранены обязательные Kafka contracts:
+  - cluster selector;
+  - topic filter;
+  - table-first topic catalog;
+  - table-first messages view с details pane;
+  - all partitions / selected partition controls;
+  - read modes `LATEST / OFFSET / TIMESTAMP`;
+  - read result summary `DONE / ms / bytes / messages consumed`;
+  - JSON highlighting только для валидного JSON;
+  - plain-text fallback для non-JSON/invalid JSON;
+  - structured produce editor;
+  - create topic form;
+  - TLS settings file picker affordances для JKS/PEM/cert/key fields.
+
+#### 19.2. Kafka compact tool shell and cluster rail
+
+Статус:
+
+- выполнено
+
+Ключевой результат:
+
+- `PageScaffold`/hero-like оболочка Kafka страницы заменена на compact product shell;
+- добавлен Kafka tool header с breadcrumbs, current cluster, bootstrap и protocol/read-write/max-read/bounded-read chips;
+- left rail переработан в плотный `Clusters / Navigation / Selected topic` layout;
+- route semantics и callbacks сохранены;
+- изменения ограничены `ui-compose-web` page/components/styles, без изменения server/store contracts.
+
+#### 19.3. Kafka topics catalog table-first view
+
+Статус:
+
+- выполнено
+
+Ключевой результат:
+
+- Topics screen вынесен из общего card-heavy shell в compact table-first panel;
+- добавлены toolbar/status chips по total/user/internal topics и refreshing state;
+- сохранены topic filter draft, explicit reload, create-topic action и inline create-topic form;
+- таблица сохранила row/link navigation и колонки topic, partitions, replication, cleanup, retention;
+- server/store/API contracts не менялись.
+
+#### 19.4. Kafka topic details and tabs redesign
+
+Статус:
+
+- выполнено
+
+Ключевой результат:
+
+- topic header перепакован в compact panel с breadcrumbs, topic name, cluster/protocol/bootstrap meta, partition/replication/cleanup chips и refresh action;
+- tabs `Overview / Messages / Consumers / Settings / Produce` сохранены и переведены на compact tab style;
+- overview заменен на плотный layout с summary metrics, partition table и side panel `Partition load`;
+- consumer metadata status показывается section-level chip и не блокирует topic overview;
+- server/store/API contracts не менялись.
+
+#### 19.5. Kafka messages browser redesign
+
+Статус:
+
+- выполнено
+
+Ключевой результат:
+
+- message browser переведен на compact table-first panel без card-heavy списка сообщений;
+- controls сохранены как draft-only: scope, partition, mode, limit, offset, timestamp и explicit `Читать сообщения`;
+- result summary оформлен как Kafka UI-like строка `DONE / elapsed time / bytes / messages consumed`;
+- messages table получила expander column, offset, partition, timestamp, key/value preview и headers count;
+- selected message раскрывается inline внутри таблицы через tabs `Value / Key / Headers / Metadata`;
+- payload actions `Pretty / Raw / Copy` сохранены;
+- valid JSON продолжает подсвечиваться, plain text и invalid JSON остаются plain text fallback;
+- server/store/API contracts не менялись.
 
 #### 19.6. Kafka produce and create-topic tool forms
 
@@ -537,6 +621,38 @@
 - добавлена явная кнопка `Очистить`;
 - store нормализует hidden stale SSL fields перед save/test connection;
 - `default` как SSL material mode не отображается.
+
+#### 19.9. Kafka modernization implementation guide
+
+Статус:
+
+- выполнено
+
+Ключевой результат:
+
+- создан [KAFKA_MODERNIZATION_IMPLEMENTATION_GUIDE.md](/Users/kwdev/DataPoolLoader/KAFKA_MODERNIZATION_IMPLEMENTATION_GUIDE.md);
+- зафиксированы component/store/server boundaries Kafka UI;
+- описаны migration phases:
+  - compact shell and rail;
+  - topics catalog and topic overview;
+  - messages browser;
+  - produce and create-topic;
+  - consumer groups, brokers and settings;
+  - visual regression and cleanup;
+- добавлены state boundaries, file-level implementation map, regression checklist и stop criteria.
+
+#### 19.10. Kafka modernization backlog closure and archive cleanup
+
+Статус:
+
+- выполнено
+
+Ключевой результат:
+
+- реализованные Kafka packages `19.1–19.5` и `19.9` перенесены из рабочего backlog в архив;
+- рабочий backlog оставляет только итоговый статус Kafka modernization и ссылку на архив;
+- зафиксировано, что product UI перенос Kafka modernization завершен и ожидает финального визуального подтверждения;
+- Kafka runtime, store, routes и CSS в этом cleanup package не менялись.
 
 ## P2
 
