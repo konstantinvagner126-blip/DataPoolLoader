@@ -5,8 +5,10 @@ import com.sbrf.lt.datapool.sqlconsole.SqlConsoleSourceConfig
 import com.sbrf.lt.platform.ui.config.UiAppConfig
 import com.sbrf.lt.platform.ui.module.ModuleRegistry
 import com.sbrf.lt.platform.ui.run.RunManager
+import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleExecutionHistoryService
 import com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleQueryManager
 import com.sbrf.lt.platform.ui.sqlconsole.autoCommitBlockingService
+import com.sbrf.lt.platform.ui.sqlconsole.manualTransactionService
 import io.ktor.client.request.get
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
@@ -118,6 +120,108 @@ class SqlConsoleRunningOwnerLossRoutesTest {
             Thread.sleep(25)
         }
         error("SQL execution did not complete after releasing test latch")
+    }
+
+    @Test
+    fun `released running manual transaction route rolls back after recovery window`() = testApplication {
+        var now = Instant.parse("2026-04-27T00:00:00Z")
+        val releaseExecution = CountDownLatch(1)
+        val root = createProject()
+        val registry = ModuleRegistry(appsRoot = root.resolve("apps"))
+        val storageDir = Files.createTempDirectory("ui-server-state-")
+        val uiConfig = UiAppConfig(
+            storageDir = storageDir.toString(),
+            sqlConsole = SqlConsoleConfig(
+                queryTimeoutSec = 30,
+                sourceCatalog = listOf(SqlConsoleSourceConfig("db1", "jdbc:test:one", "user", "pwd")),
+            ),
+        )
+        val runManager = RunManager(moduleRegistry = registry, uiConfig = uiConfig)
+        val sqlConsoleService = manualTransactionService(releaseExecution)
+        val historyService = SqlConsoleExecutionHistoryService(storageDir)
+        val queryManager = SqlConsoleQueryManager(
+            sqlConsoleService = sqlConsoleService,
+            executionHistoryService = historyService,
+            clock = { now },
+            ownerReleaseRecoveryWindow = Duration.ofSeconds(3),
+        )
+        application {
+            uiModule(
+                moduleRegistry = registry,
+                runManager = runManager,
+                sqlConsoleService = sqlConsoleService,
+                sqlConsoleQueryManager = queryManager,
+                sqlConsoleExecutionHistoryService = historyService,
+            )
+        }
+
+        val workspaceId = "workspace-running-release-owner-loss-route"
+        val started = client.post("/api/sql-console/query/start") {
+            contentType(ContentType.Application.Json)
+            setBody(
+                """{"sql":"update demo set flag = true","selectedSourceNames":["db1"],"workspaceId":"$workspaceId","ownerSessionId":"tab-running-release-owner-loss-route","transactionMode":"TRANSACTION_PER_SHARD"}""",
+            )
+        }
+        assertEquals(HttpStatusCode.OK, started.status)
+        val startedBody = started.bodyAsText()
+        val executionId = startedBody.jsonStringField("id")
+        assertNotNull(executionId)
+        val ownerToken = startedBody.jsonStringField("ownerToken")
+        assertNotNull(ownerToken)
+
+        val released = client.post("/api/sql-console/query/$executionId/release") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"ownerSessionId":"tab-running-release-owner-loss-route","ownerToken":"$ownerToken"}""")
+        }
+        assertEquals(HttpStatusCode.OK, released.status)
+
+        now = now.plusSeconds(4)
+        queryManager.enforceSafetyTimeouts()
+
+        val ownerLost = client.get("/api/sql-console/query/$executionId").bodyAsText()
+        assertTrue(ownerLost.contains(""""id":"$executionId""""), ownerLost)
+        assertTrue(ownerLost.contains(""""status":"RUNNING""""), ownerLost)
+        assertTrue(ownerLost.jsonFieldIsNullOrMissing("ownerToken"), ownerLost)
+        assertTrue(ownerLost.jsonFieldIsNullOrMissing("ownerLeaseExpiresAt"), ownerLost)
+        assertTrue(ownerLost.jsonFieldIsNullOrMissing("pendingCommitExpiresAt"), ownerLost)
+
+        assertOwnerLostActionConflict(
+            path = "/api/sql-console/query/$executionId/heartbeat",
+            ownerToken = ownerToken,
+        )
+        assertOwnerLostActionConflict(
+            path = "/api/sql-console/query/$executionId/release",
+            ownerToken = ownerToken,
+        )
+        assertOwnerLostActionConflict(
+            path = "/api/sql-console/query/$executionId/cancel",
+            ownerToken = ownerToken,
+        )
+
+        releaseExecution.countDown()
+        repeat(20) {
+            val completed = client.get("/api/sql-console/query/$executionId").bodyAsText()
+            if (completed.contains(""""transactionState":"ROLLED_BACK_BY_OWNER_LOSS"""")) {
+                assertTrue(completed.jsonFieldIsNullOrMissing("ownerToken"), completed)
+                assertTrue(completed.jsonFieldIsNullOrMissing("ownerLeaseExpiresAt"), completed)
+                assertTrue(completed.jsonFieldIsNullOrMissing("pendingCommitExpiresAt"), completed)
+                return@testApplication
+            }
+            Thread.sleep(25)
+        }
+        error("released manual SQL execution did not roll back after owner loss")
+    }
+
+    private suspend fun io.ktor.server.testing.ApplicationTestBuilder.assertOwnerLostActionConflict(
+        path: String,
+        ownerToken: String,
+    ) {
+        val response = client.post(path) {
+            contentType(ContentType.Application.Json)
+            setBody("""{"ownerSessionId":"tab-running-release-owner-loss-route","ownerToken":"$ownerToken"}""")
+        }
+        assertEquals(HttpStatusCode.Conflict, response.status)
+        assertTrue(response.bodyAsText().contains("потеряла владельца"))
     }
 
     private fun String.jsonFieldIsNullOrMissing(name: String): Boolean {

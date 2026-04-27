@@ -1377,7 +1377,7 @@
    - JSON highlighting применяется только при успешном parse;
    - non-JSON и invalid JSON остаются plain text и не ломают message browser.
 
-### 9. Операционная надежность long-running операций: реализованные packages `9.1–9.27`
+### 9. Операционная надежность long-running операций: реализованные packages `9.1–9.28`
 
 Статус:
 
@@ -1397,6 +1397,7 @@
 - `2026-04-27`: package `9.25`.
 - `2026-04-27`: package `9.26`.
 - `2026-04-27`: package `9.27`.
+- `2026-04-28`: package `9.28`.
 
 #### 9.1. Write-through recovery interrupted FILES runs after restart
 
@@ -2236,11 +2237,48 @@
 - `./gradlew :ui-server:test --tests 'com.sbrf.lt.platform.ui.server.SqlConsoleRunningOwnerLossHistoryRoutesTest'` — `BUILD SUCCESSFUL`;
 - `./gradlew :ui-server:test --tests 'com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleQueryManagerTransactionSafetyTest'` — `BUILD SUCCESSFUL`.
 
+#### 9.28. SQL running release owner-loss route regression
+
+Статус:
+
+- выполнено
+
+Контекст:
+
+- server-level owner-loss coverage для `RUNNING` уже проверяла lease timeout;
+- закрытие вкладки обычно идет через explicit `/release`, после чего действует короткое recovery window;
+- не хватало HTTP boundary regression для сценария `RUNNING -> /release -> recovery window expired`, чтобы этот path не отличался от lease timeout.
+
+Что нужно сделать:
+
+1. добавить server-level regression для `/api/sql-console/query/{id}` после `/release` во время `RUNNING` и истечения recovery window;
+2. проверить, что route response сохраняет `executionId` и `RUNNING`, но не публикует `ownerToken`, `ownerLeaseExpiresAt`, `pendingCommitExpiresAt`;
+3. проверить, что stale `/heartbeat`, `/release`, `/cancel` со старым owner token возвращают `409 Conflict`;
+4. для manual transaction проверить финальное `ROLLED_BACK_BY_OWNER_LOSS` после завершения script;
+5. не менять route handlers/runtime code, если current orchestration уже соблюдает contract.
+
+Что сделано:
+
+1. [SqlConsoleRunningOwnerLossRoutesTest.kt](/Users/kwdev/DataPoolLoader/ui-server/src/test/kotlin/com/sbrf/lt/platform/ui/server/SqlConsoleRunningOwnerLossRoutesTest.kt) расширен regression для explicit `/release` во время `RUNNING`;
+2. route flow проверяет `RUNNING -> /release -> recovery window expired`:
+   - `/api/sql-console/query/{id}` сохраняет `executionId`;
+   - response остается `status = RUNNING`, пока SQL script физически продолжается;
+   - `ownerToken`, `ownerLeaseExpiresAt`, `pendingCommitExpiresAt` не публикуются после owner-loss;
+3. stale `/heartbeat`, `/release` и `/cancel` со старым owner token возвращают `409 Conflict` с owner-loss diagnostic;
+4. manual transaction после завершения script получает финальный `transactionState = ROLLED_BACK_BY_OWNER_LOSS`;
+5. route handlers, runtime-код и persisted history format не менялись.
+
+Проверка:
+
+- `./gradlew :ui-server:test --tests 'com.sbrf.lt.platform.ui.server.SqlConsoleRunningOwnerLossRoutesTest'` — `BUILD SUCCESSFUL`;
+- `./gradlew :ui-server:test --tests 'com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleQueryManagerTransactionSafetyTest'` — `BUILD SUCCESSFUL`.
+
 Основные даты:
 
 - `2026-04-24`
 - `2026-04-25`
 - `2026-04-27`
+- `2026-04-28`
 
 ## P3
 
