@@ -818,7 +818,7 @@ Non-goals первой дизайн-волны:
 3. закрепить rollback / cleanup / recovery policy;
 4. усилить scenario-level и server-side проверки именно на long-running контрактах.
 
-История реализованных пакетов `9.1–9.24` вынесена в [BACKLOG_HISTORY.md](/Users/kwdev/DataPoolLoader/BACKLOG_HISTORY.md).
+История реализованных пакетов `9.1–9.25` вынесена в [BACKLOG_HISTORY.md](/Users/kwdev/DataPoolLoader/BACKLOG_HISTORY.md).
 
 ### 11. Зафиксировать и поддерживать repo-level архитектурную дисциплину
 

@@ -1193,7 +1193,7 @@
    - JSON highlighting применяется только при успешном parse;
    - non-JSON и invalid JSON остаются plain text и не ломают message browser.
 
-### 9. Операционная надежность long-running операций: реализованные packages `9.1–9.24`
+### 9. Операционная надежность long-running операций: реализованные packages `9.1–9.25`
 
 Статус:
 
@@ -1210,6 +1210,7 @@
 - `2026-04-27`: package `9.22`.
 - `2026-04-27`: package `9.23`.
 - `2026-04-27`: package `9.24`.
+- `2026-04-27`: package `9.25`.
 
 #### 9.1. Write-through recovery interrupted FILES runs after restart
 
@@ -1947,6 +1948,42 @@
 - `./gradlew :ui-server:test --tests 'com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleQueryManagerCurrentSnapshotTest'` — `BUILD SUCCESSFUL`;
 - `./gradlew :ui-server:test --tests 'com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleQueryManagerTransactionSafetyTest'` — `BUILD SUCCESSFUL`;
 - `./gradlew :ui-server:test --tests 'com.sbrf.lt.platform.ui.server.SqlConsoleSystemRollbackRoutesTest'` — `BUILD SUCCESSFUL`.
+
+#### 9.25. SQL running owner-loss query route boundary regression
+
+Статус:
+
+- выполнено
+
+Контекст:
+
+- `9.24` закрыл manager-level cleanup для owner-lost `RUNNING` snapshot;
+- UI polling читает execution через `/api/sql-console/query/{id}`;
+- HTTP boundary должен отдавать тот же безопасный snapshot: `RUNNING`, но без active owner lease metadata после потери владельца.
+
+Что нужно сделать:
+
+1. добавить server-level regression для `/api/sql-console/query/{id}` после owner lease timeout во время `RUNNING`;
+2. проверить, что route response сохраняет `executionId` и `status = RUNNING`;
+3. проверить, что route response очищает `ownerToken`, `ownerLeaseExpiresAt`, `pendingCommitExpiresAt`;
+4. проверить, что stale `/heartbeat` со старым token возвращает `409 Conflict`;
+5. не менять route handlers, если текущий orchestration layer уже соблюдает contract.
+
+Что сделано:
+
+1. добавлен отдельный [SqlConsoleRunningOwnerLossRoutesTest.kt](/Users/kwdev/DataPoolLoader/ui-server/src/test/kotlin/com/sbrf/lt/platform/ui/server/SqlConsoleRunningOwnerLossRoutesTest.kt);
+2. проверен HTTP flow `RUNNING -> ownerLost`:
+   - `/api/sql-console/query/{id}` сохраняет `executionId`;
+   - route response остается `status = RUNNING`, пока серверный execution физически продолжается;
+   - `ownerToken`, `ownerLeaseExpiresAt`, `pendingCommitExpiresAt` не публикуются после owner-loss;
+3. зафиксировано, что `GET /api/sql-console/query/{id}` не публикует `ownerToken` даже для active `RUNNING`; owner token остается только в start/heartbeat control responses;
+4. stale `/heartbeat` со старым token возвращает `409 Conflict` с owner-loss diagnostic;
+5. route handlers и runtime-код не менялись.
+
+Проверка:
+
+- `./gradlew :ui-server:test --tests 'com.sbrf.lt.platform.ui.server.SqlConsoleRunningOwnerLossRoutesTest'` — `BUILD SUCCESSFUL`;
+- `./gradlew :ui-server:test --tests 'com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleQueryManagerCurrentSnapshotTest'` — `BUILD SUCCESSFUL`.
 
 Основные даты:
 
