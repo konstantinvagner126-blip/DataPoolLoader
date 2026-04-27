@@ -1193,7 +1193,7 @@
    - JSON highlighting применяется только при успешном parse;
    - non-JSON и invalid JSON остаются plain text и не ломают message browser.
 
-### 9. Операционная надежность long-running операций: реализованные packages `9.1–9.21`
+### 9. Операционная надежность long-running операций: реализованные packages `9.1–9.22`
 
 Статус:
 
@@ -1207,6 +1207,7 @@
 - `2026-04-25`: packages `9.15–9.17`.
 - `2026-04-27`: packages `9.18–9.20`.
 - `2026-04-27`: package `9.21`.
+- `2026-04-27`: package `9.22`.
 
 #### 9.1. Write-through recovery interrupted FILES runs after restart
 
@@ -1836,6 +1837,41 @@
 Проверка:
 
 - `./gradlew :ui-server:test --tests 'com.sbrf.lt.platform.ui.server.SqlConsoleServerTest.sql history route exposes system rollback terminal states'` — `BUILD SUCCESSFUL`.
+
+#### 9.22. SQL system rollback terminal action route regressions
+
+Статус:
+
+- выполнено
+
+Контекст:
+
+- [ARCHITECTURE_RULES.md](/Users/kwdev/DataPoolLoader/ARCHITECTURE_RULES.md) и [SQL_CONSOLE_FAILURE_SCENARIOS.md](/Users/kwdev/DataPoolLoader/SQL_CONSOLE_FAILURE_SCENARIOS.md) фиксируют, что stale terminal control actions должны отвечать conflict;
+- server-level regressions уже покрывают async `SUCCESS`, explicit `COMMITTED` и explicit `ROLLED_BACK`;
+- system rollback terminal states `ROLLED_BACK_BY_TIMEOUT` и `ROLLED_BACK_BY_OWNER_LOSS` тоже должны быть защищены на HTTP boundary.
+
+Что нужно сделать:
+
+1. добавить server-level regression после `ROLLED_BACK_BY_TIMEOUT`:
+   - `/heartbeat` -> `409 Conflict`;
+   - `/release` -> `409 Conflict`;
+   - `/cancel` -> `409 Conflict`;
+   - повторные `/commit` и `/rollback` -> `409 Conflict`;
+2. добавить coverage для `ROLLED_BACK_BY_OWNER_LOSS`, чтобы owner-loss rollback не отличался от TTL rollback на route boundary;
+3. проверить, что terminal snapshot не публикует active control-path metadata;
+4. не менять route handlers и runtime contracts, если текущий orchestration layer уже соблюдает invariant.
+
+Что сделано:
+
+1. добавлен server-level regression в `SqlConsoleServerTest`;
+2. после `ROLLED_BACK_BY_TIMEOUT` проверяются `409 Conflict` для `/heartbeat`, `/release`, `/cancel`, повторных `/commit` и `/rollback`;
+3. после `ROLLED_BACK_BY_OWNER_LOSS` проверяются те же stale route actions;
+4. terminal snapshots проверяются на отсутствие active control-path metadata;
+5. route handlers и runtime contracts не менялись.
+
+Проверка:
+
+- `./gradlew :ui-server:test --tests 'com.sbrf.lt.platform.ui.server.SqlConsoleServerTest.system rollback terminal route actions return conflicts'` — `BUILD SUCCESSFUL`.
 
 Основные даты:
 
