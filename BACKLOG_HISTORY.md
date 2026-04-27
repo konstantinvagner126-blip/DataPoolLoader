@@ -1193,7 +1193,7 @@
    - JSON highlighting применяется только при успешном parse;
    - non-JSON и invalid JSON остаются plain text и не ломают message browser.
 
-### 9. Операционная надежность long-running операций: реализованные packages `9.1–9.23`
+### 9. Операционная надежность long-running операций: реализованные packages `9.1–9.24`
 
 Статус:
 
@@ -1209,6 +1209,7 @@
 - `2026-04-27`: package `9.21`.
 - `2026-04-27`: package `9.22`.
 - `2026-04-27`: package `9.23`.
+- `2026-04-27`: package `9.24`.
 
 #### 9.1. Write-through recovery interrupted FILES runs after restart
 
@@ -1905,6 +1906,41 @@
    - `transactionState = ROLLED_BACK_BY_OWNER_LOSS`;
    - active control-path metadata очищена;
 4. runtime contract и production-код не менялись.
+
+Проверка:
+
+- `./gradlew :ui-server:test --tests 'com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleQueryManagerCurrentSnapshotTest'` — `BUILD SUCCESSFUL`;
+- `./gradlew :ui-server:test --tests 'com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleQueryManagerTransactionSafetyTest'` — `BUILD SUCCESSFUL`;
+- `./gradlew :ui-server:test --tests 'com.sbrf.lt.platform.ui.server.SqlConsoleSystemRollbackRoutesTest'` — `BUILD SUCCESSFUL`.
+
+#### 9.24. SQL running owner-loss current snapshot cleanup
+
+Статус:
+
+- выполнено
+
+Контекст:
+
+- `RUNNING` SQL execution может потерять owner session по lease/release timeout, пока серверный запрос еще выполняется;
+- после потери владельца это уже не active browser control-path, даже если физический SQL execution еще не завершился;
+- public/current snapshot не должен продолжать публиковать `ownerToken` и lease metadata для такой owner-lost execution.
+
+Что нужно сделать:
+
+1. добавить regression для `RUNNING -> ownerLost` через owner lease timeout;
+2. проверить, что `currentSnapshot(workspaceId)` сохраняет `executionId` и `RUNNING`, но очищает `ownerToken`, `ownerLeaseExpiresAt`, `pendingCommitExpiresAt`;
+3. проверить, что stale heartbeat со старым token по-прежнему получает conflict, а внутренний fencing token не ломается;
+4. синхронизировать SQL failure/architecture docs с правилом: owner-lost execution не является active control-path.
+
+Что сделано:
+
+1. `SqlConsoleQueryStateSupport.enforceSafetyTimeouts` теперь очищает public snapshot metadata при owner-loss во время `RUNNING`:
+   - `ownerToken`;
+   - `ownerLeaseExpiresAt`;
+   - `pendingCommitExpiresAt`;
+2. internal `ActiveExecution.ownerToken` сохранен для корректного stale-action conflict/fencing;
+3. добавлена regression в [SqlConsoleQueryManagerCurrentSnapshotTest.kt](/Users/kwdev/DataPoolLoader/ui-server/src/test/kotlin/com/sbrf/lt/platform/ui/sqlconsole/SqlConsoleQueryManagerCurrentSnapshotTest.kt);
+4. [ARCHITECTURE_RULES.md](/Users/kwdev/DataPoolLoader/ARCHITECTURE_RULES.md) и [SQL_CONSOLE_FAILURE_SCENARIOS.md](/Users/kwdev/DataPoolLoader/SQL_CONSOLE_FAILURE_SCENARIOS.md) обновлены: owner-lost `RUNNING` execution не считается active browser control-path.
 
 Проверка:
 

@@ -251,7 +251,11 @@ internal class SqlConsoleQueryStateSupport(
                 (isLeaseExpired(current.snapshot, now) || isOwnerReleaseExpired(current, now))
             ) {
                 updated = current.copy(
-                    snapshot = current.snapshot.copy(ownerLeaseExpiresAt = null),
+                    snapshot = current.snapshot.copy(
+                        ownerToken = null,
+                        ownerLeaseExpiresAt = null,
+                        pendingCommitExpiresAt = null,
+                    ),
                     ownerLost = true,
                     ownerReleaseDeadline = null,
                 )

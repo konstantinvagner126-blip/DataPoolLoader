@@ -174,13 +174,14 @@ Terminal states включают:
   - `ownerToken`;
   - `ownerLeaseExpiresAt`;
   - `pendingCommitExpiresAt`;
+- owner-lost `RUNNING` snapshot тоже не должен возвращать active control-path metadata, потому что у него уже нет живого browser owner session;
 - stale browser tab не должен получать успешный ответ на terminal control action;
 - `/heartbeat` после terminal state должен возвращать conflict, потому что heartbeat больше не нужен;
 - `/cancel` после terminal state должен возвращать conflict, потому что execution уже завершен;
 - `/release` после terminal state должен возвращать conflict, потому что active control-path session уже отсутствует;
 - повторные `/commit` и `/rollback` после final manual transaction должны возвращать conflict, потому что незавершенной транзакции уже нет.
 
-Это не отменяет owner-token model для active states. В `RUNNING` и `PENDING_COMMIT` owner token, heartbeat и explicit actions остаются обязательной частью safety-механизма.
+Это не отменяет owner-token model для active states. В `RUNNING` и `PENDING_COMMIT` owner token, heartbeat и explicit actions остаются обязательной частью safety-механизма только пока owner session считается живым.
 
 ## Минимальный безопасный план реализации
 
