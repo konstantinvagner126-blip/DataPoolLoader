@@ -66,6 +66,7 @@ internal open class UiSqlConsoleSourceSettingsService(
     private val uiConfigPersistenceService: UiConfigPersistenceService,
     private val runtimeConfigResolver: UiRuntimeConfigResolver,
     private val sqlConsoleService: SqlConsoleOperations,
+    private val runtimeSqlConsoleServiceFactory: (SqlConsoleConfig) -> SqlConsoleOperations = ::SqlConsoleService,
     private val filePicker: UiSqlConsoleSourceSettingsFilePickerOperations =
         DesktopUiSqlConsoleSourceSettingsFilePicker(),
     private val secretProvider: UiSecretProvider = defaultUiSecretProvider(),
@@ -125,12 +126,12 @@ internal open class UiSqlConsoleSourceSettingsService(
                 ),
             ),
         )
-        val result = SqlConsoleService(runtimeConfig.sqlConsole)
+        val result = runtimeSqlConsoleServiceFactory(runtimeConfig.sqlConsole)
             .checkConnections(credentialsPath = null)
             .sourceResults
             .firstOrNull()
         val status = result?.status.orEmpty()
-        val success = status.equals("OK", ignoreCase = true)
+        val success = isSuccessfulConnectionStatus(status)
         val detail = result?.message?.takeIf { it.isNotBlank() }
             ?: result?.errorMessage?.takeIf { it.isNotBlank() }
         return SqlConsoleSourceSettingsConnectionTestResponse(
@@ -165,7 +166,7 @@ internal open class UiSqlConsoleSourceSettingsService(
                 ),
             ),
         )
-        val sourceResults = SqlConsoleService(runtimeConfig.sqlConsole)
+        val sourceResults = runtimeSqlConsoleServiceFactory(runtimeConfig.sqlConsole)
             .checkConnections(credentialsPath = null)
             .sourceResults
             .map {
@@ -176,8 +177,8 @@ internal open class UiSqlConsoleSourceSettingsService(
                     errorMessage = it.errorMessage,
                 )
             }
-        val failedCount = sourceResults.count { it.status.equals("FAILED", ignoreCase = true) }
-        val okCount = sourceResults.count { it.status.equals("OK", ignoreCase = true) }
+        val okCount = sourceResults.count { isSuccessfulConnectionStatus(it.status) }
+        val failedCount = sourceResults.size - okCount
         return SqlConsoleSourceSettingsConnectionsTestResponse(
             success = failedCount == 0,
             message = if (failedCount == 0) {
@@ -415,6 +416,9 @@ private fun readCredentialsProperties(path: Path): Map<String, String> {
     props.load(path.readText().removePrefix("\uFEFF").reader())
     return props.stringPropertyNames().associateWith { props.getProperty(it) }
 }
+
+private fun isSuccessfulConnectionStatus(status: String): Boolean =
+    status.equals("SUCCESS", ignoreCase = true) || status.equals("OK", ignoreCase = true)
 
 private fun extractPropertyPlaceholderKey(rawValue: String): String? {
     val match = PROPERTY_PLACEHOLDER_PATTERN.matchEntire(rawValue.trim()) ?: return null

@@ -1,5 +1,8 @@
 package com.sbrf.lt.platform.ui.sqlconsole
 
+import com.sbrf.lt.datapool.sqlconsole.RawShardConnectionCheckResult
+import com.sbrf.lt.datapool.sqlconsole.ResolvedSqlConsoleShardConfig
+import com.sbrf.lt.datapool.sqlconsole.ShardConnectionChecker
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleConfig
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleService
 import com.sbrf.lt.datapool.sqlconsole.SqlConsoleSourceConfig
@@ -10,6 +13,8 @@ import com.sbrf.lt.platform.ui.config.UiRuntimeConfigResolver
 import com.sbrf.lt.platform.ui.config.UiSecretProvider
 import com.sbrf.lt.platform.ui.config.UiSecretProviderInfo
 import com.sbrf.lt.platform.ui.model.SqlConsoleEditableSourceRequest
+import com.sbrf.lt.platform.ui.model.SqlConsoleSourceSettingsConnectionTestRequest
+import com.sbrf.lt.platform.ui.model.SqlConsoleSourceSettingsConnectionsTestRequest
 import com.sbrf.lt.platform.ui.model.SqlConsoleSourceSettingsCredentialsDiagnosticsRequest
 import com.sbrf.lt.platform.ui.model.SqlConsoleSourceSettingsUpdateRequest
 import java.nio.file.Files
@@ -179,6 +184,55 @@ class UiSqlConsoleSourceSettingsServiceTest {
         assertTrue("secret" !in diagnostics.toString())
     }
 
+    @Test
+    fun `test connection treats success status as successful after credentials resolution`() {
+        val credentialsFile = Files.createTempFile("credential", ".properties").apply {
+            writeText("db1.password=secret")
+        }
+        val current = UiAppConfig(sqlConsole = SqlConsoleConfig(sourceCatalog = emptyList()))
+        val service = sourceSettingsService(
+            current = current,
+            connectionStatus = "SUCCESS",
+        ) { shard ->
+            assertEquals("secret", shard.password)
+        }
+
+        val response = service.testConnection(
+            request = sourceConnectionTestRequest(credentialsFile),
+            currentUiConfig = current,
+        )
+
+        assertTrue(response.success)
+        assertEquals("db1", response.sourceName)
+        assertEquals("Подключение к source 'db1' успешно. Подключение установлено.", response.message)
+    }
+
+    @Test
+    fun `test connections counts success status as ok`() {
+        val credentialsFile = Files.createTempFile("credential", ".properties").apply {
+            writeText("db1.password=secret")
+        }
+        val current = UiAppConfig(sqlConsole = SqlConsoleConfig(sourceCatalog = emptyList()))
+        val service = sourceSettingsService(
+            current = current,
+            connectionStatus = "SUCCESS",
+        )
+
+        val response = service.testConnections(
+            request = SqlConsoleSourceSettingsConnectionsTestRequest(
+                settings = SqlConsoleSourceSettingsUpdateRequest(
+                    defaultCredentialsFile = credentialsFile.toString(),
+                    sources = listOf(sourceConnectionTestSource()),
+                ),
+            ),
+            currentUiConfig = current,
+        )
+
+        assertTrue(response.success)
+        assertEquals("Проверка sources завершена: 1 OK.", response.message)
+        assertEquals("SUCCESS", response.sourceResults.single().status)
+    }
+
     private fun sourceSettingsService(current: UiAppConfig): UiSqlConsoleSourceSettingsService =
         sourceSettingsService(current, FakeUiSecretProvider())
 
@@ -191,6 +245,45 @@ class UiSqlConsoleSourceSettingsServiceTest {
             runtimeConfigResolver = UiRuntimeConfigResolver(secretProvider = secretProvider),
             sqlConsoleService = SqlConsoleService(current.sqlConsole),
             secretProvider = secretProvider,
+        )
+
+    private fun sourceSettingsService(
+        current: UiAppConfig,
+        connectionStatus: String,
+        onCheck: (ResolvedSqlConsoleShardConfig) -> Unit = {},
+    ): UiSqlConsoleSourceSettingsService =
+        UiSqlConsoleSourceSettingsService(
+            uiConfigPersistenceService = CapturingSqlSourcePersistence(current),
+            runtimeConfigResolver = UiRuntimeConfigResolver(secretProvider = FakeUiSecretProvider()),
+            sqlConsoleService = SqlConsoleService(current.sqlConsole),
+            runtimeSqlConsoleServiceFactory = { config ->
+                SqlConsoleService(
+                    config = config,
+                    connectionChecker = ShardConnectionChecker { shard, _ ->
+                        onCheck(shard)
+                        RawShardConnectionCheckResult(
+                            shardName = shard.name,
+                            status = connectionStatus,
+                            message = "Подключение установлено.",
+                        )
+                    },
+                )
+            },
+            secretProvider = FakeUiSecretProvider(),
+        )
+
+    private fun sourceConnectionTestRequest(credentialsFile: Path): SqlConsoleSourceSettingsConnectionTestRequest =
+        SqlConsoleSourceSettingsConnectionTestRequest(
+            defaultCredentialsFile = credentialsFile.toString(),
+            source = sourceConnectionTestSource(),
+        )
+
+    private fun sourceConnectionTestSource(): SqlConsoleEditableSourceRequest =
+        SqlConsoleEditableSourceRequest(
+            name = "db1",
+            jdbcUrl = "jdbc:test",
+            username = "user",
+            passwordReference = "\${db1.password}",
         )
 }
 

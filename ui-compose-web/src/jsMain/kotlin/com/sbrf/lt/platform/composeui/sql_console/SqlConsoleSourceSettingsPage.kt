@@ -353,7 +353,7 @@ private fun SqlConsoleConnectionsTestSummary(
                 Span({
                     classes(
                         "sql-source-settings-test-status",
-                        if (source.status.equals("OK", ignoreCase = true)) "ok" else "failed",
+                        if (isSuccessfulSourceSettingsStatus(source.status)) "ok" else "failed",
                     )
                 }) { Text(source.status) }
                 Span({ classes("sql-source-settings-test-message") }) {
@@ -568,7 +568,7 @@ private fun SqlConsoleSourceConnectionStatusInline(
         Span({
             classes(
                 "sql-source-settings-test-status",
-                if (status.status.equals("OK", ignoreCase = true)) "ok" else "failed",
+                if (isSuccessfulSourceSettingsStatus(status.status)) "ok" else "failed",
             )
         }) {
             Text(status.status)
@@ -578,6 +578,9 @@ private fun SqlConsoleSourceConnectionStatusInline(
         }
     }
 }
+
+private fun isSuccessfulSourceSettingsStatus(status: String): Boolean =
+    status.equals("SUCCESS", ignoreCase = true) || status.equals("OK", ignoreCase = true)
 
 @Composable
 private fun SqlConsoleSourceGroupSettingsCard(

@@ -540,6 +540,46 @@ Non-goals первой волны:
 7. результат проверки:
    - `8 passed`.
 
+#### 18.11. SQL source settings connection status normalization
+
+Статус:
+
+- выполнено
+
+Контекст:
+
+- при выборе `credential.properties` и проверке подключения одного source UI может показать противоречивое сообщение:
+  - `Не удалось подключиться к source 'db1'. Подключение установлено.`;
+- причина: source-settings test flow считает успешным только статус `OK`;
+- core/JDBC checker для SQL-консоли возвращает successful status как `SUCCESS` и message `Подключение установлено.`;
+- основной SQL connection status layer уже считает `SUCCESS` и `OK` успешными, а source-settings flow должен быть с ним согласован.
+
+Что нужно сделать:
+
+1. нормализовать success detection в single-source test connection:
+   - `SUCCESS` и `OK` считаются успешным подключением;
+   - `FAILED` и `ERROR` считаются ошибкой;
+2. нормализовать aggregate `Проверить все sources`:
+   - `SUCCESS` должен попадать в successful count;
+   - summary не должен показывать `0 OK` при успешном `SUCCESS`;
+3. выровнять визуальный статус на странице source settings, чтобы `SUCCESS` не подсвечивался как failed;
+4. добавить targeted regression tests на source-settings service;
+5. не менять core/JDBC status contract и не менять формат connection check DTO.
+
+Что сделано:
+
+1. single-source test connection теперь считает `SUCCESS` и `OK` успешными статусами;
+2. aggregate `Проверить все sources` считает `SUCCESS` в successful count и не показывает `0 OK` при успешном подключении;
+3. страница source settings подсвечивает `SUCCESS` как успешный статус, а не как failed;
+4. добавлены targeted regressions в `UiSqlConsoleSourceSettingsServiceTest`:
+   - single-source `SUCCESS` после `credential.properties` resolution;
+   - aggregate `SUCCESS` summary;
+5. core/JDBC status contract и DTO формат не менялись.
+
+Проверка:
+
+- `./gradlew :ui-server:test --tests 'com.sbrf.lt.platform.ui.sqlconsole.UiSqlConsoleSourceSettingsServiceTest'` — `BUILD SUCCESSFUL`.
+
 #### 18.10. SQL export full-data contract discussion
 
 Статус:
