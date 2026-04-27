@@ -303,6 +303,48 @@ class SqlConsoleQueryManagerTransactionSafetyTest {
     }
 
     @Test
+    fun `records execution history after released pending commit owner loss rollback`() {
+        var now = Instant.parse("2026-04-23T00:00:00Z")
+        val historyService = SqlConsoleExecutionHistoryService(Files.createTempDirectory("sql-console-history-owner-loss"))
+        val manager = SqlConsoleQueryManager(
+            sqlConsoleService = manualTransactionService(),
+            executionHistoryService = historyService,
+            clock = { now },
+            ownerReleaseRecoveryWindow = Duration.ofSeconds(3),
+        )
+
+        val started = manager.startQuery(
+            sql = "update demo set flag = true",
+            credentialsPath = null,
+            selectedSourceNames = listOf("db1"),
+            workspaceId = "workspace-owner-loss",
+            ownerSessionId = OWNER_SESSION_ID,
+            transactionMode = SqlConsoleTransactionMode.TRANSACTION_PER_SHARD,
+        )
+        val initialToken = requireNotNull(started.ownerToken)
+        val pending = waitForCompletion(manager, started.id)
+
+        assertEquals(SqlConsoleExecutionTransactionState.PENDING_COMMIT, pending.transactionState)
+        assertSingleHistoryState(
+            historyService = historyService,
+            workspaceId = "workspace-owner-loss",
+            executionId = started.id,
+            transactionState = "PENDING_COMMIT",
+        )
+
+        manager.releaseOwnership(started.id, OWNER_SESSION_ID, initialToken)
+        now = now.plusSeconds(4)
+        manager.enforceSafetyTimeouts()
+
+        assertSingleHistoryState(
+            historyService = historyService,
+            workspaceId = "workspace-owner-loss",
+            executionId = started.id,
+            transactionState = "ROLLED_BACK_BY_OWNER_LOSS",
+        )
+    }
+
+    @Test
     fun `auto rollbacks pending commit when ttl expires`() {
         var now = Instant.parse("2026-04-23T00:00:00Z")
         val manager = SqlConsoleQueryManager(
@@ -331,6 +373,46 @@ class SqlConsoleQueryManagerTransactionSafetyTest {
     }
 
     @Test
+    fun `records execution history after pending commit ttl rollback`() {
+        var now = Instant.parse("2026-04-23T00:00:00Z")
+        val historyService = SqlConsoleExecutionHistoryService(Files.createTempDirectory("sql-console-history-ttl"))
+        val manager = SqlConsoleQueryManager(
+            sqlConsoleService = manualTransactionService(),
+            executionHistoryService = historyService,
+            clock = { now },
+            pendingCommitTtl = Duration.ofSeconds(5),
+        )
+
+        val started = manager.startQuery(
+            sql = "update demo set flag = true",
+            credentialsPath = null,
+            selectedSourceNames = listOf("db1"),
+            workspaceId = "workspace-ttl",
+            ownerSessionId = OWNER_SESSION_ID,
+            transactionMode = SqlConsoleTransactionMode.TRANSACTION_PER_SHARD,
+        )
+        val pending = waitForCompletion(manager, started.id)
+
+        assertEquals(SqlConsoleExecutionTransactionState.PENDING_COMMIT, pending.transactionState)
+        assertSingleHistoryState(
+            historyService = historyService,
+            workspaceId = "workspace-ttl",
+            executionId = started.id,
+            transactionState = "PENDING_COMMIT",
+        )
+
+        now = now.plusSeconds(6)
+        manager.enforceSafetyTimeouts()
+
+        assertSingleHistoryState(
+            historyService = historyService,
+            workspaceId = "workspace-ttl",
+            executionId = started.id,
+            transactionState = "ROLLED_BACK_BY_TIMEOUT",
+        )
+    }
+
+    @Test
     fun `auto rollbacks completed manual transaction when owner lease was lost during running`() {
         var now = Instant.parse("2026-04-23T00:00:00Z")
         val releaseExecution = CountDownLatch(1)
@@ -355,6 +437,41 @@ class SqlConsoleQueryManagerTransactionSafetyTest {
         assertEquals(SqlConsoleExecutionTransactionState.ROLLED_BACK_BY_OWNER_LOSS, finished.transactionState)
         assertTrue(finished.errorMessage!!.contains("владелец"))
         assertFinalControlPathCleared(finished)
+    }
+
+    @Test
+    fun `records execution history after owner lease was lost during running`() {
+        var now = Instant.parse("2026-04-23T00:00:00Z")
+        val releaseExecution = CountDownLatch(1)
+        val historyService = SqlConsoleExecutionHistoryService(Files.createTempDirectory("sql-console-history-running-owner-loss"))
+        val manager = SqlConsoleQueryManager(
+            sqlConsoleService = manualTransactionService(releaseExecution),
+            executionHistoryService = historyService,
+            clock = { now },
+            ownerLeaseDuration = Duration.ofSeconds(5),
+        )
+
+        val started = manager.startQuery(
+            sql = "update demo set flag = true",
+            credentialsPath = null,
+            selectedSourceNames = listOf("db1"),
+            workspaceId = "workspace-running-owner-loss",
+            ownerSessionId = OWNER_SESSION_ID,
+            transactionMode = SqlConsoleTransactionMode.TRANSACTION_PER_SHARD,
+        )
+
+        now = now.plusSeconds(6)
+        manager.enforceSafetyTimeouts()
+        releaseExecution.countDown()
+        val finished = waitForCompletion(manager, started.id)
+
+        assertEquals(SqlConsoleExecutionTransactionState.ROLLED_BACK_BY_OWNER_LOSS, finished.transactionState)
+        assertSingleHistoryState(
+            historyService = historyService,
+            workspaceId = "workspace-running-owner-loss",
+            executionId = started.id,
+            transactionState = "ROLLED_BACK_BY_OWNER_LOSS",
+        )
     }
 
     @Test
@@ -471,5 +588,17 @@ class SqlConsoleQueryManagerTransactionSafetyTest {
         assertNull(snapshot.ownerToken)
         assertNull(snapshot.ownerLeaseExpiresAt)
         assertNull(snapshot.pendingCommitExpiresAt)
+    }
+
+    private fun assertSingleHistoryState(
+        historyService: SqlConsoleExecutionHistoryService,
+        workspaceId: String,
+        executionId: String,
+        transactionState: String,
+    ) {
+        val entries = historyService.currentHistory(workspaceId).entries
+        assertEquals(1, entries.size)
+        assertEquals(executionId, entries.single().executionId)
+        assertEquals(transactionState, entries.single().transactionState)
     }
 }

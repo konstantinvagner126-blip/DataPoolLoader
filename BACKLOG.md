@@ -1225,6 +1225,96 @@ Non-goals первой дизайн-волны:
 
 История реализованных пакетов `9.1–9.17` вынесена в [BACKLOG_HISTORY.md](/Users/kwdev/DataPoolLoader/BACKLOG_HISTORY.md).
 
+#### 9.18. SQL pending commit TTL rollback history regression
+
+Статус:
+
+- выполнено
+
+Контекст:
+
+- `PENDING_COMMIT` auto-rollback по TTL уже проверяется по current snapshot;
+- execution history является пользовательской диагностикой long-running/manual transaction flow;
+- history entry не должна оставаться в `PENDING_COMMIT` после system rollback.
+
+Что нужно сделать:
+
+1. добавить manager-level regression для `PENDING_COMMIT -> ROLLED_BACK_BY_TIMEOUT`;
+2. проверить, что history entry обновляется для того же `executionId`;
+3. проверить, что entry не дублируется;
+4. не менять persisted history format.
+
+Что сделано:
+
+1. добавлена manager-level regression в `SqlConsoleQueryManagerTransactionSafetyTest`;
+2. проверяется переход history entry `PENDING_COMMIT -> ROLLED_BACK_BY_TIMEOUT`;
+3. проверяется single-entry behavior для того же `executionId`;
+4. persisted history format не менялся.
+
+Проверка:
+
+- `./gradlew :ui-server:test --tests 'com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleQueryManagerTransactionSafetyTest'` — `BUILD SUCCESSFUL`.
+
+#### 9.19. SQL released pending commit owner-loss rollback history regression
+
+Статус:
+
+- выполнено
+
+Контекст:
+
+- release pending commit recovery window уже приводит к `ROLLED_BACK_BY_OWNER_LOSS`;
+- history должна показывать финальный rollback reason, а не stale `PENDING_COMMIT`;
+- это нужно для диагностики закрытой вкладки или потерянного owner session.
+
+Что нужно сделать:
+
+1. добавить manager-level regression для released `PENDING_COMMIT -> ROLLED_BACK_BY_OWNER_LOSS`;
+2. проверить, что history entry обновляется для того же `executionId`;
+3. проверить, что entry не дублируется;
+4. не менять release/heartbeat runtime contract.
+
+Что сделано:
+
+1. добавлена manager-level regression в `SqlConsoleQueryManagerTransactionSafetyTest`;
+2. проверяется переход history entry `PENDING_COMMIT -> ROLLED_BACK_BY_OWNER_LOSS`;
+3. проверяется single-entry behavior для того же `executionId`;
+4. release/heartbeat runtime contract не менялся.
+
+Проверка:
+
+- `./gradlew :ui-server:test --tests 'com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleQueryManagerTransactionSafetyTest'` — `BUILD SUCCESSFUL`.
+
+#### 9.20. SQL running owner-loss rollback history regression
+
+Статус:
+
+- выполнено
+
+Контекст:
+
+- если owner lease потерян во время manual transaction `RUNNING`, успешное выполнение должно завершаться system rollback;
+- current snapshot уже проверяется, но history должна показывать финальный `ROLLED_BACK_BY_OWNER_LOSS`;
+- пользователь не должен видеть в истории ambiguous success без причины rollback.
+
+Что нужно сделать:
+
+1. добавить manager-level regression для owner lease loss while `RUNNING`;
+2. проверить, что после completion history entry имеет `ROLLED_BACK_BY_OWNER_LOSS`;
+3. проверить, что entry не дублируется;
+4. не менять running execution lifecycle.
+
+Что сделано:
+
+1. добавлена manager-level regression в `SqlConsoleQueryManagerTransactionSafetyTest`;
+2. проверяется, что после completion history entry имеет `ROLLED_BACK_BY_OWNER_LOSS`;
+3. проверяется single-entry behavior для того же `executionId`;
+4. running execution lifecycle не менялся.
+
+Проверка:
+
+- `./gradlew :ui-server:test --tests 'com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleQueryManagerTransactionSafetyTest'` — `BUILD SUCCESSFUL`.
+
 ### 11. Зафиксировать и поддерживать repo-level архитектурную дисциплину
 
 Статус:
