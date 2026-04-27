@@ -1193,7 +1193,7 @@
    - JSON highlighting применяется только при успешном parse;
    - non-JSON и invalid JSON остаются plain text и не ломают message browser.
 
-### 9. Операционная надежность long-running операций: реализованные packages `9.1–9.26`
+### 9. Операционная надежность long-running операций: реализованные packages `9.1–9.27`
 
 Статус:
 
@@ -1212,6 +1212,7 @@
 - `2026-04-27`: package `9.24`.
 - `2026-04-27`: package `9.25`.
 - `2026-04-27`: package `9.26`.
+- `2026-04-27`: package `9.27`.
 
 #### 9.1. Write-through recovery interrupted FILES runs after restart
 
@@ -2017,6 +2018,39 @@
 Проверка:
 
 - `./gradlew :ui-server:test --tests 'com.sbrf.lt.platform.ui.server.SqlConsoleRunningOwnerLossRoutesTest'` — `BUILD SUCCESSFUL`.
+
+#### 9.27. SQL running owner-loss history route regression
+
+Статус:
+
+- выполнено
+
+Контекст:
+
+- manager-level test уже проверяет history после потери owner lease во время manual transaction `RUNNING`;
+- `/api/sql-console/history` уже покрыт для TTL rollback и released `PENDING_COMMIT` owner-loss rollback;
+- не хватало HTTP boundary regression для сценария `RUNNING -> ROLLED_BACK_BY_OWNER_LOSS`, когда владелец потерян до завершения SQL script.
+
+Что нужно сделать:
+
+1. добавить отдельный server-level regression для `/api/sql-console/history`;
+2. запустить manual transaction, удержать execution в `RUNNING`, потерять owner lease и затем завершить script;
+3. проверить, что history route показывает тот же `executionId` с `transactionState = ROLLED_BACK_BY_OWNER_LOSS`;
+4. проверить single-entry behavior и отсутствие stale `PENDING_COMMIT`;
+5. не менять persisted history format и runtime contracts.
+
+Что сделано:
+
+1. добавлен отдельный [SqlConsoleRunningOwnerLossHistoryRoutesTest.kt](/Users/kwdev/DataPoolLoader/ui-server/src/test/kotlin/com/sbrf/lt/platform/ui/server/SqlConsoleRunningOwnerLossHistoryRoutesTest.kt);
+2. route regression запускает manual transaction, удерживает execution в `RUNNING`, переводит owner lease в timeout и завершает script;
+3. `/api/sql-console/history` проверяется на тот же `executionId` и финальный `transactionState = ROLLED_BACK_BY_OWNER_LOSS`;
+4. зафиксировано single-entry behavior для execution history и отсутствие stale `PENDING_COMMIT`;
+5. persisted history format, route handlers и runtime-код не менялись.
+
+Проверка:
+
+- `./gradlew :ui-server:test --tests 'com.sbrf.lt.platform.ui.server.SqlConsoleRunningOwnerLossHistoryRoutesTest'` — `BUILD SUCCESSFUL`;
+- `./gradlew :ui-server:test --tests 'com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleQueryManagerTransactionSafetyTest'` — `BUILD SUCCESSFUL`.
 
 Основные даты:
 
