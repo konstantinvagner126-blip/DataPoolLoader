@@ -1193,7 +1193,7 @@
    - JSON highlighting применяется только при успешном parse;
    - non-JSON и invalid JSON остаются plain text и не ломают message browser.
 
-### 9. Операционная надежность long-running операций: реализованные packages `9.1–9.20`
+### 9. Операционная надежность long-running операций: реализованные packages `9.1–9.21`
 
 Статус:
 
@@ -1206,6 +1206,7 @@
 - `2026-04-25`: packages `9.9–9.14`.
 - `2026-04-25`: packages `9.15–9.17`.
 - `2026-04-27`: packages `9.18–9.20`.
+- `2026-04-27`: package `9.21`.
 
 #### 9.1. Write-through recovery interrupted FILES runs after restart
 
@@ -1804,6 +1805,37 @@
 Проверка:
 
 - `./gradlew :ui-server:test --tests 'com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleQueryManagerTransactionSafetyTest'` — `BUILD SUCCESSFUL`.
+
+#### 9.21. SQL system rollback history route regression
+
+Статус:
+
+- выполнено
+
+Контекст:
+
+- manager-level tests уже проверяют, что execution history обновляется после system rollback;
+- UI читает историю через `/api/sql-console/history`, поэтому route-level contract тоже должен быть закреплен;
+- после TTL rollback или owner-loss rollback пользователь не должен видеть stale `PENDING_COMMIT` в history screen.
+
+Что нужно сделать:
+
+1. добавить server-level regression для `/api/sql-console/history` после `PENDING_COMMIT -> ROLLED_BACK_BY_TIMEOUT`;
+2. добавить server-level regression для `/api/sql-console/history` после released `PENDING_COMMIT -> ROLLED_BACK_BY_OWNER_LOSS`;
+3. проверить single-entry behavior для того же `executionId` через HTTP response;
+4. не менять persisted history format и runtime safety contracts.
+
+Что сделано:
+
+1. добавлен server-level regression в `SqlConsoleServerTest`;
+2. через HTTP route проверяется `PENDING_COMMIT -> ROLLED_BACK_BY_TIMEOUT` в `/api/sql-console/history`;
+3. через HTTP route проверяется released `PENDING_COMMIT -> ROLLED_BACK_BY_OWNER_LOSS` в `/api/sql-console/history`;
+4. single-entry behavior проверяется по количеству `executionId` в response;
+5. persisted history format и runtime safety contracts не менялись.
+
+Проверка:
+
+- `./gradlew :ui-server:test --tests 'com.sbrf.lt.platform.ui.server.SqlConsoleServerTest.sql history route exposes system rollback terminal states'` — `BUILD SUCCESSFUL`.
 
 Основные даты:
 

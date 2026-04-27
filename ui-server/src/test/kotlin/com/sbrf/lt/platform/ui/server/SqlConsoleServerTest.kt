@@ -38,6 +38,7 @@ import io.ktor.server.application.Application
 import io.ktor.server.testing.testApplication
 import java.nio.file.Files
 import java.time.Duration
+import java.time.Instant
 import java.util.concurrent.CountDownLatch
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -801,6 +802,122 @@ class SqlConsoleServerTest {
         }
         assertEquals(HttpStatusCode.Conflict, secondRollback.status)
         assertTrue(secondRollback.bodyAsText().contains("нет незавершенной транзакции"))
+    }
+
+    @Test
+    fun `sql history route exposes system rollback terminal states`() = testApplication {
+        var now = Instant.parse("2026-04-27T00:00:00Z")
+        val root = createProject()
+        val registry = ModuleRegistry(appsRoot = root.resolve("apps"))
+        val storageDir = Files.createTempDirectory("ui-server-state-")
+        val uiConfig = UiAppConfig(
+            storageDir = storageDir.toString(),
+            sqlConsole = SqlConsoleConfig(
+                queryTimeoutSec = 30,
+                sourceCatalog = listOf(SqlConsoleSourceConfig("shard1", "jdbc:test:one", "user", "pwd")),
+            ),
+        )
+        val runManager = RunManager(moduleRegistry = registry, uiConfig = uiConfig)
+        val sqlConsoleService = manualTransactionSqlConsoleService(uiConfig.sqlConsole)
+        val historyService = SqlConsoleExecutionHistoryService(storageDir)
+        val queryManager = SqlConsoleQueryManager(
+            sqlConsoleService = sqlConsoleService,
+            executionHistoryService = historyService,
+            clock = { now },
+            ownerReleaseRecoveryWindow = Duration.ofSeconds(3),
+            pendingCommitTtl = Duration.ofSeconds(5),
+        )
+        application {
+            uiModule(
+                moduleRegistry = registry,
+                runManager = runManager,
+                sqlConsoleService = sqlConsoleService,
+                sqlConsoleQueryManager = queryManager,
+                sqlConsoleExecutionHistoryService = historyService,
+            )
+        }
+
+        suspend fun startPendingManualTransaction(
+            workspaceId: String,
+            ownerSessionId: String,
+            sql: String,
+        ): Pair<String, String> {
+            val started = client.post("/api/sql-console/query/start") {
+                contentType(ContentType.Application.Json)
+                setBody(
+                    """{"sql":"$sql","selectedSourceNames":["shard1"],"workspaceId":"$workspaceId","ownerSessionId":"$ownerSessionId","transactionMode":"TRANSACTION_PER_SHARD"}""",
+                )
+            }
+            assertEquals(HttpStatusCode.OK, started.status)
+            val startedBody = started.bodyAsText()
+            val executionId = startedBody.jsonStringField("id")
+            assertNotNull(executionId)
+            val ownerToken = startedBody.jsonStringField("ownerToken")
+            assertNotNull(ownerToken)
+
+            repeat(20) {
+                val polled = client.get("/api/sql-console/query/$executionId").bodyAsText()
+                if (polled.contains(""""transactionState":"PENDING_COMMIT"""")) {
+                    return executionId to ownerToken
+                }
+                Thread.sleep(25)
+            }
+            error("manual SQL execution did not reach pending commit in time")
+        }
+
+        suspend fun assertHistoryRouteState(
+            workspaceId: String,
+            executionId: String,
+            transactionState: String,
+        ) {
+            val historyResponse = client.get("/api/sql-console/history?workspaceId=$workspaceId")
+            assertEquals(HttpStatusCode.OK, historyResponse.status)
+            val historyBody = historyResponse.bodyAsText()
+            assertTrue(historyBody.contains(""""executionId":"$executionId""""), historyBody)
+            assertTrue(historyBody.contains(""""transactionState":"$transactionState""""), historyBody)
+            assertEquals(
+                1,
+                Regex(""""executionId":"${Regex.escape(executionId)}"""").findAll(historyBody).count(),
+                historyBody,
+            )
+            if (transactionState != "PENDING_COMMIT") {
+                assertFalse(historyBody.contains(""""transactionState":"PENDING_COMMIT""""), historyBody)
+            }
+        }
+
+        val (ttlExecutionId, _) = startPendingManualTransaction(
+            workspaceId = "workspace-ttl-route",
+            ownerSessionId = "tab-ttl",
+            sql = "update demo set ttl_flag = true",
+        )
+        assertHistoryRouteState("workspace-ttl-route", ttlExecutionId, "PENDING_COMMIT")
+
+        now = now.plusSeconds(6)
+        queryManager.enforceSafetyTimeouts()
+
+        val ttlSnapshot = client.get("/api/sql-console/query/$ttlExecutionId").bodyAsText()
+        assertFinalRouteControlPathCleared(ttlSnapshot, "ROLLED_BACK_BY_TIMEOUT")
+        assertHistoryRouteState("workspace-ttl-route", ttlExecutionId, "ROLLED_BACK_BY_TIMEOUT")
+
+        val (ownerLossExecutionId, ownerLossOwnerToken) = startPendingManualTransaction(
+            workspaceId = "workspace-owner-loss-route",
+            ownerSessionId = "tab-owner-loss",
+            sql = "update demo set owner_loss_flag = true",
+        )
+        assertHistoryRouteState("workspace-owner-loss-route", ownerLossExecutionId, "PENDING_COMMIT")
+
+        val released = client.post("/api/sql-console/query/$ownerLossExecutionId/release") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"ownerSessionId":"tab-owner-loss","ownerToken":"$ownerLossOwnerToken"}""")
+        }
+        assertEquals(HttpStatusCode.OK, released.status)
+
+        now = now.plusSeconds(4)
+        queryManager.enforceSafetyTimeouts()
+
+        val ownerLossSnapshot = client.get("/api/sql-console/query/$ownerLossExecutionId").bodyAsText()
+        assertFinalRouteControlPathCleared(ownerLossSnapshot, "ROLLED_BACK_BY_OWNER_LOSS")
+        assertHistoryRouteState("workspace-owner-loss-route", ownerLossExecutionId, "ROLLED_BACK_BY_OWNER_LOSS")
     }
 
     @Test
