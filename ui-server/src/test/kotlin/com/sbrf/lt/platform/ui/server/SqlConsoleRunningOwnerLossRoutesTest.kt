@@ -92,6 +92,20 @@ class SqlConsoleRunningOwnerLossRoutesTest {
         assertEquals(HttpStatusCode.Conflict, heartbeat.status)
         assertTrue(heartbeat.bodyAsText().contains("потеряла владельца"))
 
+        val release = client.post("/api/sql-console/query/$executionId/release") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"ownerSessionId":"tab-running-owner-loss-route","ownerToken":"$ownerToken"}""")
+        }
+        assertEquals(HttpStatusCode.Conflict, release.status)
+        assertTrue(release.bodyAsText().contains("потеряла владельца"))
+
+        val cancel = client.post("/api/sql-console/query/$executionId/cancel") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"ownerSessionId":"tab-running-owner-loss-route","ownerToken":"$ownerToken"}""")
+        }
+        assertEquals(HttpStatusCode.Conflict, cancel.status)
+        assertTrue(cancel.bodyAsText().contains("потеряла владельца"))
+
         releaseExecution.countDown()
         repeat(20) {
             val completed = client.get("/api/sql-console/query/$executionId").bodyAsText()

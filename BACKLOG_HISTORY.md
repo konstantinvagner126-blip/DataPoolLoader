@@ -1193,7 +1193,7 @@
    - JSON highlighting применяется только при успешном parse;
    - non-JSON и invalid JSON остаются plain text и не ломают message browser.
 
-### 9. Операционная надежность long-running операций: реализованные packages `9.1–9.25`
+### 9. Операционная надежность long-running операций: реализованные packages `9.1–9.26`
 
 Статус:
 
@@ -1211,6 +1211,7 @@
 - `2026-04-27`: package `9.23`.
 - `2026-04-27`: package `9.24`.
 - `2026-04-27`: package `9.25`.
+- `2026-04-27`: package `9.26`.
 
 #### 9.1. Write-through recovery interrupted FILES runs after restart
 
@@ -1984,6 +1985,38 @@
 
 - `./gradlew :ui-server:test --tests 'com.sbrf.lt.platform.ui.server.SqlConsoleRunningOwnerLossRoutesTest'` — `BUILD SUCCESSFUL`;
 - `./gradlew :ui-server:test --tests 'com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleQueryManagerCurrentSnapshotTest'` — `BUILD SUCCESSFUL`.
+
+#### 9.26. SQL owner-lost running stale action route conflicts
+
+Статус:
+
+- выполнено
+
+Контекст:
+
+- `9.24–9.25` закрепили, что owner-lost `RUNNING` execution больше не является active browser control-path;
+- stale tab при этом может продолжить отправлять не только `/heartbeat`, но и `/release` или `/cancel`;
+- HTTP boundary должен явно возвращать conflict, а не разрешать stale tab выпускать или отменять execution после потери owner session.
+
+Что нужно сделать:
+
+1. расширить server-level regression для owner-lost `RUNNING`;
+2. проверить `/release -> 409 Conflict` со старым owner token;
+3. проверить `/cancel -> 409 Conflict` со старым owner token;
+4. убедиться, что execution после этих stale actions продолжает завершаться штатно после release тестового latch;
+5. не менять route handlers/runtime code, если current orchestration уже соблюдает contract.
+
+Что сделано:
+
+1. [SqlConsoleRunningOwnerLossRoutesTest.kt](/Users/kwdev/DataPoolLoader/ui-server/src/test/kotlin/com/sbrf/lt/platform/ui/server/SqlConsoleRunningOwnerLossRoutesTest.kt) расширен route regressions для stale owner-lost `RUNNING` actions;
+2. `/heartbeat`, `/release` и `/cancel` со старым owner token возвращают `409 Conflict`;
+3. response body для всех stale actions содержит owner-loss diagnostic;
+4. после stale actions execution продолжает штатно завершаться после release тестового latch;
+5. route handlers и runtime-код не менялись.
+
+Проверка:
+
+- `./gradlew :ui-server:test --tests 'com.sbrf.lt.platform.ui.server.SqlConsoleRunningOwnerLossRoutesTest'` — `BUILD SUCCESSFUL`.
 
 Основные даты:
 
