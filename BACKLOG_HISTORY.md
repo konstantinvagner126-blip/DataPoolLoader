@@ -1377,7 +1377,7 @@
    - JSON highlighting применяется только при успешном parse;
    - non-JSON и invalid JSON остаются plain text и не ломают message browser.
 
-### 9. Операционная надежность long-running операций: реализованные packages `9.1–9.29`
+### 9. Операционная надежность long-running операций: реализованные packages `9.1–9.30`
 
 Статус:
 
@@ -1399,6 +1399,7 @@
 - `2026-04-27`: package `9.27`.
 - `2026-04-28`: package `9.28`.
 - `2026-04-28`: package `9.29`.
+- `2026-04-28`: package `9.30`.
 
 #### 9.1. Write-through recovery interrupted FILES runs after restart
 
@@ -2309,6 +2310,39 @@
 
 - `./gradlew :ui-server:test --tests 'com.sbrf.lt.platform.ui.server.SqlConsoleRunningOwnerLossRoutesTest'` — `BUILD SUCCESSFUL`;
 - `./gradlew :ui-server:test --tests 'com.sbrf.lt.platform.ui.sqlconsole.SqlConsoleQueryManagerCurrentSnapshotTest'` — `BUILD SUCCESSFUL`.
+
+#### 9.30. SQL released autocommit owner-loss history route regression
+
+Статус:
+
+- выполнено
+
+Контекст:
+
+- `9.29` закрепил HTTP query route для autocommit/read execution после explicit `/release` и истечения recovery window;
+- history screen должен показывать такой execution как обычный `SUCCESS / NONE`, а не как manual transaction rollback;
+- нужен был route-level regression для `/api/sql-console/history`, чтобы диагностика закрытой вкладки не смешивала autocommit completion и manual transaction rollback.
+
+Что нужно сделать:
+
+1. добавить server-level regression для history route после `RUNNING -> /release -> recovery window expired -> SUCCESS` в autocommit mode;
+2. проверить, что history route содержит тот же `executionId` со `status = SUCCESS` и `transactionState = NONE`;
+3. проверить single-entry behavior;
+4. проверить отсутствие `ROLLED_BACK_BY_OWNER_LOSS` и stale `PENDING_COMMIT` в history для autocommit execution;
+5. не менять persisted history format и runtime contracts.
+
+Что сделано:
+
+1. [SqlConsoleRunningOwnerLossHistoryRoutesTest.kt](/Users/kwdev/DataPoolLoader/ui-server/src/test/kotlin/com/sbrf/lt/platform/ui/server/SqlConsoleRunningOwnerLossHistoryRoutesTest.kt) расширен autocommit owner-loss history route regression;
+2. route flow запускает autocommit execution, делает explicit `/release`, истекает recovery window и завершает SQL script;
+3. `/api/sql-console/history` проверяется на тот же `executionId`, `status = SUCCESS`, `transactionState = NONE`;
+4. зафиксировано single-entry behavior и отсутствие `PENDING_COMMIT` / `ROLLED_BACK_BY_OWNER_LOSS`;
+5. persisted history format, route handlers и runtime-код не менялись.
+
+Проверка:
+
+- `./gradlew :ui-server:test --tests 'com.sbrf.lt.platform.ui.server.SqlConsoleRunningOwnerLossHistoryRoutesTest'` — `BUILD SUCCESSFUL`;
+- `./gradlew :ui-server:test --tests 'com.sbrf.lt.platform.ui.server.SqlConsoleRunningOwnerLossRoutesTest'` — `BUILD SUCCESSFUL`.
 
 Основные даты:
 
